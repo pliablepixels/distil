@@ -1,0 +1,10 @@
+# Build configuration for distil-core PyO3 extension.
+#
+# The PYO3_USE_ABI3_FORWARD_COMPATIBILITY flag lets PyO3 0.29 accept
+# Python 3.14 (which exceeds PyO3's declared maximum of 3.13).
+# The Python library link flags are NOT set here — they are injected by
+# build.rs so they apply only when building as an rlib/test binary (not
+# when maturin builds the cdylib, which manages its own link lines).
+
+[env]
+PYO3_USE_ABI3_FORWARD_COMPATIBILITY = "1"

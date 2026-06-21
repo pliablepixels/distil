@@ -325,7 +325,10 @@ def cmd_holdout(args: argparse.Namespace) -> int:
 
 def cmd_proxy(args: argparse.Namespace) -> int:
     """Drop-in provider proxy: point any base_url-honoring client at it."""
-    from .proxy import serve
+    if args.use_async:
+        from .aproxy import serve  # high-concurrency (needs distil-llm[async])
+    else:
+        from .proxy import serve
 
     serve(
         host=args.host,
@@ -416,6 +419,58 @@ def cmd_perf(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_eval(args: argparse.Namespace) -> int:
+    """The certified compression frontier (savings vs decision-equivalence)."""
+    import time
+
+    from .eval import format_frontier, frontier, write_raw
+
+    runner = None
+    if args.runner == "anthropic":
+        from .replay.anthropic_runner import AnthropicRunner
+
+        runner = AnthropicRunner()
+    entries = load_corpus(args.corpus) if args.corpus else load_corpus()
+    rep = frontier(entries, runner=runner)
+    print(format_frontier(rep))
+    if args.out:
+        path = write_raw(rep, args.out, str(int(time.time())))
+        print(f"\nraw curve → {path}")
+    return 0
+
+
+def cmd_online(args: argparse.Namespace) -> int:
+    """One self-distilling round: causal labels → retrain → certify → promote."""
+    from .online import online_round
+
+    entries = load_corpus(args.corpus) if args.corpus else load_corpus()
+    rep = online_round(entries, promote_to=args.promote_to)
+    print(
+        "self-distilling round — keep-model learns from causal labels, gated by non-inferiority\n"
+    )
+    for k, v in rep.items():
+        print(f"  {k}: {v}")
+    if not rep.get("certified"):
+        print("\nNOT promoted — the candidate failed the non-inferiority gate (never-regressing).")
+    return 0
+
+
+def cmd_federated(args: argparse.Namespace) -> int:
+    """Build a verifiable federated savings leaderboard from signed submissions."""
+    import json as _json
+
+    from .telemetry import build_leaderboard, render_leaderboard_html
+
+    keys = _json.loads(Path(args.keys).read_text()) if args.keys else {}
+    lb = build_leaderboard(args.dir, keys)
+    print(f"verifiable savings — {len(lb.verified)} verified instance(s), {lb.rejected} rejected\n")
+    print(f"  totals (certified only): {lb.totals}")
+    if args.html:
+        Path(args.html).write_text(render_leaderboard_html(lb))
+        print(f"  leaderboard html → {args.html}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="distil", description="Compression with a quality contract.")
     p.add_argument("--version", action="version", version=f"distil {__version__}")
@@ -502,6 +557,12 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--iterations", type=int, default=200)
     pf.set_defaults(func=cmd_perf)
 
+    ev = sub.add_parser("eval", help="certified compression frontier (savings vs accuracy)")
+    ev.add_argument("--corpus", help="custom corpus dir (e.g. ingested benchmark traces)")
+    ev.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
+    ev.add_argument("--out", help="write the raw curve JSONL to this dir")
+    ev.set_defaults(func=cmd_eval)
+
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)
 
@@ -528,7 +589,29 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("off", "light", "aggressive"),
         help="output-token compression via a gated verbosity directive (PAYG only)",
     )
+    px.add_argument(
+        "--async",
+        dest="use_async",
+        action="store_true",
+        help="async high-concurrency proxy (needs distil-llm[async])",
+    )
     px.set_defaults(func=cmd_proxy)
+
+    on = sub.add_parser(
+        "online", help="self-distilling round: causal labels → retrain → certify → promote"
+    )
+    on.add_argument("--corpus", help="corpus dir of traffic to learn from (default: bundled)")
+    on.add_argument("--promote-to", help="persist retrained weights here if it passes the gate")
+    on.set_defaults(func=cmd_online)
+
+    fl = sub.add_parser(
+        "federated-leaderboard",
+        help="verifiable federated savings leaderboard from signed submissions",
+    )
+    fl.add_argument("--dir", required=True, help="dir containing submissions.jsonl")
+    fl.add_argument("--keys", help="JSON map of instance_id -> signing key")
+    fl.add_argument("--html", help="write a self-contained leaderboard HTML here")
+    fl.set_defaults(func=cmd_federated)
 
     gw = sub.add_parser("gateway", help="managed multi-tenant gateway + live savings dashboard")
     gw.add_argument("--host", default="127.0.0.1")

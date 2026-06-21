@@ -7,3 +7,11 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+
+# Rust build artifacts (the distil-core crate)
+target/
+rust/**/target/
+*.so
+*.dylib
+*.pyd
+*.rlib

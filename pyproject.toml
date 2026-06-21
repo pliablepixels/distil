@@ -35,6 +35,8 @@ dev = ["pytest>=8"]
 live = ["anthropic>=0.40"]
 onnx = ["onnxruntime>=1.17", "transformers>=4.40"]   # transformer keep-model inference
 train = ["torch>=2.2", "transformers>=4.40", "onnx>=1.16", "onnxscript>=0.1", "sentencepiece>=0.2"]  # training + ONNX export
+async = ["aiohttp>=3.9"]                              # async high-concurrency proxy (distil.aproxy)
+# native = the Rust hot-path core (rust/distil-core); build with `maturin develop --release`
 
 [project.scripts]
 distil = "distil.cli:main"
@@ -54,3 +56,6 @@ packages = ["distil"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_aproxy.py" = ["E402"]  # imports follow pytest.importorskip("aiohttp")

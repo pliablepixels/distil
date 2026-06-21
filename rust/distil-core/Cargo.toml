@@ -1,0 +1,19 @@
+[package]
+name = "distil-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "distil_core"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["extension-module"] }
+serde_json = "1"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "bench"
+harness = false
