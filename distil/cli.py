@@ -190,13 +190,15 @@ def cmd_bench(args: argparse.Namespace) -> int:
     print("-" * 75)
 
     base_total = distil_total = pruned_total = 0.0
+    base_tok_total = distil_tok_total = 0
     failures: list[str] = []
     for e in entries:
         bad = validate(e.trajectory)
         if bad:
             failures.append(f"{e.file}: structural — {bad[0]}")
-        base = simulate(e.trajectory, price, strategy="none", caching=False, tok=tok).total_dollars
-        dist = simulate(e.trajectory, price, strategy="distil", caching=True, tok=tok).total_dollars
+        b_sim = simulate(e.trajectory, price, strategy="none", caching=False, tok=tok)
+        d_sim = simulate(e.trajectory, price, strategy="distil", caching=True, tok=tok)
+        base, dist = b_sim.total_dollars, d_sim.total_dollars
         d_rep = certify(e.trajectory, "distil", margin=args.margin, alpha=args.alpha)
         a_rep = certify(e.trajectory, "aggressive", margin=args.margin, alpha=args.alpha)
         pruned = discover(e.trajectory, tok=tok).tokens_freed
@@ -204,6 +206,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
         base_total += base
         distil_total += dist
         pruned_total += pruned
+        base_tok_total += b_sim.total_input_tokens
+        distil_tok_total += d_sim.total_input_tokens
         if not d_rep.tost.non_inferior:
             failures.append(f"{e.file}: distil FAILED non-inferiority")
         if a_rep.tost.non_inferior:
@@ -221,6 +225,21 @@ def cmd_bench(args: argparse.Namespace) -> int:
         f"\naggregate: distil cuts ${base_total:.5f} -> ${distil_total:.5f} "
         f"({overall:.1f}% cheaper) losslessly; {int(pruned_total)} tokens causally prunable."
     )
+
+    if args.record:
+        rec = ledger.record(
+            trajectory_id="corpus-aggregate",
+            model=price.name,
+            turns=sum(len(e.trajectory.turns) for e in entries),
+            baseline_dollars=base_total,
+            distil_dollars=distil_total,
+            baseline_input_tokens=base_tok_total,
+            distil_input_tokens=distil_tok_total,
+        )
+        print(
+            f"recorded corpus run to the savings ledger: "
+            f"${rec.dollars_saved:.5f} / {rec.tokens_saved} tokens saved. (distil leaderboard)"
+        )
 
     if failures:
         print(f"\nGATE: FAIL ({len(failures)} issue(s))")
@@ -341,6 +360,11 @@ def build_parser() -> argparse.ArgumentParser:
     be.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
     be.add_argument("--margin", type=float, default=0.02)
     be.add_argument("--alpha", type=float, default=0.05)
+    be.add_argument(
+        "--record",
+        action="store_true",
+        help="log the corpus-aggregate savings to the local ledger (distil leaderboard)",
+    )
     be.set_defaults(func=cmd_bench)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
