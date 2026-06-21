@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "core@compass": true,
+    "core-lsp@compass": true
+  }
+}

@@ -34,7 +34,7 @@ Changelog = "https://github.com/dshakes/distil/blob/main/CHANGELOG.md"
 dev = ["pytest>=8"]
 live = ["anthropic>=0.40"]
 onnx = ["onnxruntime>=1.17", "transformers>=4.40"]   # transformer keep-model inference
-train = ["torch>=2.2", "transformers>=4.40"]          # transformer keep-model training
+train = ["torch>=2.2", "transformers>=4.40", "onnx>=1.16", "onnxscript>=0.1", "sentencepiece>=0.2"]  # training + ONNX export
 
 [project.scripts]
 distil = "distil.cli:main"

@@ -1,106 +1,138 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <radialGradient id="vig" cx="0.74" cy="-0.05" r="0.85"><stop offset="0" stop-color="#1a1640" stop-opacity="0.55"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
-    <marker id="arr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6173"/></marker>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a2e"/><stop offset="1" stop-color="#0c0f1d"/></linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#000000" flood-opacity="0.55"/></filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7390"/></marker>
+    <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
   </defs>
+
+  <!-- 3-layer background -->
   <rect width="1200" height="520" fill="url(#bg)"/>
-  <text x="40" y="48" font-size="22" font-weight="700" fill="#e7e9ee">Architecture <tspan fill="#5b6173" font-weight="400" font-size="14">— a cost-optimized cache hierarchy with a contract on quality</tspan></text>
+  <rect width="1200" height="520" fill="url(#dots)"/>
+  <rect width="1200" height="520" fill="url(#vig)"/>
 
-  <!-- input -->
+  <!-- title -->
+  <text x="40" y="48" font-size="22" font-weight="800" letter-spacing="-0.3" fill="#f2f3f7">Architecture <tspan fill="#8b91a3" font-weight="400" font-size="14">— a cost-optimized cache hierarchy with a contract on quality</tspan></text>
+
+  <!-- input: Agent context -->
   <g transform="translate(40,110)">
-    <rect width="150" height="120" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <text x="16" y="30" font-size="14" font-weight="700" fill="#e7e9ee">Agent context</text>
-    <text x="16" y="56" font-size="11" fill="#8b91a1">system + tools</text>
-    <text x="16" y="74" font-size="11" fill="#8b91a1">history (growing)</text>
-    <text x="16" y="92" font-size="11" fill="#8b91a1">tool outputs</text>
-    <text x="16" y="110" font-size="11" fill="#8b91a1">retrieved docs</text>
+    <rect width="150" height="120" rx="14" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+    <text x="16" y="30" font-size="14" font-weight="700" fill="#f2f3f7">Agent context</text>
+    <text x="16" y="56" font-size="11" fill="#8b91a3">system + tools</text>
+    <text x="16" y="74" font-size="11" fill="#8b91a3">history (growing)</text>
+    <text x="16" y="92" font-size="11" fill="#8b91a3">tool outputs</text>
+    <text x="16" y="110" font-size="11" fill="#8b91a3">retrieved docs</text>
   </g>
-  <line x1="190" y1="170" x2="232" y2="170" stroke="#5b6173" stroke-width="2" marker-end="url(#arr)"/>
 
-  <!-- compression tiers -->
+  <!-- connector: agent context → compression -->
+  <path d="M190,170 C210,170 222,170 232,170" fill="none" stroke="#6b7390" stroke-width="1.4" stroke-linecap="round" marker-end="url(#ar)"/>
+
+  <!-- compression tiers outer box -->
   <g transform="translate(240,84)">
-    <rect width="430" height="172" rx="16" fill="#0b0d16" stroke="#1b1f2a"/>
+    <rect width="430" height="172" rx="16" fill="#12151f" stroke="#252c3e"/>
     <text x="20" y="28" font-size="13" font-weight="700" fill="#5ad1c9">COMPRESSION — risk-graded, reversible</text>
+
+    <!-- Tier 0 -->
     <g transform="translate(20,44)">
-      <rect width="124" height="108" rx="10" fill="#0f1219" stroke="#23284a"/>
-      <text x="12" y="24" font-size="12" font-weight="700" fill="#e7e9ee">Tier 0</text>
-      <text x="12" y="44" font-size="10.5" fill="#8b91a1">JSON minify,</text>
-      <text x="12" y="60" font-size="10.5" fill="#8b91a1">reversible RLE,</text>
-      <text x="12" y="76" font-size="10.5" fill="#8b91a1">schema canon.</text>
+      <rect width="124" height="108" rx="10" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+      <text x="12" y="24" font-size="12" font-weight="700" fill="#f2f3f7">Tier 0</text>
+      <text x="12" y="44" font-size="10.5" fill="#8b91a3">JSON minify,</text>
+      <text x="12" y="60" font-size="10.5" fill="#8b91a3">reversible RLE,</text>
+      <text x="12" y="76" font-size="10.5" fill="#8b91a3">schema canon.</text>
       <text x="12" y="98" font-size="10" fill="#5ad19a">provably lossless</text>
     </g>
+
+    <!-- Tier 1 -->
     <g transform="translate(154,44)">
-      <rect width="124" height="108" rx="10" fill="#0f1219" stroke="#23284a"/>
-      <text x="12" y="24" font-size="12" font-weight="700" fill="#e7e9ee">Tier 1</text>
-      <text x="12" y="44" font-size="10.5" fill="#8b91a1">decision-aware</text>
-      <text x="12" y="60" font-size="10.5" fill="#8b91a1">digest +</text>
-      <text x="12" y="76" font-size="10.5" fill="#8b91a1">retrieval handle</text>
+      <rect width="124" height="108" rx="10" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+      <text x="12" y="24" font-size="12" font-weight="700" fill="#f2f3f7">Tier 1</text>
+      <text x="12" y="44" font-size="10.5" fill="#8b91a3">decision-aware</text>
+      <text x="12" y="60" font-size="10.5" fill="#8b91a3">digest +</text>
+      <text x="12" y="76" font-size="10.5" fill="#8b91a3">retrieval handle</text>
       <text x="12" y="98" font-size="10" fill="#5ad19a">reversible</text>
     </g>
+
+    <!-- Stabilize -->
     <g transform="translate(288,44)">
-      <rect width="124" height="108" rx="10" fill="#0f1219" stroke="#23284a"/>
-      <text x="12" y="24" font-size="12" font-weight="700" fill="#e7e9ee">Stabilize</text>
-      <text x="12" y="44" font-size="10.5" fill="#8b91a1">lift volatile</text>
-      <text x="12" y="60" font-size="10.5" fill="#8b91a1">fields out of</text>
-      <text x="12" y="76" font-size="10.5" fill="#8b91a1">the prefix</text>
+      <rect width="124" height="108" rx="10" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+      <text x="12" y="24" font-size="12" font-weight="700" fill="#f2f3f7">Stabilize</text>
+      <text x="12" y="44" font-size="10.5" fill="#8b91a3">lift volatile</text>
+      <text x="12" y="60" font-size="10.5" fill="#8b91a3">fields out of</text>
+      <text x="12" y="76" font-size="10.5" fill="#8b91a3">the prefix</text>
       <text x="12" y="98" font-size="10" fill="#5ad19a">keeps cache warm</text>
     </g>
   </g>
-  <line x1="670" y1="170" x2="712" y2="170" stroke="#5b6173" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- connector: compression → cache-aware -->
+  <path d="M670,170 C690,170 702,170 712,170" fill="none" stroke="#6b7390" stroke-width="1.4" stroke-linecap="round" marker-end="url(#ar)"/>
 
   <!-- cache-aware engine -->
   <g transform="translate(720,110)">
-    <rect width="180" height="120" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <text x="16" y="30" font-size="14" font-weight="700" fill="#e7e9ee">Cache-aware</text>
-    <text x="16" y="48" font-size="14" font-weight="700" fill="#e7e9ee">budget</text>
-    <text x="16" y="72" font-size="11" fill="#8b91a1">stable prefix → cache</text>
-    <text x="16" y="90" font-size="11" fill="#8b91a1">read (~0.1×)</text>
-    <text x="16" y="108" font-size="11" fill="#8b91a1">compress only the tail</text>
-  </g>
-  <line x1="900" y1="170" x2="942" y2="170" stroke="#5b6173" stroke-width="2" marker-end="url(#arr)"/>
-
-  <!-- output -->
-  <g transform="translate(950,110)">
-    <rect width="210" height="120" rx="14" fill="#0f1326" stroke="#2a2550"/>
-    <text x="16" y="30" font-size="14" font-weight="700" fill="url(#g)">Compressed request</text>
-    <text x="16" y="58" font-size="12" fill="#e7e9ee">33% cheaper / turn</text>
-    <text x="16" y="80" font-size="11" fill="#8b91a1">losslessly</text>
-    <text x="16" y="104" font-size="11" fill="#5b6173">+ local restore table</text>
+    <rect width="180" height="120" rx="14" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+    <text x="16" y="30" font-size="14" font-weight="700" fill="#f2f3f7">Cache-aware</text>
+    <text x="16" y="48" font-size="14" font-weight="700" fill="#f2f3f7">budget</text>
+    <text x="16" y="72" font-size="11" fill="#8b91a3">stable prefix → cache</text>
+    <text x="16" y="90" font-size="11" fill="#8b91a3">read (~0.1×)</text>
+    <text x="16" y="108" font-size="11" fill="#8b91a3">compress only the tail</text>
   </g>
 
-  <!-- bottom: the contract loop -->
+  <!-- connector: cache-aware → compressed request -->
+  <path d="M900,170 C920,170 932,170 942,170" fill="none" stroke="#6b7390" stroke-width="1.4" stroke-linecap="round" marker-end="url(#ar)"/>
+
+  <!-- Compressed request output — hero/glow node -->
+  <g filter="url(#glow)" opacity="0.5"><rect x="950" y="110" width="210" height="120" rx="14" fill="#5ad1c9" opacity="0.12"/></g>
+  <rect x="950" y="110" width="210" height="120" rx="14" fill="url(#hero)" stroke="url(#g)" stroke-width="1.6"/>
+  <text x="966" y="140" font-size="14" font-weight="700" fill="url(#g)">Compressed request</text>
+  <text x="966" y="168" font-size="12" fill="#f2f3f7">33% cheaper / turn</text>
+  <text x="966" y="190" font-size="11" fill="#8b91a3">losslessly</text>
+  <text x="966" y="214" font-size="11" fill="#5b6177">+ local restore table</text>
+
+  <!-- bottom: the quality contract outer box -->
   <g transform="translate(240,300)">
-    <rect width="920" height="170" rx="16" fill="#0b0d16" stroke="#23284a"/>
+    <rect width="920" height="170" rx="16" fill="#12151f" stroke="#252c3e"/>
     <text x="20" y="30" font-size="13" font-weight="700" fill="#8b7bff">THE QUALITY CONTRACT — measurement that produces the policy</text>
 
+    <!-- Causal ablation -->
     <g transform="translate(24,52)">
-      <rect width="200" height="92" rx="10" fill="#0f1219" stroke="#1b1f2a"/>
-      <text x="14" y="26" font-size="12" font-weight="700" fill="#e7e9ee">Causal ablation</text>
-      <text x="14" y="48" font-size="10.5" fill="#8b91a1">remove a span, replay —</text>
-      <text x="14" y="64" font-size="10.5" fill="#8b91a1">did any decision change?</text>
+      <rect width="200" height="92" rx="10" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+      <text x="14" y="26" font-size="12" font-weight="700" fill="#f2f3f7">Causal ablation</text>
+      <text x="14" y="48" font-size="10.5" fill="#8b91a3">remove a span, replay —</text>
+      <text x="14" y="64" font-size="10.5" fill="#8b91a3">did any decision change?</text>
       <text x="14" y="82" font-size="10" fill="#5ad1c9">finds free-to-drop context</text>
     </g>
+
+    <!-- Decision-equivalence -->
     <g transform="translate(244,52)">
-      <rect width="200" height="92" rx="10" fill="#0f1219" stroke="#1b1f2a"/>
-      <text x="14" y="26" font-size="12" font-weight="700" fill="#e7e9ee">Decision-equivalence</text>
-      <text x="14" y="48" font-size="10.5" fill="#8b91a1">same action with vs.</text>
-      <text x="14" y="64" font-size="10.5" fill="#8b91a1">without compression?</text>
+      <rect width="200" height="92" rx="10" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+      <text x="14" y="26" font-size="12" font-weight="700" fill="#f2f3f7">Decision-equivalence</text>
+      <text x="14" y="48" font-size="10.5" fill="#8b91a3">same action with vs.</text>
+      <text x="14" y="64" font-size="10.5" fill="#8b91a3">without compression?</text>
       <text x="14" y="82" font-size="10" fill="#5ad1c9">on real trajectories</text>
     </g>
+
+    <!-- TOST gate -->
     <g transform="translate(464,52)">
-      <rect width="200" height="92" rx="10" fill="#0f1219" stroke="#1b1f2a"/>
-      <text x="14" y="26" font-size="12" font-weight="700" fill="#e7e9ee">TOST gate</text>
-      <text x="14" y="48" font-size="10.5" fill="#8b91a1">statistical non-inferiority</text>
-      <text x="14" y="64" font-size="10.5" fill="#8b91a1">at a pre-registered margin</text>
+      <rect width="200" height="92" rx="10" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/>
+      <text x="14" y="26" font-size="12" font-weight="700" fill="#f2f3f7">TOST gate</text>
+      <text x="14" y="48" font-size="10.5" fill="#8b91a3">statistical non-inferiority</text>
+      <text x="14" y="64" font-size="10.5" fill="#8b91a3">at a pre-registered margin</text>
       <text x="14" y="82" font-size="10" fill="#5ad1c9">ship only if certified</text>
     </g>
+
+    <!-- Verdict — hero/glow node -->
     <g transform="translate(684,52)">
-      <rect width="212" height="92" rx="10" fill="#0f1326" stroke="#2a2550"/>
+      <g filter="url(#glow)" opacity="0.5"><rect width="212" height="92" rx="10" fill="#5ad1c9" opacity="0.12"/></g>
+      <rect width="212" height="92" rx="10" fill="url(#hero)" stroke="url(#g)" stroke-width="1.6"/>
       <text x="14" y="26" font-size="12" font-weight="700" fill="url(#g)">Verdict</text>
       <text x="14" y="50" font-size="13" fill="#5ad19a">distil → PASS</text>
       <text x="14" y="72" font-size="13" fill="#ff8a6b">aggressive → FAIL</text>
-      <text x="14" y="88" font-size="9.5" fill="#5b6173">measured on the same runs</text>
+      <text x="14" y="88" font-size="9.5" fill="#5b6177">measured on the same runs</text>
     </g>
   </g>
 </svg>

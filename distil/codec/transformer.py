@@ -114,11 +114,15 @@ class TransformerKeepModel:
         *,
         keep_label_index: int = 1,
         floor_decisions: bool = True,
+        input_names: set[str] | None = None,
     ) -> None:
         self._session = session
         self._encode = encode
         self._keep_label_index = keep_label_index
         self._floor_decisions = floor_decisions
+        # When set, feeds are restricted to these names — the exported ONNX graph
+        # may declare fewer inputs (e.g. no token_type_ids) than the tokenizer emits.
+        self._input_names = input_names
 
     # ------------------------------------------------------------------
     # KeepModel Protocol
@@ -154,6 +158,10 @@ class TransformerKeepModel:
         }
         if "token_type_ids" in encoded:
             feeds["token_type_ids"] = [encoded["token_type_ids"]]
+
+        # Restrict to the graph's declared inputs (the export may omit token_type_ids).
+        if self._input_names is not None:
+            feeds = {k: v for k, v in feeds.items() if k in self._input_names}
 
         # --- run ONNX session ---
         outputs = self._session.run(None, feeds)
@@ -237,6 +245,7 @@ class TransformerKeepModel:
 
         session = ort.InferenceSession(onnx_path)
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+        kw.setdefault("input_names", {i.name for i in session.get_inputs()})
 
         def encode(line: str) -> dict[str, list[int]]:
             enc = tokenizer(

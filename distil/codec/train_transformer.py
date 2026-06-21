@@ -4,7 +4,7 @@ THIS PRODUCES YOUR CHECKPOINT FROM YOUR TRACES.
 
 The model trained here is specific to the text distribution in YOUR corpus.  It
 generalises the deterministic ``SalienceKeepModel`` rules to unseen text via a
-lightweight transformer (default: ``prajjwal1/bert-tiny``).
+lightweight transformer (default: ``google/bert_uncased_L-2_H-128_A-2``).
 
 **The zero-dep logistic model (``distil.codec.learned``) is the default for all
 distil users.**  Run this script only when you have a corpus of real traces and
@@ -57,7 +57,7 @@ from typing import Any
 def train_transformer(
     out_dir: str,
     *,
-    base_model: str = "prajjwal1/bert-tiny",
+    base_model: str = "google/bert_uncased_L-2_H-128_A-2",
     epochs: int = 3,
     lr: float = 5e-5,
     max_len: int = 64,
@@ -70,7 +70,7 @@ def train_transformer(
         Directory to write the ONNX model, tokenizer, and metrics JSON.
         Created if it does not exist.
     base_model:
-        HuggingFace model ID to fine-tune.  Default ``prajjwal1/bert-tiny``
+        HuggingFace model ID to fine-tune.  Default ``google/bert_uncased_L-2_H-128_A-2``
         (~4 MB) keeps training fast without a GPU; swap for a larger encoder
         (e.g. ``distilbert-base-uncased``) for higher accuracy.
     epochs:
@@ -153,7 +153,13 @@ def train_transformer(
         raise RuntimeError("Test set is empty after split.")
 
     # --- tokenizer + model ---
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(base_model, use_fast=True)
+    except (ValueError, OSError):
+        # Some tiny model repos (e.g. google/bert_uncased_L-2_H-128_A-2) ship no tokenizer
+        # files; fall back to the standard BERT WordPiece vocab, which is
+        # compatible with the bert-tiny/mini/small family (same 30522 vocab).
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
     model = AutoModelForTokenClassification.from_pretrained(base_model, num_labels=2)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -312,9 +318,9 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument(
         "--base-model",
-        default="prajjwal1/bert-tiny",
+        default="google/bert_uncased_L-2_H-128_A-2",
         metavar="MODEL_ID",
-        help="HuggingFace model ID to fine-tune (default: prajjwal1/bert-tiny).",
+        help="HuggingFace model ID to fine-tune (default: google/bert_uncased_L-2_H-128_A-2).",
     )
     parser.add_argument(
         "--epochs",

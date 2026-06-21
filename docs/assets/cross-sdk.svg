@@ -1,61 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <radialGradient id="vig" cx="0.74" cy="-0.05" r="0.85"><stop offset="0" stop-color="#1a1640" stop-opacity="0.55"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
-    <marker id="am" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b6173"/></marker>
-    <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8b7bff"/></marker>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a2e"/><stop offset="1" stop-color="#0c0f1d"/></linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#000000" flood-opacity="0.55"/></filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7390"/></marker>
+    <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
   </defs>
-  <rect width="1200" height="470" fill="url(#bg)"/>
+  <rect width="1200" height="480" fill="url(#bg)"/>
+  <rect width="1200" height="480" fill="url(#dots)"/>
+  <rect width="1200" height="480" fill="url(#vig)"/>
 
-  <text x="40" y="44" font-size="22" font-weight="800" fill="#e7e9ee">One proxy, every SDK.<tspan font-size="14" font-weight="400" fill="#8b91a1">  — point any client at the proxy, no code change</tspan></text>
+  <text x="48" y="50" font-size="23" font-weight="800" letter-spacing="-0.3" fill="#f2f3f7">One proxy, every SDK.</text>
+  <text x="296" y="50" font-size="14" fill="#8b91a3">— point any client at the proxy, no code change</text>
 
-  <!-- column headers, centered on each column -->
-  <g font-size="11" letter-spacing="1.5" fill="#5b6173" text-anchor="middle">
-    <text x="190" y="92">CLIENTS</text>
-    <text x="615" y="92">PROXY · :8788</text>
-    <text x="1020" y="92">PROVIDERS</text>
+  <g font-size="10.5" letter-spacing="2" fill="#5b6177" text-anchor="middle" font-weight="600">
+    <text x="195" y="98">CLIENTS</text><text x="615" y="98">PROXY</text><text x="1025" y="98">PROVIDERS</text>
   </g>
 
-  <!-- arrows first (behind boxes): clients funnel into proxy left-center, providers fan from proxy right-center -->
-  <g fill="none" stroke="#5b6173" stroke-width="1.4">
-    <line x1="340" y1="148" x2="467" y2="276" marker-end="url(#am)"/>
-    <line x1="340" y1="212" x2="467" y2="276" marker-end="url(#am)"/>
-    <line x1="340" y1="276" x2="467" y2="276" marker-end="url(#am)"/>
-    <line x1="340" y1="340" x2="467" y2="276" marker-end="url(#am)"/>
-    <line x1="340" y1="404" x2="467" y2="276" marker-end="url(#am)"/>
+  <!-- connectors (curved, behind cards): clients funnel to (468,278); providers fan from (762,278) -->
+  <g fill="none" stroke="#5b6177" stroke-width="1.4" stroke-linecap="round" opacity="0.8">
+    <path d="M345,150 C420,150 410,278 463,278" marker-end="url(#ar)"/>
+    <path d="M345,214 C412,214 408,278 463,278" marker-end="url(#ar)"/>
+    <path d="M345,278 L463,278" marker-end="url(#ar)"/>
+    <path d="M345,342 C412,342 408,278 463,278" marker-end="url(#ar)"/>
+    <path d="M345,406 C420,406 410,278 463,278" marker-end="url(#ar)"/>
   </g>
-  <g fill="none" stroke="#8b7bff" stroke-width="1.6" opacity="0.9">
-    <line x1="760" y1="276" x2="877" y2="229" marker-end="url(#ag)"/>
-    <line x1="760" y1="276" x2="877" y2="331" marker-end="url(#ag)"/>
-  </g>
-
-  <!-- client boxes: x=40 w=300 h=56, tops 120/184/248/312/376 (centers 148/212/276/340/404) -->
-  <g>
-    <g transform="translate(40,120)"><rect width="300" height="56" rx="10" fill="#0c0e14" stroke="#23284a"/><text x="16" y="24" font-size="13" font-weight="700" fill="#e7e9ee">Anthropic SDK</text><text x="16" y="42" font-size="10.5" fill="#8b91a1">Python · TS</text><text x="284" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">base_url → :8788</text></g>
-    <g transform="translate(40,184)"><rect width="300" height="56" rx="10" fill="#0c0e14" stroke="#23284a"/><text x="16" y="24" font-size="13" font-weight="700" fill="#e7e9ee">OpenAI SDK</text><text x="16" y="42" font-size="10.5" fill="#8b91a1">Python · TS</text><text x="284" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">base_url → :8788/v1</text></g>
-    <g transform="translate(40,248)"><rect width="300" height="56" rx="10" fill="#0c0e14" stroke="#23284a"/><text x="16" y="24" font-size="13" font-weight="700" fill="#e7e9ee">Vercel AI SDK</text><text x="16" y="42" font-size="10.5" fill="#8b91a1">TypeScript</text><text x="284" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">baseURL → :8788</text></g>
-    <g transform="translate(40,312)"><rect width="300" height="56" rx="10" fill="#0c0e14" stroke="#23284a"/><text x="16" y="24" font-size="13" font-weight="700" fill="#e7e9ee">LangChain</text><text x="16" y="42" font-size="10.5" fill="#8b91a1">Python · JS</text><text x="284" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">base_url → :8788</text></g>
-    <g transform="translate(40,376)"><rect width="300" height="56" rx="10" fill="#0c0e14" stroke="#23284a"/><text x="16" y="24" font-size="13" font-weight="700" fill="#e7e9ee">LiteLLM</text><text x="16" y="42" font-size="10.5" fill="#8b91a1">Python</text><text x="284" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">api_base → :8788</text></g>
+  <g fill="none" stroke="#7d8cff" stroke-width="1.7" stroke-linecap="round">
+    <path d="M765,278 C828,278 820,231 873,231" marker-end="url(#arg)"/>
+    <path d="M765,278 C828,278 820,333 873,333" marker-end="url(#arg)"/>
   </g>
 
-  <!-- proxy box: x=470 w=290, y=186 h=180, vertical center y=276 -->
-  <rect x="470" y="186" width="290" height="180" rx="16" fill="#0b0d16" stroke="#5ad1c9" stroke-width="1.5"/>
-  <text x="615" y="218" text-anchor="middle" font-size="22" font-weight="800" fill="url(#g)">Distil</text>
-  <text x="615" y="238" text-anchor="middle" font-size="11.5" fill="#8b91a1">proxy · localhost:8788</text>
-  <g text-anchor="middle">
-    <rect x="490" y="252" width="250" height="28" rx="8" fill="#0f1219" stroke="#1b1f2a"/><text x="615" y="270" font-size="12" fill="#5ad1c9">cache-aware compress</text>
-    <rect x="490" y="288" width="250" height="28" rx="8" fill="#0f1219" stroke="#1b1f2a"/><text x="615" y="306" font-size="12" fill="#5ad19a">lossless · reversible</text>
-    <rect x="490" y="324" width="250" height="28" rx="8" fill="#0f1219" stroke="#1b1f2a"/><text x="615" y="342" font-size="12" fill="#ff8a6b">auth-mode gating</text>
+  <!-- client cards: x=44 w=300 h=56, tops 122/186/250/314/378 -->
+  <g font-size="13">
+    <g transform="translate(44,122)"><rect width="300" height="56" rx="13" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><rect x="13" y="15" width="26" height="26" rx="7" fill="#171d30" stroke="#2c3658"/><text x="26" y="33" text-anchor="middle" font-size="12" font-weight="800" fill="#8b7bff">A</text><text x="50" y="25" font-weight="700" fill="#eef0f5">Anthropic SDK</text><text x="50" y="42" font-size="10.5" fill="#8b91a3">Python · TS</text><text x="285" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">base_url → :8788</text></g>
+    <g transform="translate(44,186)"><rect width="300" height="56" rx="13" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><rect x="13" y="15" width="26" height="26" rx="7" fill="#171d30" stroke="#2c3658"/><text x="26" y="33" text-anchor="middle" font-size="12" font-weight="800" fill="#5ad1c9">O</text><text x="50" y="25" font-weight="700" fill="#eef0f5">OpenAI SDK</text><text x="50" y="42" font-size="10.5" fill="#8b91a3">Python · TS</text><text x="285" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">base_url → :8788/v1</text></g>
+    <g transform="translate(44,250)"><rect width="300" height="56" rx="13" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><rect x="13" y="15" width="26" height="26" rx="7" fill="#171d30" stroke="#2c3658"/><text x="26" y="33" text-anchor="middle" font-size="12" font-weight="800" fill="#8b7bff">V</text><text x="50" y="25" font-weight="700" fill="#eef0f5">Vercel AI SDK</text><text x="50" y="42" font-size="10.5" fill="#8b91a3">TypeScript</text><text x="285" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">baseURL → :8788</text></g>
+    <g transform="translate(44,314)"><rect width="300" height="56" rx="13" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><rect x="13" y="15" width="26" height="26" rx="7" fill="#171d30" stroke="#2c3658"/><text x="26" y="33" text-anchor="middle" font-size="12" font-weight="800" fill="#5ad1c9">L</text><text x="50" y="25" font-weight="700" fill="#eef0f5">LangChain</text><text x="50" y="42" font-size="10.5" fill="#8b91a3">Python · JS</text><text x="285" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">base_url → :8788</text></g>
+    <g transform="translate(44,378)"><rect width="300" height="56" rx="13" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><rect x="13" y="15" width="26" height="26" rx="7" fill="#171d30" stroke="#2c3658"/><text x="26" y="33" text-anchor="middle" font-size="12" font-weight="800" fill="#8b7bff">Li</text><text x="50" y="25" font-weight="700" fill="#eef0f5">LiteLLM</text><text x="50" y="42" font-size="10.5" fill="#8b91a3">Python</text><text x="285" y="42" font-size="10.5" text-anchor="end" fill="#5ad1c9">api_base → :8788</text></g>
+  </g>
+
+  <!-- hero proxy node: x=470 w=290 y=190 h=176, center 278 -->
+  <g filter="url(#glow)" opacity="0.5"><rect x="470" y="190" width="290" height="176" rx="18" fill="#5ad1c9" opacity="0.12"/></g>
+  <rect x="470" y="190" width="290" height="176" rx="18" fill="url(#hero)" stroke="url(#g)" stroke-width="1.6"/>
+  <text x="615" y="222" text-anchor="middle" font-size="23" font-weight="800" fill="url(#g)">Distil</text>
+  <text x="615" y="241" text-anchor="middle" font-size="11" fill="#8b91a3">proxy · localhost:8788</text>
+  <g text-anchor="middle" font-size="11.5">
+    <rect x="492" y="254" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle cx="510" cy="268" r="3" fill="#5ad1c9"/><text x="620" y="272" fill="#cdd3e2">cache-aware compress</text>
+    <rect x="492" y="289" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle cx="510" cy="303" r="3" fill="#5ad19a"/><text x="620" y="307" fill="#cdd3e2">lossless · reversible</text>
+    <rect x="492" y="324" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle cx="510" cy="338" r="3" fill="#ff8a6b"/><text x="620" y="342" fill="#cdd3e2">auth-mode gating</text>
   </g>
 
   <!-- in-process alternative -->
-  <rect x="470" y="384" width="290" height="52" rx="14" fill="#0b0d16" stroke="#23284a" stroke-dasharray="5 4"/>
-  <text x="615" y="406" text-anchor="middle" font-size="10.5" fill="#5b6173">or in-process</text>
-  <text x="615" y="425" text-anchor="middle" font-size="14" font-weight="700" fill="#e7e9ee">wrap(client)</text>
+  <rect x="470" y="386" width="290" height="50" rx="14" fill="#0b0d15" stroke="#252c3e" stroke-dasharray="2 5" stroke-linecap="round"/>
+  <text x="615" y="408" text-anchor="middle" font-size="10.5" fill="#6b7390">or in-process</text>
+  <text x="615" y="425" text-anchor="middle" font-size="13.5" font-weight="700" fill="#eef0f5">wrap(client)</text>
 
-  <!-- provider boxes: x=880 w=280 h=82, tops 188/290 (centers 229/331) -->
-  <g transform="translate(880,188)"><rect width="280" height="82" rx="14" fill="#0c0e14" stroke="#23284a"/><text x="18" y="30" font-size="14" font-weight="700" fill="#e7e9ee">Anthropic API</text><text x="18" y="52" font-size="11" fill="#8b91a1">api.anthropic.com</text><text x="18" y="70" font-size="10" fill="#5b6173">Claude — all models</text></g>
-  <g transform="translate(880,290)"><rect width="280" height="82" rx="14" fill="#0c0e14" stroke="#23284a"/><text x="18" y="30" font-size="14" font-weight="700" fill="#e7e9ee">OpenAI-compatible</text><text x="18" y="52" font-size="11" fill="#8b91a1">OpenAI · Azure · Together</text><text x="18" y="70" font-size="10" fill="#5b6173">Fireworks · Groq · …</text></g>
+  <!-- provider cards: x=874 w=282 h=84, tops 189/291 (centers 231/333) -->
+  <g transform="translate(874,189)"><rect width="282" height="84" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="42" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="46" text-anchor="middle" font-size="12" font-weight="800" fill="#8b7bff">A</text><text x="60" y="36" font-size="14" font-weight="700" fill="#eef0f5">Anthropic API</text><text x="60" y="56" font-size="11" fill="#8b91a3">api.anthropic.com</text><text x="60" y="72" font-size="10" fill="#5b6177">Claude — all models</text></g>
+  <g transform="translate(874,291)"><rect width="282" height="84" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="42" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="46" text-anchor="middle" font-size="12" font-weight="800" fill="#5ad1c9">O</text><text x="60" y="36" font-size="14" font-weight="700" fill="#eef0f5">OpenAI-compatible</text><text x="60" y="56" font-size="11" fill="#8b91a3">OpenAI · Azure · Together</text><text x="60" y="72" font-size="10" fill="#5b6177">Fireworks · Groq · …</text></g>
 
-  <text x="600" y="456" text-anchor="middle" font-size="12.5" fill="#8b91a1">no code change — point <tspan fill="#e7e9ee">base_url</tspan> at the proxy; works in any language</text>
+  <text x="600" y="466" text-anchor="middle" font-size="12.5" fill="#8b91a3">no code change — point <tspan fill="#eef0f5" font-weight="600">base_url</tspan> at the proxy; works in any language</text>
 </svg>

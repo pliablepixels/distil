@@ -1,39 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
-    <linearGradient id="good" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <radialGradient id="vig" cx="0.74" cy="-0.05" r="0.85"><stop offset="0" stop-color="#1a1640" stop-opacity="0.55"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a2e"/><stop offset="1" stop-color="#0c0f1d"/></linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#000000" flood-opacity="0.55"/></filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7390"/></marker>
+    <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
+    <linearGradient id="bar0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e2235"/><stop offset="1" stop-color="#151826"/></linearGradient>
+    <linearGradient id="bar1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#262d4a"/><stop offset="1" stop-color="#1a2038"/></linearGradient>
   </defs>
+
+  <!-- 3-layer background -->
   <rect width="1200" height="360" fill="url(#bg)"/>
-  <text x="40" y="46" font-size="22" font-weight="700" fill="#e7e9ee">Technique #1 — cache-aware <tspan fill="#5b6173" font-weight="400" font-size="14">$ per run, Opus 4.8, bundled corpus sample</tspan></text>
-  <text x="40" y="72" font-size="13" fill="#8b91a1">The dominant cost in an agent loop is cache <tspan fill="#e7e9ee">misses</tspan>, not context <tspan fill="#e7e9ee">size</tspan>. Naive recompression sends fewer tokens yet costs more.</text>
+  <rect width="1200" height="360" fill="url(#dots)"/>
+  <rect width="1200" height="360" fill="url(#vig)"/>
+
+  <!-- Title -->
+  <text x="40" y="46" font-size="22" font-weight="800" letter-spacing="-0.3" fill="#f2f3f7">Technique #1 — cache-aware <tspan fill="#8b91a3" font-weight="400" font-size="14">$ per run, Opus 4.8, bundled corpus sample</tspan></text>
+  <text x="40" y="72" font-size="13" fill="#8b91a3">The dominant cost in an agent loop is cache <tspan fill="#f2f3f7">misses</tspan>, not context <tspan fill="#f2f3f7">size</tspan>. Naive recompression sends fewer tokens yet costs more.</text>
 
   <!-- axis -->
-  <line x1="300" y1="110" x2="300" y2="320" stroke="#1b1f2a"/>
-  <g font-size="13" fill="#8b91a1">
-    <!-- bars: max ~0.0169 maps to 760px scale -->
+  <line x1="300" y1="110" x2="300" y2="320" stroke="#252c3e" stroke-width="1.5"/>
+
+  <!-- grid lines at bar centers -->
+  <line x1="300" y1="139" x2="1160" y2="139" stroke="#1a1f30" stroke-width="1" opacity="0.5"/>
+  <line x1="300" y1="195" x2="1160" y2="195" stroke="#1a1f30" stroke-width="1" opacity="0.5"/>
+  <line x1="300" y1="251" x2="1160" y2="251" stroke="#1a1f30" stroke-width="1" opacity="0.5"/>
+  <line x1="300" y1="307" x2="1160" y2="307" stroke="#1a1f30" stroke-width="1" opacity="0.5"/>
+
+  <g font-size="13" fill="#8b91a3">
     <!-- baseline 0.01524 -->
-    <text x="40" y="139" fill="#e7e9ee">baseline</text>
-    <text x="40" y="155" font-size="10" fill="#5b6173">no cache, no compress</text>
-    <rect x="300" y="124" width="686" height="30" rx="6" fill="#1b1f2a"/>
-    <text x="1000" y="145" fill="#8b91a1">$0.01524</text>
+    <text x="40" y="139" fill="#f2f3f7">baseline</text>
+    <text x="40" y="155" font-size="10" fill="#5b6177">no cache, no compress</text>
+    <rect x="300" y="124" width="686" height="30" rx="10" fill="url(#bar0)" stroke="#252c3e" stroke-width="1"/>
+    <text x="1000" y="145" fill="#8b91a3">$0.01524</text>
 
     <!-- cache only 0.01115 -->
-    <text x="40" y="195" fill="#e7e9ee">cache only</text>
-    <rect x="300" y="180" width="502" height="30" rx="6" fill="#2a2f45"/>
-    <text x="816" y="201" fill="#8b91a1">$0.01115  ·  −27%</text>
+    <text x="40" y="195" fill="#f2f3f7">cache only</text>
+    <rect x="300" y="180" width="502" height="30" rx="10" fill="url(#bar1)" stroke="#2e3758" stroke-width="1"/>
+    <text x="816" y="201" fill="#8b91a3">$0.01115  ·  −27%</text>
 
     <!-- naive 0.01691 -->
     <text x="40" y="251" fill="#ff8a6b">naive compress</text>
-    <text x="40" y="267" font-size="10" fill="#5b6173">busts the prefix cache</text>
-    <rect x="300" y="236" width="761" height="30" rx="6" fill="#3a2230"/>
-    <rect x="300" y="236" width="761" height="30" rx="6" fill="none" stroke="#ff8a6b" stroke-opacity="0.6"/>
+    <text x="40" y="267" font-size="10" fill="#5b6177">busts the prefix cache</text>
+    <rect x="300" y="236" width="761" height="30" rx="10" fill="#2e1a20" stroke="#ff8a6b" stroke-width="1.5" stroke-opacity="0.7"/>
     <text x="1010" y="240" font-size="10" fill="#ff8a6b">▲ MORE than baseline</text>
     <text x="1075" y="257" fill="#ff8a6b">$0.01691</text>
 
     <!-- distil 0.01019 -->
     <text x="40" y="307" fill="#5ad1c9">distil</text>
-    <text x="40" y="323" font-size="10" fill="#5b6173">cache-aware lossless</text>
-    <rect x="300" y="292" width="459" height="30" rx="6" fill="url(#good)"/>
-    <text x="773" y="313" font-weight="700" fill="#e7e9ee">$0.01019  ·  −33%</text>
+    <text x="40" y="323" font-size="10" fill="#5b6177">cache-aware lossless</text>
+    <!-- glow layer behind distil bar -->
+    <rect x="300" y="292" width="459" height="30" rx="10" fill="url(#g)" filter="url(#glow)" opacity="0.35"/>
+    <!-- actual distil bar -->
+    <rect x="300" y="292" width="459" height="30" rx="10" fill="url(#g)"/>
+    <text x="773" y="313" font-weight="700" fill="#f2f3f7">$0.01019  ·  −33%</text>
   </g>
 </svg>

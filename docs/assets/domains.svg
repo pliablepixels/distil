@@ -1,39 +1,139 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <radialGradient id="vig" cx="0.74" cy="-0.05" r="0.85"><stop offset="0" stop-color="#1a1640" stop-opacity="0.55"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a2e"/><stop offset="1" stop-color="#0c0f1d"/></linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#000000" flood-opacity="0.55"/></filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7390"/></marker>
+    <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
   </defs>
-  <rect width="1200" height="430" fill="url(#bg)"/>
-  <text x="40" y="46" font-size="22" font-weight="700" fill="#e7e9ee">Measured across 7 domains <tspan fill="#5b6173" font-weight="400" font-size="14">— the same gate, not one cherry-picked example</tspan></text>
-  <text x="40" y="72" font-size="13" fill="#8b91a1">Every trajectory: distil certified non-inferior, the gate rejects lossy aggression, savings are lossless. <tspan fill="#5ad1c9">distil bench</tspan></text>
 
-  <!-- column header -->
-  <g font-size="11" fill="#5b6173" transform="translate(40,104)">
+  <!-- 3-layer background -->
+  <rect width="1200" height="430" fill="url(#bg)"/>
+  <rect width="1200" height="430" fill="url(#dots)"/>
+  <rect width="1200" height="430" fill="url(#vig)"/>
+
+  <!-- title -->
+  <text x="40" y="46" font-size="22" font-weight="800" fill="#f2f3f7">Measured across 7 domains <tspan fill="#5b6177" font-weight="400" font-size="14">&#x2014; the same gate, not one cherry-picked example</tspan></text>
+  <text x="40" y="72" font-size="13" fill="#8b91a3">Every trajectory: distil certified non-inferior, the gate rejects lossy aggression, savings are lossless. <tspan fill="#5ad1c9">distil bench</tspan></text>
+
+  <!-- column headers -->
+  <g font-size="11" fill="#5b6177" transform="translate(40,104)">
     <text x="0" y="0">DOMAIN</text>
     <text x="160" y="0">LOSSLESS SAVINGS</text>
     <text x="600" y="0">DISTIL</text>
     <text x="730" y="0">AGGRESSIVE</text>
     <text x="900" y="0">TOKENS PRUNED</text>
   </g>
-  <line x1="40" y1="116" x2="1160" y2="116" stroke="#1b1f2a"/>
+  <line x1="40" y1="116" x2="1160" y2="116" stroke="#252c3e" stroke-width="1"/>
 
-  <!-- rows. bar scale = 360px / 33.1% ; columns: bar[160..520] | % @540 | PASS @600 | FAIL @730 | tokens @910 -->
+  <!-- rows: bar columns[160..520] | % @540 | PASS @600 | FAIL @730 | tokens @910 -->
   <g transform="translate(40,116)">
+
     <!-- ops/sre 33.1 615 -->
-    <g transform="translate(0,38)"><text x="0" y="5" font-size="13" fill="#e7e9ee">ops/sre</text><rect x="160" y="-9" width="360" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">33.1%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">615</text></g>
+    <g transform="translate(0,38)">
+      <rect x="160" y="-9" width="360" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="360" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">ops/sre</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">33.1%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">615</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
     <!-- coding 28.7 736 -->
-    <g transform="translate(0,76)"><text x="0" y="5" font-size="13" fill="#e7e9ee">coding</text><rect x="160" y="-9" width="312" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">28.7%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">736</text></g>
+    <g transform="translate(0,76)">
+      <rect x="160" y="-9" width="312" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="312" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">coding</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">28.7%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">736</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
     <!-- support 32.6 765 -->
-    <g transform="translate(0,114)"><text x="0" y="5" font-size="13" fill="#e7e9ee">support</text><rect x="160" y="-9" width="355" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">32.6%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">765</text></g>
+    <g transform="translate(0,114)">
+      <rect x="160" y="-9" width="355" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="355" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">support</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">32.6%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">765</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
     <!-- research 25.7 809 -->
-    <g transform="translate(0,152)"><text x="0" y="5" font-size="13" fill="#e7e9ee">research</text><rect x="160" y="-9" width="280" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">25.7%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">809</text></g>
-    <!-- data 18.1 965 -->
-    <g transform="translate(0,190)"><text x="0" y="5" font-size="13" fill="#e7e9ee">data-analysis</text><rect x="160" y="-9" width="197" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">18.1%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">965</text></g>
+    <g transform="translate(0,152)">
+      <rect x="160" y="-9" width="280" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="280" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">research</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">25.7%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">809</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
+    <!-- data-analysis 18.1 965 -->
+    <g transform="translate(0,190)">
+      <rect x="160" y="-9" width="197" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="197" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">data-analysis</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">18.1%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">965</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
     <!-- devops 25.0 857 -->
-    <g transform="translate(0,228)"><text x="0" y="5" font-size="13" fill="#e7e9ee">devops</text><rect x="160" y="-9" width="272" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">25.0%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">857</text></g>
+    <g transform="translate(0,228)">
+      <rect x="160" y="-9" width="272" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="272" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">devops</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">25.0%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">857</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
     <!-- finance 29.1 1014 -->
-    <g transform="translate(0,266)"><text x="0" y="5" font-size="13" fill="#e7e9ee">finance</text><rect x="160" y="-9" width="317" height="20" rx="5" fill="url(#g)"/><text x="540" y="5" font-size="13" font-weight="700" fill="#e7e9ee">29.1%</text><text x="600" y="5" font-size="13" fill="#5ad19a">✔ PASS</text><text x="730" y="5" font-size="13" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" font-size="13" fill="#8b91a1">1014</text></g>
+    <g transform="translate(0,266)">
+      <rect x="160" y="-9" width="317" height="20" rx="6" fill="url(#g)" opacity="0.2" filter="url(#glow)"/>
+      <rect x="160" y="-9" width="317" height="20" rx="6" fill="url(#g)"/>
+      <text x="0" y="5" font-size="13" fill="#f2f3f7">finance</text>
+      <text x="540" y="5" font-size="13" font-weight="700" fill="#f2f3f7">29.1%</text>
+      <rect x="596" y="-4" width="76" height="18" rx="9" fill="#0d3028" stroke="#1a5040"/>
+      <text x="634" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#5ad19a">&#x2714; PASS</text>
+      <rect x="726" y="-4" width="68" height="18" rx="9" fill="#2e1a1a" stroke="#4a2525"/>
+      <text x="760" y="9" text-anchor="middle" font-size="11" font-weight="700" fill="#ff8a6b">&#x2718; FAIL</text>
+      <text x="930" y="5" font-size="13" fill="#8b91a3">1014</text>
+      <line x1="0" y1="19" x2="1120" y2="19" stroke="#1a1f2e" stroke-width="1" opacity="0.7"/>
+    </g>
+
   </g>
-  <line x1="40" y1="402" x2="1160" y2="402" stroke="#1b1f2a"/>
-  <text x="40" y="424" font-size="13" fill="#8b91a1">aggregate: <tspan fill="#5ad1c9" font-weight="700">26.8% cheaper</tspan>, losslessly · <tspan fill="#e7e9ee">5,761 tokens</tspan> causally prunable · <tspan fill="#5ad19a">GATE: PASS</tspan></text>
+
+  <line x1="40" y1="402" x2="1160" y2="402" stroke="#252c3e" stroke-width="1"/>
+  <text x="40" y="424" font-size="13" fill="#8b91a3">aggregate: <tspan fill="#5ad1c9" font-weight="700">26.8% cheaper</tspan>, losslessly &#xB7; <tspan fill="#f2f3f7">5,761 tokens</tspan> causally prunable &#xB7; <tspan fill="#5ad19a">GATE: PASS</tspan></text>
 </svg>

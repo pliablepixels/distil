@@ -436,7 +436,7 @@ def build_parser() -> argparse.ArgumentParser:
     tt.add_argument(
         "--out", default="distil-keep-transformer", help="output dir for ONNX + tokenizer"
     )
-    tt.add_argument("--base-model", default="prajjwal1/bert-tiny")
+    tt.add_argument("--base-model", default="google/bert_uncased_L-2_H-128_A-2")
     tt.add_argument("--epochs", type=int, default=3)
     tt.set_defaults(func=cmd_train_transformer)
     return p

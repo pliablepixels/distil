@@ -84,6 +84,8 @@ aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) losslessly; 5761 tok
 GATE: PASS — every trajectory certified non-inferior; aggressive rejected on all.
 ```
 
+<p align="center"><img src="docs/assets/domains.svg" alt="measured across 7 domains" width="100%"/></p>
+
 > **Why trust the number?** Token-savings numbers are easy to fake — measure quality at *low* compression, advertise savings at *high* compression. Distil refuses that: accuracy and compression are measured on the **same** trajectories, and a strategy that can't pass non-inferiority doesn't ship.
 > ```
 > distil certify --strategy distil       # VERDICT: PASS  (100% decision-equivalence)
@@ -96,17 +98,7 @@ GATE: PASS — every trajectory certified non-inferior; aggressive rejected on a
 
 One proxy. Point any `base_url`-honoring client at it — **Python, TypeScript, any language** — and get cache-aware lossless compression with **no code change**.
 
-```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f1219','primaryTextColor':'#e7e9ee','primaryBorderColor':'#2a2550','lineColor':'#8b7bff','fontFamily':'ui-sans-serif'}}}%%
-flowchart LR
-    A["Anthropic SDK"] --> P
-    O["OpenAI SDK"] --> P
-    V["Vercel AI SDK"] --> P
-    L["LangChain"] --> P
-    LL["LiteLLM"] --> P
-    P{{"Distil proxy · :8788<br/><i>cache-aware · lossless · gated</i>"}} --> AN["Anthropic API"]
-    P --> OAI["OpenAI-compatible"]
-```
+<p align="center"><img src="docs/assets/cross-sdk.svg" alt="one proxy, every SDK" width="100%"/></p>
 
 ```bash
 distil proxy --upstream https://api.anthropic.com   # localhost:8788
@@ -131,6 +123,8 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 ## 📦 Install your way
 
+<p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
+
 | Format | Command |
 |---|---|
 | **Zero install** | `uvx distil bench` |
@@ -146,34 +140,15 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 ## 🧠 How it works
 
-```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f1219','primaryTextColor':'#e7e9ee','primaryBorderColor':'#2a2550','lineColor':'#8b7bff','fontFamily':'ui-sans-serif'}}}%%
-flowchart LR
-    CTX["Agent context<br/><i>system · tools · history · tool outputs</i>"] --> T0
-    subgraph TIER["Compression — risk-graded, reversible"]
-      direction LR
-      T0["Tier 0<br/><i>provably lossless</i>"] --> T1["Tier 1<br/><i>reversible digest + handle</i>"] --> ST["Stabilize<br/><i>keep cache warm</i>"]
-    end
-    ST --> CACHE["Cache-aware budget<br/><i>stable prefix cached ~0.1×</i>"]
-    CACHE --> OUT(["Compressed request<br/><b>~30% cheaper · losslessly</b>"])
-```
-
-**The quality contract** — measurement that *produces* the policy:
-
-```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0f1219','primaryTextColor':'#e7e9ee','primaryBorderColor':'#2a2550','lineColor':'#8b7bff','fontFamily':'ui-sans-serif'}}}%%
-flowchart LR
-    AB["Causal ablation<br/><i>find free-to-drop context</i>"] --> DE["Decision-equivalence<br/><i>same actions, compressed or not?</i>"]
-    DE --> G{"TOST<br/>non-inferiority"}
-    G -->|certified| PASS(["distil → PASS"])
-    G -->|degrades quality| FAIL(["aggressive → FAIL"])
-```
+<p align="center"><img src="docs/assets/architecture.svg" alt="architecture — pipeline and the quality-contract loop" width="100%"/></p>
 
 Two techniques carry most of the win — they target where the money actually is in an agent loop, not where it looks like it is.
 
 ### ① Cache-aware compression — the dominant lever
 
 You re-send the growing context every step. With prompt caching a cache **read is ~10× cheaper** than fresh input, so the real cost is cache **misses**, not context **size**. Distil keeps the prefix byte-stable (schema canonicalization + lifting volatile fields like timestamps/UUIDs out of the prefix) and compresses only the volatile tail.
+
+<p align="center"><img src="docs/assets/cache-aware.svg" alt="cache-aware savings" width="100%"/></p>
 
 > Naive recompression sends **fewer tokens yet costs more than not compressing at all**, because it rewrites the cached prefix every turn. Distil doesn't — that's the whole game most tools miss.
 
@@ -229,7 +204,7 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 
 - **Default tokenizer is an offline heuristic** (zero deps); ratios are robust, dollars are approximate. Use `--tokenizer anthropic` for billing-grade counts (the correct Claude tokenizer — tiktoken undercounts Claude).
 - **The default runner is a deterministic stand-in** so the gate runs offline with ground truth. `--runner anthropic` certifies against the live model — implemented, **UNVERIFIED** until you run it with a key.
-- The learned keep-model is a real trained **logistic** classifier (96.4%/0.98 on held-out lines). The **transformer** path ships a real ONNX inference adapter + training pipeline, but **no pre-baked checkpoint** — you train it on your traces (`distil train-transformer`, needs `[train]`). We won't fabricate weights to claim "done."
+- The learned keep-model is a real trained **logistic** classifier (96.4%/0.98 on held-out lines). The **transformer** path ships a real ONNX adapter + training pipeline; a **demo checkpoint** (96.3%/0.98, trained on the bundled corpus) is on the v0.1.0 release, and you retrain on your own traces for production (`distil train-transformer`). We don't fabricate weights to claim "done."
 - Numbers here are reproducible from the bundled corpus with the heuristic tokenizer. No vanity metrics.
 
 ---
@@ -246,7 +221,7 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 - [x] **Managed multi-tenant gateway + live per-tenant dashboard** (`distil gateway`)
 - [x] **Transformer keep-model** — ONNX inference adapter + training pipeline (`distil train-transformer`)¹
 
-<sub>¹ The transformer *pipeline and adapter* are real and tested; the production **checkpoint** is trained on **your** traces (`pip install 'distil-llm[train]'`), not shipped pre-baked — a universal tiny checkpoint would be worse than the zero-dep logistic default. That's deliberate, and we won't fake a checkpoint to check a box.</sub>
+<sub>¹ Real ONNX inference adapter + training pipeline, both tested. A **demo checkpoint** trained on the bundled 7-domain corpus (**96.3% acc / 0.98 F1** held-out) is attached to the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — but the *production* checkpoint is trained on **your** traces (`distil train-transformer`, needs `[train]`); a universal tiny checkpoint would underperform the zero-dep logistic default. We won't fake weights to check a box.</sub>
 
 ---
 
