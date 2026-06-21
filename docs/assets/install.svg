@@ -1,91 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
   </defs>
-  <rect width="1200" height="300" fill="url(#bg)"/>
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <text x="40" y="44" font-size="22" font-weight="800" fill="#e7e9ee">Install your way <tspan font-size="14" font-weight="400" fill="#8b91a1">— stdlib-only core, zero runtime deps, corpus bundled</tspan></text>
 
-  <!-- Title -->
-  <text x="40" y="46" font-size="22" font-weight="700" fill="#e7e9ee">Install your way. <tspan fill="#5b6173" font-weight="400" font-size="14">— six routes to the same tool</tspan></text>
+  <!-- 3 cols (x 40/421/802, w 357), 2 rows (y 84/218, h 110) -->
+  <!-- row 0 -->
+  <g transform="translate(40,84)"><rect width="357" height="110" rx="14" fill="#0c0e14" stroke="#23284a"/><rect x="18" y="22" width="30" height="3" rx="1.5" fill="url(#g)"/><text x="18" y="44" font-size="11" letter-spacing="1.5" fill="#5ad1c9">ZERO INSTALL</text><text x="18" y="74" font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e7e9ee">uvx distil bench</text><text x="18" y="96" font-size="10.5" fill="#5b6173">nothing to install — run it straight from PyPI</text></g>
+  <g transform="translate(421,84)"><rect width="357" height="110" rx="14" fill="#0c0e14" stroke="#23284a"/><rect x="18" y="22" width="30" height="3" rx="1.5" fill="url(#g)"/><text x="18" y="44" font-size="11" letter-spacing="1.5" fill="#5ad1c9">PYPI</text><text x="18" y="74" font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e7e9ee">pip install distil-llm</text><text x="18" y="96" font-size="10.5" fill="#5b6173">zero deps · corpus bundled in the wheel</text></g>
+  <g transform="translate(802,84)"><rect width="357" height="110" rx="14" fill="#0c0e14" stroke="#23284a"/><rect x="18" y="22" width="30" height="3" rx="1.5" fill="url(#g)"/><text x="18" y="44" font-size="11" letter-spacing="1.5" fill="#5ad1c9">HOMEBREW</text><text x="18" y="74" font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e7e9ee">brew install dshakes/tap/distil</text><text x="18" y="96" font-size="10.5" fill="#5b6173">macOS · Linux</text></g>
 
-  <!-- Card 1: uvx distil -->
-  <g transform="translate(30,70)">
-    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <!-- accent top bar -->
-    <rect width="172" height="4" rx="2" fill="url(#g)"/>
-    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">ZERO INSTALL</text>
-    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
-    <text x="14" y="62" font-size="13" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">uvx distil</text>
-    <text x="14" y="110" font-size="10" fill="#8b91a1">No install needed.</text>
-    <text x="14" y="126" font-size="10" fill="#8b91a1">Runs from the</text>
-    <text x="14" y="142" font-size="10" fill="#8b91a1">uv tool cache.</text>
-  </g>
-
-  <!-- Card 2: pip install distil-llm -->
-  <g transform="translate(220,70)">
-    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <rect width="172" height="4" rx="2" fill="url(#g)"/>
-    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">PYPI</text>
-    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
-    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">pip install</text>
-    <text x="14" y="80" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">distil-llm</text>
-    <text x="14" y="110" font-size="10" fill="#8b91a1">Python package.</text>
-    <text x="14" y="126" font-size="10" fill="#8b91a1">Works in any</text>
-    <text x="14" y="142" font-size="10" fill="#8b91a1">virtualenv.</text>
-  </g>
-
-  <!-- Card 3: brew install -->
-  <g transform="translate(410,70)">
-    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <rect width="172" height="4" rx="2" fill="url(#g)"/>
-    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">HOMEBREW</text>
-    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
-    <text x="14" y="62" font-size="10.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">brew install</text>
-    <text x="14" y="80" font-size="9.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">dshakes/tap/distil</text>
-    <text x="14" y="110" font-size="10" fill="#8b91a1">macOS / Linux.</text>
-    <text x="14" y="126" font-size="10" fill="#8b91a1">Auto-updates via</text>
-    <text x="14" y="142" font-size="10" fill="#8b91a1">brew upgrade.</text>
-  </g>
-
-  <!-- Card 4: docker run distil bench -->
-  <g transform="translate(600,70)">
-    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <rect width="172" height="4" rx="2" fill="url(#g)"/>
-    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">CONTAINER</text>
-    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
-    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">docker run</text>
-    <text x="14" y="80" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">distil bench</text>
-    <text x="14" y="110" font-size="10" fill="#8b91a1">Zero-dep image.</text>
-    <text x="14" y="126" font-size="10" fill="#8b91a1">Works anywhere</text>
-    <text x="14" y="142" font-size="10" fill="#8b91a1">Docker runs.</text>
-  </g>
-
-  <!-- Card 5: python distil.pyz bench -->
-  <g transform="translate(790,70)">
-    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <rect width="172" height="4" rx="2" fill="url(#g)"/>
-    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">SINGLE FILE</text>
-    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
-    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">python</text>
-    <text x="14" y="80" font-size="10.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">distil.pyz bench</text>
-    <text x="14" y="110" font-size="10" fill="#8b91a1">Drop in one .pyz</text>
-    <text x="14" y="126" font-size="10" fill="#8b91a1">zipapp. No pip</text>
-    <text x="14" y="142" font-size="10" fill="#8b91a1">required.</text>
-  </g>
-
-  <!-- Card 6: npx @distil/proxy -->
-  <g transform="translate(980,70)">
-    <rect width="190" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
-    <rect width="190" height="4" rx="2" fill="url(#g)"/>
-    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">NODE LAUNCHER</text>
-    <line x1="14" y1="38" x2="176" y2="38" stroke="#1b1f2a"/>
-    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">npx</text>
-    <text x="14" y="80" font-size="10.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">@distil/proxy</text>
-    <text x="14" y="110" font-size="10" fill="#8b91a1">Run via Node /</text>
-    <text x="14" y="126" font-size="10" fill="#8b91a1">npm ecosystem.</text>
-    <text x="14" y="142" font-size="10" fill="#8b91a1">No Python needed.</text>
-  </g>
-
-  <!-- Bottom caption -->
-  <text x="600" y="268" font-size="11" fill="#5b6173" text-anchor="middle">same CLI surface and proxy endpoint regardless of install method</text>
+  <!-- row 1 -->
+  <g transform="translate(40,218)"><rect width="357" height="110" rx="14" fill="#0c0e14" stroke="#23284a"/><rect x="18" y="22" width="30" height="3" rx="1.5" fill="url(#g)"/><text x="18" y="44" font-size="11" letter-spacing="1.5" fill="#5ad1c9">CONTAINER</text><text x="18" y="74" font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e7e9ee">docker run distil bench</text><text x="18" y="96" font-size="10.5" fill="#5b6173">tiny, reproducible image</text></g>
+  <g transform="translate(421,218)"><rect width="357" height="110" rx="14" fill="#0c0e14" stroke="#23284a"/><rect x="18" y="22" width="30" height="3" rx="1.5" fill="url(#g)"/><text x="18" y="44" font-size="11" letter-spacing="1.5" fill="#5ad1c9">SINGLE FILE</text><text x="18" y="74" font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e7e9ee">python distil.pyz bench</text><text x="18" y="96" font-size="10.5" fill="#5b6173">one portable executable, no install</text></g>
+  <g transform="translate(802,218)"><rect width="357" height="110" rx="14" fill="#0c0e14" stroke="#23284a"/><rect x="18" y="22" width="30" height="3" rx="1.5" fill="url(#g)"/><text x="18" y="44" font-size="11" letter-spacing="1.5" fill="#5ad1c9">NODE LAUNCHER</text><text x="18" y="74" font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e7e9ee">npx @distil/proxy</text><text x="18" y="96" font-size="10.5" fill="#5b6173">for JS/TS stacks — wraps the Python proxy</text></g>
 </svg>
