@@ -92,6 +92,22 @@ GATE: PASS — every trajectory certified non-inferior; aggressive rejected on a
 > distil certify --strategy aggressive   # VERDICT: FAIL  (mean diff −1.0, blocked)
 > ```
 
+### The certified compression frontier — `distil eval`
+
+The artifact no competitor publishes: a savings-vs-quality curve where **every point carries its certification verdict**. It locates the cliff past which lossy compression drops decisions — and shows distil sitting safely inside it. Reproducible offline; run `--runner anthropic` over your ingested traces for live task-accuracy.
+
+```
+level                   savings   equiv  certified  curve
+--------------------------------------------------------------------------
+distil (cache-aware)       8.4%    100%     ✔ PASS   ██
+truncate@1200              7.2%     79%        ✘ —    ██
+truncate@700              20.0%     36%        ✘ —    ████
+truncate@300              41.3%      0%        ✘ —    █████████
+--------------------------------------------------------------------------
+distil: 8.4% token savings @ 100% decision-equivalence — certified.
+certified ceiling beyond which lossy compression drops decisions and the gate rejects it.
+```
+
 ---
 
 ## 🔌 Works with every SDK
@@ -187,6 +203,11 @@ distil prune
 | **Performance benchmark** — p50/p95 latency + throughput | `perf.py`, `distil perf` | — |
 | Billing-grade tokenizer + live runner | `tokenizer.py`, `replay/anthropic_runner.py` | opt-in |
 | Savings ledger + leaderboard (privacy-preserving) | `ledger.py` | local-first |
+| **Certified compression frontier** — savings-vs-accuracy curve | `eval.py`, `distil eval` | the proof |
+| **Self-distilling keep-model** — learns from causal labels, gated by the contract | `online.py`, `distil online` | never-regressing |
+| **Verifiable federated telemetry** — signed, content-free savings + verdict | `telemetry.py`, `distil federated-leaderboard` | tamper-evident |
+| **Async high-concurrency proxy** | `aproxy.py`, `distil proxy --async` | `[async]` extra |
+| **Rust hot-path core** + pure-Python parity fallback | `rust/distil-core`, `distil/native.py` | opt-in speed |
 
 **Full docs:** [Getting started](https://dshakes.github.io/distil/getting-started.html) · [Concepts](https://dshakes.github.io/distil/concepts.html) · [Techniques](https://dshakes.github.io/distil/techniques.html) · [CLI](https://dshakes.github.io/distil/cli.html) · [Output & I/O](https://dshakes.github.io/distil/output.html) · [Architecture](https://dshakes.github.io/distil/architecture.html) · [Integrations](https://dshakes.github.io/distil/integrations.html) · [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) · [FAQ](https://dshakes.github.io/distil/faq.html)
 
