@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Concepts — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html" class="active">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Core <span class="g">Concepts</span></h1>
+    <p class="lead">Three ideas underpin everything Distil does. Understanding them explains why the numbers are real and why the approach is different.</p>
+
+    <img src="assets/architecture.svg" alt="Distil architecture overview" class="svg-embed"/>
+
+    <hr/>
+
+    <h2>1. Decision-equivalence, not byte-equivalence</h2>
+
+    <p>Most context compressors frame the problem as a string transformation: compress the context, compare the result byte-by-byte to the original, report the overlap as accuracy. That framing has a fatal flaw — byte-equivalence and high compression are <strong>information-theoretically in tension</strong>. You cannot meaningfully claim "87% compression, 100% accuracy" under byte-equivalence; the two numbers cannot describe the same operation.</p>
+
+    <p><strong>Decision-equivalence is the correct target.</strong> An agent only needs to take the same actions and produce the same outputs whether or not its context was compressed. "Same decision" is:</p>
+
+    <ul>
+      <li>The same tool calls (name + arguments) in the same order.</li>
+      <li>The same final answer or action at each turn.</li>
+      <li>Measured across a real multi-turn trajectory, not a single prompt.</li>
+    </ul>
+
+    <p>This is measurable. It is certifiable. And it is <strong>compatible with aggressive compression</strong> — because context blocks that are causally inert (never change a decision when removed) are provably free to drop, regardless of how many bytes they contain.</p>
+
+    <div class="callout good">
+      <b>The reframe in one sentence:</b> "100% accuracy" becomes a statistical non-inferiority guarantee on <em>outcomes</em>, not a diff of strings — and that makes it real.
+    </div>
+
+    <hr/>
+
+    <h2>2. The quality contract</h2>
+
+    <p>A compression strategy in Distil does not ship unless a pre-registered <strong>TOST non-inferiority test</strong> certifies it. TOST (Two One-Sided Tests) is the standard statistical framework for equivalence testing — the same method used in pharmaceutical non-inferiority trials.</p>
+
+    <h3>How the gate works</h3>
+    <ol>
+      <li><strong>Pre-register</strong> an indifference margin (default: 0.02 — tolerate at most a 2-point drop in task-success rate) and a significance level (default: α = 0.05).</li>
+      <li>For each turn in the trajectory, run the agent on the original context (baseline) and on the compressed context, and record whether the decision matched.</li>
+      <li>Compute paired differences (compressed score − baseline score) across all turns.</li>
+      <li>Run the lower one-sided test: reject H₀ that mean ≤ −margin. If you can reject that hypothesis at α, the strategy is certified <strong>non-inferior</strong>.</li>
+    </ol>
+
+    <p>The Student-t tail is computed from a hand-rolled regularised incomplete beta function — zero dependencies on scipy or numpy. The contract is the same gate, run across all 7 corpus domains.</p>
+
+    <pre class="term"><span class="d">$ distil certify --strategy distil</span>
+decision-equivalence match rate: <span class="g">100.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=+0.000, p=0.0000
+
+VERDICT: <span class="g">PASS</span>  (certified non-inferior)
+
+<span class="d">$ distil certify --strategy aggressive</span>
+decision-equivalence match rate: <span class="w">0.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=−1.000, p=1.0000
+
+VERDICT: <span class="w">FAIL</span>  (NOT certified — would degrade quality)</pre>
+
+    <p>A strategy that cannot pass the gate <strong>simply does not ship</strong>. You can watch the gate reject a quality-degrading strategy yourself — it is not a configuration option.</p>
+
+    <hr/>
+
+    <h2>3. Cache misses — not size — dominate agent cost</h2>
+
+    <p>This is the insight most context compressors miss entirely, and it is where Distil's biggest wins come from.</p>
+
+    <p>In a multi-turn agent loop, the growing context is re-sent to the model at <em>every turn</em>. With prompt caching enabled:</p>
+
+    <ul>
+      <li>A <strong>cache read</strong> costs roughly <strong>0.1×</strong> (one tenth) of the normal input price.</li>
+      <li>A <strong>cache write</strong> costs roughly <strong>1.25×</strong> of normal input.</li>
+      <li>A <strong>cache miss</strong> (fresh token) costs the full input price.</li>
+    </ul>
+
+    <p>The dominant cost lever is therefore not <em>how many tokens</em> you send — it is <em>how many of those tokens hit the cache</em>. A naive compressor that rewrites the context every turn causes the longest common prefix to drop to zero, losing the 10× discount on every cached block. The result:</p>
+
+    <div class="callout warn">
+      <b>Naive recompression sends fewer tokens yet costs more than not compressing at all</b>, because it rewrites the cached prefix every turn and pays the full input price on tokens that would otherwise cost 0.1×.
+    </div>
+
+    <p>Distil's cache-aware engine models this explicitly. It keeps the prefix <strong>byte-stable</strong> across turns (via schema canonicalization and volatile-field extraction), compresses only the volatile tail, and proves via simulation that the naive approach is strictly dominated.</p>
+
+    <h3>The numbers, measured</h3>
+
+    <div class="stat-row">
+      <div class="stat-box hl">
+        <div class="stat-n">33<s>%</s></div>
+        <div class="stat-l">Cost cut, cache-aware lossless · ops/sre trajectory</div>
+      </div>
+      <div class="stat-box hl">
+        <div class="stat-n">−11<s>%</s></div>
+        <div class="stat-l">Naive compress + cache (costs <em>more</em> than baseline)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">10<s>×</s></div>
+        <div class="stat-l">Cache-read discount vs. fresh input (Anthropic pricing)</div>
+      </div>
+    </div>
+
+    <img src="assets/cache-aware.svg" alt="Cache-aware savings vs naive compression" class="svg-embed"/>
+
+    <p>See <a href="techniques.html">Techniques</a> for the full breakdown of how cache stabilization works, and <a href="cli.html">CLI Reference</a> for <code>distil savings</code> which prices all four strategies on any trajectory.</p>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

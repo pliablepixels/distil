@@ -1,0 +1,30 @@
+{
+  "name": "@distil/proxy",
+  "version": "0.1.0",
+  "description": "Launch the Distil compression proxy from Node — wraps the Python CLI",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "distil-proxy": "./bin/distil-proxy.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "distil",
+    "llm",
+    "compression",
+    "proxy",
+    "anthropic",
+    "openai"
+  ],
+  "homepage": "https://github.com/dshakes/distil",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dshakes/distil"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ]
+}

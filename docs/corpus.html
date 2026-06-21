@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Corpus — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html" class="active">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>The <span class="g">Corpus</span></h1>
+    <p class="lead">The asset that makes certification meaningful — 7 real, captured-style agent trajectories across 7 domains. Every strategy must pass the gate on every one of them.</p>
+
+    <img src="assets/domains.svg" alt="Measured across 7 domains" class="svg-embed"/>
+
+    <hr/>
+
+    <h2>Why a corpus matters</h2>
+
+    <p>A compression strategy is not trustworthy because it works on one example. It needs to hold across the full breadth of what agents actually do: incident response, code debugging, customer support, research synthesis, data analysis, infrastructure work, and financial reconciliation.</p>
+
+    <div class="callout">
+      <b>The rule:</b> a strategy that fails the TOST non-inferiority gate on <em>any</em> trajectory does not ship — not just the easy ones. <code>distil bench</code> runs this check as a full CI gate, and exits non-zero on any failure.
+    </div>
+
+    <hr/>
+
+    <h2>Domain table</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Trajectory ID</th>
+          <th>$ Saved</th>
+          <th>Distil</th>
+          <th>Aggressive</th>
+          <th>Prunable tokens</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>ops/sre</strong></td>
+          <td><code>sre-disk-incident</code></td>
+          <td>33.1%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>615</td>
+        </tr>
+        <tr>
+          <td><strong>coding</strong></td>
+          <td><code>coding-bugfix</code></td>
+          <td>28.7%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>736</td>
+        </tr>
+        <tr>
+          <td><strong>support</strong></td>
+          <td><code>support-refund</code></td>
+          <td>32.6%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>765</td>
+        </tr>
+        <tr>
+          <td><strong>research</strong></td>
+          <td><code>research-synthesis</code></td>
+          <td>25.7%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>809</td>
+        </tr>
+        <tr>
+          <td><strong>data-analysis</strong></td>
+          <td><code>data-analysis-sql</code></td>
+          <td>18.1%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>965</td>
+        </tr>
+        <tr>
+          <td><strong>devops</strong></td>
+          <td><code>devops-rollback</code></td>
+          <td>25.0%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>857</td>
+        </tr>
+        <tr>
+          <td><strong>finance</strong></td>
+          <td><code>finance-reconcile</code></td>
+          <td>29.1%</td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td>1014</td>
+        </tr>
+        <tr style="border-top: 2px solid var(--line)">
+          <td colspan="2"><strong>Aggregate</strong></td>
+          <td><strong>26.8%</strong></td>
+          <td><span class="badge-pass">PASS</span></td>
+          <td><span class="badge-fail">FAIL</span></td>
+          <td><strong>5,761</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>Numbers are reproducible from the bundled corpus using the heuristic tokenizer. Absolute dollar figures assume claude-opus-4-8 public list pricing — verify before billing use.</p>
+
+    <hr/>
+
+    <h2>Trajectory structure</h2>
+
+    <p>Each trajectory is a 4-turn headless agent loop with three structural components:</p>
+
+    <ul>
+      <li><strong>Cacheable stable prefix</strong> — system instructions, tool definitions, and other content that does not change between turns. This is what the cache-aware engine keeps byte-stable to maximize cache hits.</li>
+      <li><strong>Decision-driving volatile tool outputs</strong> — the tool results that carry the information the agent actually needs to make its next decision. These are the blocks that show up as <em>keep</em> in ablation.</li>
+      <li><strong>Causally-inert noise</strong> — speculative retrievals, stale observations, context blocks that were present but never cited by any decision. These are the blocks ablation marks as <em>PRUNE</em>.</li>
+    </ul>
+
+    <p>Trajectories are stored as JSON files in <code>corpus/</code>. The manifest is at <code>corpus/manifest.json</code>. The loader (<code>distil/corpus.py</code>) resolves the corpus path from the wheel, the repo, or a <code>$DISTIL_CORPUS</code> environment variable.</p>
+
+    <hr/>
+
+    <h2><code>distil bench</code> — the CI gate</h2>
+
+    <p><code>distil bench</code> is the intended CI gate for new compression strategies. It runs the full corpus measurement loop and exits non-zero if any of the following occur:</p>
+
+    <ul>
+      <li>A trajectory fails structural validation (<code>corpus.validate()</code>)</li>
+      <li>The distil strategy fails the TOST non-inferiority test on any trajectory</li>
+      <li>The gate <em>fails to reject</em> the aggressive lossy strategy on any trajectory (which would indicate the gate itself is broken)</li>
+    </ul>
+
+    <pre class="term"><span class="d">$ distil bench</span>
+<span class="d"># Exits 0 only if every trajectory passes all three conditions above</span>
+
+GATE: <span class="g">PASS</span> — every trajectory certified non-inferior; aggressive rejected on all.
+
+<span class="d"># If a new strategy were added that degraded quality on one domain:</span>
+
+GATE: <span class="w">FAIL</span> (1 issue(s))
+  - corpus/finance-reconcile.json: distil FAILED non-inferiority</pre>
+
+    <h3>The rule in one sentence</h3>
+    <div class="callout good">
+      <b>A new compression strategy must pass <code>make gate</code></b> (non-inferior on every domain, byte-reversible). No green gate, no merge. That's the whole philosophy in one sentence.
+    </div>
+
+    <hr/>
+
+    <h2>Corpus invariants enforced by <code>corpus.validate()</code></h2>
+
+    <p>The <code>validate()</code> function checks structural correctness of each trajectory before it enters the gate:</p>
+
+    <ul>
+      <li>Every trajectory must have at least one turn.</li>
+      <li>Every turn must have at least one block.</li>
+      <li>Every block must have a non-empty ID and non-empty text.</li>
+      <li>Block stability labels must be from the defined <code>Stability</code> enum (<code>STABLE</code> / <code>VOLATILE</code>).</li>
+      <li>Turn indices must be monotonically increasing.</li>
+    </ul>
+
+    <p>A trajectory that fails validation is reported as a failure in <code>bench</code> before any cost or quality measurement runs — there is no silent skip.</p>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

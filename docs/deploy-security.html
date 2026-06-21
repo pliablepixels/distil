@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Deploy &amp; Security — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html" class="active">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <h1>Deploy &amp; <span class="g">Security</span></h1>
+    <p class="lead">Three deployment topologies, one security model. The proxy is designed to be safe by default — it binds localhost, forwards only to the single configured upstream, and never touches your secrets.</p>
+
+    <img src="assets/install.svg" alt="Deployment topologies diagram" class="svg-embed"/>
+
+    <hr/>
+
+    <h2>Deployment topologies</h2>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="k">Topology 1</div>
+        <h4>Local dev sidecar</h4>
+        <p>Run <code>distil proxy</code> on your laptop alongside your application. Default bind is <code>127.0.0.1:8788</code> — not reachable from the network. Zero infra overhead.</p>
+      </div>
+      <div class="tier">
+        <div class="k">Topology 2</div>
+        <h4>Container sidecar</h4>
+        <p>Add the proxy as a sidecar container in the same Pod or Compose stack. Your app container calls <code>http://localhost:8788</code>; only the sidecar egresses to the upstream API.</p>
+      </div>
+      <div class="tier">
+        <div class="k">Topology 3</div>
+        <h4>Shared gateway</h4>
+        <p>Run one proxy instance accessible to multiple services on a private network. Bind to an internal interface (<code>--host 0.0.0.0</code>), keep it behind a firewall or service mesh, never expose it to the public internet.</p>
+      </div>
+    </div>
+
+    <h3>Local dev sidecar</h3>
+    <pre class="term"><span class="d"># Terminal 1</span>
+distil proxy --port 8788 --upstream https://api.anthropic.com
+
+<span class="d"># Terminal 2 — your application</span>
+ANTHROPIC_BASE_URL=http://127.0.0.1:8788 python my_agent.py</pre>
+
+    <h3>Container sidecar (Docker Compose)</h3>
+    <pre class="term">services:
+  app:
+    build: .
+    environment:
+      - ANTHROPIC_BASE_URL=http://distil-proxy:8788
+    depends_on:
+      - distil-proxy
+
+  distil-proxy:
+    image: python:3.12-slim
+    command: >
+      sh -c "pip install distil-llm &&
+             distil proxy --host 0.0.0.0 --port 8788
+               --upstream https://api.anthropic.com"
+    ports: []  <span class="d"># not exposed externally</span></pre>
+
+    <h3>Shared gateway (Kubernetes)</h3>
+    <pre class="term">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: distil-proxy
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: distil
+        image: python:3.12-slim
+        command:
+          - sh
+          - -c
+          - pip install distil-llm &amp;&amp; distil proxy --host 0.0.0.0 --port 8788
+        env:
+          - name: DISTIL_UPSTREAM
+            value: https://api.anthropic.com
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: distil-proxy
+spec:
+  clusterIP: ...  <span class="d"># internal only — no LoadBalancer type</span>
+  ports:
+  - port: 8788</pre>
+
+    <hr/>
+
+    <h2>Security model</h2>
+
+    <h3>Localhost-only by default</h3>
+    <p>The proxy binds to <code>127.0.0.1</code> by default. It is not reachable from any other host unless you explicitly pass <code>--host 0.0.0.0</code>. In production topologies, always restrict network access to the proxy with a firewall rule or service mesh policy.</p>
+
+    <h3>Single configured upstream — no SSRF</h3>
+    <p>The upstream URL is set once at startup (<code>--upstream</code>). The proxy does not read the destination from the incoming request, so a malicious request body cannot redirect traffic to an attacker-controlled server. All outbound connections go to exactly one destination.</p>
+
+    <div class="callout good">
+      <b>No SSRF surface.</b> The upstream is a constructor argument baked into the handler class at startup, not read from request headers or the request body. There is no mechanism for an incoming request to change where the proxy connects.
+    </div>
+
+    <h3>No request body logging</h3>
+    <p>The proxy overrides <code>log_message</code> to suppress all request logs. It reads the request body to compress it, then discards it — nothing is written to disk or stdout. API keys, message content, and tool results are never logged.</p>
+
+    <pre class="term"><span class="d"># In distil/proxy.py — request logs are silenced by design</span>
+def log_message(self, fmt: str, *args: object) -&gt; None:
+    pass</pre>
+
+    <h3>Auth-mode gating — lossless subscriptions stay lossless</h3>
+    <p>Anthropic's cache-control and subscription/OAuth sessions require byte-for-byte stability in the system prefix. Pass <code>--lossless-only</code> to restrict the proxy to Tier-0 lossless transforms only (JSON minification, run-length collapse). No digests, no content changes that could break a cached prefix or OAuth flow.</p>
+
+    <pre class="term">distil proxy --lossless-only --upstream https://api.anthropic.com</pre>
+
+    <h3>Hop-by-hop header stripping</h3>
+    <p>The proxy strips connection-specific headers (<code>Connection</code>, <code>Transfer-Encoding</code>, <code>Keep-Alive</code>, etc.) before forwarding. This prevents header injection attacks and ensures clean HTTP/1.1 semantics at the upstream boundary.</p>
+
+    <hr/>
+
+    <h2>Data retention and zero-data retention (ZDR)</h2>
+
+    <p>Distil itself retains no data. The proxy is stateless: it reads a request, compresses the <code>messages</code> array in memory, forwards it, and relays the response. Nothing is written to disk.</p>
+
+    <p>If your Anthropic contract includes Zero Data Retention (ZDR), the compressed payload forwarded by the proxy is covered by the same ZDR terms as a direct call — Distil does not introduce any additional retention surface.</p>
+
+    <div class="callout">
+      <b>RestoreStore is in-process only.</b> The Tier-1 reversible digest stores original text in a Python dict for the duration of a single request. It is never persisted, never sent to the model, and is garbage-collected when the request handler exits.
+    </div>
+
+    <hr/>
+
+    <h2>Threat model summary</h2>
+
+    <table>
+      <thead>
+        <tr><th>Threat</th><th>Mitigation</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Network exposure of the proxy</td>
+          <td>Binds <code>127.0.0.1</code> by default; explicit <code>--host</code> required to listen externally.</td>
+        </tr>
+        <tr>
+          <td>SSRF via request body</td>
+          <td>Upstream is set once at startup; cannot be overridden by request content.</td>
+        </tr>
+        <tr>
+          <td>Secret exfiltration via logs</td>
+          <td>Request logging is disabled; no body content is written anywhere.</td>
+        </tr>
+        <tr>
+          <td>Cache prefix corruption</td>
+          <td><code>--lossless-only</code> mode restricts to byte-stable Tier-0 transforms only.</td>
+        </tr>
+        <tr>
+          <td>Header injection</td>
+          <td>Hop-by-hop headers are stripped before forwarding in both directions.</td>
+        </tr>
+        <tr>
+          <td>Data retention beyond request</td>
+          <td>Stateless handler; RestoreStore is in-process, not persisted.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

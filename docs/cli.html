@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>CLI Reference — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html" class="active">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>CLI <span class="g">Reference</span></h1>
+    <p class="lead">Every subcommand, its flags, and a real sample output. All commands work offline with zero API key — the bundled corpus is self-contained.</p>
+
+    <div class="callout">
+      <b>Global flag:</b> <code>distil --version</code> prints the installed version.
+      <br/>
+      <b>Default trajectory:</b> when <code>--trajectory</code> is omitted, the bundled <code>sre-disk-incident</code> sample trajectory is used.
+    </div>
+
+    <hr/>
+
+    <!-- bench -->
+    <h2 id="bench">distil bench</h2>
+    <p>The <strong>corpus-wide CI gate</strong>. Iterates over all 7 trajectories, prices four strategies, runs the TOST non-inferiority gate on each, and confirms aggressive lossy compression is still rejected. Exits 0 only if every trajectory passes.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--tokenizer</code></td><td><code>heuristic</code></td><td><code>heuristic</code> (offline, zero deps) or <code>anthropic</code> (billing-grade <code>count_tokens</code>)</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing to use (see pricing catalog)</td></tr>
+        <tr><td><code>--margin</code></td><td><code>0.02</code></td><td>TOST indifference margin (max tolerable mean score drop)</td></tr>
+        <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Significance level for the non-inferiority test</td></tr>
+        <tr><td><code>--record</code></td><td>off</td><td>Append corpus-aggregate savings to the local savings ledger</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil bench</span>
+corpus gate — 7 trajectories | model claude-opus-4-8 | tokenizer=heuristic
+
+domain            trajectory               $ saved   distil   aggr  pruned
+---------------------------------------------------------------------------
+ops/sre           sre-disk-incident          33.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>     615
+coding            coding-bugfix              28.7%     <span class="g">PASS</span>   <span class="w">FAIL</span>     736
+support           support-refund             32.6%     <span class="g">PASS</span>   <span class="w">FAIL</span>     765
+research          research-synthesis         25.7%     <span class="g">PASS</span>   <span class="w">FAIL</span>     809
+data-analysis     data-analysis-sql          18.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>     965
+devops            devops-rollback            25.0%     <span class="g">PASS</span>   <span class="w">FAIL</span>     857
+finance           finance-reconcile          29.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>    1014
+---------------------------------------------------------------------------
+aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) losslessly; 5761 tokens prunable.
+
+GATE: <span class="g">PASS</span> — every trajectory certified non-inferior; aggressive rejected on all.</pre>
+
+    <hr/>
+
+    <!-- savings -->
+    <h2 id="savings">distil savings</h2>
+    <p>Price four compression strategies on a single trajectory and show per-strategy cost, savings percentage, and cache hit tokens. The key result: naive compress + cache costs <em>more</em> than baseline because it busts the prefix cache.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--trajectory, -t</code></td><td>bundled sample</td><td>Path to a trajectory JSON file</td></tr>
+        <tr><td><code>--tokenizer</code></td><td><code>heuristic</code></td><td><code>heuristic</code> or <code>anthropic</code> (billing-grade)</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing to use</td></tr>
+        <tr><td><code>--output-tokens-per-turn</code></td><td><code>0</code></td><td>Assumed output tokens per turn (for output cost accounting)</td></tr>
+        <tr><td><code>--record</code></td><td>off</td><td>Append this run to the local savings ledger</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil savings --pricing claude-opus-4-8</span>
+model claude-opus-4-8   |   4 turns   |   tokenizer=heuristic (≈, not billing-grade)
+
+strategy                               $ / run   vs baseline  cache hits
+------------------------------------------------------------------------
+baseline (no cache, no compress)       0.01524          0.0%           0
+cache only                             0.01115         26.8%       1,028
+naive compress + cache                 0.01691        <span class="w">-11.0%</span>           0
+distil (cache-aware lossless)          0.01019         <span class="g">33.1%</span>       1,028
+------------------------------------------------------------------------
+distil cuts $0.01524 -> $0.01019 per run (33.1% cheaper), losslessly.
+note: naive compression costs $0.01691 — <span class="w">66% MORE</span> than distil despite fewer tokens,
+      because it busts the prefix cache.</pre>
+
+    <hr/>
+
+    <!-- certify -->
+    <h2 id="certify">distil certify</h2>
+    <p>Run the TOST non-inferiority gate on a single trajectory and strategy. Exits 0 on PASS, 1 on FAIL. Use this as the unit-level quality check; use <code>bench</code> for the corpus-wide gate.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--trajectory, -t</code></td><td>bundled sample</td><td>Path to a trajectory JSON file</td></tr>
+        <tr><td><code>--strategy</code></td><td><code>distil</code></td><td>Strategy to certify: <code>distil</code>, <code>aggressive</code>, <code>naive</code>, <code>none</code></td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline, uses ground-truth markers) or <code>anthropic</code> (live model, requires key)</td></tr>
+        <tr><td><code>--margin</code></td><td><code>0.02</code></td><td>TOST indifference margin</td></tr>
+        <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Significance level</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil certify --strategy distil</span>
+certifying strategy 'distil' on 'sre-disk-incident' (runner=deterministic)
+
+  turn 0: ok
+  turn 1: ok
+  turn 2: ok
+  turn 3: ok
+
+decision-equivalence match rate: <span class="g">100.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=+0.000, p=0.0000
+
+VERDICT: <span class="g">PASS</span>  (certified non-inferior)
+
+<span class="d">$ distil certify --strategy aggressive</span>
+certifying strategy 'aggressive' on 'sre-disk-incident' (runner=deterministic)
+
+  turn 0: <span class="w">DIVERGED</span>
+      baseline:   use_tool(bash, {"cmd":"df -h /"})
+      compressed: use_tool(bash, {"cmd":"ls /"})
+  turn 1: <span class="w">DIVERGED</span>
+  turn 2: <span class="w">DIVERGED</span>
+  turn 3: <span class="w">DIVERGED</span>
+
+decision-equivalence match rate: <span class="w">0.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=-1.000, p=1.0000
+
+VERDICT: <span class="w">FAIL</span>  (NOT certified — would degrade quality)</pre>
+
+    <hr/>
+
+    <!-- prune -->
+    <h2 id="prune">distil prune</h2>
+    <p>Causal ablation: for each context block, remove it and replay the trajectory. Blocks that never change a decision are <strong>causally inert</strong> — provably free to drop.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--trajectory, -t</code></td><td>bundled sample</td><td>Path to a trajectory JSON file</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil prune</span>
+causal ablation over 'sre-disk-incident' — what is free to drop?
+
+block                  occ   tokens  verdict
+doc-0                    4      312  <span class="g">PRUNE (causally inert)</span>
+doc-1                    4      303  <span class="g">PRUNE (causally inert)</span>
+obs-0                    4      234  <span class="d">keep (changed a decision)</span>
+obs-1                    4      198  <span class="d">keep (changed a decision)</span>
+system                   4      218  <span class="d">keep (changed a decision)</span>
+
+tokens provably free to drop: 615 across 2 block(s).</pre>
+
+    <hr/>
+
+    <!-- compress -->
+    <h2 id="compress">distil compress</h2>
+    <p>Apply the distil strategy to a trajectory turn by turn and report the per-turn token reduction and overall reversibility status.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--trajectory, -t</code></td><td>bundled sample</td><td>Path to a trajectory JSON file</td></tr>
+        <tr><td><code>--tokenizer</code></td><td><code>heuristic</code></td><td><code>heuristic</code> or <code>anthropic</code></td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil compress</span>
+trajectory 'sre-disk-incident'  (4 turns, tokenizer=heuristic)
+
+turn    before     after   saved
+   0      1824      1312   28.1%
+   1      1956      1401   28.4%
+   2      2108      1518   28.0%
+   3      2340      1689   27.8%
+
+ ALL      8228      5920   28.1%
+
+reversible: yes (Tier-0/1) — 3 blocks digested, originals recoverable locally</pre>
+
+    <hr/>
+
+    <!-- verify -->
+    <h2 id="verify">distil verify</h2>
+    <p>Byte-fidelity gate: confirms every Tier-0/1 compression across the corpus is byte-reversible, and that frozen history never mutates between turns (append-only invariant). Exits 0 only if all checks pass.</p>
+
+    <p>No flags. Runs across the full bundled corpus.</p>
+
+    <pre class="term"><span class="d">$ distil verify</span>
+byte-fidelity gate — reversibility + append-only across the corpus
+
+  sre-disk-incident        reversible + append-only: ok
+  coding-bugfix            reversible + append-only: ok
+  support-refund           reversible + append-only: ok
+  research-synthesis       reversible + append-only: ok
+  data-analysis-sql        reversible + append-only: ok
+  devops-rollback          reversible + append-only: ok
+  finance-reconcile        reversible + append-only: ok
+
+FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history append-only across the corpus.</pre>
+
+    <hr/>
+
+    <!-- holdout -->
+    <h2 id="holdout">distil holdout</h2>
+    <p>Holdout A/B savings measurement. Partitions the corpus into a control group (held out, not counted toward the headline) and a treatment group, reports savings with a bootstrap 95% confidence interval.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--tokenizer</code></td><td><code>heuristic</code></td><td><code>heuristic</code> or <code>anthropic</code></td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing to use</td></tr>
+        <tr><td><code>--control-fraction</code></td><td><code>0.2</code></td><td>Fraction of corpus held out as control group</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil holdout</span>
+holdout A/B savings measurement (deterministic partition + bootstrap CI)
+
+  treatment savings: 27.4% [95% CI: 24.1%–30.8%]
+  control group mean savings: 26.1% (held out, not counted toward the headline)</pre>
+
+    <hr/>
+
+    <!-- leaderboard -->
+    <h2 id="leaderboard">distil leaderboard</h2>
+    <p>Shows cumulative savings from all runs recorded via <code>--record</code> flags on <code>savings</code> and <code>bench</code>. Local-first; no data leaves the machine unless you opt in to community sharing (not currently enabled).</p>
+
+    <p>No flags.</p>
+
+    <pre class="term"><span class="d">$ distil leaderboard</span>
+distil savings ledger — ~/.local/share/distil/ledger.jsonl
+
+runs recorded:        12
+total tokens saved:   42,816
+total dollars saved:  $0.51234
+
+by trajectory:
+  corpus-aggregate             $0.38112
+  sre-disk-incident            $0.13122
+
+(local-first; community sharing is opt-in and not enabled.)</pre>
+
+    <hr/>
+
+    <!-- proxy -->
+    <h2 id="proxy">distil proxy <span style="font-size:13px;font-weight:400;color:var(--acc2)">(in progress)</span></h2>
+    <p>HTTP proxy that applies Distil compression to every LLM API request passing through it. Drop-in for any client that honours a <code>base_url</code> parameter — Anthropic SDK, OpenAI SDK, LiteLLM, LangChain, etc.</p>
+
+    <p>The proxy is currently available as a Python module (<code>python -m distil.proxy</code>). A CLI subcommand wrapping the same server is being added.</p>
+
+    <h3>Flags (module / upcoming CLI)</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--port</code></td><td><code>8788</code></td><td>Port to listen on</td></tr>
+        <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions)</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ python -m distil.proxy --port 8788 --upstream https://api.anthropic.com</span>
+distil proxy listening on http://127.0.0.1:8788
+  → upstream: https://api.anthropic.com</pre>
+
+    <p>Point your SDK at the proxy:</p>
+    <pre class="term"><span class="d"># Anthropic SDK</span>
+client = anthropic.Anthropic(base_url=<span class="g">"http://localhost:8788"</span>)
+
+<span class="d"># OpenAI-compatible client</span>
+client = openai.OpenAI(base_url=<span class="g">"http://localhost:8788/v1"</span>)
+
+<span class="d"># LiteLLM</span>
+response = litellm.completion(api_base=<span class="g">"http://localhost:8788"</span>, ...)</pre>
+
+    <p>The proxy adds two response headers: <code>x-distil-compressed: 1</code> and <code>x-distil-tokens-saved: &lt;n&gt;</code>. All other paths and HTTP methods are forwarded unchanged.</p>
+
+    <p>See <a href="adapters.html">Adapters</a> for the full story on in-process vs. proxy adoption.</p>
+
+    <hr/>
+
+    <h2>Full CI gate</h2>
+    <pre class="term"><span class="d">$ make gate</span>
+<span class="d"># Runs: tests + corpus non-inferiority (distil bench) + byte-fidelity (distil verify)</span>
+
+pytest ... 181 passed in 4.2s
+corpus gate: <span class="g">PASS</span>
+fidelity gate: <span class="g">PASS</span></pre>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

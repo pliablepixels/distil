@@ -31,4 +31,41 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
             dist/distil.pyz
-      # To publish to PyPI, add a trusted-publisher step here (pypa/gh-action-pypi-publish).
+      - name: Stage PyPI artifacts (wheel + sdist only)
+        run: |
+          mkdir -p pypi-dist
+          cp dist/*.whl dist/*.tar.gz pypi-dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-dist
+          path: pypi-dist/
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    # Enable once the PyPI trusted publisher is configured (see below), by setting
+    # repo variable PUBLISH_TO_PYPI=true. Until then the release still ships GitHub artifacts.
+    if: ${{ vars.PUBLISH_TO_PYPI == 'true' }}
+    environment:
+      name: pypi
+      url: https://pypi.org/p/distil-llm
+    permissions:
+      id-token: write   # OIDC — trusted publishing, no API token/secret needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pypi-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+# ── PyPI trusted publishing setup (one-time, on pypi.org) ──────────────────────
+# 1. Create the project owner account, then add a *pending publisher*:
+#    PyPI → Your projects → Publishing → Add a new pending publisher
+#      PyPI Project Name : distil-llm
+#      Owner             : dshakes
+#      Repository        : distil
+#      Workflow name     : release.yml
+#      Environment       : pypi
+# 2. In this repo: Settings → Secrets and variables → Actions → Variables →
+#    add PUBLISH_TO_PYPI = true
+# 3. Push a tag (vX.Y.Z). No API token is ever stored — auth is OIDC.

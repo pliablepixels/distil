@@ -302,6 +302,14 @@ def cmd_holdout(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_proxy(args: argparse.Namespace) -> int:
+    """Drop-in provider proxy: point any base_url-honoring client at it."""
+    from .proxy import serve
+
+    serve(host=args.host, port=args.port, upstream=args.upstream, lossless_only=args.lossless_only)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="distil", description="Compression with a quality contract.")
     p.add_argument("--version", action="version", version=f"distil {__version__}")
@@ -375,6 +383,19 @@ def build_parser() -> argparse.ArgumentParser:
     ho.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
     ho.add_argument("--control-fraction", type=float, default=0.2)
     ho.set_defaults(func=cmd_holdout)
+
+    px = sub.add_parser("proxy", help="drop-in provider proxy (point any client's base_url at it)")
+    px.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
+    px.add_argument("--port", type=int, default=8788)
+    px.add_argument(
+        "--upstream", default="https://api.anthropic.com", help="upstream provider base URL"
+    )
+    px.add_argument(
+        "--lossless-only",
+        action="store_true",
+        help="lossless compression only (safe for subscription/OAuth sessions)",
+    )
+    px.set_defaults(func=cmd_proxy)
     return p
 
 

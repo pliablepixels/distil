@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Architecture — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html" class="active">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Architecture <span class="g">Overview</span></h1>
+    <p class="lead">How the parts fit together: the tier model, the measure→discover→certify loop, byte-fidelity invariants, auth-mode gating, and holdout A/B validation.</p>
+
+    <img src="assets/architecture.svg" alt="Distil architecture diagram" class="svg-embed"/>
+
+    <hr/>
+
+    <h2>The tier model</h2>
+    <p>Distil organises every compression operation into three tiers, ordered by safety. Higher tiers require stronger evidence before they are permitted.</p>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="k">Tier 0 — Always on</div>
+        <h4>Provably lossless transforms</h4>
+        <p>Reconstructable by construction — no state required. Applied unconditionally to every block.</p>
+        <ul style="margin-top:8px;font-size:13px;color:var(--mut)">
+          <li><b style="color:var(--ink)">JSON minification</b> — strips whitespace from valid JSON payloads; semantics unchanged.</li>
+          <li><b style="color:var(--ink)">Run-length collapse</b> — replaces repetitive patterns (repeated separators, blank lines) with a compact representation.</li>
+          <li><b style="color:var(--ink)">Reject-if-bigger invariant</b> — Tier 0 never emits a block larger than its original; the transform is a no-op if it would grow the content.</li>
+        </ul>
+        <p style="margin-top:10px;font-size:12px">Module: <code>compress/tier0.py</code></p>
+      </div>
+      <div class="tier">
+        <div class="k">Tier 1 — Reversible</div>
+        <h4>Decision-aware digest</h4>
+        <p>Large tool results (≥ 6 lines) are replaced with a compact digest. The original is kept locally in a <code>RestoreStore</code> keyed by an 8-hex SHA-256 handle.</p>
+        <ul style="margin-top:8px;font-size:13px;color:var(--mut)">
+          <li>The handle is embedded inline in the compressed text — re-expansion is always possible.</li>
+          <li>BM25 partial retrieval lets the agent query the original content without full re-expansion.</li>
+          <li>Reject-if-bigger also applied at Tier 1.</li>
+        </ul>
+        <p style="margin-top:10px;font-size:12px">Module: <code>compress/tier1.py</code></p>
+      </div>
+      <div class="tier">
+        <div class="k">Certified — Gated</div>
+        <h4>Lossy strategies</h4>
+        <p>Pruning, summarization, and aggressive rewriting only apply at ratios the TOST non-inferiority gate certifies. A strategy that fails the gate is blocked — it does not ship.</p>
+        <ul style="margin-top:8px;font-size:13px;color:var(--mut)">
+          <li>Ablation discovers which blocks are causally inert before any pruning runs.</li>
+          <li>Subscription / OAuth sessions are locked to lossless-only (see auth gating).</li>
+        </ul>
+        <p style="margin-top:10px;font-size:12px">Gate: <code>certify/gate.py</code></p>
+      </div>
+    </div>
+
+    <hr/>
+
+    <h2>The measure → discover → certify loop</h2>
+
+    <p>This is the architecture that makes the quality contract meaningful — and that separates Distil from estimators that measure quality and savings in separate runs.</p>
+
+    <div class="callout">
+      <b>The invariant:</b> the accuracy claim and the compression ratio are measured on the <em>same trajectories in the same run</em>. There is no separate "quality benchmark at low compression" — you see both numbers for the same corpus, or you see nothing.
+    </div>
+
+    <h3>Step 1 — Measure</h3>
+    <p>For each trajectory and strategy, the cache-aware cost engine (<code>compress/cache_aware.py</code>) simulates the full multi-turn loop with four variants: baseline (no cache, no compress), cache only, naive compress + cache, and distil. It computes per-turn cost breakdowns and reports the total dollar cost of each strategy.</p>
+
+    <h3>Step 2 — Discover</h3>
+    <p>The causal ablation engine (<code>replay/ablation.py</code>) systematically removes each context block, replays the trajectory through the runner, and records whether any decision changed. The output is a per-block verdict: <em>causally inert</em> (safe to prune) or <em>decision-driving</em> (must be kept). This step <strong>produces</strong> the compression policy — it does not assume one.</p>
+
+    <h3>Step 3 — Certify</h3>
+    <p>The TOST gate (<code>certify/stats.py</code> via <code>certify/gate.py</code>) computes paired differences (compressed score − baseline score) across all turns and runs a one-sided Student-t test against the pre-registered margin. The implementation uses a hand-rolled regularised incomplete beta function — zero scipy/numpy.</p>
+
+    <p>A non-inferior strategy has its policy registered in the compress registry. A failing strategy is rejected and produces a non-zero exit code from <code>distil certify</code> and <code>distil bench</code>.</p>
+
+    <hr/>
+
+    <h2>Byte-fidelity invariants</h2>
+    <p><strong>Module:</strong> <code>distil/fidelity.py</code> · Gate: <code>distil verify</code></p>
+
+    <p>Two structural invariants are enforced across the entire corpus by the verify gate:</p>
+
+    <h3>Reversibility</h3>
+    <p>Every original block is recoverable, either because the compressed text is byte-identical to the original, or because the original lives in the local restore table (keyed by block ID for Tier-0, by content handle for Tier-1). Recovery is confirmed via SHA-256 equality — auditable and machine-checkable.</p>
+
+    <h3>Append-only history</h3>
+    <p>A block ID that appears in two consecutive turns must carry identical bytes. Mutating a previously-seen block ID is a violation. This invariant ensures the prefix cache is never invalidated by history rewriting — the cache hit rate depends on it.</p>
+
+    <h3>Numeric precision</h3>
+    <p>JSON canonicalization must not lose numeric precision. <code>numeric_precision_preserved()</code> confirms that both the original and transformed strings parse to the same JSON value.</p>
+
+    <pre class="term"><span class="d">$ distil verify</span>
+byte-fidelity gate — reversibility + append-only across the corpus
+
+  sre-disk-incident        reversible + append-only: ok
+  coding-bugfix            reversible + append-only: ok
+  support-refund           reversible + append-only: ok
+  research-synthesis       reversible + append-only: ok
+  data-analysis-sql        reversible + append-only: ok
+  devops-rollback          reversible + append-only: ok
+  finance-reconcile        reversible + append-only: ok
+
+FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history append-only across the corpus.</pre>
+
+    <hr/>
+
+    <h2>Auth-mode gating</h2>
+    <p><strong>Module:</strong> <code>distil/policy.py</code></p>
+
+    <p>Aggressive compression applied to a subscription or OAuth session can alter conversations in ways that violate provider terms — injected retrieval tools the user never authorized, rewritten history that changes the conversation record. Auth-mode gating is a safety boundary, not an optimization.</p>
+
+    <table>
+      <thead><tr><th>Mode</th><th>Allowed strategies</th><th>Tool injection</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>PAYG</strong> (pay-as-you-go API key)</td>
+          <td>Full toolbox: <code>none</code>, <code>distil</code>, <code>naive</code>, <code>aggressive</code></td>
+          <td>Permitted</td>
+        </tr>
+        <tr>
+          <td><strong>SUBSCRIPTION</strong> (OAuth / first-party app)</td>
+          <td>Lossless-only: <code>none</code>, <code>distil</code></td>
+          <td>Blocked</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The policy is a <strong>tightening boundary</strong> — a project's config can never loosen it. A <code>PolicyError</code> is raised if a non-permitted strategy is requested under the active auth mode. This maps cleanly onto the proxy's <code>--lossless-only</code> flag for subscription-context deployments.</p>
+
+    <hr/>
+
+    <h2>Holdout A/B with bootstrap CI</h2>
+    <p><strong>Module:</strong> <code>distil/certify/holdout.py</code> · Command: <code>distil holdout</code></p>
+
+    <p>The holdout module provides an additional validation layer on top of the TOST gate. It:</p>
+
+    <ol>
+      <li><strong>Deterministically partitions</strong> the corpus into a control group (default: 20%, held out and not counted toward the headline) and a treatment group, using a hash-based split for reproducibility.</li>
+      <li><strong>Measures savings</strong> in both groups separately.</li>
+      <li><strong>Bootstrap-resamples</strong> the treatment group to compute a 95% confidence interval on the savings estimate.</li>
+    </ol>
+
+    <p>The reported confidence interval is honest: it reflects the uncertainty in the savings measurement given the finite corpus size. The control group acts as a sanity check — if control and treatment savings diverge significantly, something is wrong with the partition or the measurement.</p>
+
+    <hr/>
+
+    <h2>Module map</h2>
+    <table>
+      <thead><tr><th>Module</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>compress/cache_aware.py</code></td><td>Cache-aware cost simulation — the dominant cost lever</td></tr>
+        <tr><td><code>compress/stabilize.py</code></td><td>Schema canonicalization + volatile-field extraction</td></tr>
+        <tr><td><code>compress/tier0.py</code></td><td>Tier-0 lossless transforms (JSON minify, RLE)</td></tr>
+        <tr><td><code>compress/tier1.py</code></td><td>Tier-1 reversible digest + handle embedding</td></tr>
+        <tr><td><code>compress/strategies.py</code></td><td>Strategy registry + reject-if-bigger invariant</td></tr>
+        <tr><td><code>replay/ablation.py</code></td><td>Causal/counterfactual pruning discovery engine</td></tr>
+        <tr><td><code>replay/runner.py</code></td><td>Agent runner protocol + deterministic stand-in</td></tr>
+        <tr><td><code>replay/anthropic_runner.py</code></td><td>Live Anthropic runner (requires key)</td></tr>
+        <tr><td><code>certify/stats.py</code></td><td>TOST non-inferiority (hand-rolled Student-t)</td></tr>
+        <tr><td><code>certify/gate.py</code></td><td>Gate: replay + TOST → verdict</td></tr>
+        <tr><td><code>certify/holdout.py</code></td><td>Holdout A/B savings with bootstrap CI</td></tr>
+        <tr><td><code>fidelity.py</code></td><td>Byte-fidelity invariants (reversibility + append-only)</td></tr>
+        <tr><td><code>policy.py</code></td><td>Auth-mode gating (PAYG vs subscription)</td></tr>
+        <tr><td><code>corpus.py</code></td><td>Multi-domain corpus loader + structural validation</td></tr>
+        <tr><td><code>adapters/anthropic.py</code></td><td>In-process drop-in adapter (wrap + cache-control)</td></tr>
+        <tr><td><code>proxy.py</code></td><td>HTTP proxy for framework-agnostic adoption</td></tr>
+        <tr><td><code>codec/learned.py</code></td><td>Logistic-regression keep classifier</td></tr>
+        <tr><td><code>gist.py</code></td><td>Content-addressed gist caching for tool schemas</td></tr>
+        <tr><td><code>delta.py</code></td><td>Append-only delta context management</td></tr>
+        <tr><td><code>retrieval.py</code></td><td>BM25 partial retrieval from digest handles</td></tr>
+        <tr><td><code>ledger.py</code></td><td>Local-first savings ledger</td></tr>
+        <tr><td><code>tokenizer.py</code></td><td>Heuristic tokenizer + Anthropic billing-grade count_tokens</td></tr>
+        <tr><td><code>pricing.py</code></td><td>Model pricing catalog</td></tr>
+        <tr><td><code>cli.py</code></td><td>Entry point — all subcommands</td></tr>
+      </tbody>
+    </table>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

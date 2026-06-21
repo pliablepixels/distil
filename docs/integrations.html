@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Integrations — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html" class="active">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <h1>Integrations — <span class="g">one proxy, every SDK</span></h1>
+    <p class="lead">Start <code>distil proxy</code> once and point any SDK's <code>baseURL</code> at it. No library changes, no monkey-patching — compression happens at the network layer.</p>
+
+    <img src="assets/cross-sdk.svg" alt="Cross-SDK proxy diagram" class="svg-embed"/>
+
+    <hr/>
+
+    <h2>How it works</h2>
+    <p>The proxy (<code>distil proxy</code>, default <code>http://127.0.0.1:8788</code>) is a local HTTP server. It intercepts the three compressible paths across all major LLM APIs:</p>
+    <ul>
+      <li><code>/v1/messages</code> — Anthropic Messages API</li>
+      <li><code>/v1/chat/completions</code> — OpenAI Chat Completions (also used by LiteLLM, LangChain, etc.)</li>
+      <li><code>/v1/responses</code> — OpenAI Responses API</li>
+    </ul>
+    <p>All other paths and HTTP verbs pass through unchanged. Your API key travels in the request headers exactly as normal — the proxy never logs or stores it.</p>
+
+    <div class="callout good">
+      <b>Zero SDK changes beyond baseURL.</b> The proxy is transparent: the SDK sees the same wire format it always expects. Auth headers, streaming, tool use, and all other features work as-is.
+    </div>
+
+    <hr/>
+
+    <h2>SDK integration matrix</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>SDK / Framework</th>
+          <th>Language</th>
+          <th>Setting</th>
+          <th>Value</th>
+          <th>Example</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Anthropic Python SDK</strong></td>
+          <td>Python</td>
+          <td><code>base_url=</code></td>
+          <td><code>http://127.0.0.1:8788</code></td>
+          <td><a href="https://github.com/dshakes/distil/blob/main/examples/python_anthropic.py">python_anthropic.py</a></td>
+        </tr>
+        <tr>
+          <td><strong>OpenAI Python SDK</strong></td>
+          <td>Python</td>
+          <td><code>base_url=</code></td>
+          <td><code>http://127.0.0.1:8788/v1</code></td>
+          <td><a href="https://github.com/dshakes/distil/blob/main/examples/python_openai.py">python_openai.py</a></td>
+        </tr>
+        <tr>
+          <td><strong>LiteLLM</strong></td>
+          <td>Python</td>
+          <td><code>api_base=</code></td>
+          <td><code>http://127.0.0.1:8788</code></td>
+          <td><a href="https://github.com/dshakes/distil/blob/main/examples/python_litellm.py">python_litellm.py</a></td>
+        </tr>
+        <tr>
+          <td><strong>Vercel AI SDK</strong> (<code>@ai-sdk/anthropic</code>)</td>
+          <td>TypeScript</td>
+          <td><code>baseURL</code> in <code>createAnthropic({…})</code></td>
+          <td><code>http://127.0.0.1:8788</code></td>
+          <td><a href="https://github.com/dshakes/distil/blob/main/examples/js_vercel_ai_sdk.ts">js_vercel_ai_sdk.ts</a></td>
+        </tr>
+        <tr>
+          <td><strong>LangChain.js</strong> (<code>@langchain/anthropic</code>)</td>
+          <td>TypeScript</td>
+          <td><code>anthropicApiUrl</code> in <code>ChatAnthropic({…})</code></td>
+          <td><code>http://127.0.0.1:8788</code></td>
+          <td><a href="https://github.com/dshakes/distil/blob/main/examples/js_langchain.ts">js_langchain.ts</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <h2>Snippets</h2>
+
+    <h3>Anthropic Python SDK</h3>
+    <pre class="term"><span class="c">import</span> anthropic
+
+client = anthropic.Anthropic(
+    api_key=<span class="g">"sk-ant-…"</span>,
+    base_url=<span class="g">"http://127.0.0.1:8788"</span>,
+)
+response = client.messages.create(
+    model=<span class="g">"claude-opus-4-5"</span>,
+    max_tokens=1024,
+    messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Hello!"</span>}],
+)</pre>
+
+    <h3>OpenAI Python SDK</h3>
+    <pre class="term"><span class="c">import</span> openai
+
+client = openai.OpenAI(
+    api_key=<span class="g">"sk-…"</span>,
+    base_url=<span class="g">"http://127.0.0.1:8788/v1"</span>,
+)
+response = client.chat.completions.create(
+    model=<span class="g">"gpt-4o"</span>,
+    messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Hello!"</span>}],
+)</pre>
+
+    <h3>LiteLLM</h3>
+    <pre class="term"><span class="c">import</span> litellm
+
+response = litellm.completion(
+    model=<span class="g">"claude-opus-4-5"</span>,
+    api_base=<span class="g">"http://127.0.0.1:8788"</span>,
+    api_key=<span class="g">"sk-ant-…"</span>,
+    messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Hello!"</span>}],
+)</pre>
+
+    <h3>Vercel AI SDK (TypeScript)</h3>
+    <pre class="term"><span class="c">import</span> { createAnthropic } <span class="c">from</span> <span class="g">"@ai-sdk/anthropic"</span>;
+<span class="c">import</span> { generateText } <span class="c">from</span> <span class="g">"ai"</span>;
+
+<span class="c">const</span> anthropic = createAnthropic({
+  baseURL: <span class="g">"http://127.0.0.1:8788"</span>,
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+<span class="c">const</span> { text } = <span class="c">await</span> generateText({
+  model: anthropic(<span class="g">"claude-opus-4-5"</span>),
+  prompt: <span class="g">"Hello!"</span>,
+});</pre>
+
+    <h3>LangChain.js (TypeScript)</h3>
+    <pre class="term"><span class="c">import</span> { ChatAnthropic } <span class="c">from</span> <span class="g">"@langchain/anthropic"</span>;
+
+<span class="c">const</span> model = <span class="c">new</span> ChatAnthropic({
+  model: <span class="g">"claude-opus-4-5"</span>,
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  anthropicApiUrl: <span class="g">"http://127.0.0.1:8788"</span>,
+  <span class="d">// older versions: clientOptions: { baseURL: "http://127.0.0.1:8788" }</span>
+});
+
+<span class="c">const</span> response = <span class="c">await</span> model.invoke([
+  [<span class="g">"human"</span>, <span class="g">"Hello!"</span>],
+]);</pre>
+
+    <hr/>
+
+    <h2>Observability headers</h2>
+    <p>The proxy adds two informational headers to every compressed response:</p>
+    <table>
+      <thead>
+        <tr><th>Header</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>x-distil-compressed: 1</code></td>
+          <td>Compression was applied this turn.</td>
+        </tr>
+        <tr>
+          <td><code>x-distil-tokens-saved: &lt;n&gt;</code></td>
+          <td>Estimated input tokens saved (heuristic tokenizer).</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <h2>Node.js launcher</h2>
+    <p>No Python on PATH? Use the npx launcher — it locates or installs the Python package and starts the proxy:</p>
+    <pre class="term">npx @distil/proxy --port 8788 --upstream https://api.anthropic.com</pre>
+    <p>This is a thin launcher around the Python package, not a reimplementation. See <a href="https://github.com/dshakes/distil/tree/main/packaging/npx">packaging/npx/</a> for details.</p>
+
+    <h2>Homebrew</h2>
+    <pre class="term">brew tap dshakes/tap
+brew install dshakes/tap/distil
+distil proxy --port 8788</pre>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

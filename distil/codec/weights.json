@@ -1,0 +1,24 @@
+{
+  "features": [
+    "bias",
+    "has_decision_marker",
+    "has_error_keyword",
+    "looks_structured",
+    "digit_density",
+    "length_norm",
+    "has_debug_keyword",
+    "uppercase_ratio",
+    "is_blank"
+  ],
+  "weights": [
+    0.015619034070098875,
+    0.8683450957092889,
+    2.0044464852682244,
+    1.6282982282588385,
+    -0.08221058028655247,
+    2.0928367128953598,
+    -5.044375724666463,
+    0.16513577402041174,
+    0.0
+  ]
+}

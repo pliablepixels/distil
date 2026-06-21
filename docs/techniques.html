@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Techniques — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html" class="active">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Compression <span class="g">Techniques</span></h1>
+    <p class="lead">Every technique in Distil targets a specific slice of agent cost. Two carry the bulk of the win; the rest stack cleanly on top.</p>
+
+    <hr/>
+
+    <!-- Technique 1 -->
+    <h2>① Cache-aware compression</h2>
+    <p><strong>Module:</strong> <code>distil/compress/cache_aware.py</code> · Loss profile: lossless</p>
+
+    <p>The dominant cost lever in a multi-turn agent loop is not token count — it is cache hit rate. A cache read costs ~0.1× fresh input; a cache miss costs the full price. Distil models the full multi-turn loop, tracking the longest contiguous prefix that is identical between consecutive turns. Any compressor that rewrites the prefix (even to save tokens) destroys this prefix match and loses the 10× discount.</p>
+
+    <img src="assets/cache-aware.svg" alt="Cache-aware savings vs naive recompression" class="svg-embed"/>
+
+    <h3>Cache stabilization</h3>
+    <p>To keep the prefix byte-stable turn over turn, Distil applies two lossless pre-processing steps before any compression runs:</p>
+
+    <ul>
+      <li><strong>Schema canonicalization</strong> — recursively sorts JSON object keys in tool payloads and API responses. Two semantically identical JSON objects with different key orders produce byte-identical text after canonicalization, which means they hash identically and hit the prefix cache.</li>
+      <li><strong>Volatile-field extraction</strong> — fields whose values change every turn (timestamps, UUIDs, JWT tokens, request IDs) are lifted out of the stable prefix into the volatile tail. The stable portion stops churning; the volatile tail is compressed separately.</li>
+    </ul>
+
+    <div class="callout">
+      <b>Result:</b> the prefix cache hit rate stays near 100% across turns. Compression is applied <em>only</em> to the volatile tail, where there is no cache to bust. The savings from keeping the prefix stable outweigh the savings from naively shrinking it.
+    </div>
+
+    <h3>The simulation</h3>
+    <p><code>cache_aware.simulate()</code> models four strategies across a full trajectory and reports per-turn cost breakdown (cache reads, cache writes, fresh tokens). Run <code>distil savings</code> to see the numbers on any trajectory.</p>
+
+    <pre class="term"><span class="d">$ distil savings --pricing claude-opus-4-8</span>
+strategy                               $ / run   vs baseline  cache hits
+------------------------------------------------------------------------
+baseline (no cache, no compress)       0.01524          0.0%           0
+cache only                             0.01115         26.8%       1,028
+naive compress + cache                 0.01691        <span class="w">-11.0%</span>           0  <span class="d">← busts cache</span>
+distil (cache-aware lossless)          0.01019         <span class="g">33.1%</span>       1,028</pre>
+
+    <hr/>
+
+    <!-- Technique 4 -->
+    <h2>④ Causal / counterfactual pruning</h2>
+    <p><strong>Module:</strong> <code>distil/replay/ablation.py</code> · Loss profile: certified</p>
+
+    <p>The eval engine in Distil is not a ruler bolted on the side of compression — it is a <strong>discovery engine</strong>. The algorithm:</p>
+
+    <ol>
+      <li>For each context block present in the trajectory, remove it and replay the trajectory.</li>
+      <li>Record whether any turn's decision changed.</li>
+      <li>A block that <em>never</em> changed a decision in any of its occurrences is <strong>causally inert</strong> — provably free to drop.</li>
+    </ol>
+
+    <p>This is the sense in which the measurement produces the compression policy. Speculative retrievals that were never cited, stale history that no longer affects any tool call, diagnostic context that was superseded — these all show up as zero-impact in ablation and can be pruned with a causal guarantee, not a heuristic guess.</p>
+
+    <pre class="term"><span class="d">$ distil prune</span>
+causal ablation over 'sre-disk-incident' — what is free to drop?
+
+block                  occ   tokens  verdict
+doc-0                    4      312  <span class="g">PRUNE (causally inert)</span>
+doc-1                    4      303  <span class="g">PRUNE (causally inert)</span>
+obs-0                    4      234  <span class="d">keep (changed a decision)</span>
+obs-1                    4      198  <span class="d">keep (changed a decision)</span>
+system                   4      218  <span class="d">keep (changed a decision)</span>
+
+tokens provably free to drop: 615 across 2 block(s).</pre>
+
+    <hr/>
+
+    <!-- Tier model -->
+    <h2>Risk-graded tiers</h2>
+    <p>Every technique is assigned to a tier based on its loss profile. Distil applies them in order — the safest ones unconditionally, the certified ones only when the gate passes.</p>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="k">Tier 0</div>
+        <h4>Provably lossless</h4>
+        <p>Reconstructable transforms that make no assumptions about content semantics. Applied unconditionally.</p>
+        <ul style="margin-top:10px;font-size:13px;color:var(--mut)">
+          <li>JSON minification</li>
+          <li>Run-length encoding collapse</li>
+          <li>Whitespace normalization</li>
+        </ul>
+        <p style="margin-top:10px;font-size:12px">Module: <code>compress/tier0.py</code></p>
+      </div>
+      <div class="tier">
+        <div class="k">Tier 1</div>
+        <h4>Reversible digest</h4>
+        <p>Decision-aware digest: the compressed form embeds an 8-hex handle; the original is kept locally and re-expands on demand.</p>
+        <ul style="margin-top:10px;font-size:13px;color:var(--mut)">
+          <li>Large tool results (≥ 6 lines) digested</li>
+          <li>Handle → original in local RestoreStore</li>
+          <li>Reject-if-bigger invariant enforced</li>
+        </ul>
+        <p style="margin-top:10px;font-size:12px">Module: <code>compress/tier1.py</code></p>
+      </div>
+      <div class="tier">
+        <div class="k">Certified</div>
+        <h4>Lossy, gated</h4>
+        <p>Pruning and summarization are applied only at ratios the non-inferiority gate certifies. Never ships without a TOST PASS.</p>
+        <ul style="margin-top:10px;font-size:13px;color:var(--mut)">
+          <li>Causal pruning (ablation-discovered)</li>
+          <li>Lossy strategies blocked if gate fails</li>
+          <li>Subscriptions: lossless-only policy</li>
+        </ul>
+        <p style="margin-top:10px;font-size:12px">Gate: <code>certify/gate.py</code></p>
+      </div>
+    </div>
+
+    <hr/>
+
+    <!-- Learned keep-model -->
+    <h2>Learned keep-model codec</h2>
+    <p><strong>Module:</strong> <code>distil/codec/learned.py</code> · Loss profile: pluggable</p>
+
+    <p>For per-content-type decisions about which lines of a tool result are worth keeping, Distil ships a <strong>logistic-regression keep classifier</strong> — trained from scratch in pure Python, zero external dependencies.</p>
+
+    <ul>
+      <li><strong>Architecture:</strong> logistic regression over a fixed feature set (<code>codec/features.py</code>), trained with full-batch gradient descent on binary cross-entropy with L2 regularization.</li>
+      <li><strong>Training signal:</strong> labels are distilled from <code>SalienceKeepModel</code> — a line is labelled <em>keep</em> (1.0) if the heuristic salience score is ≥ 0.6.</li>
+      <li><strong>Performance on held-out lines:</strong> 96.4% accuracy, 0.98 F1, deterministic train/test split (SHA-256 hash-based, reproducible).</li>
+      <li><strong>Persistence:</strong> weights stored in <code>distil/codec/weights.json</code>; load with <code>LogisticKeepModel.load()</code>.</li>
+    </ul>
+
+    <div class="callout">
+      <b>Honesty note:</b> The logistic keep-model is a real, wired, deterministic implementation. A fully learned per-content-type neural classifier (and true soft-prompt gisting) are documented seams behind the same interfaces — not stubs, but not the default either. The deterministic heuristic is what runs in production.
+    </div>
+
+    <hr/>
+
+    <!-- Gist caching -->
+    <h2>Gist caching</h2>
+    <p><strong>Module:</strong> <code>distil/gist.py</code> · Loss profile: lossless</p>
+
+    <p>Tool schemas are verbose and essentially never change within a session. Gist caching detects when the same tool schema has been sent before (by content hash) and replaces subsequent occurrences with a compact reference handle. The model only needs to see the full schema once; subsequent turns pay only for the reference token.</p>
+
+    <p>This is implemented as a content-addressed local cache — no network calls, no external state. The handle is embedded inline in the message; a session-aware proxy or adapter layer resolves it back to the full schema if needed.</p>
+
+    <hr/>
+
+    <!-- Delta context -->
+    <h2>Delta / append-only context</h2>
+    <p><strong>Module:</strong> <code>distil/delta.py</code> · Loss profile: lossless</p>
+
+    <p>Context history is append-only — a block present in turn N must carry identical bytes in turn N+1 (this is enforced by the byte-fidelity gate). The delta engine exploits this: only the <em>new</em> blocks added since the last turn need to be transmitted at full cost. Stable history is already in the cache and costs only cache-read price. The delta layer ensures no block is re-sent in a way that would corrupt the prefix hash.</p>
+
+    <hr/>
+
+    <!-- BM25 -->
+    <h2>BM25 partial retrieval</h2>
+    <p><strong>Module:</strong> <code>distil/retrieval.py</code></p>
+
+    <p>When a context block is digested (Tier 1) and represented by a handle, BM25 partial retrieval lets the agent query for the most relevant chunks of the original without re-expanding the entire block. This keeps the context window focused while preserving access to the full original content on demand — useful for large tool outputs, retrieved documents, or log dumps where only a fraction is decision-relevant.</p>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

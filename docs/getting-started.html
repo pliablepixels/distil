@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Getting Started — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html" class="active">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <h1>Getting <span class="g">Started</span></h1>
+    <p class="lead">Install Distil in seconds, run the corpus gate, and drop compression into your existing agent with one line of code.</p>
+
+    <hr/>
+
+    <!-- Install -->
+    <h2>Install</h2>
+    <p>Distil has a <strong>zero-dependency stdlib-only core</strong>. Pick the format that fits your workflow — the corpus is bundled in every distribution.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <span class="tag">Zero install</span>
+        <h3>uvx</h3>
+        <p>Run straight from PyPI with no local install step — great for a one-off check.</p>
+        <pre class="term">uvx distil bench</pre>
+      </div>
+      <div class="card">
+        <span class="tag">PyPI</span>
+        <h3>pip</h3>
+        <p>Install the package for permanent use. No transitive dependencies pulled in.</p>
+        <pre class="term">pip install distil-llm
+distil certify</pre>
+      </div>
+      <div class="card">
+        <span class="tag">Container</span>
+        <h3>Docker</h3>
+        <p>Reproducible image, ideal for CI or sandboxed environments.</p>
+        <pre class="term">docker build -t distil .
+docker run distil bench</pre>
+      </div>
+      <div class="card">
+        <span class="tag">Single file</span>
+        <h3>Zipapp (.pyz)</h3>
+        <p>One portable executable — copy it anywhere that has Python 3.11+.</p>
+        <pre class="term">make pyz
+python dist/distil.pyz bench</pre>
+      </div>
+    </div>
+
+    <h3>Billing-grade tokenizer (optional)</h3>
+    <p>The default tokenizer is an offline heuristic — compression <em>ratios</em> are robust, but absolute dollar figures are approximate. To get billing-grade token counts and certify against the live model, install the extras and export your key:</p>
+    <pre class="term">pip install 'distil-llm[live]'
+<span class="d">export ANTHROPIC_API_KEY=sk-ant-…</span>
+distil savings --tokenizer anthropic
+distil certify --runner anthropic</pre>
+
+    <hr/>
+
+    <!-- 60-second quickstart -->
+    <h2>60-second quickstart</h2>
+    <p>Three commands cover the core workflow. Run them against the bundled multi-domain corpus (no API key required).</p>
+
+    <h3>1. Benchmark savings across 7 domains</h3>
+    <p><code>distil bench</code> is the corpus-wide CI gate. It prices four strategies, certifies Distil is non-inferior on every trajectory, and confirms the gate rejects the aggressive lossy strategy. This is the command you run in CI.</p>
+    <pre class="term"><span class="d">$ distil bench</span>
+corpus gate — 7 trajectories | model claude-opus-4-8 | tokenizer=heuristic
+
+domain            trajectory               $ saved   distil   aggr  pruned
+---------------------------------------------------------------------------
+ops/sre           sre-disk-incident          33.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>     615
+coding            coding-bugfix              28.7%     <span class="g">PASS</span>   <span class="w">FAIL</span>     736
+support           support-refund             32.6%     <span class="g">PASS</span>   <span class="w">FAIL</span>     765
+research          research-synthesis         25.7%     <span class="g">PASS</span>   <span class="w">FAIL</span>     809
+data-analysis     data-analysis-sql          18.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>     965
+devops            devops-rollback            25.0%     <span class="g">PASS</span>   <span class="w">FAIL</span>     857
+finance           finance-reconcile          29.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>    1014
+---------------------------------------------------------------------------
+aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) losslessly; 5761 tokens prunable.
+
+GATE: <span class="g">PASS</span> — every trajectory certified non-inferior; aggressive rejected on all.</pre>
+
+    <h3>2. Certify a strategy</h3>
+    <p>Run the TOST non-inferiority gate on a single trajectory and strategy. Exits 0 on pass, 1 on fail — plug it into any CI pipeline.</p>
+    <pre class="term"><span class="d">$ distil certify --strategy distil</span>
+certifying strategy 'distil' on 'sre-disk-incident' (runner=deterministic)
+
+  turn 0: ok
+  turn 1: ok
+  turn 2: ok
+  turn 3: ok
+
+decision-equivalence match rate: <span class="g">100.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=+0.000, p=0.0000
+
+VERDICT: <span class="g">PASS</span>  (certified non-inferior)</pre>
+
+    <h3>3. Discover causally inert blocks</h3>
+    <p><code>distil prune</code> ablates each context block, replays the trajectory, and identifies what never changed a decision — provably free to drop.</p>
+    <pre class="term"><span class="d">$ distil prune</span>
+causal ablation over 'sre-disk-incident' — what is free to drop?
+
+block                  occ   tokens  verdict
+doc-0                    4      312  <span class="g">PRUNE (causally inert)</span>
+doc-1                    4      303  <span class="g">PRUNE (causally inert)</span>
+obs-0                    4      234  <span class="d">keep (changed a decision)</span>
+obs-1                    4      198  <span class="d">keep (changed a decision)</span>
+system                   4      218  <span class="d">keep (changed a decision)</span>
+
+tokens provably free to drop: 615 across 2 block(s).</pre>
+
+    <hr/>
+
+    <!-- Drop-in wrap -->
+    <h2>Drop-in adoption: <code>wrap(client)</code></h2>
+    <p>The fastest path to production compression — no changes to your call sites. Wrap your existing Anthropic client once and every subsequent <code>messages.create</code> call is transparently compressed and cache-pinned.</p>
+
+    <pre class="term"><span class="c">import</span> anthropic
+<span class="c">from</span> distil.adapters.anthropic <span class="c">import</span> wrap
+
+<span class="d"># One-line drop-in — no call-site changes needed</span>
+client = wrap(anthropic.Anthropic())
+
+<span class="d"># Works exactly like the original client</span>
+response = client.messages.create(
+    model=<span class="g">"claude-opus-4-5"</span>,
+    max_tokens=1024,
+    system=<span class="g">"You are a helpful assistant."</span>,
+    messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Analyse this log output…"</span>}],
+)</pre>
+
+    <p>The wrapper applies Tier-0 lossless transforms (JSON minification, run-length collapse) and Tier-1 reversible digests to large tool results. It also pins the stable system prefix for cache-control so repeated calls get the ~10× cache-read discount automatically.</p>
+
+    <div class="callout good">
+      <b>No call-site changes.</b> The wrapper is a pure structural proxy — it duck-types against any object that exposes a <code>messages.create(**kwargs)</code> method. It imports nothing from the Anthropic SDK itself, so it also works in test environments where the SDK is not installed.
+    </div>
+
+    <h3>Alternative: provider proxy</h3>
+    <p>Prefer a network-level approach that works with any SDK, framework, or language? See the <a href="adapters.html">Adapters</a> page for <code>distil proxy</code>.</p>
+
+    <hr/>
+
+    <h2>What to read next</h2>
+    <ul>
+      <li><a href="concepts.html"><strong>Concepts</strong></a> — why decision-equivalence beats byte-equivalence, and why cache misses (not token size) dominate cost.</li>
+      <li><a href="techniques.html"><strong>Techniques</strong></a> — deep-dive into every compression technique: cache-aware, causal pruning, the learned keep-model, gist caching, and more.</li>
+      <li><a href="cli.html"><strong>CLI Reference</strong></a> — every flag and sample output for all commands.</li>
+      <li><a href="architecture.html"><strong>Architecture</strong></a> — tier model, the measure→discover→certify loop, byte-fidelity invariants.</li>
+    </ul>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+// Close sidebar on outside click (mobile)
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

@@ -6,25 +6,64 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-181%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-202%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
-  <img src="https://img.shields.io/badge/distributables-pip%20·%20docker%20·%20pyz-8b7bff" alt="distributables"/>
+  <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
 
 <h3 align="center">Cut LLM agent costs ~30% — and <em>prove</em> the agent still makes the same decisions.</h3>
 
 <p align="center">
 Most context compressors ship a token-savings <em>estimate</em>.<br/>
-Distil ships a <strong>quality contract</strong>: a strategy compresses only as far as a statistical non-inferiority test certifies the agent behaves identically.
+<strong>Distil ships a quality contract:</strong> a strategy compresses only as far as a statistical non-inferiority test certifies the agent behaves identically — across 7 domains, as a CI gate.
+</p>
+
+<p align="center">
+  <a href="#-60-second-start">Quickstart</a> ·
+  <a href="#-works-with-every-sdk">Integrations</a> ·
+  <a href="#-install-your-way">Install</a> ·
+  <a href="https://dshakes.github.io/distil/getting-started.html"><b>Full Docs →</b></a>
 </p>
 
 ---
 
-## The idea in one breath
+## 🧭 Pick your lens
 
-**You don't need byte-equivalence, you need decision-equivalence.** Byte-lossless compression and high savings are information-theoretically in tension. But an agent only has to take the *same actions* and produce the *same outputs* whether or not its context was compressed. That is measurable, certifiable, and compatible with aggressive compression — so **"100% accuracy" becomes a statistical guarantee on outcomes, not a diff of strings.**
+<table>
+<tr>
+<td width="33%" valign="top">
 
-That reframe is the whole project. Everything below makes it real, measured, and shippable.
+**👔 For decision-makers**
+
+Agents re-send their whole context every turn — you pay for it every turn. Distil cuts that **~30% with zero quality loss**, and *proves* it: the savings and the accuracy are measured on the **same runs**, gated in CI. No "trust us."
+
+</td>
+<td width="33%" valign="top">
+
+**🛠️ For developers**
+
+`pip install distil-llm`, point your client's `base_url` at the proxy, done — **no code change, any language or SDK**. Or `wrap(client)` in-process. Lossless by default, reversible on demand.
+
+</td>
+<td width="33%" valign="top">
+
+**🔬 For researchers**
+
+Compression reframed as **decision-equivalence** and certified with **TOST non-inferiority** + bootstrap CIs over a multi-domain trajectory corpus. Causal ablation discovers what's safe to drop. Reproducible, zero-dep.
+
+</td>
+</tr>
+</table>
+
+---
+
+## 💡 The one idea
+
+**You don't need byte-equivalence, you need decision-equivalence.** Byte-lossless compression and high savings are information-theoretically in tension. But an agent only has to take the *same actions* and produce the *same outputs* whether or not its context was compressed. That's measurable and certifiable — so **"100% accuracy" becomes a statistical guarantee on outcomes, not a diff of strings.** Everything here makes that real and measured.
+
+---
+
+## ⚡ 60-second start
 
 ```bash
 uvx distil bench          # certify savings + quality across 7 domains, in seconds
@@ -47,70 +86,33 @@ GATE: PASS — every trajectory certified non-inferior; aggressive rejected on a
 
 <p align="center"><img src="docs/assets/domains.svg" alt="measured across 7 domains" width="100%"/></p>
 
----
-
-## Why this is different
-
-Token-savings numbers are easy to fake: measure quality at *low* compression, then advertise savings at *high* compression — two different runs. Distil refuses that. **The accuracy and the compression are measured on the same trajectories**, and a strategy that can't pass non-inferiority simply doesn't ship. You can watch the gate reject a quality-degrading strategy yourself:
-
-```bash
-distil certify --strategy distil       # VERDICT: PASS  (100% decision-equivalence)
-distil certify --strategy aggressive   # VERDICT: FAIL  (mean diff −1.0, blocked)
-```
+> **Why trust the number?** Token-savings numbers are easy to fake — measure quality at *low* compression, advertise savings at *high* compression. Distil refuses that: accuracy and compression are measured on the **same** trajectories, and a strategy that can't pass non-inferiority doesn't ship.
+> ```
+> distil certify --strategy distil       # VERDICT: PASS  (100% decision-equivalence)
+> distil certify --strategy aggressive   # VERDICT: FAIL  (mean diff −1.0, blocked)
+> ```
 
 ---
 
-## How it works
+## 🔌 Works with every SDK
 
-<p align="center"><img src="docs/assets/architecture.svg" alt="architecture" width="100%"/></p>
+One proxy. Point any `base_url`-honoring client at it — **Python, TypeScript, any language** — and get cache-aware lossless compression with **no code change**.
 
-Two techniques carry most of the win, because they target where the money actually is in an agent loop — not where it looks like it is.
-
-### ① Cache-aware compression — the dominant lever
-
-In a multi-turn loop you re-send the growing context every step. With prompt caching a cache **read is ~10× cheaper** than fresh input, so the real cost is cache **misses**, not context **size**. Distil keeps the prefix byte-stable (schema canonicalization + lifting volatile fields like timestamps/UUIDs out of the prefix) and compresses only the volatile tail. The counterintuitive result, measured:
-
-<p align="center"><img src="docs/assets/cache-aware.svg" alt="cache-aware savings" width="100%"/></p>
-
-> Naive recompression sends **fewer tokens yet costs more than not compressing at all**, because it rewrites the cached prefix every turn. Distil doesn't — that's the whole game most tools miss.
-
-### ② Causal / counterfactual pruning — the discovery engine
-
-The eval isn't a ruler bolted on the side; it's a *discovery engine*. For each context block: remove it, replay, did any decision change? Blocks that never change a decision are **provably free to drop** — speculative retrievals, stale history.
+<p align="center"><img src="docs/assets/cross-sdk.svg" alt="one proxy, every SDK" width="100%"/></p>
 
 ```bash
-distil prune
-# doc-0   PRUNE (causally inert)     # speculative retrieval, never cited
-# obs-0   keep (changed a decision)  # carries the decision-driving signal
-# tokens provably free to drop: 615
+distil proxy --upstream https://api.anthropic.com   # localhost:8788
 ```
 
-### The quality contract
+| SDK / framework | Change | Example |
+|---|---|---|
+| Anthropic SDK (Py/TS) | `base_url="http://127.0.0.1:8788"` | [`examples/python_anthropic.py`](examples/python_anthropic.py) |
+| OpenAI SDK | `base_url="http://127.0.0.1:8788/v1"` | [`examples/python_openai.py`](examples/python_openai.py) |
+| Vercel AI SDK | `createAnthropic({ baseURL: '…:8788' })` | [`examples/js_vercel_ai_sdk.ts`](examples/js_vercel_ai_sdk.ts) |
+| LangChain (py/js) | `anthropicApiUrl` / base URL | [`examples/js_langchain.ts`](examples/js_langchain.ts) |
+| LiteLLM | `api_base="http://127.0.0.1:8788"` | [`examples/python_litellm.py`](examples/python_litellm.py) |
 
-TOST non-inferiority testing (hand-rolled Student-t, **zero dependencies**). Lossless strategies pass; quality-degrading ones are rejected — across the **whole corpus**, as a CI gate.
-
----
-
-## Quickstart
-
-```bash
-# zero install — run it straight from PyPI
-uvx distil bench
-
-# or install
-pip install distil           # stdlib-only core, no transitive deps
-distil savings               # technique #1, real dollars
-distil prune                 # technique #4, causal ablation
-distil certify               # the quality contract
-distil verify                # byte-fidelity: reversible + append-only
-distil holdout               # A/B savings with a bootstrap 95% CI
-
-# billing-grade, against the real model (pip install 'distil[live]' + ANTHROPIC_API_KEY)
-distil savings --tokenizer anthropic   # real Claude count_tokens, not an estimate
-distil certify --runner anthropic      # certify against the live model
-```
-
-Wrap your existing client with **no code change** to the call site:
+Prefer in-process? Wrap the client directly — still no call-site change:
 
 ```python
 from distil.adapters.anthropic import wrap
@@ -119,81 +121,107 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 ---
 
-## What's inside (all real, all wired, no stubs)
+## 📦 Install your way
 
-| Capability | Module | Loss profile |
-|---|---|---|
-| Cache-aware priced cost engine (proves naive busts the cache) | `compress/cache_aware.py` | — |
-| Schema canonicalization (byte-stable prefix) | `compress/stabilize.py` | lossless |
-| Volatile-field extraction (dates/UUIDs/JWTs out of the prefix) | `compress/stabilize.py` | lossless · reversible |
-| Tier-0 reversible transforms (JSON minify, RLE) | `compress/tier0.py` | provably lossless |
-| Tier-1 decision-aware digest + retrieval handles | `compress/tier1.py` | reversible |
-| Reject-if-bigger invariant | `compress/strategies.py` | safety |
-| **Causal / counterfactual pruning** | `replay/ablation.py` | certified |
-| **TOST non-inferiority gate** | `certify/` | the contract |
-| Multi-domain corpus + corpus-wide CI gate | `corpus.py`, `distil bench` | — |
-| Auth-mode gating (lossless-only on subscription/OAuth) | `policy.py` | safety boundary |
-| Holdout A/B savings with bootstrap CI | `certify/holdout.py` | — |
-| Byte-fidelity invariants (reversible + append-only) | `fidelity.py`, `distil verify` | — |
-| BM25 partial retrieval from a handle | `retrieval.py` | — |
-| Delta / append-only context | `delta.py` | lossless |
-| Per-content-type keep-model codec | `codec/` | pluggable |
-| Gist tool-schema caching (send once, reference forever) | `gist.py` | lossless |
-| Runtime adapter (compress an Anthropic request, no code change) | `adapters/anthropic.py` | reversible |
-| Billing-grade tokenizer + live runner | `tokenizer.py`, `replay/anthropic_runner.py` | opt-in |
-| Local-first savings ledger + leaderboard | `ledger.py` | privacy-preserving |
+<p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
+
+| Format | Command |
+|---|---|
+| **Zero install** | `uvx distil bench` |
+| **PyPI** | `pip install distil-llm` → `distil bench` |
+| **Homebrew** | `brew install dshakes/tap/distil` |
+| **Docker** | `docker build -t distil . && docker run distil bench` |
+| **Single file** | `make pyz` → `python dist/distil.pyz bench` |
+| **Node launcher** | `npx @distil/proxy --upstream https://api.anthropic.com` |
+
+> The import package and CLI are `distil`; the PyPI distribution is `distil-llm` (the bare name was taken). The `npx` path is a thin launcher around the Python proxy — the real cross-language story is pointing your SDK's `base_url` at it.
 
 ---
 
-## The corpus
+## 🧠 How it works
 
-The asset that makes certification meaningful: **7 real, captured-style agent trajectories across domains** — ops/SRE, coding, customer support, research, data analysis, devops, finance. Each is a 4-turn headless loop with a cacheable stable prefix, decision-driven volatile tool outputs, and causally-inert noise. `distil bench` runs the non-inferiority gate over all of them; new strategies can't ship unless they pass on every one. See [`corpus/manifest.json`](corpus/manifest.json).
+<p align="center"><img src="docs/assets/architecture.svg" alt="architecture" width="100%"/></p>
 
----
+Two techniques carry most of the win — they target where the money actually is in an agent loop, not where it looks like it is.
 
-## Distributables (multiple formats)
+### ① Cache-aware compression — the dominant lever
 
-The stdlib-only core makes the packaging genuinely clean:
+You re-send the growing context every step. With prompt caching a cache **read is ~10× cheaper** than fresh input, so the real cost is cache **misses**, not context **size**. Distil keeps the prefix byte-stable (schema canonicalization + lifting volatile fields like timestamps/UUIDs out of the prefix) and compresses only the volatile tail.
 
-| Format | Get it | Notes |
-|---|---|---|
-| **PyPI** | `pip install distil` / `uvx distil` | zero runtime deps; corpus bundled in the wheel |
-| **Docker** | `docker build -t distil .` → `docker run distil bench` | tiny, reproducible image |
-| **Single-file** | `make pyz` → `python dist/distil.pyz bench` | one portable executable, no install |
-| **Source** | `git clone … && make test` | full dev loop |
+<p align="center"><img src="docs/assets/cache-aware.svg" alt="cache-aware savings" width="100%"/></p>
+
+> Naive recompression sends **fewer tokens yet costs more than not compressing at all**, because it rewrites the cached prefix every turn. Distil doesn't — that's the whole game most tools miss.
+
+### ② Causal / counterfactual pruning — the discovery engine
+
+The eval isn't a ruler bolted on the side; it's a *discovery engine*. Remove a context block, replay, did any decision change? Blocks that never change a decision are **provably free to drop**.
 
 ```bash
-make gate     # the full CI gate: tests + corpus non-inferiority + byte-fidelity
+distil prune
+# doc-0   PRUNE (causally inert)     # speculative retrieval, never cited
+# obs-0   keep (changed a decision)  # carries the decision-driving signal
 ```
 
 ---
 
-## What we won't pretend
+## 🧩 What's inside (all real, all wired, no stubs)
 
-This is a discovery-grade project with a clear honesty line:
+| Capability | Module | Loss profile |
+|---|---|---|
+| Cache-aware priced cost engine | `compress/cache_aware.py` | — |
+| Schema canonicalization + volatile-field extraction | `compress/stabilize.py` | lossless · reversible |
+| Tier-0 reversible transforms · Tier-1 decision-aware digest | `compress/tier0.py`, `tier1.py` | lossless / reversible |
+| **Causal / counterfactual pruning** | `replay/ablation.py` | certified |
+| **TOST non-inferiority gate** + 7-domain corpus + `distil bench` | `certify/`, `corpus.py` | the contract |
+| **Provider proxy** — drop-in across SDKs | `proxy.py`, `distil proxy` | reversible |
+| In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |
+| **Learned keep-model** (logistic, 96.4% acc / 0.98 F1 held-out) | `codec/learned.py` | pluggable |
+| Auth-mode gating (lossless-only on subscription/OAuth) | `policy.py` | safety |
+| Holdout A/B savings + bootstrap CI | `certify/holdout.py` | — |
+| Byte-fidelity invariants (reversible + append-only) | `fidelity.py`, `distil verify` | — |
+| BM25 partial retrieval · delta context · gist caching | `retrieval.py`, `delta.py`, `gist.py` | lossless |
+| Billing-grade tokenizer + live runner | `tokenizer.py`, `replay/anthropic_runner.py` | opt-in |
+| Savings ledger + leaderboard (privacy-preserving) | `ledger.py` | local-first |
 
-- **Default tokenizer is an offline heuristic** (so the core has zero deps). Compression *ratios* are robust to it; absolute dollars are not — use `--tokenizer anthropic` for billing-grade counts (the correct Claude tokenizer; tiktoken undercounts Claude).
-- **The default runner is a deterministic stand-in** keyed on decision markers, so the gate runs offline with ground truth. `--runner anthropic` certifies against the live model — implemented, **UNVERIFIED** until you run it with a key.
-- The **keep-model codec** and **gist** ship strong, real, deterministic implementations; a learned token-classifier and true soft-prompt gisting are documented *seams behind the same interfaces*, not stubs.
-- Numbers in this README are reproducible from the bundled corpus with the heuristic tokenizer. No vanity metrics.
+**Full docs:** [Getting started](https://dshakes.github.io/distil/getting-started.html) · [Concepts](https://dshakes.github.io/distil/concepts.html) · [Techniques](https://dshakes.github.io/distil/techniques.html) · [CLI](https://dshakes.github.io/distil/cli.html) · [Architecture](https://dshakes.github.io/distil/architecture.html) · [Integrations](https://dshakes.github.io/distil/integrations.html) · [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) · [FAQ](https://dshakes.github.io/distil/faq.html)
 
 ---
 
-## Roadmap
+## 🔒 Security & deployment
 
+- **Localhost-only by default** — the proxy binds `127.0.0.1` and forwards only to the single configured upstream (no SSRF).
+- **No secret/body logging** — request bodies and credentials are never logged.
+- **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions lossless and never injects tools (provider-ToS-safe).
+- **Stateless** — nothing is persisted; ZDR-compatible.
+
+See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) for topologies (local sidecar, container sidecar, shared gateway) and the threat model.
+
+---
+
+## ✅ What we won't pretend
+
+- **Default tokenizer is an offline heuristic** (zero deps); ratios are robust, dollars are approximate. Use `--tokenizer anthropic` for billing-grade counts (the correct Claude tokenizer — tiktoken undercounts Claude).
+- **The default runner is a deterministic stand-in** so the gate runs offline with ground truth. `--runner anthropic` certifies against the live model — implemented, **UNVERIFIED** until you run it with a key.
+- The learned keep-model is a real trained **logistic** classifier (96.4%/0.98 on held-out lines); a heavier transformer classifier is a documented upgrade behind the same interface.
+- Numbers here are reproducible from the bundled corpus with the heuristic tokenizer. No vanity metrics.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Cache-aware compression · causal pruning · TOST quality gate
+- [x] Multi-domain corpus + CI non-inferiority gate
 - [x] Real tokenizer + live runner (billing-grade)
-- [x] Multi-domain trajectory corpus + CI non-inferiority gate
-- [x] Runtime adapter (no-code-change compression)
-- [x] Auth-mode gating
-- [x] Holdout A/B with confidence intervals
-- [x] Byte-fidelity invariants
-- [x] BM25 partial retrieval · delta context · keep-model codec · gist caching
-- [ ] Learned per-content-type keep-model weights (the codec seam)
-- [ ] Provider proxy for drop-in adoption across frameworks
+- [x] Runtime adapter + **provider proxy** (drop-in across SDKs)
+- [x] Auth-mode gating · holdout A/B · byte-fidelity invariants
+- [x] **Learned per-content-type keep-model** (trained weights)
+- [x] BM25 partial retrieval · delta context · gist caching
+- [ ] Transformer keep-model weights (the codec's heavier seam)
+- [ ] Managed gateway + per-tenant dashboards
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The one rule that matters: **a new compression strategy must pass `make gate`** (non-inferior on every domain, byte-reversible). No green gate, no merge. That's the whole philosophy in one sentence.
 

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Adapters — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html" class="active">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Adapters <span class="g">&amp; Integration</span></h1>
+    <p class="lead">Two paths to production: a one-line Python wrapper that compresses in-process, or a standalone HTTP proxy that works with any SDK or framework.</p>
+
+    <hr/>
+
+    <h2>Path 1 — In-process: <code>wrap(client)</code></h2>
+    <p><strong>Module:</strong> <code>distil/adapters/anthropic.py</code></p>
+
+    <p>The fastest path for Python codebases already using the Anthropic SDK. Wrap your client once at construction time — all downstream <code>messages.create</code> calls are transparently compressed and cache-pinned with no call-site changes.</p>
+
+    <pre class="term"><span class="c">import</span> anthropic
+<span class="c">from</span> distil.adapters.anthropic <span class="c">import</span> wrap
+
+<span class="d"># Before: plain Anthropic client</span>
+client = anthropic.Anthropic()
+
+<span class="d"># After: one-line drop-in</span>
+client = wrap(anthropic.Anthropic())
+
+<span class="d"># No other code changes — all calls compressed transparently</span>
+response = client.messages.create(
+    model=<span class="g">"claude-opus-4-5"</span>,
+    max_tokens=1024,
+    system=<span class="g">"You are a helpful assistant."</span>,
+    messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Analyse this log output…"</span>}],
+)</pre>
+
+    <h3>What the wrapper does</h3>
+
+    <p>On every <code>messages.create(**kwargs)</code> call, the wrapper:</p>
+
+    <ol>
+      <li><strong>Compresses the messages array</strong> via <code>compress_messages()</code>:
+        <ul>
+          <li>User text blocks: Tier-0 lossless transforms (JSON minify + run collapse).</li>
+          <li>Tool result blocks with ≥ 6 lines: Tier-1 reversible digest, original stored in a local <code>RestoreStore</code>.</li>
+          <li>Assistant text, <code>tool_use</code>, and <code>image</code> blocks: passed through unchanged.</li>
+        </ul>
+      </li>
+      <li><strong>Pins the cache prefix</strong> via <code>place_cache_control()</code>: marks the last stable system block with <code>{"cache_control": {"type": "ephemeral"}}</code>, so the first call pays the cache-write price and every subsequent call pays the ~0.1× cache-read price.</li>
+      <li><strong>Forwards the modified kwargs</strong> to the real <code>client.messages.create</code>.</li>
+    </ol>
+
+    <h3>The RestoreStore</h3>
+    <p>Digested blocks embed an 8-hex SHA-256 handle in their compressed text. The <code>RestoreStore</code> maps handles to originals locally — it is never sent to the model and costs zero tokens. To recover an original:</p>
+
+    <pre class="term"><span class="c">from</span> distil.adapters.anthropic <span class="c">import</span> compress_messages
+
+compressed, store = compress_messages(messages)
+<span class="d"># store.handles → frozenset of all active handles</span>
+original = store.expand(<span class="g">"a3f92b1c"</span>)  <span class="d"># retrieve original by handle</span></pre>
+
+    <h3>Design properties</h3>
+    <ul>
+      <li><strong>Duck-typed.</strong> The wrapper imports nothing from the Anthropic SDK — it works with any object that exposes a <code>messages.create(**kwargs)</code> method, including mocks in test environments.</li>
+      <li><strong>Non-mutating.</strong> Input message lists are never modified in place; new lists are returned.</li>
+      <li><strong>Reversible.</strong> Every change is either lossless (Tier-0) or stored in the local RestoreStore (Tier-1). Nothing is permanently lost.</li>
+    </ul>
+
+    <hr/>
+
+    <h2>Path 2 — Provider proxy: <code>distil proxy</code></h2>
+    <p><strong>Module:</strong> <code>distil/proxy.py</code></p>
+
+    <p>A lightweight HTTP proxy that sits between your client and the real LLM API. It intercepts <code>POST /v1/messages</code>, <code>POST /v1/chat/completions</code>, and <code>POST /v1/responses</code> requests, compresses the <code>messages</code> array, and forwards the modified request to the upstream. All other paths and methods pass through unchanged.</p>
+
+    <p>This approach works with <strong>any SDK, framework, or language</strong> — you do not need to touch your application code at all.</p>
+
+    <pre class="term"><span class="d">$ python -m distil.proxy --port 8788 --upstream https://api.anthropic.com</span>
+distil proxy listening on http://127.0.0.1:8788
+  → upstream: https://api.anthropic.com</pre>
+
+    <h3>Point your client at the proxy</h3>
+
+    <div class="grid2">
+      <div class="card">
+        <span class="tag">Anthropic SDK</span>
+        <h3>Python</h3>
+        <pre class="term" style="margin-top:8px"><span class="c">import</span> anthropic
+client = anthropic.Anthropic(
+    base_url=<span class="g">"http://localhost:8788"</span>
+)</pre>
+      </div>
+      <div class="card">
+        <span class="tag">OpenAI SDK</span>
+        <h3>Python / Node</h3>
+        <pre class="term" style="margin-top:8px"><span class="c">import</span> openai
+client = openai.OpenAI(
+    base_url=<span class="g">"http://localhost:8788/v1"</span>,
+    api_key=<span class="g">"…"</span>
+)</pre>
+      </div>
+      <div class="card">
+        <span class="tag">LiteLLM</span>
+        <h3>Multi-provider</h3>
+        <pre class="term" style="margin-top:8px">litellm.completion(
+    api_base=<span class="g">"http://localhost:8788"</span>,
+    model=<span class="g">"anthropic/claude-…"</span>,
+    messages=[...]
+)</pre>
+      </div>
+      <div class="card">
+        <span class="tag">LangChain</span>
+        <h3>Python</h3>
+        <pre class="term" style="margin-top:8px"><span class="c">from</span> langchain_anthropic <span class="c">import</span> ChatAnthropic
+llm = ChatAnthropic(
+    base_url=<span class="g">"http://localhost:8788"</span>
+)</pre>
+      </div>
+    </div>
+
+    <h3>Proxy flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--port</code></td><td><code>8788</code></td><td>Port to listen on</td></tr>
+        <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL (no trailing slash)</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply Tier-0 transforms only — safe for subscription / OAuth sessions</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Response headers</h3>
+    <p>The proxy adds two custom headers to compressed responses:</p>
+    <ul>
+      <li><code>x-distil-compressed: 1</code> — signals that the request was compressed</li>
+      <li><code>x-distil-tokens-saved: &lt;n&gt;</code> — heuristic estimate of tokens saved (not billing-grade)</li>
+    </ul>
+
+    <h3>Threading model</h3>
+    <p>The proxy uses Python's <code>ThreadingHTTPServer</code> — each incoming connection is handled in its own thread, so concurrent requests from multiple clients are supported. It is intentionally simple and easy to audit.</p>
+
+    <hr/>
+
+    <h2>Choosing between in-process and proxy</h2>
+
+    <table>
+      <thead><tr><th></th><th><code>wrap(client)</code></th><th><code>distil proxy</code></th></tr></thead>
+      <tbody>
+        <tr><td>Language</td><td>Python only</td><td>Any (HTTP)</td></tr>
+        <tr><td>SDK required</td><td>Anthropic SDK (duck-typed)</td><td>Any <code>base_url</code>-honoring client</td></tr>
+        <tr><td>Setup</td><td>One import + one call</td><td>Start proxy process, update base_url</td></tr>
+        <tr><td>RestoreStore access</td><td>Direct Python object</td><td>Not exposed (stateless proxy)</td></tr>
+        <tr><td>Cache-control pinning</td><td>Automatic via <code>place_cache_control()</code></td><td>Not currently applied</td></tr>
+        <tr><td>lossless-only mode</td><td>Pass <code>lossless_only=True</code> to <code>compress_messages</code></td><td><code>--lossless-only</code> flag</td></tr>
+        <tr><td>Multi-language teams</td><td>No</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <h2>Honest note: live provider path</h2>
+
+    <div class="callout warn">
+      <b>The proxy forwards to the real upstream.</b> Any request that goes through <code>distil proxy</code> will hit the live provider API and consume your quota / billing. Ensure you have a valid API key set in the client — the proxy does not add or modify authorization headers.
+    </div>
+
+    <p>The <code>--runner anthropic</code> flag on <code>distil certify</code> also routes to the live Anthropic API. It is implemented and wired up, but marked <b>UNVERIFIED</b> in the README until you run it with a real key. The offline deterministic runner (the default) is what powers all corpus measurements.</p>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

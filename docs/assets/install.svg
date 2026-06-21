@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+  </defs>
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="40" y="46" font-size="22" font-weight="700" fill="#e7e9ee">Install your way. <tspan fill="#5b6173" font-weight="400" font-size="14">— six routes to the same tool</tspan></text>
+
+  <!-- Card 1: uvx distil -->
+  <g transform="translate(30,70)">
+    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
+    <!-- accent top bar -->
+    <rect width="172" height="4" rx="2" fill="url(#g)"/>
+    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">ZERO INSTALL</text>
+    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
+    <text x="14" y="62" font-size="13" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">uvx distil</text>
+    <text x="14" y="110" font-size="10" fill="#8b91a1">No install needed.</text>
+    <text x="14" y="126" font-size="10" fill="#8b91a1">Runs from the</text>
+    <text x="14" y="142" font-size="10" fill="#8b91a1">uv tool cache.</text>
+  </g>
+
+  <!-- Card 2: pip install distil-llm -->
+  <g transform="translate(220,70)">
+    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
+    <rect width="172" height="4" rx="2" fill="url(#g)"/>
+    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">PYPI</text>
+    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
+    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">pip install</text>
+    <text x="14" y="80" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">distil-llm</text>
+    <text x="14" y="110" font-size="10" fill="#8b91a1">Python package.</text>
+    <text x="14" y="126" font-size="10" fill="#8b91a1">Works in any</text>
+    <text x="14" y="142" font-size="10" fill="#8b91a1">virtualenv.</text>
+  </g>
+
+  <!-- Card 3: brew install -->
+  <g transform="translate(410,70)">
+    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
+    <rect width="172" height="4" rx="2" fill="url(#g)"/>
+    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">HOMEBREW</text>
+    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
+    <text x="14" y="62" font-size="10.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">brew install</text>
+    <text x="14" y="80" font-size="9.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">dshakes/tap/distil</text>
+    <text x="14" y="110" font-size="10" fill="#8b91a1">macOS / Linux.</text>
+    <text x="14" y="126" font-size="10" fill="#8b91a1">Auto-updates via</text>
+    <text x="14" y="142" font-size="10" fill="#8b91a1">brew upgrade.</text>
+  </g>
+
+  <!-- Card 4: docker run distil bench -->
+  <g transform="translate(600,70)">
+    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
+    <rect width="172" height="4" rx="2" fill="url(#g)"/>
+    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">CONTAINER</text>
+    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
+    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">docker run</text>
+    <text x="14" y="80" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">distil bench</text>
+    <text x="14" y="110" font-size="10" fill="#8b91a1">Zero-dep image.</text>
+    <text x="14" y="126" font-size="10" fill="#8b91a1">Works anywhere</text>
+    <text x="14" y="142" font-size="10" fill="#8b91a1">Docker runs.</text>
+  </g>
+
+  <!-- Card 5: python distil.pyz bench -->
+  <g transform="translate(790,70)">
+    <rect width="172" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
+    <rect width="172" height="4" rx="2" fill="url(#g)"/>
+    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">SINGLE FILE</text>
+    <line x1="14" y1="38" x2="158" y2="38" stroke="#1b1f2a"/>
+    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">python</text>
+    <text x="14" y="80" font-size="10.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">distil.pyz bench</text>
+    <text x="14" y="110" font-size="10" fill="#8b91a1">Drop in one .pyz</text>
+    <text x="14" y="126" font-size="10" fill="#8b91a1">zipapp. No pip</text>
+    <text x="14" y="142" font-size="10" fill="#8b91a1">required.</text>
+  </g>
+
+  <!-- Card 6: npx @distil/proxy -->
+  <g transform="translate(980,70)">
+    <rect width="190" height="170" rx="14" fill="#0c0e14" stroke="#23284a"/>
+    <rect width="190" height="4" rx="2" fill="url(#g)"/>
+    <text x="14" y="30" font-size="9" font-weight="700" fill="#5ad1c9" letter-spacing="1.2">NODE LAUNCHER</text>
+    <line x1="14" y1="38" x2="176" y2="38" stroke="#1b1f2a"/>
+    <text x="14" y="62" font-size="11" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">npx</text>
+    <text x="14" y="80" font-size="10.5" font-weight="600" fill="#e7e9ee" font-family="ui-monospace,Menlo,Monaco,monospace">@distil/proxy</text>
+    <text x="14" y="110" font-size="10" fill="#8b91a1">Run via Node /</text>
+    <text x="14" y="126" font-size="10" fill="#8b91a1">npm ecosystem.</text>
+    <text x="14" y="142" font-size="10" fill="#8b91a1">No Python needed.</text>
+  </g>
+
+  <!-- Bottom caption -->
+  <text x="600" y="268" font-size="11" fill="#5b6173" text-anchor="middle">same CLI surface and proxy endpoint regardless of install method</text>
+</svg>

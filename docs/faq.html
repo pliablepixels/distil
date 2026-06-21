@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FAQ — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html" class="active">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">← Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Frequently Asked <span class="g">Questions</span></h1>
+    <p class="lead">Honest answers to the questions that matter most — including the things Distil won't pretend.</p>
+
+    <hr/>
+
+    <h2>"Is 100% decision-equivalence real, or is it marketing?"</h2>
+
+    <p>It is real, in a specific and honest sense. <strong>100% decision-equivalence means 100% of turns in the default corpus trajectories produced the same decision (tool call name + arguments, or final answer) when using the distil strategy versus the uncompressed baseline, as measured by the deterministic offline runner.</strong></p>
+
+    <p>Three caveats the numbers depend on:</p>
+
+    <ul>
+      <li><strong>Decision-equivalence, not byte-equivalence.</strong> The compressed context may differ byte-for-byte from the original — what is certified is that the <em>agent's decisions</em> match, not that the two texts are identical strings.</li>
+      <li><strong>Deterministic offline runner.</strong> The default runner is a keyed stand-in, not the live Claude model. It produces reproducible, ground-truth decisions based on decision markers embedded in the trajectories. Running with <code>--runner anthropic</code> against the live model is implemented but marked UNVERIFIED until you exercise it with a key (real model outputs have non-determinism at temperature > 0).</li>
+      <li><strong>Bundled corpus.</strong> The 7 trajectories are real, captured-style agent workflows — but they are a finite corpus. The gate certifies the strategies work on these domains; generalization to new domains is a reasonable assumption, not a guarantee.</li>
+    </ul>
+
+    <div class="callout">
+      <b>What makes this different from other "100% accuracy" claims:</b> accuracy and compression are measured on the <em>same trajectories in the same run</em>. No separate "quality benchmark at low compression" and "compression benchmark at high compression." You see both numbers for the same corpus, or you see nothing.
+    </div>
+
+    <hr/>
+
+    <h2>"Is the compression lossless?"</h2>
+
+    <p>Depends on the tier — and the answer is precise:</p>
+
+    <table>
+      <thead><tr><th>Tier</th><th>Lossless?</th><th>How</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Tier 0</strong> — JSON minify, RLE</td>
+          <td>Provably lossless</td>
+          <td>Reconstructable by inversion — no side state needed. The original can always be recovered from the transform output alone.</td>
+        </tr>
+        <tr>
+          <td><strong>Tier 1</strong> — Digest + handles</td>
+          <td>Reversible</td>
+          <td>The original is stored in a local <code>RestoreStore</code> keyed by an 8-hex SHA-256 handle embedded in the compressed text. Recovery requires the RestoreStore, which is kept locally and never sent to the model.</td>
+        </tr>
+        <tr>
+          <td><strong>Certified</strong> — Pruning</td>
+          <td>Not lossless — but causally certified</td>
+          <td>Pruned blocks are causally inert: ablation confirmed they never changed any decision. The bytes are dropped but the agent behaviour is preserved within the non-inferiority margin.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The byte-fidelity gate (<code>distil verify</code>) confirms that every Tier-0 and Tier-1 operation across the corpus is byte-reversible and that frozen history never mutates between turns.</p>
+
+    <hr/>
+
+    <h2>"How accurate is the tokenizer?"</h2>
+
+    <p>The default tokenizer is an <strong>offline heuristic</strong> — it estimates tokens by a character-based approximation without calling any API. This means:</p>
+
+    <ul>
+      <li><strong>Compression ratios are robust.</strong> The numerator and denominator of the ratio use the same heuristic, so the ratio is a good estimate regardless of the absolute token count.</li>
+      <li><strong>Absolute dollar figures are approximate.</strong> The heuristic is not calibrated to Claude's actual tokenizer, which uses BPE. Dollar amounts should be treated as directional, not billing-grade.</li>
+      <li><strong>tiktoken undercounts Claude.</strong> If you use OpenAI's tiktoken to count tokens for Claude pricing, you will systematically undercount — Claude's vocabulary differs. Use <code>--tokenizer anthropic</code> for accurate counts.</li>
+    </ul>
+
+    <p>To get billing-grade token counts:</p>
+    <pre class="term">pip install 'distil-llm[live]'
+<span class="d">export ANTHROPIC_API_KEY=sk-ant-…</span>
+distil savings --tokenizer anthropic
+distil bench   --tokenizer anthropic</pre>
+
+    <p>This calls the Anthropic <code>count_tokens</code> API — accurate billing-grade counts, but requires network access and consumes a small amount of API quota.</p>
+
+    <hr/>
+
+    <h2>"What is not done yet?"</h2>
+
+    <p>From the roadmap — implemented items that are real and wired, and items that are planned seams:</p>
+
+    <table>
+      <thead><tr><th>Item</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Real tokenizer + live runner (billing-grade)</td><td><span class="badge-pass">Done</span> — <code>--tokenizer anthropic</code> / <code>--runner anthropic</code></td></tr>
+        <tr><td>Multi-domain trajectory corpus + CI gate</td><td><span class="badge-pass">Done</span> — <code>distil bench</code></td></tr>
+        <tr><td>Runtime adapter (no-code-change compression)</td><td><span class="badge-pass">Done</span> — <code>wrap(client)</code></td></tr>
+        <tr><td>Auth-mode gating</td><td><span class="badge-pass">Done</span> — <code>distil/policy.py</code></td></tr>
+        <tr><td>Holdout A/B with confidence intervals</td><td><span class="badge-pass">Done</span> — <code>distil holdout</code></td></tr>
+        <tr><td>Byte-fidelity invariants</td><td><span class="badge-pass">Done</span> — <code>distil verify</code></td></tr>
+        <tr><td>BM25 partial retrieval · delta context · keep-model codec · gist caching</td><td><span class="badge-pass">Done</span> — all wired, real implementations</td></tr>
+        <tr><td>Learned per-content-type keep-model weights</td><td><span class="badge-new">In progress</span> — the logistic classifier is implemented; neural/soft-prompt variant is a planned seam</td></tr>
+        <tr><td>Provider proxy CLI subcommand</td><td><span class="badge-new">In progress</span> — module works (<code>python -m distil.proxy</code>), CLI flag wrapper being added</td></tr>
+        <tr><td><code>--runner anthropic</code> verified against live model</td><td>Implemented — <b>UNVERIFIED</b> without a key; the deterministic runner covers all corpus measurements</td></tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <h2>"Does it work with models other than Claude?"</h2>
+
+    <p>The core techniques — cache-aware compression, causal pruning, TOST certification, byte-fidelity invariants — are model-agnostic and apply to any LLM with prompt caching. The corpus trajectories and the adapter are built around the Anthropic Messages API format, but:</p>
+
+    <ul>
+      <li>The proxy intercepts <code>/v1/chat/completions</code> and <code>/v1/responses</code> in addition to <code>/v1/messages</code>, making it compatible with OpenAI-format APIs.</li>
+      <li>The token count and dollar figures use Anthropic pricing by default; other models can be added to the pricing catalog.</li>
+      <li>The TOST gate and causal ablation are purely statistical and format-independent.</li>
+    </ul>
+
+    <hr/>
+
+    <h2>"What is the license?"</h2>
+
+    <p>Apache-2.0. See <a href="https://github.com/dshakes/distil/blob/main/LICENSE" target="_blank" rel="noopener"><code>LICENSE</code></a> in the repository.</p>
+
+    <p>The short version: you can use it commercially, modify it, distribute it, and sublicense it. The only requirements are attribution and preservation of the license notice. There are no patent traps beyond the standard Apache-2.0 patent grant.</p>
+
+    <hr/>
+
+    <h2>"Can I contribute a new compression strategy?"</h2>
+
+    <p>Yes — PRs are welcome. The rule is simple: <strong>a new strategy must pass <code>make gate</code></strong> (non-inferior on every corpus domain, byte-reversible on Tier-0/1 operations). No green gate, no merge. See <a href="https://github.com/dshakes/distil/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a> for details.</p>
+
+    <div class="callout good">
+      <b>The gate is the philosophy in one sentence.</b> If a strategy can't pass non-inferiority on the bundled corpus with the default tokenizer and runner, it is not safe to ship — regardless of how impressive the savings look.
+    </div>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>
