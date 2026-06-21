@@ -209,19 +209,17 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 
 ---
 
-## 🗺️ Roadmap
+## 🎯 Scope & limits
 
-- [x] Cache-aware compression · causal pruning · TOST quality gate
-- [x] Multi-domain corpus + CI non-inferiority gate
-- [x] Real tokenizer + live runner (billing-grade)
-- [x] Runtime adapter + **provider proxy** (drop-in across SDKs)
-- [x] Auth-mode gating · holdout A/B · byte-fidelity invariants
-- [x] **Learned per-content-type keep-model** (trained logistic weights)
-- [x] BM25 partial retrieval · delta context · gist caching
-- [x] **Managed multi-tenant gateway + live per-tenant dashboard** (`distil gateway`)
-- [x] **Transformer keep-model** — ONNX inference adapter + training pipeline (`distil train-transformer`)¹
+Distil compresses the **input / context path** — the request `messages`, tool outputs, history, and retrieved docs your agent re-sends every turn. It is comprehensive there (Tier-0/1, cache stabilization, causal pruning, the proxy and in-process adapter).
 
-<sub>¹ Real ONNX inference adapter + training pipeline, both tested. A **demo checkpoint** trained on the bundled 7-domain corpus (**96.3% acc / 0.98 F1** held-out) is attached to the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — but the *production* checkpoint is trained on **your** traces (`distil train-transformer`, needs `[train]`); a universal tiny checkpoint would underperform the zero-dep logistic default. We won't fake weights to check a box.</sub>
+What it does **not** do yet, stated plainly:
+- **Output-token reduction.** The model's *generated* output is relayed unchanged — no verbosity steering / output shaping. Output tokens cost ~4–5× input, so this is the next real frontier, not a finished feature.
+- **Production keep-model weights.** A logistic model (96.4%/0.98) ships built-in; the transformer is a real adapter + pipeline with a *demo* checkpoint on the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — retrain on your traces for production (`distil train-transformer`).
+- **Live-model certification** runs offline by default (deterministic runner); `--runner anthropic` certifies against the real model but is **UNVERIFIED** until you run it with a key.
+- The corpus is **realistic but synthetic** (7 domains); production confidence comes from running the gate on *your* captured traces.
+
+No vanity metrics — every number here is reproducible from the bundled corpus.
 
 ---
 
