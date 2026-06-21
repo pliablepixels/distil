@@ -310,6 +310,31 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gateway(args: argparse.Namespace) -> int:
+    """Managed multi-tenant gateway with a live per-tenant savings dashboard."""
+    from .gateway import serve_gateway
+
+    serve_gateway(
+        host=args.host,
+        port=args.port,
+        upstream=args.upstream,
+        pricing_model=args.pricing,
+        lossless_only=args.lossless_only,
+    )
+    return 0
+
+
+def cmd_train_transformer(args: argparse.Namespace) -> int:
+    """Train the transformer keep-model on the corpus (needs distil-llm[train])."""
+    from .codec.train_transformer import train_transformer
+
+    metrics = train_transformer(args.out, base_model=args.base_model, epochs=args.epochs)
+    print(f"trained transformer keep-model -> {args.out}")
+    for k, v in metrics.items():
+        print(f"  {k}: {v}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="distil", description="Compression with a quality contract.")
     p.add_argument("--version", action="version", version=f"distil {__version__}")
@@ -396,6 +421,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="lossless compression only (safe for subscription/OAuth sessions)",
     )
     px.set_defaults(func=cmd_proxy)
+
+    gw = sub.add_parser("gateway", help="managed multi-tenant gateway + live savings dashboard")
+    gw.add_argument("--host", default="127.0.0.1")
+    gw.add_argument("--port", type=int, default=8789)
+    gw.add_argument("--upstream", default="https://api.anthropic.com")
+    gw.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
+    gw.add_argument("--lossless-only", action="store_true")
+    gw.set_defaults(func=cmd_gateway)
+
+    tt = sub.add_parser(
+        "train-transformer", help="train the transformer keep-model (needs distil-llm[train])"
+    )
+    tt.add_argument(
+        "--out", default="distil-keep-transformer", help="output dir for ONNX + tokenizer"
+    )
+    tt.add_argument("--base-model", default="prajjwal1/bert-tiny")
+    tt.add_argument("--epochs", type=int, default=3)
+    tt.set_defaults(func=cmd_train_transformer)
     return p
 
 
