@@ -97,6 +97,19 @@ docker run distil bench</pre>
         <pre class="term">make pyz
 python dist/distil.pyz bench</pre>
       </div>
+      <div class="card">
+        <span class="tag">macOS / Linux</span>
+        <h3>Homebrew</h3>
+        <p>Install via the tap; runs in an isolated keg, doesn't touch your Python.</p>
+        <pre class="term">brew install dshakes/tap/distil
+distil bench</pre>
+      </div>
+      <div class="card">
+        <span class="tag">Node launcher</span>
+        <h3>npx</h3>
+        <p>Launch the proxy from a JS/TS stack — a thin wrapper around the Python proxy.</p>
+        <pre class="term">npx @distil/proxy --upstream https://api.anthropic.com</pre>
+      </div>
     </div>
 
     <h3>Billing-grade tokenizer (optional)</h3>
