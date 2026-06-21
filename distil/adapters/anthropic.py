@@ -182,7 +182,13 @@ def _compress_message(
     if isinstance(content, str):
         if role == "assistant":
             return msg
-        new_text = _compress_text_content(content, store, lossless_only)
+        # OpenAI tool-result messages ({"role":"tool","content":"…"}) get the same
+        # decision-aware reversible digest as Anthropic tool_result blocks; other
+        # string content gets Tier-0 lossless transforms.
+        if role == "tool":
+            new_text = _compress_tool_result_text(content, store)
+        else:
+            new_text = _compress_text_content(content, store, lossless_only)
         if new_text == content:
             return msg
         return {**msg, "content": new_text}

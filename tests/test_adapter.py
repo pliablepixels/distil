@@ -329,3 +329,19 @@ class TestWrap:
         original = copy.deepcopy(msgs)
         client.messages.create(model="claude-opus-4-5", max_tokens=1024, messages=msgs)
         assert msgs == original
+
+
+def test_openai_tool_message_is_digested_and_reversible():
+    # OpenAI shape: {"role":"tool","content": "<long string>"}
+    from distil.adapters.anthropic import compress_messages
+
+    long = "DECISION: keep this\n" + "\n".join(f"verbose log line {i}" for i in range(20))
+    messages = [
+        {"role": "user", "content": "investigate"},
+        {"role": "tool", "tool_call_id": "c1", "content": long},
+    ]
+    out, store = compress_messages(messages)
+    tool_msg = out[1]
+    assert len(tool_msg["content"]) < len(long)  # digested
+    assert "DECISION: keep this" in tool_msg["content"]  # decision preserved
+    assert any(store.expand(h) == long for h in store.handles)  # reversible
