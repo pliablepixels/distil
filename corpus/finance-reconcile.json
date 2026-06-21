@@ -1,0 +1,209 @@
+{
+  "id": "finance-reconcile",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless back-office finance agent reconciling invoices against payments and flagging an exception. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried in noise. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous back-office finance agent performing accounts-receivable reconciliation.\nYou match invoices against incoming payments, identify discrepancies, and escalate exceptions per policy.\nOperating policy: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions.\nDECISION: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- fetch_invoices(period, status): returns open invoices for the period as a JSON array with fields {id, vendor, amount_usd, due_date, currency, po_ref}.\n- fetch_payments(period, account): returns incoming payments as a JSON array with fields {id, amount_usd, received_date, reference, bank_ref}.\n- match_records(invoices, payments, tolerance_usd): runs fuzzy matching; returns match table with status per invoice (matched|partial|unmatched) and variance.\n- flag_exception(invoice_id, reason, amount_usd): creates an exception record for human review queue; returns exception_id.\n- post_journal(entries): posts balanced journal entries to the GL; requires all exceptions resolved first.\nDECISION: tool match_records is available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "fetch_invoices(\"2026-06\", \"open\") -> {\"period\":\"2026-06\",\"status\":\"open\",\"count\":24,\"invoices\":[{\"id\":\"INV-4401\",\"vendor\":\"Apex Logistics\",\"amount_usd\":3200.00,\"due_date\":\"2026-06-30\",\"currency\":\"USD\",\"po_ref\":\"PO-9901\"},{\"id\":\"INV-4402\",\"vendor\":\"Meridian Supplies\",\"amount_usd\":875.50,\"due_date\":\"2026-06-28\",\"currency\":\"USD\",\"po_ref\":\"PO-9902\"},{\"id\":\"INV-4403\",\"vendor\":\"GlobalTech GmbH\",\"amount_usd\":1250.00,\"due_date\":\"2026-06-25\",\"currency\":\"EUR\",\"po_ref\":\"PO-9903\"},{\"id\":\"INV-4404\",\"vendor\":\"Sunrise Media\",\"amount_usd\":540.00,\"due_date\":\"2026-07-05\",\"currency\":\"USD\",\"po_ref\":\"PO-9904\"}]}\nfetch_payments(\"2026-06\", \"AR-001\") -> {\"period\":\"2026-06\",\"account\":\"AR-001\",\"count\":23,\"payments\":[{\"id\":\"PMT-8801\",\"amount_usd\":3200.00,\"received_date\":\"2026-06-18\",\"reference\":\"INV-4401\",\"bank_ref\":\"BNK-220183\"},{\"id\":\"PMT-8802\",\"amount_usd\":875.50,\"received_date\":\"2026-06-19\",\"reference\":\"INV-4402\",\"bank_ref\":\"BNK-220184\"},{\"id\":\"PMT-8803\",\"amount_usd\":1209.60,\"received_date\":\"2026-06-20\",\"reference\":\"PO-9903\",\"bank_ref\":\"BNK-220185\"}]}\ninfo: invoice dataset covers 24 open invoices across 18 vendors for period 2026-06\ninfo: payment dataset covers 23 incoming payments totalling $148,320.40 in AR-001\ninfo: currency codes: USD (22 invoices), EUR (2 invoices); FX rate EUR/USD = 1.0875 as of 2026-06-20\nDECISION: 24 invoices, 23 payments to reconcile\ninfo: 1 invoice has no matching payment candidate by reference or amount in initial scan\ninfo: 2 invoices have potential matches with non-zero variance requiring deeper inspection\ndebug: fetch latency invoices=88ms payments=74ms; tenant=acme-corp; fiscal_period=FP-2026-06\ndebug: dataset hash invoices=a3f9c1 payments=b7d204; snapshot_time=2026-06-21T08:02:11Z\nwarn: INV-4403 amount_usd=1250.00 flagged as over $1,000 threshold; currency mismatch with payment PMT-8803\ninfo: all 23 payments have valid bank_ref and cleared status in the bank feed"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.69): 'Vendor Master Data Governance Policy v3.2' — this document describes onboarding procedures for new vendors, including the required W-9/W-8BEN forms, EFT enrollment steps, vendor portal access, and the 45-day net payment terms default. It also contains the escalation matrix for duplicate vendor records and the quarterly vendor audit schedule. None of this content is required for the current reconciliation task; it was surfaced by a broad semantic search over the knowledge base using the term 'vendor'. The appendix includes a glossary of payment terms and a sample vendor scorecard template."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Run the June 2026 AR reconciliation. Fetch invoices and payments and prepare to match."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous back-office finance agent performing accounts-receivable reconciliation.\nYou match invoices against incoming payments, identify discrepancies, and escalate exceptions per policy.\nOperating policy: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions.\nDECISION: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- fetch_invoices(period, status): returns open invoices for the period as a JSON array with fields {id, vendor, amount_usd, due_date, currency, po_ref}.\n- fetch_payments(period, account): returns incoming payments as a JSON array with fields {id, amount_usd, received_date, reference, bank_ref}.\n- match_records(invoices, payments, tolerance_usd): runs fuzzy matching; returns match table with status per invoice (matched|partial|unmatched) and variance.\n- flag_exception(invoice_id, reason, amount_usd): creates an exception record for human review queue; returns exception_id.\n- post_journal(entries): posts balanced journal entries to the GL; requires all exceptions resolved first.\nDECISION: tool match_records is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Fetched 24 open invoices and 23 incoming payments for June 2026 from AR-001. Invoice total spans USD and EUR vendors. FX rate EUR/USD = 1.0875. One payment count shortfall vs invoice count; INV-4403 ($1,250 USD-equiv) has a potential variance. Next: run match_records."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "match_records(invoices_2026_06, payments_AR001, tolerance_usd=5.00) -> {\"run_id\":\"MR-20260621-001\",\"period\":\"2026-06\",\"invoices_in\":24,\"payments_in\":23,\"matched\":22,\"partial\":1,\"unmatched\":1,\"tolerance_usd\":5.00,\"fx_rate_eur_usd\":1.0875,\"match_table\":[{\"invoice\":\"INV-4401\",\"payment\":\"PMT-8801\",\"status\":\"matched\",\"variance_usd\":0.00},{\"invoice\":\"INV-4402\",\"payment\":\"PMT-8802\",\"status\":\"matched\",\"variance_usd\":0.00},{\"invoice\":\"INV-4403\",\"payment\":\"PMT-8803\",\"status\":\"partial\",\"variance_usd\":40.40},{\"invoice\":\"INV-4404\",\"payment\":null,\"status\":\"unmatched\",\"variance_usd\":540.00}]}\ninfo: 22 invoices matched cleanly with zero variance against corresponding payments\ninfo: 1 partial match: INV-4403 (GlobalTech GmbH) EUR 1,148.85 billed; PMT-8803 received $1,209.60; variance = $40.40\nDECISION: 22 matched cleanly, 2 need review\ninfo: 1 unmatched invoice: INV-4404 (Sunrise Media) $540.00; no payment received or pending\ninfo: partial match on INV-4403 consistent with EUR/USD FX rounding over a multi-day settlement window\ninfo: unmatched INV-4404 is below the $1,000 policy threshold for mandatory human escalation\ndebug: match engine v4.1; run_id=MR-20260621-001; elapsed_ms=312; snapshot=2026-06-21T08:04:55Z\nwarn: 2 items require follow-up: INV-4403 (partial, FX rounding) and INV-4404 (unmatched, $540)\ninfo: all 22 clean matches are pre-approved for GL posting pending exception resolution"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.65): 'Month-End Close Checklist — Finance Operations Q2 2026' — a procedural document listing 34 steps for the monthly close cycle, including subledger tie-outs, intercompany eliminations, prepaid amortization schedules, accrual review, and the sign-off matrix for the Controller and CFO. This document is used by the finance team during the formal close process and was retrieved due to keyword overlap with 'reconciliation' and 'June 2026'. It is not required to resolve the current matching exceptions and was not cited by the agent this turn."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Good. Now inspect the two items that need review and determine how to handle them."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous back-office finance agent performing accounts-receivable reconciliation.\nYou match invoices against incoming payments, identify discrepancies, and escalate exceptions per policy.\nOperating policy: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions.\nDECISION: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- fetch_invoices(period, status): returns open invoices for the period as a JSON array with fields {id, vendor, amount_usd, due_date, currency, po_ref}.\n- fetch_payments(period, account): returns incoming payments as a JSON array with fields {id, amount_usd, received_date, reference, bank_ref}.\n- match_records(invoices, payments, tolerance_usd): runs fuzzy matching; returns match table with status per invoice (matched|partial|unmatched) and variance.\n- flag_exception(invoice_id, reason, amount_usd): creates an exception record for human review queue; returns exception_id.\n- post_journal(entries): posts balanced journal entries to the GL; requires all exceptions resolved first.\nDECISION: tool match_records is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Fetched 24 open invoices and 23 incoming payments for June 2026 from AR-001. Invoice total spans USD and EUR vendors. FX rate EUR/USD = 1.0875. One payment count shortfall vs invoice count; INV-4403 ($1,250 USD-equiv) has a potential variance. Next: run match_records."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Ran match_records with $5 tolerance. 22 invoices matched cleanly. Two items need follow-up: INV-4403 (GlobalTech GmbH, partial match, $40.40 variance likely FX rounding) and INV-4404 (Sunrise Media, unmatched, $540.00, below $1,000 threshold). Next: inspect each mismatch to decide treatment."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "match_records([\"INV-4403\",\"INV-4404\"], payments_AR001, tolerance_usd=50.00) -> {\"run_id\":\"MR-20260621-002\",\"invoices_in\":2,\"payments_in\":23,\"matched\":1,\"partial\":0,\"unmatched\":1,\"tolerance_usd\":50.00,\"detail\":[{\"invoice\":\"INV-4403\",\"vendor\":\"GlobalTech GmbH\",\"invoice_amount_eur\":1148.85,\"invoice_amount_usd\":1249.77,\"payment\":\"PMT-8803\",\"payment_amount_usd\":1209.60,\"variance_usd\":40.17,\"variance_pct\":0.032,\"fx_rate_applied\":1.0875,\"fx_rate_invoice_date\":1.0882,\"classification\":\"fx_rounding\",\"auto_ok\":true},{\"invoice\":\"INV-4404\",\"vendor\":\"Sunrise Media\",\"invoice_amount_usd\":540.00,\"payment\":null,\"variance_usd\":540.00,\"classification\":\"unmatched_no_payment\",\"auto_ok\":false,\"note\":\"no payment received or in-flight; vendor has not responded to reminders sent 2026-06-14 and 2026-06-18\"}]}\ninfo: INV-4403 variance of $40.17 is attributable to EUR/USD rate difference between invoice date (1.0882) and settlement date (1.0875); delta = 0.0007 per EUR on EUR 1,148.85\ninfo: INV-4403 qualifies for FX rounding auto-approval under the $50 tolerance band; no human review required\nDECISION: one is a $40 FX rounding (auto-ok), one is a $1,250 unmatched invoice\ninfo: INV-4404 has no corresponding payment; vendor contact shows two unanswered reminders; invoice is 3 days past due\nwarn: INV-4404 invoice_amount_usd=540.00 is below the $1,000 mandatory escalation threshold but is still unmatched\ninfo: INV-4403 will be posted with an FX adjustment entry of $40.17 dr FX-Loss / cr AR once GL posting runs\ndebug: re-run elapsed_ms=198; run_id=MR-20260621-002; snapshot=2026-06-21T08:07:33Z\ninfo: 22 clean matches + 1 FX-auto-ok = 23 invoices ready for posting pending INV-4404 disposition"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.63): 'Foreign Exchange Risk Management Policy — Treasury Operations' — a 22-page document outlining the company's FX hedging strategy, approved derivative instruments, hedge accounting elections under ASC 815, and the treasury committee approval process for FX positions exceeding $500,000. Includes tables of approved counterparties and notional limits by currency pair. Surfaced due to the EUR/USD rate mentioned in the tool output; the $40 FX rounding being handled is well below the scope of this policy and the agent did not cite it."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Understood. Handle each mismatch appropriately and proceed."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous back-office finance agent performing accounts-receivable reconciliation.\nYou match invoices against incoming payments, identify discrepancies, and escalate exceptions per policy.\nOperating policy: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions.\nDECISION: flag any unmatched invoice over $1,000 for human review; never auto-post exceptions"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- fetch_invoices(period, status): returns open invoices for the period as a JSON array with fields {id, vendor, amount_usd, due_date, currency, po_ref}.\n- fetch_payments(period, account): returns incoming payments as a JSON array with fields {id, amount_usd, received_date, reference, bank_ref}.\n- match_records(invoices, payments, tolerance_usd): runs fuzzy matching; returns match table with status per invoice (matched|partial|unmatched) and variance.\n- flag_exception(invoice_id, reason, amount_usd): creates an exception record for human review queue; returns exception_id.\n- post_journal(entries): posts balanced journal entries to the GL; requires all exceptions resolved first.\nDECISION: tool match_records is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Fetched 24 open invoices and 23 incoming payments for June 2026 from AR-001. Invoice total spans USD and EUR vendors. FX rate EUR/USD = 1.0875. One payment count shortfall vs invoice count; INV-4403 ($1,250 USD-equiv) has a potential variance. Next: run match_records."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Ran match_records with $5 tolerance. 22 invoices matched cleanly. Two items need follow-up: INV-4403 (GlobalTech GmbH, partial match, $40.40 variance likely FX rounding) and INV-4404 (Sunrise Media, unmatched, $540.00, below $1,000 threshold). Next: inspect each mismatch to decide treatment."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Re-ran match with $50 tolerance. INV-4403 FX rounding of $40.17 confirmed auto-ok (EUR rate delta, within tolerance band). INV-4404 (Sunrise Media, $540) fully unmatched with no payment in-flight; two reminders unanswered. 23 invoices ready for posting once INV-4404 is dispositioned. Next: flag INV-4404 if required by policy, then post journal."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "flag_exception(\"INV-4404\", \"unmatched_no_payment: no payment received or in-flight; vendor Sunrise Media unresponsive to two reminders; invoice 3 days past due; amount below $1000 threshold but routing for AR team review per standing work instruction WI-AR-04\", 540.00) -> {\"exception_id\":\"EX-20260621-047\",\"invoice\":\"INV-4404\",\"vendor\":\"Sunrise Media\",\"amount_usd\":540.00,\"reason\":\"unmatched_no_payment\",\"status\":\"open\",\"assigned_to\":\"ar-team@acme-corp.com\",\"priority\":\"normal\",\"created_at\":\"2026-06-21T08:09:12Z\",\"sla_due\":\"2026-06-23T08:09:12Z\"}\ninfo: exception EX-20260621-047 created and routed to AR team queue; SLA 48 hours\ninfo: post_journal called for 23 matched/auto-ok invoices: 22 clean matches + INV-4403 FX adjustment\nDECISION: flag the $1,250 invoice for human review, post the rest\ninfo: GL journal JNL-20260621-188 posted with 23 balanced entries; dr AR / cr Revenue for 22 invoices; dr FX-Loss $40.17 / cr AR for INV-4403 adjustment\ninfo: INV-4404 excluded from GL posting pending exception resolution per policy; AR balance held open\ninfo: reconciliation run MR-20260621 complete; 22 clean, 1 FX auto-ok posted, 1 exception open\nwarn: INV-4404 will age into the 30-day AR bucket if not resolved by 2026-06-23; escalation auto-triggers at that date\ndebug: total invoices reconciled=24; posted=23; exceptions=1; run closed at 2026-06-21T08:09:45Z"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.61): 'Accounts Receivable Aging Report — May 2026 (archived)' — a prior-month aging snapshot listing overdue balances by vendor and bucket (0-30, 31-60, 61-90, 90+ days). Shows historical delinquency patterns for 140 active vendors. Sunrise Media appears with a $0 balance in the May report, meaning INV-4404 is a new delinquency. The archived report was retrieved by the similarity engine due to shared vendor names; the agent used the live June data from the tool outputs rather than this stale artifact, and did not cite it."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Confirm the reconciliation is complete and summarize any open items."
+        }
+      ]
+    }
+  ]
+}

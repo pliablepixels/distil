@@ -1,0 +1,209 @@
+{
+  "id": "data-analysis-sql",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless BI/analytics agent loop investigating a revenue anomaly via SQL. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried in noise. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous BI/analytics agent investigating data anomalies on behalf of the revenue operations team.\nYou have read-only access to the analytics warehouse. You may query, aggregate, and chart data but may not modify it.\nOperating policy: never run UPDATE, DELETE, INSERT, or DDL statements; read-only analysis only.\nDECISION: read-only analysis only; all mutations are forbidden"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- list_tables(schema): returns array of table names in the given schema.\n- describe_table(table): returns column names, types, and row-count estimate.\n- run_sql(query, limit): executes a read-only SELECT and returns up to `limit` rows as JSON.\n- make_chart(spec): renders a chart from a vega-lite spec; returns chart_id and preview URL.\nDECISION: tool run_sql is available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "list_tables(\"analytics\") -> {\"schema\":\"analytics\",\"tables\":[\"orders\",\"order_items\",\"refunds\",\"customers\",\"products\",\"daily_revenue_mv\",\"sessions\"],\"retrieved_at\":\"2026-06-21T08:00:12Z\",\"elapsed_ms\":34}\ndescribe_table(\"orders\") -> columns: order_id (bigint PK), customer_id (bigint FK), created_at (timestamptz), status (varchar), gross_usd (numeric), net_usd (numeric), region (varchar); est. rows: 4,812,003\ndescribe_table(\"refunds\") -> columns: refund_id (bigint PK), order_id (bigint FK), sku_id (varchar), refund_usd (numeric), reason (varchar), refunded_at (timestamptz); est. rows: 193,441\ninfo: daily_revenue_mv is a materialized view refreshed nightly at 02:00 UTC; last refresh 2026-06-21T02:00:44Z\nDECISION: join orders to refunds on order_id to correlate revenue and refund events\ninfo: products table has 8,204 rows with columns: sku_id, category, unit_price_usd, supplier_id\ninfo: sessions table has 91M rows; not relevant to this investigation\ndebug: warehouse=snowflake cluster=prod-analytics query_tag=bi-agent-run-3901\ndebug: list_tables executed in 34ms; describe_table(orders) 41ms; describe_table(refunds) 29ms"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.63): 'Data Governance Policy v3.2 — Retention Schedules and Archival Windows' — This document covers PII retention limits (orders older than 7 years are scrubbed of customer_id), the archive schedule for the sessions table (compressed to weekly roll-ups after 90 days), and the quarterly review cycle for materialized-view refresh schedules. It was surfaced by broad semantic retrieval on 'analytics warehouse tables' and is entirely unrelated to the revenue anomaly being investigated. Includes an appendix with GDPR-compliance sign-off forms and a distribution list of 47 data stewards; none of this was cited by the agent."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Revenue is down this week. Please investigate the anomaly and identify the root cause. Start by understanding what tables are available."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous BI/analytics agent investigating data anomalies on behalf of the revenue operations team.\nYou have read-only access to the analytics warehouse. You may query, aggregate, and chart data but may not modify it.\nOperating policy: never run UPDATE, DELETE, INSERT, or DDL statements; read-only analysis only.\nDECISION: read-only analysis only; all mutations are forbidden"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- list_tables(schema): returns array of table names in the given schema.\n- describe_table(table): returns column names, types, and row-count estimate.\n- run_sql(query, limit): executes a read-only SELECT and returns up to `limit` rows as JSON.\n- make_chart(spec): renders a chart from a vega-lite spec; returns chart_id and preview URL.\nDECISION: tool run_sql is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Listed tables in analytics schema: orders, order_items, refunds, customers, products, daily_revenue_mv, sessions. Orders has ~4.8M rows; refunds has ~193K rows. Plan: join orders to refunds on order_id to investigate revenue drop."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "run_sql(\"SELECT date_trunc('day', created_at) AS day, SUM(net_usd) AS revenue_usd, COUNT(*) AS order_count FROM analytics.orders WHERE created_at >= '2026-06-07' GROUP BY 1 ORDER BY 1\", limit=20) -> {\"rows\":[{\"day\":\"2026-06-07\",\"revenue_usd\":\"487234.12\",\"order_count\":9841},{\"day\":\"2026-06-08\",\"revenue_usd\":\"491002.77\",\"order_count\":9902},{\"day\":\"2026-06-09\",\"revenue_usd\":\"488750.43\",\"order_count\":9876},{\"day\":\"2026-06-10\",\"revenue_usd\":\"493411.88\",\"order_count\":9955},{\"day\":\"2026-06-11\",\"revenue_usd\":\"490182.55\",\"order_count\":9918},{\"day\":\"2026-06-12\",\"revenue_usd\":\"489901.34\",\"order_count\":9895},{\"day\":\"2026-06-13\",\"revenue_usd\":\"491874.02\",\"order_count\":9933},{\"day\":\"2026-06-14\",\"revenue_usd\":\"305412.67\",\"order_count\":9801},{\"day\":\"2026-06-15\",\"revenue_usd\":\"301887.45\",\"order_count\":9823},{\"day\":\"2026-06-16\",\"revenue_usd\":\"303204.19\",\"order_count\":9788},{\"day\":\"2026-06-17\",\"revenue_usd\":\"298741.33\",\"order_count\":9766},{\"day\":\"2026-06-18\",\"revenue_usd\":\"302093.78\",\"order_count\":9812},{\"day\":\"2026-06-19\",\"revenue_usd\":\"304411.56\",\"order_count\":9834},{\"day\":\"2026-06-20\",\"revenue_usd\":\"301984.22\",\"order_count\":9791}],\"elapsed_ms\":892,\"bytes_scanned\":\"1.4GB\",\"rows_returned\":14}\ninfo: query executed as read-only SELECT; no writes performed; warehouse=prod-analytics\ninfo: baseline daily revenue Jun 7-13 averaged $490,337; Jun 14-20 averaged $302,534\nDECISION: revenue dropped 38% on 2026-06-14; investigate refunds and order net values starting that date\ninfo: order_count is stable across both periods (~9,800-9,955/day), ruling out order volume as cause\ninfo: the drop is isolated to revenue_usd (net), not to transaction count\ndebug: query_hash=a7f2b1 plan_type=full_scan partition_pruning=yes evaluated_at=2026-06-21T08:04:17Z"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.59): 'Marketing Campaign Calendar Q2 2026 — Promo Codes and Discount Windows' — This document lists all planned discount events for Q2, including a mid-June flash sale (10% off, June 3-6 only), a Father's Day promotion (June 12-16, 5% off select categories), and an end-of-quarter clearance window. It was pulled because the SQL query touched June dates; however the Father's Day promotion ended June 16 and cannot account for the sustained drop through June 20. The document includes budget allocations, campaign owner contacts, and creative brief references. The agent did not cite this document."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Good. Keep going — drill into what changed on the 14th."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous BI/analytics agent investigating data anomalies on behalf of the revenue operations team.\nYou have read-only access to the analytics warehouse. You may query, aggregate, and chart data but may not modify it.\nOperating policy: never run UPDATE, DELETE, INSERT, or DDL statements; read-only analysis only.\nDECISION: read-only analysis only; all mutations are forbidden"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- list_tables(schema): returns array of table names in the given schema.\n- describe_table(table): returns column names, types, and row-count estimate.\n- run_sql(query, limit): executes a read-only SELECT and returns up to `limit` rows as JSON.\n- make_chart(spec): renders a chart from a vega-lite spec; returns chart_id and preview URL.\nDECISION: tool run_sql is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Listed tables in analytics schema: orders, order_items, refunds, customers, products, daily_revenue_mv, sessions. Orders has ~4.8M rows; refunds has ~193K rows. Plan: join orders to refunds on order_id to investigate revenue drop."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Queried daily revenue Jun 7-20. Baseline (Jun 7-13) averaged $490K/day. Starting Jun 14, revenue collapsed to ~$302K/day — a 38% drop. Order count held steady (~9,800/day), so volume is not the cause. Net revenue per order fell sharply."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "run_sql(\"SELECT r.sku_id, p.category, COUNT(*) AS refund_count, SUM(r.refund_usd) AS total_refunded_usd, AVG(r.refund_usd) AS avg_refund_usd FROM analytics.refunds r JOIN analytics.products p ON r.sku_id = p.sku_id WHERE r.refunded_at >= '2026-06-14' GROUP BY r.sku_id, p.category ORDER BY total_refunded_usd DESC LIMIT 10\", limit=10) -> {\"rows\":[{\"sku_id\":\"SKU-8841\",\"category\":\"Electronics\",\"refund_count\":14203,\"total_refunded_usd\":\"1284109.44\",\"avg_refund_usd\":\"90.41\"},{\"sku_id\":\"SKU-2201\",\"category\":\"Electronics\",\"refund_count\":312,\"total_refunded_usd\":\"18204.88\",\"avg_refund_usd\":\"58.35\"},{\"sku_id\":\"SKU-5503\",\"category\":\"Apparel\",\"refund_count\":289,\"total_refunded_usd\":\"9812.33\",\"avg_refund_usd\":\"33.95\"},{\"sku_id\":\"SKU-1102\",\"category\":\"Home\",\"refund_count\":201,\"total_refunded_usd\":\"7433.17\",\"avg_refund_usd\":\"36.98\"},{\"sku_id\":\"SKU-7704\",\"category\":\"Apparel\",\"refund_count\":188,\"total_refunded_usd\":\"6941.02\",\"avg_refund_usd\":\"36.92\"}],\"elapsed_ms\":1241,\"bytes_scanned\":\"2.1GB\",\"rows_returned\":10}\ninfo: SKU-8841 accounts for 14,203 refunds since Jun 14, dwarfing all other SKUs combined (which total ~2,800 refunds)\ninfo: the $1.28M in SKU-8841 refunds over 7 days maps closely to the $187K/day revenue shortfall (baseline minus actuals)\nDECISION: revenue drop caused by a refund spike from SKU-8841 (Electronics); drill into refund reasons and daily trend\ninfo: all other top-10 SKUs show refund counts in the 188-312 range, consistent with historical baselines\ninfo: SKU-8841 avg refund of $90.41 suggests a mid-range electronics item; check product table for detail\ndebug: query_hash=c3d8e9 join_type=hash_join rows_scanned=193441 evaluated_at=2026-06-21T08:09:33Z"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.57): 'Supplier Compliance Handbook — Returns and Warranty Policy SLA' — This handbook documents the SLA requirements for supplier-funded refunds versus merchant-funded refunds, the escalation path for refund disputes exceeding $50K in 30 days, and the quarterly supplier scorecard process. It was surfaced because the query involved refunds; however the agent has not yet established supplier involvement in the anomaly and did not consult this document this turn."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "That is a big spike on one SKU. What does the daily refund trend look like for SKU-8841?"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous BI/analytics agent investigating data anomalies on behalf of the revenue operations team.\nYou have read-only access to the analytics warehouse. You may query, aggregate, and chart data but may not modify it.\nOperating policy: never run UPDATE, DELETE, INSERT, or DDL statements; read-only analysis only.\nDECISION: read-only analysis only; all mutations are forbidden"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- list_tables(schema): returns array of table names in the given schema.\n- describe_table(table): returns column names, types, and row-count estimate.\n- run_sql(query, limit): executes a read-only SELECT and returns up to `limit` rows as JSON.\n- make_chart(spec): renders a chart from a vega-lite spec; returns chart_id and preview URL.\nDECISION: tool run_sql is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Listed tables in analytics schema: orders, order_items, refunds, customers, products, daily_revenue_mv, sessions. Orders has ~4.8M rows; refunds has ~193K rows. Plan: join orders to refunds on order_id to investigate revenue drop."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Queried daily revenue Jun 7-20. Baseline (Jun 7-13) averaged $490K/day. Starting Jun 14, revenue collapsed to ~$302K/day — a 38% drop. Order count held steady (~9,800/day), so volume is not the cause. Net revenue per order fell sharply."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Joined refunds to products on sku_id, grouped by SKU since Jun 14. SKU-8841 (Electronics) generated 14,203 refunds totalling $1.28M — roughly 45x the next-highest SKU. All other SKUs are at baseline. Root cause is a refund spike on SKU-8841; next step is the daily refund trend and a chart."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "make_chart({\"title\":\"Daily Refund Count — SKU-8841 vs All Other SKUs (Jun 7–20)\",\"data\":{\"sku_8841\":[{\"day\":\"2026-06-07\",\"refunds\":18},{\"day\":\"2026-06-08\",\"refunds\":21},{\"day\":\"2026-06-09\",\"refunds\":19},{\"day\":\"2026-06-10\",\"refunds\":22},{\"day\":\"2026-06-11\",\"refunds\":17},{\"day\":\"2026-06-12\",\"refunds\":20},{\"day\":\"2026-06-13\",\"refunds\":23},{\"day\":\"2026-06-14\",\"refunds\":1988},{\"day\":\"2026-06-15\",\"refunds\":2041},{\"day\":\"2026-06-16\",\"refunds\":2103},{\"day\":\"2026-06-17\",\"refunds\":1974},{\"day\":\"2026-06-18\",\"refunds\":2017},{\"day\":\"2026-06-19\",\"refunds\":2098},{\"day\":\"2026-06-20\",\"refunds\":1962}],\"all_other\":[{\"day\":\"2026-06-07\",\"refunds\":381},{\"day\":\"2026-06-08\",\"refunds\":374},{\"day\":\"2026-06-09\",\"refunds\":390},{\"day\":\"2026-06-10\",\"refunds\":368},{\"day\":\"2026-06-11\",\"refunds\":377},{\"day\":\"2026-06-12\",\"refunds\":383},{\"day\":\"2026-06-13\",\"refunds\":379},{\"day\":\"2026-06-14\",\"refunds\":395},{\"day\":\"2026-06-15\",\"refunds\":388},{\"day\":\"2026-06-16\",\"refunds\":401},{\"day\":\"2026-06-17\",\"refunds\":371},{\"day\":\"2026-06-18\",\"refunds\":384},{\"day\":\"2026-06-19\",\"refunds\":392},{\"day\":\"2026-06-20\",\"refunds\":378}]},\"chart_id\":\"chart-7720\",\"preview_url\":\"https://charts.internal/bi-agent/chart-7720.png\",\"render_ms\":211}) \ninfo: chart rendered successfully as a dual-line time-series; SKU-8841 line shows a step-change cliff on Jun 14, all-other-SKUs line is flat and unremarkable\ninfo: SKU-8841 pre-spike baseline was ~20 refunds/day; post-spike is ~2,026/day — a 100x increase starting exactly Jun 14\nDECISION: anomaly fully explained; revenue drop is a refund spike on SKU-8841 starting Jun 14; chart the SKU-8841 refund trend for stakeholder report\ninfo: no other SKU shows any inflection on Jun 14, confirming the anomaly is isolated to this product\ninfo: recommended next step: escalate to product/supplier team to identify the defect or batch issue that triggered mass returns on SKU-8841 from Jun 14 onward\ndebug: chart_id=chart-7720 vega_lite_version=5.8 agent_run=bi-agent-run-3901 closed_at=2026-06-21T08:14:52Z"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.54): 'Internal BI Tool Glossary — Chart Types and When to Use Them' — A reference guide explaining the difference between line charts, bar charts, scatter plots, and heatmaps, including accessibility guidelines for color-blind users and embed code snippets for the internal dashboard platform. Surfaced because the agent invoked make_chart; however the chart spec was already fully formed and this document was not consulted. Includes a section on vega-lite version compatibility notes."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Great work. Summarize the findings and share the chart for the stakeholder report."
+        }
+      ]
+    }
+  ]
+}

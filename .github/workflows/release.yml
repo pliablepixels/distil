@@ -1,0 +1,34 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Gate before release
+        run: |
+          uv run --with pytest python -m pytest -q
+          uv run distil bench
+          uv run distil verify
+      - name: Build wheel + sdist
+        run: uv build
+      - name: Build single-file executable
+        run: bash scripts/build_pyz.sh
+      - name: Attach artifacts to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/distil.pyz
+      # To publish to PyPI, add a trusted-publisher step here (pypa/gh-action-pypi-publish).

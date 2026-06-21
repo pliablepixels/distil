@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "Distil trajectory corpus — real, captured-style agent runs across domains. Each is a 4-turn headless agent loop with a cacheable stable prefix, decision-driven volatile tool outputs, and causally-inert noise. The corpus is the asset that makes certification meaningful beyond a single example.",
+  "trajectories": [
+    {"file": "sample_trajectory.json",   "domain": "ops/sre",       "title": "Disk-pressure incident remediation"},
+    {"file": "coding-bugfix.json",        "domain": "coding",        "title": "Off-by-one bugfix from a failing test"},
+    {"file": "support-refund.json",       "domain": "support",       "title": "Refund resolved within policy"},
+    {"file": "research-synthesis.json",   "domain": "research",      "title": "Two-source claim verification"},
+    {"file": "data-analysis-sql.json",    "domain": "data-analysis", "title": "Revenue anomaly root-caused via SQL"},
+    {"file": "devops-rollback.json",      "domain": "devops",        "title": "Crash-loop rollback to last-good revision"},
+    {"file": "finance-reconcile.json",    "domain": "finance",       "title": "Invoice/payment reconciliation with exception"}
+  ]
+}

@@ -1,0 +1,209 @@
+{
+  "id": "devops-rollback",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless Kubernetes incident-response agent loop. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried past char 120 in the noise. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth. Arc: triage CrashLoopBackOff -> diagnose root cause -> confirm rollback target -> execute rollback.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Kubernetes incident-response agent operating headless on call.\nYou triage deployment alerts, inspect pod state, and remediate within policy without a human in the loop.\nOperating policy: prefer rollback to a known-good revision over hotfixing in prod.\nDECISION: when pods are CrashLoopBackOff, inspect root cause before acting; prefer rollback_undo over in-place patch"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- kubectl_get(resource, namespace, selector): returns JSON list of matching Kubernetes resources.\n- describe_pod(namespace, pod): returns full pod description including events, status, and resource limits.\n- rollout_history(namespace, deployment): returns revision history for a deployment with change-cause annotations.\n- rollout_undo(namespace, deployment, to_revision): rolls the deployment back to the specified revision; returns confirmation JSON.\n- get_metrics(service, window): returns time-series for cpu/mem/error-rate/latency as JSON.\nDECISION: tool rollout_undo is available and is the preferred remediation for crash-looping pods caused by a bad deploy"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "kubectl_get(\"pods\", \"production\", \"app=checkout\") -> {\"apiVersion\":\"v1\",\"items\":[{\"metadata\":{\"name\":\"checkout-7d9f8b6c4-xk2pq\",\"namespace\":\"production\"},\"status\":{\"phase\":\"Running\",\"containerStatuses\":[{\"name\":\"checkout\",\"ready\":true,\"restartCount\":0,\"image\":\"acme/checkout:v1.6.0\"}]}},{\"metadata\":{\"name\":\"checkout-85c7d9f4b-lm3nz\",\"namespace\":\"production\"},\"status\":{\"phase\":\"Running\",\"containerStatuses\":[{\"name\":\"checkout\",\"ready\":false,\"restartCount\":7,\"state\":{\"waiting\":{\"reason\":\"CrashLoopBackOff\"}},\"image\":\"acme/checkout:v1.7.0\"}]}},{\"metadata\":{\"name\":\"checkout-85c7d9f4b-pw8vt\",\"namespace\":\"production\"},\"status\":{\"phase\":\"Running\",\"containerStatuses\":[{\"name\":\"checkout\",\"ready\":false,\"restartCount\":5,\"state\":{\"waiting\":{\"reason\":\"CrashLoopBackOff\"}},\"image\":\"acme/checkout:v1.7.0\"}]}},{\"metadata\":{\"name\":\"checkout-85c7d9f4b-rq1xs\",\"namespace\":\"production\"},\"status\":{\"phase\":\"Running\",\"containerStatuses\":[{\"name\":\"checkout\",\"ready\":false,\"restartCount\":6,\"state\":{\"waiting\":{\"reason\":\"CrashLoopBackOff\"}},\"image\":\"acme/checkout:v1.7.0\"}]}},{\"metadata\":{\"name\":\"checkout-7d9f8b6c4-zt5wy\",\"namespace\":\"production\"},\"status\":{\"phase\":\"Running\",\"containerStatuses\":[{\"name\":\"checkout\",\"ready\":true,\"restartCount\":0,\"image\":\"acme/checkout:v1.6.0\"}]}}],\"kind\":\"List\"}\nfetched 5 pods; 2 on old replicaset (v1.6.0, healthy), 3 on new replicaset (v1.7.0, crashing)\ninfo: deployment checkout is in a partial rollout state; rollout paused by liveness probe failures\ninfo: restart counts on v1.7.0 pods are 5, 6, 7 — escalating rapidly over the last 8 minutes\nDECISION: 3/5 pods CrashLoopBackOff on checkout; new image v1.7.0 is the likely culprit, inspect pod before rolling back\ninfo: v1.6.0 pods continue serving traffic; partial availability maintained at 2/5 capacity\ninfo: error-rate on the checkout service has risen to 38% from baseline 0.2% since deploy began\ninfo: PodDisruptionBudget allows a minimum of 2 healthy pods; current state is at the boundary\ndebug: kubectl query resolved in 61ms; server-version=1.29.3; cluster=prod-us-east-1\ndebug: list resourceVersion=48821934; generation=7 observedGeneration=7\ndebug: labels applied: app=checkout tier=frontend env=production"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.69): 'Kubernetes Capacity Planning Handbook Q2 2026' — This document covers expected node counts, autoscaler tuning targets, and reserved instance commitments for the production cluster over the next two quarters. It includes cost-per-namespace breakdowns, vertical pod autoscaler recommendations, and a section on right-sizing CPU requests for the frontend tier. None of this information is relevant to diagnosing a CrashLoopBackOff during an active incident; it was surfaced by broad semantic overlap on the keyword 'checkout production pods'. Appendix E contains a pod template reference that is entirely unrelated to the crash in progress."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "ALERT fired: CrashLoopBackOff on deployment=checkout namespace=production. Investigate and remediate per policy."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Kubernetes incident-response agent operating headless on call.\nYou triage deployment alerts, inspect pod state, and remediate within policy without a human in the loop.\nOperating policy: prefer rollback to a known-good revision over hotfixing in prod.\nDECISION: when pods are CrashLoopBackOff, inspect root cause before acting; prefer rollback_undo over in-place patch"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- kubectl_get(resource, namespace, selector): returns JSON list of matching Kubernetes resources.\n- describe_pod(namespace, pod): returns full pod description including events, status, and resource limits.\n- rollout_history(namespace, deployment): returns revision history for a deployment with change-cause annotations.\n- rollout_undo(namespace, deployment, to_revision): rolls the deployment back to the specified revision; returns confirmation JSON.\n- get_metrics(service, window): returns time-series for cpu/mem/error-rate/latency as JSON.\nDECISION: tool rollout_undo is available and is the preferred remediation for crash-looping pods caused by a bad deploy"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Listed checkout pods; 3/5 in CrashLoopBackOff on new image v1.7.0, 2/5 healthy on v1.6.0. Error rate spiked to 38%. Next: describe a crashing pod to identify root cause."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "describe_pod(\"production\", \"checkout-85c7d9f4b-lm3nz\") -> {\"kind\":\"Pod\",\"metadata\":{\"name\":\"checkout-85c7d9f4b-lm3nz\",\"namespace\":\"production\",\"labels\":{\"app\":\"checkout\",\"pod-template-hash\":\"85c7d9f4b\"}},\"spec\":{\"containers\":[{\"name\":\"checkout\",\"image\":\"acme/checkout:v1.7.0\",\"env\":[{\"name\":\"DATABASE_URL\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"checkout-db\",\"key\":\"url\"}}},{\"name\":\"STRIPE_API_KEY\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"checkout-payments\",\"key\":\"api_key\"}}}],\"resources\":{\"requests\":{\"cpu\":\"250m\",\"memory\":\"512Mi\"},\"limits\":{\"cpu\":\"1\",\"memory\":\"1Gi\"}}}]},\"status\":{\"phase\":\"Running\",\"containerStatuses\":[{\"name\":\"checkout\",\"restartCount\":7,\"lastState\":{\"terminated\":{\"exitCode\":1,\"reason\":\"Error\",\"finishedAt\":\"2026-06-21T11:42:17Z\"}}}]},\"events\":[{\"type\":\"Warning\",\"reason\":\"BackOff\",\"message\":\"Back-off restarting failed container checkout in pod checkout-85c7d9f4b-lm3nz\"},{\"type\":\"Warning\",\"reason\":\"Failed\",\"message\":\"Error: failed to create containerd task: failed to create shim task: OCI runtime create failed\"}]}\ncontainer exit code: 1; last termination reason: Error; container never passed readiness probe\nlog tail (last 5 lines before crash): FATAL: required environment variable PAYMENT_GATEWAY_URL is not set; startup aborted\nlog tail: panic: runtime error — missing required config; see PAYMENT_GATEWAY_URL in deployment spec\nDECISION: new image v1.7.0 crashes on a missing env var PAYMENT_GATEWAY_URL, a regression introduced in the latest deploy; rollback is the correct remediation\nlog tail: goroutine 1 [running]: main.mustGetenv(0xc000112080, 0x13) — startup.go:47\ninfo: secret checkout-payments exists and is mounted correctly; PAYMENT_GATEWAY_URL is a newly required var absent from the deployment manifest\ninfo: the missing variable was added in the v1.7.0 codebase but not added to the Helm values; a config drift issue\ninfo: pod has been restarted 7 times in 9 minutes; exponential back-off now at ~5 minute interval\ndebug: describe resolved in 74ms; pod uid=a3f1bc92-44e7-4d11-9c3b-7f082de61a04"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.65): 'Helm Chart Authoring Best Practices — Internal Style Guide' — a 40-page guide covering chart versioning, values.yaml structure, templating conventions, and how to write reusable subcharts. Includes a section on environment variable injection via ConfigMaps versus Secrets. This document would be useful for a postmortem review of the config-drift root cause, but has no bearing on the immediate rollback decision. Pulled due to keyword overlap on 'deployment spec' and 'environment variable'. The agent does not cite this document."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Continue investigation. Stay within policy."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Kubernetes incident-response agent operating headless on call.\nYou triage deployment alerts, inspect pod state, and remediate within policy without a human in the loop.\nOperating policy: prefer rollback to a known-good revision over hotfixing in prod.\nDECISION: when pods are CrashLoopBackOff, inspect root cause before acting; prefer rollback_undo over in-place patch"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- kubectl_get(resource, namespace, selector): returns JSON list of matching Kubernetes resources.\n- describe_pod(namespace, pod): returns full pod description including events, status, and resource limits.\n- rollout_history(namespace, deployment): returns revision history for a deployment with change-cause annotations.\n- rollout_undo(namespace, deployment, to_revision): rolls the deployment back to the specified revision; returns confirmation JSON.\n- get_metrics(service, window): returns time-series for cpu/mem/error-rate/latency as JSON.\nDECISION: tool rollout_undo is available and is the preferred remediation for crash-looping pods caused by a bad deploy"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Listed checkout pods; 3/5 in CrashLoopBackOff on new image v1.7.0, 2/5 healthy on v1.6.0. Error rate spiked to 38%. Next: describe a crashing pod to identify root cause."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Described crashing pod; root cause is missing env var PAYMENT_GATEWAY_URL introduced in v1.7.0 but absent from Helm values — config drift. Exit code 1 on every startup. Rollback is the correct fix; need to identify the safe target revision."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "rollout_history(\"production\", \"checkout\") -> {\"deployment\":\"checkout\",\"namespace\":\"production\",\"revisions\":[{\"revision\":5,\"changeCause\":\"deploy: checkout v1.5.2 — hotfix payment timeout\",\"image\":\"acme/checkout:v1.5.2\",\"deployedAt\":\"2026-05-14T08:22:00Z\"},{\"revision\":6,\"changeCause\":\"deploy: checkout v1.6.0 — feature/loyalty-points\",\"image\":\"acme/checkout:v1.6.0\",\"deployedAt\":\"2026-06-10T14:05:00Z\",\"soakHours\":263,\"incidentCount\":0},{\"revision\":7,\"changeCause\":\"deploy: checkout v1.7.0 — feature/payment-gateway-v2\",\"image\":\"acme/checkout:v1.7.0\",\"deployedAt\":\"2026-06-21T11:33:00Z\",\"soakHours\":0.15,\"incidentCount\":1}],\"currentRevision\":7,\"desiredRevision\":7}\nrevision 5: acme/checkout:v1.5.2, deployed 2026-05-14, 38 soak-days, 0 incidents\nrevision 6: acme/checkout:v1.6.0, deployed 2026-06-10, 11 soak-days, 0 incidents — last known-good\nrevision 7: acme/checkout:v1.7.0, deployed 2026-06-21T11:33Z (9 minutes ago), 0 soak time, 1 active incident\nDECISION: revision 7 is the bad deploy; roll back to revision 6 which has 11 days of soak time and zero incidents\ninfo: revision 6 image acme/checkout:v1.6.0 is still present in the cluster image cache on all nodes\ninfo: rollback to revision 6 will reuse the existing v1.6.0 replicaset (checkout-7d9f8b6c4) already partially healthy\ninfo: estimated time to full recovery after rollback: 60-90 seconds based on readiness probe intervals\ndebug: rollout_history resolved in 38ms; cluster=prod-us-east-1; deployment generation=7"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.62): 'Deployment Frequency and Change Failure Rate — DORA Metrics Dashboard Q2 2026' — a quarterly summary of deployment metrics across all services, including mean time to recovery, change failure rate by team, and deployment volume trends. The checkout service shows a CFR of 2.1% year-to-date, with this incident now contributing to the quarterly total. This document contains useful postmortem context but is entirely irrelevant to executing the rollback decision. The agent does not cite it."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Proceed with remediation. Confirm the rollback target before executing."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Kubernetes incident-response agent operating headless on call.\nYou triage deployment alerts, inspect pod state, and remediate within policy without a human in the loop.\nOperating policy: prefer rollback to a known-good revision over hotfixing in prod.\nDECISION: when pods are CrashLoopBackOff, inspect root cause before acting; prefer rollback_undo over in-place patch"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- kubectl_get(resource, namespace, selector): returns JSON list of matching Kubernetes resources.\n- describe_pod(namespace, pod): returns full pod description including events, status, and resource limits.\n- rollout_history(namespace, deployment): returns revision history for a deployment with change-cause annotations.\n- rollout_undo(namespace, deployment, to_revision): rolls the deployment back to the specified revision; returns confirmation JSON.\n- get_metrics(service, window): returns time-series for cpu/mem/error-rate/latency as JSON.\nDECISION: tool rollout_undo is available and is the preferred remediation for crash-looping pods caused by a bad deploy"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Listed checkout pods; 3/5 in CrashLoopBackOff on new image v1.7.0, 2/5 healthy on v1.6.0. Error rate spiked to 38%. Next: describe a crashing pod to identify root cause."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Described crashing pod; root cause is missing env var PAYMENT_GATEWAY_URL introduced in v1.7.0 but absent from Helm values — config drift. Exit code 1 on every startup. Rollback is the correct fix; need to identify the safe target revision."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Pulled rollout history; revision 7 (v1.7.0) is the bad deploy with 9 minutes soak and 1 active incident. Revision 6 (v1.6.0) has 11 soak-days and zero incidents — confirmed safe rollback target. Executing rollback now."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "rollout_undo(\"production\", \"checkout\", 6) -> {\"deployment\":\"checkout\",\"namespace\":\"production\",\"rolledBackTo\":{\"revision\":6,\"image\":\"acme/checkout:v1.6.0\",\"changeCause\":\"deploy: checkout v1.6.0 — feature/loyalty-points\"},\"status\":\"progressing\",\"startedAt\":\"2026-06-21T11:43:02Z\",\"observedGeneration\":8,\"conditions\":[{\"type\":\"Progressing\",\"status\":\"True\",\"reason\":\"NewReplicaSetAvailable\"},{\"type\":\"Available\",\"status\":\"True\",\"reason\":\"MinimumReplicasAvailable\"}]}\nrollback initiated; deployment generation bumped to 8; target replicaset checkout-7d9f8b6c4 scaling up\npost-check (t+30s): 5/5 pods ready on acme/checkout:v1.6.0; replicaset checkout-85c7d9f4b (v1.7.0) scaled to 0\npost-check (t+30s): error rate returned to 0.2% (baseline); p99 latency 94ms (nominal)\nDECISION: rolled back to revision 6, all 5 pods healthy on v1.6.0, incident resolved; file follow-up for missing PAYMENT_GATEWAY_URL in Helm values\npost-check: PodDisruptionBudget constraints satisfied throughout rollback; zero pods below minimum at any point\ninfo: incident duration 11 minutes from alert to full recovery; no data loss, no payment failures logged\ninfo: follow-up ticket RB-4421 auto-filed: add PAYMENT_GATEWAY_URL to checkout Helm values before re-deploying v1.7.0\ninfo: notifying on-call channel #incidents with resolution summary\ndebug: rollout_undo resolved in 112ms; audit_id=rollback-8a3f; signed_by=policy-engine; cluster=prod-us-east-1"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.61): 'Incident Postmortem Template and Blameless Culture Guide' — an internal template for writing postmortem documents after production incidents, covering the five-whys method, timeline reconstruction, contributing factors, and action items. Useful for the follow-up postmortem session, but completely irrelevant to the live rollback execution happening in this turn. Surfaced by semantic overlap on 'incident resolved' and 'follow-up ticket'. The agent does not consult or cite this document."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Confirm resolution and wrap up any follow-ups."
+        }
+      ]
+    }
+  ]
+}

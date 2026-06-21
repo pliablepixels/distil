@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Tests
+        run: uv run --with pytest python -m pytest -q
+      - name: Non-inferiority gate (every domain must certify)
+        run: uv run distil bench
+      - name: Byte-fidelity gate (reversible + append-only)
+        run: uv run distil verify

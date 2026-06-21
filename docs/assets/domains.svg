@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+  </defs>
+  <rect width="1200" height="430" fill="url(#bg)"/>
+  <text x="40" y="46" font-size="22" font-weight="700" fill="#e7e9ee">Measured across 7 domains <tspan fill="#5b6173" font-weight="400" font-size="14">— the same gate, not one cherry-picked example</tspan></text>
+  <text x="40" y="72" font-size="13" fill="#8b91a1">Every trajectory: distil certified non-inferior, the gate rejects lossy aggression, savings are lossless. <tspan fill="#5ad1c9">distil bench</tspan></text>
+
+  <!-- header -->
+  <g font-size="11" fill="#5b6173" transform="translate(40,104)">
+    <text x="0" y="0">DOMAIN</text><text x="180" y="0">LOSSLESS SAVINGS</text><text x="640" y="0">DISTIL</text><text x="740" y="0">AGGRESSIVE</text><text x="900" y="0">TOKENS PRUNED</text>
+  </g>
+  <line x1="40" y1="116" x2="1160" y2="116" stroke="#1b1f2a"/>
+
+  <!-- rows: bar scale 33% -> 440px -->
+  <g font-size="13" transform="translate(40,116)">
+    <!-- ops/sre 33.1 615 -->
+    <g transform="translate(0,34)"><text x="0" y="5" fill="#e7e9ee">ops/sre</text><rect x="180" y="-9" width="440" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">33.1%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">615</text></g>
+    <!-- coding 28.7 736 -->
+    <g transform="translate(0,72)"><text x="0" y="5" fill="#e7e9ee">coding</text><rect x="180" y="-9" width="382" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">28.7%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">736</text></g>
+    <!-- support 32.6 765 -->
+    <g transform="translate(0,110)"><text x="0" y="5" fill="#e7e9ee">support</text><rect x="180" y="-9" width="434" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">32.6%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">765</text></g>
+    <!-- research 25.7 809 -->
+    <g transform="translate(0,148)"><text x="0" y="5" fill="#e7e9ee">research</text><rect x="180" y="-9" width="342" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">25.7%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">809</text></g>
+    <!-- data 18.1 965 -->
+    <g transform="translate(0,186)"><text x="0" y="5" fill="#e7e9ee">data-analysis</text><rect x="180" y="-9" width="241" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">18.1%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">965</text></g>
+    <!-- devops 25.0 857 -->
+    <g transform="translate(0,224)"><text x="0" y="5" fill="#e7e9ee">devops</text><rect x="180" y="-9" width="333" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">25.0%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">857</text></g>
+    <!-- finance 29.1 1014 -->
+    <g transform="translate(0,262)"><text x="0" y="5" fill="#e7e9ee">finance</text><rect x="180" y="-9" width="388" height="20" rx="5" fill="url(#g)"/><text x="630" y="5" fill="#e7e9ee" font-weight="700">29.1%</text><text x="640" y="5" fill="#5ad19a">✔ PASS</text><text x="752" y="5" fill="#ff8a6b">✘ FAIL</text><text x="930" y="5" fill="#8b91a1">1014</text></g>
+  </g>
+  <line x1="40" y1="402" x2="1160" y2="402" stroke="#1b1f2a"/>
+  <text x="40" y="424" font-size="13" fill="#8b91a1">aggregate: <tspan fill="url(#g)" font-weight="700">26.8% cheaper</tspan>, losslessly · <tspan fill="#e7e9ee">5,761 tokens</tspan> causally prunable · <tspan fill="#5ad19a">GATE: PASS</tspan></text>
+</svg>

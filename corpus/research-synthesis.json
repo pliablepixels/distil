@@ -1,0 +1,209 @@
+{
+  "id": "research-synthesis",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless research agent answering a factual question by searching, fetching, and verifying sources. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried in noise after char 120. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous research agent operating headless. You answer factual questions by searching for sources, fetching primary documents, and verifying claims against independent sources before asserting.\nOperating policy: verify every claim against >=2 independent primary sources before asserting.\nDECISION: verify every claim against >=2 independent primary sources before asserting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- web_search(query, max_results): returns JSON list of {title, url, snippet, source_type}.\n- fetch_url(url): fetches and returns article text, author, publication_date, domain.\n- extract_claim(text, claim_template): extracts a structured claim with value, confidence, and source citation.\n- take_note(claim, sources): records a verified claim with its supporting sources for final synthesis.\nDECISION: tool web_search is available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "web_search(\"global average surface temperature anomaly 2023 NASA NOAA\", max_results=5) -> {\"results\":[{\"title\":\"2023 Was the Hottest Year on Record\",\"url\":\"https://climate.nasa.gov/news/3281/2023-was-the-hottest-year-on-record/\",\"snippet\":\"NASAs analysis shows that 2023 was the warmest year since global records began in 1880, continuing a long-term warming trend.\",\"source_type\":\"primary_government\",\"domain\":\"climate.nasa.gov\"},{\"title\":\"Global Surface Temperature | Vital Signs\",\"url\":\"https://climate.nasa.gov/vital-signs/global-temperature/\",\"snippet\":\"Global temperature has risen about 1.1 degrees Celsius since the pre-industrial period (1850-1900).\",\"source_type\":\"primary_government\",\"domain\":\"climate.nasa.gov\"}]}\nresult metadata: total_hits=5, search_engine=web_api, latency_ms=210, tenant=research-agent, request_id=req-001\nresult[0] classified as primary_government_source; domain=climate.nasa.gov trust_tier=1\nresult[1] classified as primary_government_source; domain=climate.nasa.gov trust_tier=1\nresult[2] title=\"2023 global temperature records\" domain=reuters.com trust_tier=3\nDECISION: top result is a NASA primary source, fetch it to extract the exact temperature anomaly figure\nresult[3] title=\"Climate change 2023 overview\" domain=wikipedia.org trust_tier=4\nresult[4] title=\"Record heat 2023\" domain=theguardian.com trust_tier=3\ninfo: results ranked by trust_tier ascending; primary government sources prioritised\ndebug: query_hash=a7f2 evaluated_at=2026-06-21T10:01:15Z tenant=research-agent"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.62): 'Ocean Heat Content Trends 2020-2023 — NOAA Technical Report TR-OHC-2024' — This 47-page technical report covers deep ocean heat accumulation measured by Argo floats and XBT casts. Section 3.2 details upper-700m heat content anomalies. Appendix B contains raw buoy station data. The report is tangentially related to surface temperature but measures a different quantity (ocean joules vs surface air temperature anomaly in degrees Celsius); it was pulled by broad semantic retrieval on climate keywords and was never cited by the agent."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "What was the global average surface temperature anomaly in 2023 relative to the pre-industrial baseline?"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous research agent operating headless. You answer factual questions by searching for sources, fetching primary documents, and verifying claims against independent sources before asserting.\nOperating policy: verify every claim against >=2 independent primary sources before asserting.\nDECISION: verify every claim against >=2 independent primary sources before asserting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- web_search(query, max_results): returns JSON list of {title, url, snippet, source_type}.\n- fetch_url(url): fetches and returns article text, author, publication_date, domain.\n- extract_claim(text, claim_template): extracts a structured claim with value, confidence, and source citation.\n- take_note(claim, sources): records a verified claim with its supporting sources for final synthesis.\nDECISION: tool web_search is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Ran web_search for 2023 global surface temperature anomaly. Top results are NASA primary sources (trust_tier=1). Next: fetch the top NASA article to extract the precise anomaly figure."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "fetch_url(\"https://climate.nasa.gov/news/3281/2023-was-the-hottest-year-on-record/\") -> {\"url\":\"https://climate.nasa.gov/news/3281/2023-was-the-hottest-year-on-record/\",\"title\":\"2023 Was the Hottest Year on Record\",\"author\":\"NASA Earth Observatory\",\"publication_date\":\"2024-01-12\",\"domain\":\"climate.nasa.gov\",\"word_count\":820,\"status\":200}\nfetch latency: 380ms; content_type=text/html; charset=utf-8; cache=miss\npage excerpt (first 600 chars of body): \"The global average surface temperature in 2023 was 1.17 degrees Celsius (2.1 degrees Fahrenheit) warmer than the pre-industrial average (1850–1900 baseline), according to scientists at NASAs Goddard Institute for Space Studies (GISS). This makes 2023 the warmest year in NASAs record, which dates to 1880.\"\npage excerpt continued: \"NOAA independently reported a +1.17°C anomaly for 2023, consistent with the NASA figure. The WMO confirmed 2023 as the warmest year on record at +1.45°C above the 1850-1900 average.\"\nDECISION: source states figure 1.17°C anomaly above pre-industrial baseline, need a second independent source to confirm\ncitations present: NASA GISS, NOAA, WMO all cited in article text\ninfo: publication date 2024-01-12 is consistent with annual climate summary timing\ndebug: fetch_id=f-002 tenant=research-agent request_id=req-002 evaluated_at=2026-06-21T10:01:44Z"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.58): 'Paleoclimate Proxies and the Holocene Temperature Record — Journal of Quaternary Science 2022' — A peer-reviewed article examining temperature reconstructions from ice cores, pollen records, and tree rings over the last 12,000 years. Provides useful long-term context for pre-industrial baselines but addresses timescales of centuries and millennia, not the 2023 annual anomaly measurement being verified. Pulled by semantic overlap on 'pre-industrial baseline'; never cited by the agent this turn."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Continue. Make sure to confirm with a second source before answering."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous research agent operating headless. You answer factual questions by searching for sources, fetching primary documents, and verifying claims against independent sources before asserting.\nOperating policy: verify every claim against >=2 independent primary sources before asserting.\nDECISION: verify every claim against >=2 independent primary sources before asserting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- web_search(query, max_results): returns JSON list of {title, url, snippet, source_type}.\n- fetch_url(url): fetches and returns article text, author, publication_date, domain.\n- extract_claim(text, claim_template): extracts a structured claim with value, confidence, and source citation.\n- take_note(claim, sources): records a verified claim with its supporting sources for final synthesis.\nDECISION: tool web_search is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Ran web_search for 2023 global surface temperature anomaly. Top results are NASA primary sources (trust_tier=1). Next: fetch the top NASA article to extract the precise anomaly figure."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Fetched NASA GISS article; extracted figure: +1.17°C anomaly above 1850-1900 pre-industrial baseline. NASA and NOAA both report the same figure. WMO reports +1.45°C (different baseline methodology). Need a second independent primary source to satisfy the verification policy."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "fetch_url(\"https://www.ncei.noaa.gov/access/monitoring/monthly-report/global/202313\") -> {\"url\":\"https://www.ncei.noaa.gov/access/monitoring/monthly-report/global/202313\",\"title\":\"Global Climate Report - Annual 2023\",\"author\":\"NOAA National Centers for Environmental Information\",\"publication_date\":\"2024-01-12\",\"domain\":\"ncei.noaa.gov\",\"word_count\":2140,\"status\":200}\nfetch latency: 290ms; content_type=text/html; charset=utf-8; cache=miss; request_id=req-003\npage excerpt: \"The global surface temperature for 2023 was 1.17°C (2.11°F) above the 20th century average of 13.9°C (57.0°F). This was the warmest year on record since global records began in 1850.\"\npage excerpt continued: \"NOAA uses the 20th century average as its baseline; when adjusted to the 1850-1900 pre-industrial baseline for comparison, the 2023 anomaly is approximately +1.17°C, consistent with figures reported by NASA GISS.\"\nDECISION: second independent source NOAA NCEI confirms +1.17°C anomaly above pre-industrial baseline, claim verified by 2 primary sources\ninfo: both NASA GISS and NOAA NCEI are independent US government climate agencies\ninfo: publication dates both 2024-01-12 represent the same annual reporting cycle but produced independently\ninfo: baseline methodology note recorded; WMO figure of +1.45°C uses a different 1850-1900 reference period\ndebug: fetch_id=f-003 tenant=research-agent evaluated_at=2026-06-21T10:02:03Z"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.55): 'Extreme Weather Events Atlas 2023 — World Meteorological Organization' — A 180-page annual compendium cataloguing individual extreme weather events (heatwaves, floods, droughts) that occurred in 2023, with regional breakdowns and economic damage estimates. Broad climate context, but this document covers event attribution rather than the global mean surface temperature anomaly metric under verification; it was surfaced by keyword overlap on '2023 climate' and was not cited by the agent."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Good. Now record the verified finding."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous research agent operating headless. You answer factual questions by searching for sources, fetching primary documents, and verifying claims against independent sources before asserting.\nOperating policy: verify every claim against >=2 independent primary sources before asserting.\nDECISION: verify every claim against >=2 independent primary sources before asserting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- web_search(query, max_results): returns JSON list of {title, url, snippet, source_type}.\n- fetch_url(url): fetches and returns article text, author, publication_date, domain.\n- extract_claim(text, claim_template): extracts a structured claim with value, confidence, and source citation.\n- take_note(claim, sources): records a verified claim with its supporting sources for final synthesis.\nDECISION: tool web_search is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Ran web_search for 2023 global surface temperature anomaly. Top results are NASA primary sources (trust_tier=1). Next: fetch the top NASA article to extract the precise anomaly figure."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Fetched NASA GISS article; extracted figure: +1.17°C anomaly above 1850-1900 pre-industrial baseline. NASA and NOAA both report the same figure. WMO reports +1.45°C (different baseline methodology). Need a second independent primary source to satisfy the verification policy."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Fetched NOAA NCEI annual climate report; confirms +1.17°C anomaly above pre-industrial baseline independently of NASA. Two independent primary government sources now agree. Claim is verified; ready to synthesise answer."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "take_note(\"2023 global average surface temperature anomaly was +1.17°C above the 1850-1900 pre-industrial baseline\", sources=[\"NASA GISS 2024-01-12 https://climate.nasa.gov/news/3281/\",\"NOAA NCEI 2024-01-12 https://www.ncei.noaa.gov/access/monitoring/monthly-report/global/202313\"]) -> {\"note_id\":\"n-001\",\"claim\":\"2023 global average surface temperature anomaly was +1.17°C above the 1850-1900 pre-industrial baseline\",\"sources_recorded\":2,\"source_types\":[\"primary_government\",\"primary_government\"],\"verification_status\":\"confirmed\",\"stored_at\":\"2026-06-21T10:02:31Z\"}\nnote stored: note_id=n-001 sources=2 verification_status=confirmed\nverification audit: source[0] NASA GISS trust_tier=1 independent=true\nverification audit: source[1] NOAA NCEI trust_tier=1 independent=true\nDECISION: claim verified by 2 independent primary sources, synthesize answer as +1.17°C above 1850-1900 baseline\nverification policy check: required>=2 independent primary sources, have=2, policy=satisfied\ninfo: WMO figure of +1.45°C noted as alternate methodology (different reference baseline) in synthesis caveat\ndebug: agent_run_id=run-9912 tenant=research-agent total_tool_calls=4 evaluated_at=2026-06-21T10:02:31Z"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.51): 'IPCC Sixth Assessment Report WG1 Summary for Policymakers (2021)' — The landmark scientific assessment summarising the physical science basis for climate change. Contains extensive discussion of observed temperature trends up to approximately 2019 and projected future scenarios. Predates the 2023 annual measurement and covers multi-decadal trends rather than the specific 2023 anomaly value; pulled by high semantic similarity to climate temperature topics but not relevant to the point-in-time figure being synthesised."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Synthesise the final answer based on the verified sources."
+        }
+      ]
+    }
+  ]
+}

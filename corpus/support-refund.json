@@ -1,0 +1,209 @@
+{
+  "id": "support-refund",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless customer-support agent loop. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried in noise. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous customer-support agent handling refund and order-dispute tickets headless, without a human in the loop.\nYou look up orders, consult the refund policy knowledge base, issue refunds, and close tickets strictly within the limits set below.\nNever issue a refund for an amount that exceeds the order total, and never waive restocking fees without explicit policy authorization.\nDECISION: auto-refund orders under $200 within 30 days; escalate otherwise"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- lookup_order(order_id): returns order status, line items, amount, purchase date, and customer info as JSON.\n- kb_search(query): searches the internal refund-policy knowledge base; returns top-3 matching policy paragraphs.\n- issue_refund(order_id, amount, method): posts a refund to the original payment method or store credit; returns confirmation JSON.\n- escalate(ticket_id, reason, tier): routes the ticket to a human agent at the specified tier (L2 or L3).\n- annotate_ticket(ticket_id, note, status): appends an audit note and sets the ticket status (open|resolved|escalated).\nDECISION: tool issue_refund is available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "lookup_order(\"ORD-884712\") -> {\"order_id\":\"ORD-884712\",\"customer_id\":\"cust-30291\",\"customer_email\":\"jane.doe@example.com\",\"status\":\"delivered\",\"total_usd\":89.00,\"currency\":\"USD\",\"items\":[{\"sku\":\"WIDGET-BLU-M\",\"qty\":1,\"unit_price\":89.00}],\"purchased_at\":\"2026-06-09T14:22:00Z\",\"delivered_at\":\"2026-06-12T10:05:00Z\",\"payment_method\":\"visa_ending_4821\"}\nfetched order in 38ms; cache=miss; tenant=acme-store; region=us-east-1\ninfo: order age is 12 days from purchase date 2026-06-09 to today 2026-06-21\ninfo: order total $89.00 is below the $200 auto-refund threshold\ninfo: payment method on file: visa_ending_4821 (original method, eligible for reversal)\nDECISION: order eligible for auto-refund, $89.00 within 12 days, no manager approval needed\ninfo: customer has no prior refund requests in the last 180 days\ninfo: item WIDGET-BLU-M is non-perishable; restocking policy applies if item not returned\ndebug: query_hash=a3f1 evaluated_at=2026-06-21T10:02:14Z tenant=acme-store\ndebug: order index freshness: 0s (real-time lookup, no cache)"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.69): 'Seasonal Promotion Terms and Conditions — Summer Sale 2026' — This document covers promotional discount stacking rules, exclusion lists for sale items, and gift-card redemption limits during the summer sale window running June 1 through August 31. It was pulled by a broad semantic retrieval on 'order refund customer' and is not cited anywhere in the resolution path for this ticket. Appendix B lists all excluded SKUs; Appendix C covers influencer promo codes and their non-refundable status under specific campaign terms. None of these terms apply to the current order."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Ticket TKT-20941: Customer jane.doe@example.com requests a refund for order ORD-884712. Process the request per policy."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous customer-support agent handling refund and order-dispute tickets headless, without a human in the loop.\nYou look up orders, consult the refund policy knowledge base, issue refunds, and close tickets strictly within the limits set below.\nNever issue a refund for an amount that exceeds the order total, and never waive restocking fees without explicit policy authorization.\nDECISION: auto-refund orders under $200 within 30 days; escalate otherwise"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- lookup_order(order_id): returns order status, line items, amount, purchase date, and customer info as JSON.\n- kb_search(query): searches the internal refund-policy knowledge base; returns top-3 matching policy paragraphs.\n- issue_refund(order_id, amount, method): posts a refund to the original payment method or store credit; returns confirmation JSON.\n- escalate(ticket_id, reason, tier): routes the ticket to a human agent at the specified tier (L2 or L3).\n- annotate_ticket(ticket_id, note, status): appends an audit note and sets the ticket status (open|resolved|escalated).\nDECISION: tool issue_refund is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Looked up order ORD-884712; $89.00, delivered 2026-06-12, 12 days old, below $200 threshold. Customer jane.doe@example.com. Next: confirm refund policy via kb_search."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "kb_search(\"refund policy standard order under $200 within 30 days\") -> {\"query\":\"refund policy standard order under $200 within 30 days\",\"hits\":[{\"id\":\"pol-refund-001\",\"score\":0.94,\"title\":\"Standard Refund Policy\"},{\"id\":\"pol-refund-002\",\"score\":0.81,\"title\":\"Restocking Fee Schedule\"},{\"id\":\"pol-refund-003\",\"score\":0.76,\"title\":\"Escalation Thresholds\"}]}\npol-refund-001 (score 0.94): Orders under $200.00 purchased within the last 30 days are eligible for a full refund to the original payment method, no manager approval required.\npol-refund-001: Refund processing time is 3-5 business days for credit card reversals; 1 business day for store credit.\npol-refund-002 (score 0.81): A 15% restocking fee applies to non-perishable items returned in original packaging; fee is waived if item is defective or if customer was not at fault.\nDECISION: refund permitted under pol-refund-001, no manager approval needed, full $89.00 to original method\npol-refund-002: Restocking fee waiver requires documented defect report or carrier damage claim; no waiver for change-of-mind returns without photo evidence.\npol-refund-003 (score 0.76): Orders above $200.00 or outside the 30-day window must be escalated to L2 for manual review before any credit is issued.\ninfo: policy version v4.2 effective 2026-01-15; next review 2026-07-01\ninfo: kb_search latency 61ms; index freshness 4h; tenant=acme-store\ndebug: embeddings model text-embed-v3, top_k=3, rerank=true"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.65): 'Customer Loyalty Program — Tier Benefits and Point Accrual Rules' — A 14-section guide explaining how Bronze, Silver, and Gold tier customers accumulate and redeem loyalty points, including point multipliers during promotional windows and the blackout calendar for double-point events. Pulled because the customer record contains a loyalty tier field; entirely unrelated to the refund determination. The agent did not reference this document in the policy lookup."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Continue processing the refund for TKT-20941. Stay within policy."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous customer-support agent handling refund and order-dispute tickets headless, without a human in the loop.\nYou look up orders, consult the refund policy knowledge base, issue refunds, and close tickets strictly within the limits set below.\nNever issue a refund for an amount that exceeds the order total, and never waive restocking fees without explicit policy authorization.\nDECISION: auto-refund orders under $200 within 30 days; escalate otherwise"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- lookup_order(order_id): returns order status, line items, amount, purchase date, and customer info as JSON.\n- kb_search(query): searches the internal refund-policy knowledge base; returns top-3 matching policy paragraphs.\n- issue_refund(order_id, amount, method): posts a refund to the original payment method or store credit; returns confirmation JSON.\n- escalate(ticket_id, reason, tier): routes the ticket to a human agent at the specified tier (L2 or L3).\n- annotate_ticket(ticket_id, note, status): appends an audit note and sets the ticket status (open|resolved|escalated).\nDECISION: tool issue_refund is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Looked up order ORD-884712; $89.00, delivered 2026-06-12, 12 days old, below $200 threshold. Customer jane.doe@example.com. Next: confirm refund policy via kb_search."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Searched KB; pol-refund-001 confirms full refund eligible, no manager approval, return to original payment method. Restocking fee not applicable per policy read. Next: call issue_refund."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "issue_refund(\"ORD-884712\", 89.00, \"original\") -> {\"refund_id\":\"REF-554901\",\"order_id\":\"ORD-884712\",\"amount_usd\":89.00,\"method\":\"visa_ending_4821\",\"status\":\"approved\",\"initiated_at\":\"2026-06-21T10:04:37Z\",\"expected_settlement\":\"2026-06-24T10:04:37Z\",\"audit_id\":\"aud-ref-884712\"}\ngateway response: APPROVED; authorization code GW-7741-XQ; idempotency key ref-884712-001\ninfo: refund of $89.00 posted to visa_ending_4821; settlement window 3 business days\ninfo: customer notification email queued to jane.doe@example.com; template=refund_confirmation_v2\nDECISION: refund of $89.00 issued to original payment method visa_ending_4821, no escalation\ninfo: ledger entry created; refund_id REF-554901 linked to order ORD-884712 and ticket TKT-20941\ninfo: no partial refund split; full order amount returned in one transaction\ninfo: policy reference pol-refund-001 recorded in audit trail\ndebug: payment gateway latency 210ms; retry_count=0; tenant=acme-store; run=run-20941"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.63): 'Payment Gateway Integration Guide — Retry Logic and Idempotency Keys' — An internal engineering document covering the retry backoff strategy for failed gateway calls, idempotency key construction, and how to reconcile partial settlements in the ledger. Surfaced because the refund call invoked the gateway; irrelevant to the business decision about whether the refund should be issued. The agent did not consult this document when processing the refund."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Confirm the refund was issued and close out ticket TKT-20941 per policy."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous customer-support agent handling refund and order-dispute tickets headless, without a human in the loop.\nYou look up orders, consult the refund policy knowledge base, issue refunds, and close tickets strictly within the limits set below.\nNever issue a refund for an amount that exceeds the order total, and never waive restocking fees without explicit policy authorization.\nDECISION: auto-refund orders under $200 within 30 days; escalate otherwise"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- lookup_order(order_id): returns order status, line items, amount, purchase date, and customer info as JSON.\n- kb_search(query): searches the internal refund-policy knowledge base; returns top-3 matching policy paragraphs.\n- issue_refund(order_id, amount, method): posts a refund to the original payment method or store credit; returns confirmation JSON.\n- escalate(ticket_id, reason, tier): routes the ticket to a human agent at the specified tier (L2 or L3).\n- annotate_ticket(ticket_id, note, status): appends an audit note and sets the ticket status (open|resolved|escalated).\nDECISION: tool issue_refund is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Looked up order ORD-884712; $89.00, delivered 2026-06-12, 12 days old, below $200 threshold. Customer jane.doe@example.com. Next: confirm refund policy via kb_search."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Searched KB; pol-refund-001 confirms full refund eligible, no manager approval, return to original payment method. Restocking fee not applicable per policy read. Next: call issue_refund."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Issued refund REF-554901 for $89.00 to visa_ending_4821; approved by gateway, settlement in 3 business days, confirmation email queued. Next: annotate ticket and close."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "annotate_ticket(\"TKT-20941\", \"Refund REF-554901 issued: $89.00 to visa_ending_4821 per pol-refund-001. Order ORD-884712 age 12d, amount $89.00, within auto-refund threshold.\", \"resolved\") -> {\"ticket_id\":\"TKT-20941\",\"status\":\"resolved\",\"note_id\":\"note-77432\",\"audit_complete\":true,\"closed_at\":\"2026-06-21T10:05:12Z\",\"signed_by\":\"policy-engine-v4.2\"}\naudit: refund REF-554901 linked; all policy references recorded (pol-refund-001 v4.2)\naudit: no policy exceptions taken; no escalation pathway triggered during resolution\naudit: SLA met; ticket age from open to close was 3 minutes 58 seconds\nDECISION: ticket resolved, no escalation, refund complete within auto-refund policy\ninfo: follow-up survey email queued to jane.doe@example.com; template=csat_post_refund_v1\ninfo: ticket TKT-20941 moved to resolved queue; CSAT window closes in 72 hours\ndebug: final audit span flushed; run=run-20941 status=success tenant=acme-store"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.61): 'Customer Satisfaction Survey Design Guidelines — Q3 2026' — An internal operations document outlining question weighting, Likert-scale calibration, and NPS benchmark targets for post-resolution CSAT surveys. Surfaced because the ticket closure step queues a CSAT email; entirely irrelevant to whether the ticket resolution was correct. The agent never consulted this document when determining ticket disposition."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Wrap up ticket TKT-20941 and confirm no further action is needed."
+        }
+      ]
+    }
+  ]
+}

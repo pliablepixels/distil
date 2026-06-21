@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/></linearGradient>
+    <linearGradient id="good" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+  </defs>
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <text x="40" y="46" font-size="22" font-weight="700" fill="#e7e9ee">Technique #1 — cache-aware <tspan fill="#5b6173" font-weight="400" font-size="14">$ per run, Opus 4.8, bundled corpus sample</tspan></text>
+  <text x="40" y="72" font-size="13" fill="#8b91a1">The dominant cost in an agent loop is cache <tspan fill="#e7e9ee">misses</tspan>, not context <tspan fill="#e7e9ee">size</tspan>. Naive recompression sends fewer tokens yet costs more.</text>
+
+  <!-- axis -->
+  <line x1="300" y1="110" x2="300" y2="320" stroke="#1b1f2a"/>
+  <g font-size="13" fill="#8b91a1">
+    <!-- bars: max ~0.0169 maps to 760px scale -->
+    <!-- baseline 0.01524 -->
+    <text x="40" y="139" fill="#e7e9ee">baseline</text>
+    <text x="40" y="155" font-size="10" fill="#5b6173">no cache, no compress</text>
+    <rect x="300" y="124" width="686" height="30" rx="6" fill="#1b1f2a"/>
+    <text x="1000" y="145" fill="#8b91a1">$0.01524</text>
+
+    <!-- cache only 0.01115 -->
+    <text x="40" y="195" fill="#e7e9ee">cache only</text>
+    <rect x="300" y="180" width="502" height="30" rx="6" fill="#2a2f45"/>
+    <text x="816" y="201" fill="#8b91a1">$0.01115  ·  −27%</text>
+
+    <!-- naive 0.01691 -->
+    <text x="40" y="251" fill="#ff8a6b">naive compress</text>
+    <text x="40" y="267" font-size="10" fill="#5b6173">busts the prefix cache</text>
+    <rect x="300" y="236" width="761" height="30" rx="6" fill="#3a2230"/>
+    <rect x="300" y="236" width="761" height="30" rx="6" fill="none" stroke="#ff8a6b" stroke-opacity="0.6"/>
+    <text x="1010" y="240" font-size="10" fill="#ff8a6b">▲ MORE than baseline</text>
+    <text x="1075" y="257" fill="#ff8a6b">$0.01691</text>
+
+    <!-- distil 0.01019 -->
+    <text x="40" y="307" fill="#5ad1c9">distil</text>
+    <text x="40" y="323" font-size="10" fill="#5b6173">cache-aware lossless</text>
+    <rect x="300" y="292" width="459" height="30" rx="6" fill="url(#good)"/>
+    <text x="773" y="313" font-weight="700" fill="#e7e9ee">$0.01019  ·  −33%</text>
+  </g>
+</svg>

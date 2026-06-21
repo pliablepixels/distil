@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240" font-family="ui-sans-serif,Segoe UI,Inter,Roboto,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0b12"/><stop offset="1" stop-color="#06070a"/>
+    </linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.1" r="0.7">
+      <stop offset="0" stop-color="#2a2360" stop-opacity="0.9"/><stop offset="1" stop-color="#06070a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="240" fill="url(#bg)"/>
+  <rect width="1200" height="240" fill="url(#glow)"/>
+  <g opacity="0.18" fill="#8b7bff">
+    <circle cx="1010" cy="60" r="3"/><circle cx="1040" cy="60" r="3"/><circle cx="1070" cy="60" r="3"/>
+    <circle cx="1010" cy="92" r="3"/><circle cx="1070" cy="92" r="3"/><circle cx="1100" cy="92" r="3"/>
+    <circle cx="1040" cy="124" r="3"/><circle cx="1100" cy="124" r="3"/><circle cx="1130" cy="124" r="3"/>
+    <circle cx="1070" cy="156" r="3"/><circle cx="1130" cy="156" r="3"/>
+  </g>
+  <text x="64" y="104" font-size="68" font-weight="800" letter-spacing="-2" fill="#e7e9ee">Dist<tspan fill="url(#g)">il</tspan></text>
+  <text x="66" y="146" font-size="22" fill="#8b91a1">Compression with a <tspan fill="#e7e9ee" font-weight="600">quality contract</tspan>.</text>
+  <text x="66" y="180" font-size="16" fill="#5b6173">Cache-aware, causally-pruned context compression for agentic runtimes — certified non-inferior.</text>
+  <g transform="translate(66,200)">
+    <rect width="150" height="26" rx="13" fill="#0f1219" stroke="#1b1f2a"/>
+    <text x="16" y="17" font-size="12" fill="#5ad1c9">same potency, less volume</text>
+  </g>
+</svg>

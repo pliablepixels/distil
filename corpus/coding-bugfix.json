@@ -1,0 +1,209 @@
+{
+  "id": "coding-bugfix",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless Python coding agent loop. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried in noise. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Python coding agent fixing a failing unit test.\nDECISION: run the failing test before and after any edit"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- read_file(path): read file contents.\n- grep(pattern, path): search for pattern in files.\n- edit(path, old, new): replace text in file.\n- run_tests(pattern): run pytest matching pattern; returns stdout.\n- git_diff(path): show unstaged diff for a file.\nDECISION: tool run_tests is available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "run_tests(\"test_pagination.py\") -> {\"status\":\"failed\",\"total\":12,\"passed\":11,\"failed\":1,\"duration_ms\":843,\"session\":\"ses-a3f1\",\"runner\":\"pytest-7.4.2\",\"cwd\":\"/workspace/myapp\"}\ncollected 12 items\ntest_pagination.py::test_paginate_items_basic PASSED\ntest_pagination.py::test_paginate_items_empty PASSED\ntest_pagination.py::test_paginate_items_single_page PASSED\ntest_pagination.py::test_paginate_items_last_page FAILED\nFAILED test_pagination.py::test_paginate_items_last_page - AssertionError: assert [8, 9] == [8, 9, 10]\nDECISION: failure is an off-by-one in range bound in pagination.py line 47\ninfo: test_paginate_items_last_page expected items [8, 9, 10] but got [8, 9]; range upper bound is exclusive when it should be inclusive\ndebug: session_id=ses-a3f1 duration_ms=843 worker=main"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.69): 'Python Packaging User Guide: Publishing to PyPI' — covers sdist and wheel builds, twine upload, trusted publishing via OIDC, and version tagging conventions. Entirely unrelated to the failing unit test being debugged; surfaced because the repository name matched a PyPI package name in the index. Includes a six-step checklist for first-time publishers and notes on test.pypi.org, none of which is relevant to the current task."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "A unit test is failing. Investigate and fix the bug."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Python coding agent fixing a failing unit test.\nDECISION: run the failing test before and after any edit"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- read_file(path): read file contents.\n- grep(pattern, path): search for pattern in files.\n- edit(path, old, new): replace text in file.\n- run_tests(pattern): run pytest matching pattern; returns stdout.\n- git_diff(path): show unstaged diff for a file.\nDECISION: tool run_tests is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Ran test_pagination.py; 11/12 passed. test_paginate_items_last_page failed: got [8, 9] instead of [8, 9, 10]. Suspect off-by-one in range bound. Next: read pagination.py."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "read_file(\"myapp/pagination.py\") -> {\"lines\":62,\"encoding\":\"utf-8\",\"mtime\":\"2026-06-21T08:42:11Z\",\"sha256\":\"4c9a7e23b1f0dd\",\"size_bytes\":1847,\"repo\":\"myapp\",\"branch\":\"main\"}\n     1\tdef paginate_items(items, page, page_size):\n     2\t    \"\"\"Return one page of items (1-indexed pages).\"\"\"\n     3\t    start = (page - 1) * page_size\n     4\t    end = start + page_size\n     5\t    return items[start:end]\nDECISION: fix is changing <= to < on line 47 in paginate_items; end bound must use strict less-than\n    47\t    end = min(start + page_size, len(items) - 1)  # BUG: should be len(items)\n    48\t    return items[start:end + 1]  # BUG: off-by-one, clips last element\ndebug: read completed in 3ms, no encoding errors"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.65): 'PEP 8 — Style Guide for Python Code' — covers indentation (4 spaces), maximum line length (79 chars), blank lines between top-level definitions, imports ordering, whitespace in expressions, naming conventions for variables, functions, classes, and constants. Relevant to code style broadly but has no bearing on the off-by-one bug being fixed. Surfaced by keyword overlap on 'Python code'; never consulted by the agent this turn."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Continue. Read the source and identify the exact fix needed."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Python coding agent fixing a failing unit test.\nDECISION: run the failing test before and after any edit"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- read_file(path): read file contents.\n- grep(pattern, path): search for pattern in files.\n- edit(path, old, new): replace text in file.\n- run_tests(pattern): run pytest matching pattern; returns stdout.\n- git_diff(path): show unstaged diff for a file.\nDECISION: tool run_tests is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Ran test_pagination.py; 11/12 passed. test_paginate_items_last_page failed: got [8, 9] instead of [8, 9, 10]. Suspect off-by-one in range bound. Next: read pagination.py."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Read pagination.py; lines 47-48 use len(items)-1 as the end bound (off-by-one). Fix: replace with plain slice items[start:start+page_size]. Next: apply edit and diff."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "git_diff(\"myapp/pagination.py\") -> {\"status\":\"ok\",\"changed_files\":1,\"insertions\":1,\"deletions\":1,\"sha\":\"e5c9f12\",\"repo\":\"myapp\",\"branch\":\"main\",\"staged\":false,\"diff_lines\":7}\n--- a/myapp/pagination.py\n+++ b/myapp/pagination.py\n@@ -44,8 +44,7 @@ def paginate_items(items, page, page_size):\n     start = (page - 1) * page_size\n-    end = min(start + page_size, len(items) - 1)\n-    return items[start:end + 1]\n+    return items[start:start + page_size]\nDECISION: edit applied correctly, re-run tests to confirm fix is complete\ninfo: diff is minimal, one logical change, no unintended side effects visible\ndebug: git diff exit_code=0 unstaged_files=1 repo=myapp"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.63): 'Git Branching — Branching and Merging' from the Pro Git book — explains fast-forward merges, three-way merges, merge conflicts, and the rebase workflow. Surfaced because the agent called git_diff and the retrieval system matched on 'git'; entirely unrelated to the Python pagination bug being fixed. Agent did not consult this material."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Apply the fix and verify with git diff. Then re-run tests."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous Python coding agent fixing a failing unit test.\nDECISION: run the failing test before and after any edit"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- read_file(path): read file contents.\n- grep(pattern, path): search for pattern in files.\n- edit(path, old, new): replace text in file.\n- run_tests(pattern): run pytest matching pattern; returns stdout.\n- git_diff(path): show unstaged diff for a file.\nDECISION: tool run_tests is available"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Ran test_pagination.py; 11/12 passed. test_paginate_items_last_page failed: got [8, 9] instead of [8, 9, 10]. Suspect off-by-one in range bound. Next: read pagination.py."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Read pagination.py; lines 47-48 use len(items)-1 as the end bound (off-by-one). Fix: replace with plain slice items[start:start+page_size]. Next: apply edit and diff."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Applied edit; git diff confirms single-line change replacing off-by-one slice with items[start:start+page_size]. No unintended modifications. Next: re-run tests."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "run_tests(\"test_pagination.py\") -> {\"status\":\"passed\",\"total\":12,\"passed\":12,\"failed\":0,\"duration_ms\":791,\"session\":\"ses-b7d4\",\"runner\":\"pytest-7.4.2\",\"cwd\":\"/workspace/myapp\"}\ncollected 12 items\ntest_pagination.py::test_paginate_items_basic PASSED\ntest_pagination.py::test_paginate_items_empty PASSED\ntest_pagination.py::test_paginate_items_single_page PASSED\ntest_pagination.py::test_paginate_items_last_page PASSED\ntest_pagination.py::test_paginate_items_over_boundary PASSED\nDECISION: bug fixed, all 12 tests pass, close task\ntest_pagination.py::test_paginate_items_large_dataset PASSED\ninfo: 12 passed in 0.79s\ndebug: session_id=ses-b7d4 duration_ms=791 worker=main exit_code=0"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.61): 'Python unittest.mock — Mock Object Library' — documents MagicMock, patch decorators, assert_called_with, side_effect, and spec enforcement. Surfaced because the test suite used pytest which contains 'test' as a keyword; the agent's fix was to correct a slice bound, not to mock anything. This document was never cited."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Re-run the tests and confirm the fix is complete."
+        }
+      ]
+    }
+  ]
+}

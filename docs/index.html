@@ -82,8 +82,9 @@
   <div class="logo">Dist<b>il</b></div>
   <span class="pill">compression with a quality contract</span>
   <div class="links">
-    <a href="#how">How</a><a href="#proof">Proof</a><a href="#tiers">Tiers</a>
-    <a href="#bestof">Capabilities</a><a href="#honest">Honesty</a>
+    <a href="#how">How</a><a href="#proof">Proof</a><a href="#domains">Domains</a>
+    <a href="#bestof">Capabilities</a><a href="#install">Install</a><a href="#honest">Honesty</a>
+    <a href="https://github.com/dshakes/distil">GitHub →</a>
   </div>
 </div></nav>
 
@@ -109,26 +110,28 @@
       <div class="foot">certified by TOST — measured, not claimed</div>
     </div>
     <div class="stat">
-      <div class="n">615</div>
-      <div class="l">Tokens proven free to drop</div>
-      <div class="foot">causal ablation, this corpus</div>
+      <div class="n">7</div>
+      <div class="l">Domains certified</div>
+      <div class="foot">ops · code · support · research · data · devops · finance</div>
     </div>
     <div class="stat">
       <div class="n">0</div>
       <div class="l">Runtime dependencies</div>
-      <div class="foot">stdlib-only · runs day one</div>
+      <div class="foot">stdlib-only · 181 tests · pip · docker · pyz</div>
     </div>
   </div>
   <p class="muted" style="font-size:12.5px;margin-top:14px">
-    Numbers are reproducible from the bundled 4-turn trajectory
-    (<code>distil savings</code> / <code>certify</code> / <code>prune</code>) with an offline
+    Reproducible from the bundled multi-domain corpus
+    (<code>distil bench</code> / <code>certify</code> / <code>verify</code>) with an offline
     heuristic tokenizer. Ratios are robust; absolute dollars depend on the tokenizer. No vanity metrics.
   </p>
 </div></header>
 
 <section id="how"><div class="wrap">
-  <h2>Two highest-leverage techniques <span class="g">— and why they win</span></h2>
+  <h2>How it works <span class="g">— a cost-optimized cache hierarchy with a contract</span></h2>
   <p class="lead">Most compressors optimize bytes. In an agent loop the money is somewhere else.</p>
+  <img src="assets/architecture.svg" alt="architecture" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 24px"/>
+  <h2 style="font-size:22px">Two highest-leverage techniques <span class="g">— and why they win</span></h2>
   <div class="grid2">
     <div class="card">
       <span class="tag">TECHNIQUE #1</span>
@@ -177,6 +180,14 @@ VERDICT: <span class="g">PASS</span>  (certified non-inferior)
 <span class="d">$ distil certify --strategy aggressive</span>
 decision-equivalence match rate: <span class="w">0.0%</span>
 VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
+  <img src="assets/cache-aware.svg" alt="cache-aware savings" style="width:100%;border:1px solid var(--line);border-radius:16px;margin-top:18px"/>
+</div></section>
+
+<section id="domains"><div class="wrap">
+  <h2>Measured across 7 domains <span class="g">— the same gate, not one example</span></h2>
+  <p class="lead">A strategy isn't trustworthy because it works once. <code>distil bench</code> certifies
+    every domain — ops, coding, support, research, data, devops, finance — or it doesn't ship.</p>
+  <img src="assets/domains.svg" alt="measured across 7 domains" style="width:100%;border:1px solid var(--line);border-radius:16px"/>
 </div></section>
 
 <section id="tiers"><div class="wrap">
@@ -207,6 +218,29 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
   </table>
 </div></section>
 
+<section id="install"><div class="wrap">
+  <h2>Install <span class="g">— pick a format</span></h2>
+  <p class="lead">The stdlib-only core makes the packaging clean: zero runtime deps, corpus bundled.</p>
+  <div class="grid2">
+    <div class="card"><span class="tag">ZERO INSTALL</span><h3>uvx</h3>
+      <pre style="margin-top:10px">uvx distil bench</pre></div>
+    <div class="card"><span class="tag">PYPI</span><h3>pip</h3>
+      <pre style="margin-top:10px">pip install distil
+distil certify</pre></div>
+    <div class="card"><span class="tag">CONTAINER</span><h3>Docker</h3>
+      <pre style="margin-top:10px">docker build -t distil .
+docker run distil bench</pre></div>
+    <div class="card"><span class="tag">SINGLE FILE</span><h3>zipapp</h3>
+      <pre style="margin-top:10px">make pyz
+python dist/distil.pyz bench</pre></div>
+  </div>
+  <div class="callout" style="margin-top:18px">
+    Drop-in, no call-site change:
+    <pre style="margin-top:10px"><span class="c">from</span> distil.adapters.anthropic <span class="c">import</span> wrap
+client = wrap(anthropic.Anthropic())  <span class="d"># compresses + keeps the cache warm</span></pre>
+  </div>
+</div></section>
+
 <section id="honest"><div class="wrap">
   <h2>What we won't pretend</h2>
   <div class="callout">
@@ -214,10 +248,10 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
     see the eval. Published quality numbers in this space are typically measured at far lower
     compression than the headline workload ratios — so the two figures don't describe the same
     run. Distil's answer isn't a bigger number; it's a <b>gate</b>: the accuracy claim and the
-    compression are measured on the <i>same</i> trajectories, and a strategy that can't pass
-    non-inferiority doesn't ship. Today's figures come from one 4-turn corpus with an offline
-    tokenizer — directionally honest, not billing-grade. Swap in a real tokenizer and a live
-    agent runner and the same gate certifies production.
+    compression are measured on the <i>same</i> trajectories across <b>7 domains</b>, and a
+    strategy that can't pass non-inferiority doesn't ship. The default tokenizer is an offline
+    heuristic (ratios robust, dollars approximate); <code>--tokenizer anthropic</code> and
+    <code>--runner anthropic</code> make it billing-grade against the real model.
   </div>
 </div></section>
 

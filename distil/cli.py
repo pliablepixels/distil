@@ -9,20 +9,20 @@ distil certify   --trajectory T --strategy non-inferiority gate (the quality con
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from . import __version__, ledger, pricing, tokenizer
 from .compress.cache_aware import simulate
 from .compress.strategies import REGISTRY, distil as distil_strategy
+from .corpus import load_corpus, validate
 from .replay.ablation import discover
 from .certify.gate import certify
 from .trajectory import Trajectory
 
-_DEFAULT_CORPUS = Path(__file__).resolve().parent.parent / "corpus" / "sample_trajectory.json"
+from .corpus import CORPUS_DIR  # env-aware corpus dir (wheel / repo / $DISTIL_CORPUS)
 
 
 def _load(path: str | None) -> Trajectory:
-    return Trajectory.load(path or _DEFAULT_CORPUS)
+    return Trajectory.load(path or CORPUS_DIR / "sample_trajectory.json")
 
 
 def _pct(part: float, whole: float) -> str:
@@ -174,6 +174,115 @@ def cmd_certify(args: argparse.Namespace) -> int:
     return 0 if t.non_inferior else 1
 
 
+def cmd_bench(args: argparse.Namespace) -> int:
+    """Corpus-wide gate (CI). Across every trajectory: price distil vs baseline,
+    certify distil is non-inferior, and confirm the gate still rejects the
+    aggressive lossy strategy. Exits non-zero if any distil run fails the
+    contract or the gate fails to reject aggressive — i.e. a real CI gate."""
+    entries = load_corpus()
+    price = pricing.get(args.pricing)
+    tok = tokenizer.resolve(args.tokenizer, model=price.name)
+
+    print(
+        f"corpus gate — {len(entries)} trajectories | model {price.name} | tokenizer={args.tokenizer}\n"
+    )
+    print(f"{'domain':<18}{'trajectory':<24}{'$ saved':>9}{'distil':>9}{'aggr':>7}{'pruned':>8}")
+    print("-" * 75)
+
+    base_total = distil_total = pruned_total = 0.0
+    failures: list[str] = []
+    for e in entries:
+        bad = validate(e.trajectory)
+        if bad:
+            failures.append(f"{e.file}: structural — {bad[0]}")
+        base = simulate(e.trajectory, price, strategy="none", caching=False, tok=tok).total_dollars
+        dist = simulate(e.trajectory, price, strategy="distil", caching=True, tok=tok).total_dollars
+        d_rep = certify(e.trajectory, "distil", margin=args.margin, alpha=args.alpha)
+        a_rep = certify(e.trajectory, "aggressive", margin=args.margin, alpha=args.alpha)
+        pruned = discover(e.trajectory, tok=tok).tokens_freed
+
+        base_total += base
+        distil_total += dist
+        pruned_total += pruned
+        if not d_rep.tost.non_inferior:
+            failures.append(f"{e.file}: distil FAILED non-inferiority")
+        if a_rep.tost.non_inferior:
+            failures.append(f"{e.file}: gate failed to reject aggressive")
+
+        saved = (1 - dist / base) * 100 if base else 0.0
+        print(
+            f"{e.domain:<18}{e.trajectory.id:<24}{saved:>8.1f}%"
+            f"{d_rep.verdict:>9}{a_rep.verdict:>7}{pruned:>8}"
+        )
+
+    print("-" * 75)
+    overall = (1 - distil_total / base_total) * 100 if base_total else 0.0
+    print(
+        f"\naggregate: distil cuts ${base_total:.5f} -> ${distil_total:.5f} "
+        f"({overall:.1f}% cheaper) losslessly; {int(pruned_total)} tokens causally prunable."
+    )
+
+    if failures:
+        print(f"\nGATE: FAIL ({len(failures)} issue(s))")
+        for f in failures:
+            print(f"  - {f}")
+        return 1
+    print("\nGATE: PASS — every trajectory certified non-inferior; aggressive rejected on all.")
+    return 0
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Byte-fidelity gate (Phase 6): every distil compression across the corpus is
+    reconstructable, and frozen history never mutates turn-to-turn."""
+    from .compress.base import CompressResult
+    from .compress.tier0 import Tier0Lossless
+    from .compress.tier1 import Tier1Reversible
+    from .fidelity import assert_append_only, verify_reversible
+    from .trajectory import Stability
+
+    print("byte-fidelity gate — reversibility + append-only across the corpus\n")
+    problems: list[str] = []
+    for e in load_corpus():
+        prev = None
+        for turn in e.trajectory.turns:
+            volatile = [b for b in turn.blocks if b.stability is Stability.VOLATILE]
+            r1 = Tier1Reversible().compress(volatile)
+            r0 = Tier0Lossless().compress(r1.blocks)
+            merged = CompressResult(r0.blocks, {**r1.restore, **r0.restore})
+            rep = verify_reversible(volatile, merged)
+            if not rep.lossless:
+                problems.append(f"{e.file} turn {turn.index}: irrecoverable {rep.irrecoverable}")
+            if prev is not None:
+                v = assert_append_only(prev, turn.blocks)
+                if v:
+                    problems.append(f"{e.file} turn {turn.index}: append-only violation {v}")
+            prev = turn.blocks
+        print(f"  {e.trajectory.id:<24} reversible + append-only: ok")
+    if problems:
+        print("\nFIDELITY: FAIL")
+        for p in problems:
+            print(f"  - {p}")
+        return 1
+    print("\nFIDELITY: PASS — Tier-0/1 byte-reversible and history append-only across the corpus.")
+    return 0
+
+
+def cmd_holdout(args: argparse.Namespace) -> int:
+    """Holdout A/B savings with a bootstrap CI (Phase 5)."""
+    from .certify.holdout import run_holdout
+
+    price = pricing.get(args.pricing)
+    tok = tokenizer.resolve(args.tokenizer, model=price.name)
+    rep = run_holdout(load_corpus(), price, control_fraction=args.control_fraction, tok=tok)
+    print("holdout A/B savings measurement (deterministic partition + bootstrap CI)\n")
+    print(f"  {rep.summary}")
+    print(
+        f"  control group mean savings: {rep.control_mean_savings * 100:.1f}% "
+        "(held out, not counted toward the headline)"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="distil", description="Compression with a quality contract.")
     p.add_argument("--version", action="version", version=f"distil {__version__}")
@@ -226,6 +335,22 @@ def build_parser() -> argparse.ArgumentParser:
     ce.add_argument("--margin", type=float, default=0.02)
     ce.add_argument("--alpha", type=float, default=0.05)
     ce.set_defaults(func=cmd_certify)
+
+    be = sub.add_parser("bench", help="corpus-wide CI gate across every domain")
+    add_tokenizer(be)
+    be.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
+    be.add_argument("--margin", type=float, default=0.02)
+    be.add_argument("--alpha", type=float, default=0.05)
+    be.set_defaults(func=cmd_bench)
+
+    ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
+    ve.set_defaults(func=cmd_verify)
+
+    ho = sub.add_parser("holdout", help="holdout A/B savings with a bootstrap CI (phase 5)")
+    add_tokenizer(ho)
+    ho.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
+    ho.add_argument("--control-fraction", type=float, default=0.2)
+    ho.set_defaults(func=cmd_holdout)
     return p
 
 
