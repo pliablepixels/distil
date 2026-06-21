@@ -78,3 +78,25 @@ class Trajectory:
     @staticmethod
     def load(path: str | Path) -> "Trajectory":
         return Trajectory.from_dict(json.loads(Path(path).read_text()))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "model": self.model,
+            "turns": [
+                {
+                    "index": t.index,
+                    "blocks": [
+                        {
+                            "id": b.id,
+                            "kind": b.kind.value,
+                            "text": b.text,
+                            "stability": b.stability.value,
+                            "decision_relevant": b.decision_relevant,
+                        }
+                        for b in t.blocks
+                    ],
+                }
+                for t in self.turns
+            ],
+        }

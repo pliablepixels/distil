@@ -9,6 +9,7 @@ distil certify   --trajectory T --strategy non-inferiority gate (the quality con
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from . import __version__, ledger, pricing, tokenizer
 from .compress.cache_aware import simulate
@@ -179,41 +180,54 @@ def cmd_bench(args: argparse.Namespace) -> int:
     certify distil is non-inferior, and confirm the gate still rejects the
     aggressive lossy strategy. Exits non-zero if any distil run fails the
     contract or the gate fails to reject aggressive — i.e. a real CI gate."""
-    entries = load_corpus()
+    entries = load_corpus(args.corpus) if args.corpus else load_corpus()
     price = pricing.get(args.pricing)
     tok = tokenizer.resolve(args.tokenizer, model=price.name)
+    # Real ingested traces carry no DECISION labels, so the offline decision-
+    # equivalence gate doesn't apply — report savings only (certify live instead).
+    savings_only = args.savings_only
 
+    mode = "savings only" if savings_only else "gate"
     print(
-        f"corpus gate — {len(entries)} trajectories | model {price.name} | tokenizer={args.tokenizer}\n"
+        f"corpus {mode} — {len(entries)} trajectories | model {price.name} | "
+        f"tokenizer={args.tokenizer}\n"
     )
-    print(f"{'domain':<18}{'trajectory':<24}{'$ saved':>9}{'distil':>9}{'aggr':>7}{'pruned':>8}")
+    if savings_only:
+        print(f"{'domain':<18}{'trajectory':<28}{'$ saved':>10}")
+    else:
+        print(
+            f"{'domain':<18}{'trajectory':<24}{'$ saved':>9}{'distil':>9}{'aggr':>7}{'pruned':>8}"
+        )
     print("-" * 75)
 
     base_total = distil_total = pruned_total = 0.0
     base_tok_total = distil_tok_total = 0
     failures: list[str] = []
     for e in entries:
-        bad = validate(e.trajectory)
-        if bad:
-            failures.append(f"{e.file}: structural — {bad[0]}")
         b_sim = simulate(e.trajectory, price, strategy="none", caching=False, tok=tok)
         d_sim = simulate(e.trajectory, price, strategy="distil", caching=True, tok=tok)
         base, dist = b_sim.total_dollars, d_sim.total_dollars
+        base_total += base
+        distil_total += dist
+        base_tok_total += b_sim.total_input_tokens
+        distil_tok_total += d_sim.total_input_tokens
+        saved = (1 - dist / base) * 100 if base else 0.0
+
+        if savings_only:
+            print(f"{e.domain:<18}{e.trajectory.id:<28}{saved:>9.1f}%")
+            continue
+
+        bad = validate(e.trajectory)
+        if bad:
+            failures.append(f"{e.file}: structural — {bad[0]}")
         d_rep = certify(e.trajectory, "distil", margin=args.margin, alpha=args.alpha)
         a_rep = certify(e.trajectory, "aggressive", margin=args.margin, alpha=args.alpha)
         pruned = discover(e.trajectory, tok=tok).tokens_freed
-
-        base_total += base
-        distil_total += dist
         pruned_total += pruned
-        base_tok_total += b_sim.total_input_tokens
-        distil_tok_total += d_sim.total_input_tokens
         if not d_rep.tost.non_inferior:
             failures.append(f"{e.file}: distil FAILED non-inferiority")
         if a_rep.tost.non_inferior:
             failures.append(f"{e.file}: gate failed to reject aggressive")
-
-        saved = (1 - dist / base) * 100 if base else 0.0
         print(
             f"{e.domain:<18}{e.trajectory.id:<24}{saved:>8.1f}%"
             f"{d_rep.verdict:>9}{a_rep.verdict:>7}{pruned:>8}"
@@ -221,10 +235,17 @@ def cmd_bench(args: argparse.Namespace) -> int:
 
     print("-" * 75)
     overall = (1 - distil_total / base_total) * 100 if base_total else 0.0
+    tail = "" if savings_only else f"; {int(pruned_total)} tokens causally prunable"
     print(
         f"\naggregate: distil cuts ${base_total:.5f} -> ${distil_total:.5f} "
-        f"({overall:.1f}% cheaper) losslessly; {int(pruned_total)} tokens causally prunable."
+        f"({overall:.1f}% cheaper) losslessly{tail}."
     )
+    if savings_only:
+        print(
+            "\nsavings-only mode (ingested traces have no decision labels); "
+            "certify decision-equivalence live with: distil certify --runner anthropic"
+        )
+        return 0
 
     if args.record:
         rec = ledger.record(
@@ -306,7 +327,13 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     """Drop-in provider proxy: point any base_url-honoring client at it."""
     from .proxy import serve
 
-    serve(host=args.host, port=args.port, upstream=args.upstream, lossless_only=args.lossless_only)
+    serve(
+        host=args.host,
+        port=args.port,
+        upstream=args.upstream,
+        lossless_only=args.lossless_only,
+        shape_output=args.shape_output,
+    )
     return 0
 
 
@@ -332,6 +359,60 @@ def cmd_train_transformer(args: argparse.Namespace) -> int:
     print(f"trained transformer keep-model -> {args.out}")
     for k, v in metrics.items():
         print(f"  {k}: {v}")
+    return 0
+
+
+def cmd_output_savings(args: argparse.Namespace) -> int:
+    """Measure generation-side output-token savings A/B (token cut + answer kept)."""
+    import json as _json
+
+    from .output import measure_output_savings
+
+    src = args.input or (CORPUS_DIR / "output_pairs.jsonl")
+    pairs = [
+        (d["baseline"], d["shaped"])
+        for d in (_json.loads(ln) for ln in Path(src).read_text().splitlines() if ln.strip())
+    ]
+    rep = measure_output_savings(pairs)
+    print("output compression — generation-side shaping, measured A/B\n")
+    print(f"  {rep.summary}")
+    print("  (answer-preservation is the gate: a reduction that drops the answer is not a saving)")
+    return 0
+
+
+def cmd_ingest(args: argparse.Namespace) -> int:
+    """Convert recorded provider requests into a Distil corpus you can run the gate on."""
+    import json as _json
+
+    from .ingest import ingest_file
+
+    traj = ingest_file(args.input, provider=args.provider, model=args.model)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    fname = f"{traj.id}.json"
+    (out / fname).write_text(_json.dumps(traj.to_dict(), indent=2))
+    manifest = out / "manifest.json"
+    entries = []
+    if manifest.exists():
+        entries = _json.loads(manifest.read_text()).get("trajectories", [])
+    entries = [e for e in entries if e.get("file") != fname]
+    entries.append({"file": fname, "domain": "ingested", "title": traj.id})
+    manifest.write_text(_json.dumps({"version": 1, "trajectories": entries}, indent=2))
+    print(f"ingested {len(traj.turns)} turn(s) from {args.input} -> {out / fname}")
+    print(
+        f"run:  DISTIL_CORPUS={out} distil savings   # or: distil bench --corpus {out} --savings-only"
+    )
+    print(
+        "note: real traces carry no DECISION labels — certify decision-equivalence with --runner anthropic."
+    )
+    return 0
+
+
+def cmd_perf(args: argparse.Namespace) -> int:
+    """Report compression + adapter latency/throughput (p50/p95)."""
+    from .perf import format_table, run_perf
+
+    print(format_table(run_perf(iterations=args.iterations)))
     return 0
 
 
@@ -398,7 +479,28 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="log the corpus-aggregate savings to the local ledger (distil leaderboard)",
     )
+    be.add_argument("--corpus", help="run on a custom corpus dir (e.g. from `distil ingest`)")
+    be.add_argument(
+        "--savings-only",
+        action="store_true",
+        help="report savings only, skip the decision-equivalence gate (for real traces)",
+    )
     be.set_defaults(func=cmd_bench)
+
+    os_ = sub.add_parser("output-savings", help="measure generation-side output-token savings A/B")
+    os_.add_argument("--input", help="JSONL of {baseline, shaped} pairs (default: bundled fixture)")
+    os_.set_defaults(func=cmd_output_savings)
+
+    ig = sub.add_parser("ingest", help="convert recorded provider requests into a Distil corpus")
+    ig.add_argument("--input", required=True, help="path to a .json/.jsonl of recorded requests")
+    ig.add_argument("--out", default="./ingested-corpus", help="output corpus directory")
+    ig.add_argument("--provider", default="anthropic", choices=("anthropic", "openai"))
+    ig.add_argument("--model", default="claude-opus-4-8")
+    ig.set_defaults(func=cmd_ingest)
+
+    pf = sub.add_parser("perf", help="latency/throughput benchmark (p50/p95)")
+    pf.add_argument("--iterations", type=int, default=200)
+    pf.set_defaults(func=cmd_perf)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)
@@ -419,6 +521,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--lossless-only",
         action="store_true",
         help="lossless compression only (safe for subscription/OAuth sessions)",
+    )
+    px.add_argument(
+        "--shape-output",
+        default="off",
+        choices=("off", "light", "aggressive"),
+        help="output-token compression via a gated verbosity directive (PAYG only)",
     )
     px.set_defaults(func=cmd_proxy)
 

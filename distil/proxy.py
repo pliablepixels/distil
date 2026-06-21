@@ -89,7 +89,9 @@ def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> 
 # ---------------------------------------------------------------------------
 
 
-def build_handler(upstream: str, *, lossless_only: bool = False) -> type[BaseHTTPRequestHandler]:
+def build_handler(
+    upstream: str, *, lossless_only: bool = False, shape_output: str = "off"
+) -> type[BaseHTTPRequestHandler]:
     """Return a ``BaseHTTPRequestHandler`` subclass configured for *upstream*.
 
     Parameters
@@ -99,6 +101,10 @@ def build_handler(upstream: str, *, lossless_only: bool = False) -> type[BaseHTT
         Must not have a trailing slash.
     lossless_only:
         When *True* only Tier-0 lossless transforms are applied.
+    shape_output:
+        Output-compression level (``"off"``/``"light"``/``"aggressive"``). When
+        not ``"off"`` and lossy compression is permitted, a verbosity-control
+        ``role:"system"`` directive is appended so the model emits fewer tokens.
     """
 
     _upstream = upstream.rstrip("/")
@@ -226,6 +232,12 @@ def build_handler(upstream: str, *, lossless_only: bool = False) -> type[BaseHTT
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
                 }
+                # Output compression: gated by lossless_only (only on PAYG-style).
+                if shape_output != "off" and not lossless_only:
+                    from .output import shape_request
+
+                    body = shape_request(body, level=shape_output, allow=True)
+                    extras["x-distil-output-shaping"] = shape_output
 
             new_raw = json.dumps(body).encode()
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
@@ -274,6 +286,7 @@ def serve(
     upstream: str = "https://api.anthropic.com",
     *,
     lossless_only: bool = False,
+    shape_output: str = "off",
 ) -> None:
     """Run a blocking :class:`ThreadingHTTPServer` proxy.
 
@@ -284,11 +297,15 @@ def serve(
     upstream:   Real LLM API base URL (no trailing slash).
     lossless_only:
         When *True* only Tier-0 lossless transforms are applied.
+    shape_output:
+        Output-compression level: ``"off"``/``"light"``/``"aggressive"``.
     """
-    handler = build_handler(upstream, lossless_only=lossless_only)
+    handler = build_handler(upstream, lossless_only=lossless_only, shape_output=shape_output)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
+    if shape_output != "off":
+        print(f"  → output shaping: {shape_output}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
