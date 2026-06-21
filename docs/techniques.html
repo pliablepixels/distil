@@ -163,21 +163,121 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
 
     <hr/>
 
-    <!-- Learned keep-model -->
-    <h2>Learned keep-model codec</h2>
-    <p><strong>Module:</strong> <code>distil/codec/learned.py</code> · Loss profile: pluggable</p>
+    <!-- Keep-model codec (pluggable) -->
+    <h2 id="keep-model">Keep-model codec <span class="g">(pluggable)</span></h2>
+    <p><strong>Modules:</strong> <code>distil/codec/learned.py</code> · <code>distil/codec/transformer.py</code> · Loss profile: pluggable</p>
 
-    <p>For per-content-type decisions about which lines of a tool result are worth keeping, Distil ships a <strong>logistic-regression keep classifier</strong> — trained from scratch in pure Python, zero external dependencies.</p>
+    <p>For per-line decisions about which content in a tool result is worth keeping, Distil exposes a pluggable <strong>KeepModel</strong> seam. Three implementations ship, from the heuristic default through to a retrain-on-your-traces transformer.</p>
+
+    <h3>The three tiers at a glance</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Accuracy (held-out)</th>
+          <th>F1</th>
+          <th>Dependencies</th>
+          <th>When to use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>SalienceKeepModel</strong> <span style="color:var(--dim);font-size:12px">(heuristic)</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td>None (stdlib only)</td>
+          <td>Default. Rule-based: error keywords, digit density, structure detection. Zero training cost.</td>
+        </tr>
+        <tr>
+          <td><strong>LogisticKeepModel</strong> <span style="color:var(--acc2);font-size:12px">(built-in)</span></td>
+          <td><span class="badge-pass">96.4%</span></td>
+          <td><span class="badge-pass">0.98</span></td>
+          <td>None (stdlib only)</td>
+          <td>Trained on corpus labels derived from the heuristic. Ships in the wheel as <code>codec/weights.json</code>. Zero extra installs, better generalisation than rules alone.</td>
+        </tr>
+        <tr>
+          <td><strong>TransformerKeepModel</strong> <span style="color:var(--warn);font-size:12px">(upgrade)</span></td>
+          <td><span class="badge-pass">96.3%</span> <span style="color:var(--dim);font-size:12px">(demo)</span></td>
+          <td><span class="badge-pass">0.98</span> <span style="color:var(--dim);font-size:12px">(demo)</span></td>
+          <td><code>pip install 'distil-llm[train]'</code></td>
+          <td>ONNX inference adapter. Retrain on YOUR traces for best results. Demo checkpoint on the v0.1.0 release.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Heuristic default — SalienceKeepModel</h3>
+    <p><code>distil/codec/keep_model.py</code> · The baseline. A deterministic rule-set that fires on error keywords, structured data markers (<code>DECISION:</code>, key:value lines, pipe tables), digit density, and debug-noise keywords. Always available, no training step, no external dependencies.</p>
+
+    <h3>Logistic keep-model — built-in, zero-dep</h3>
+    <p><code>distil/codec/learned.py</code> · A logistic-regression classifier trained entirely in pure Python (stdlib only), implementing the same <code>KeepModel</code> protocol. Key design decisions grounded in the source:</p>
 
     <ul>
-      <li><strong>Architecture:</strong> logistic regression over a fixed feature set (<code>codec/features.py</code>), trained with full-batch gradient descent on binary cross-entropy with L2 regularization.</li>
-      <li><strong>Training signal:</strong> labels are distilled from <code>SalienceKeepModel</code> — a line is labelled <em>keep</em> (1.0) if the heuristic salience score is ≥ 0.6.</li>
-      <li><strong>Performance on held-out lines:</strong> 96.4% accuracy, 0.98 F1, deterministic train/test split (SHA-256 hash-based, reproducible).</li>
-      <li><strong>Persistence:</strong> weights stored in <code>distil/codec/weights.json</code>; load with <code>LogisticKeepModel.load()</code>.</li>
+      <li><strong>Feature set:</strong> nine features defined in <code>codec/features.py</code> — bias, decision-marker indicator, error keywords, structured-data signal, digit density, length, debug keywords, uppercase ratio, blank-line flag. All normalized to [0, 1].</li>
+      <li><strong>Training:</strong> full-batch gradient descent on binary cross-entropy with L2 regularization (<code>l2=1e-4</code>, 400 epochs). Labels are derived from <code>SalienceKeepModel</code>: a line is labelled <em>keep</em> (1.0) if the heuristic scores it ≥ 0.6.</li>
+      <li><strong>Train/test split:</strong> deterministic, SHA-256 hash of the raw line — reproducible across machines with no random seed dependency.</li>
+      <li><strong>Held-out performance:</strong> 96.4% accuracy, 0.98 F1 on the bundled corpus test split.</li>
+      <li><strong>Weights:</strong> persisted to <code>distil/codec/weights.json</code>; load with <code>LogisticKeepModel.load()</code>. The weights ship inside the installed wheel — no training step required.</li>
     </ul>
 
+    <div class="stat-row">
+      <div class="stat-box hl">
+        <div class="stat-n">96.4<s>%</s></div>
+        <div class="stat-l">Accuracy — held-out lines</div>
+      </div>
+      <div class="stat-box hl">
+        <div class="stat-n">0.98</div>
+        <div class="stat-l">F1 — held-out lines</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">0</div>
+        <div class="stat-l">Extra dependencies</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">9</div>
+        <div class="stat-l">Feature dimensions</div>
+      </div>
+    </div>
+
+    <h3>Transformer keep-model — ONNX inference adapter</h3>
+    <p><code>distil/codec/transformer.py</code> · An ONNX-backed token-classification transformer that implements the same <code>KeepModel</code> protocol. Heavy deps (<code>onnxruntime</code>, <code>transformers</code>) are lazy-imported so the stdlib core of distil runs untouched. The class is <strong>the inference adapter only</strong> — it does not ship a pretrained checkpoint.</p>
+
+    <ul>
+      <li><strong>Inference:</strong> tokenizes each line, runs the ONNX session, applies softmax over the label axis, and aggregates per-token keep-probabilities via mean of top-3 — more robust than plain mean on mixed-content lines.</li>
+      <li><strong>Never-drop floor:</strong> any line containing <code>DECISION:</code> is forced to score 1.0 regardless of model output, matching the <code>SalienceKeepModel</code> guarantee.</li>
+      <li><strong>Demo checkpoint:</strong> a checkpoint trained on the bundled corpus (96.3% acc / 0.98 F1) is attached to the <a href="https://github.com/dshakes/distil/releases/tag/v0.1.0">v0.1.0 release</a>. This is a <em>demo</em> — for production quality, retrain on your own traces.</li>
+      <li><strong>Loading:</strong> <code>TransformerKeepModel.from_pretrained(onnx_path, tokenizer_dir)</code>. Requires <code>pip install 'distil-llm[onnx]'</code> for inference only, or <code>'distil-llm[train]'</code> to train.</li>
+    </ul>
+
+    <div class="callout warn">
+      <b>Retrain on your traces.</b> The demo checkpoint was trained on the bundled corpus. Its performance on your production text distribution will vary. Use <code>distil ingest</code> to convert your request logs into a corpus, then <code>distil train-transformer --out ./my-keep-model</code> to produce a checkpoint tuned to your traffic.
+    </div>
+
+    <h3>Training the transformer on your traces</h3>
+    <p><code>distil/codec/train_transformer.py</code> · Fine-tunes a HuggingFace token-classification model (default: <code>google/bert_uncased_L-2_H-128_A-2</code>, ~4 MB) using the same label pipeline as the logistic model, then exports to ONNX. Requires the <code>train</code> extras.</p>
+
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ pip install 'distil-llm[train]'</span>
+
+<span class="d"># Train on the bundled corpus (replace with --corpus ./mycorpus for real traces)</span>
+<span class="d">$ distil train-transformer --out ./my-keep-model</span>
+Epoch 1/3  train_loss=0.4821
+Epoch 2/3  train_loss=0.2134
+Epoch 3/3  train_loss=0.1589
+Exported ONNX to ./my-keep-model/model.onnx
+Accuracy=0.9630  F1=0.9812
+Load with: TransformerKeepModel.from_pretrained('./my-keep-model/model.onnx', './my-keep-model')
+
+<span class="d"># Use the checkpoint via the Python API</span>
+<span class="a">from</span> distil.codec.transformer <span class="a">import</span> TransformerKeepModel
+model = TransformerKeepModel.from_pretrained(
+    <span class="g">"./my-keep-model/model.onnx"</span>,
+    <span class="g">"./my-keep-model"</span>,
+)
+score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span class="g">"tool_output"</span>)
+<span class="d"># → 0.97  (keep)</span></pre>
+
     <div class="callout">
-      <b>Honesty note:</b> The logistic keep-model is a real, wired, deterministic implementation. A fully learned per-content-type neural classifier (and true soft-prompt gisting) are documented seams behind the same interfaces — not stubs, but not the default either. The deterministic heuristic is what runs in production.
+      <b>Honesty note:</b> The logistic keep-model is a real, wired, deterministic implementation — the default for all users, zero extra dependencies. The transformer adapter is also real and wired; the demo checkpoint trains on the bundled corpus. For production, retrain on your own traces. Both implement the same <code>KeepModel</code> protocol and are interchangeable at the seam.
     </div>
 
     <hr/>

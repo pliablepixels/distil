@@ -407,6 +407,91 @@ distil performance benchmark
 
     <hr/>
 
+    <!-- gateway -->
+    <h2 id="gateway">distil gateway</h2>
+    <p>Managed multi-tenant HTTP gateway with per-tenant token and dollar accounting, a live auto-refreshing dashboard at <code>/distil/dashboard</code>, and a JSON stats API at <code>/distil/stats</code>. Extends the basic proxy with tenant identification and savings attribution. Default port is <strong>8789</strong> (distinct from <code>distil proxy</code>'s 8788).</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Interface to bind on. Pass <code>0.0.0.0</code> for network-accessible deployments.</td></tr>
+        <tr><td><code>--port</code></td><td><code>8789</code></td><td>Port to listen on.</td></tr>
+        <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL (set once at startup, cannot be overridden per-request).</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key for per-tenant dollar accounting.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions).</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil gateway --port 8789 --upstream https://api.anthropic.com</span>
+distil gateway listening on http://127.0.0.1:8789
+  dashboard: http://127.0.0.1:8789/distil/dashboard
+  → upstream: https://api.anthropic.com</pre>
+
+    <p>Tenant identification (priority order): <code>x-distil-tenant</code> header → anonymized key hash (<code>anon-&lt;sha256[:8]&gt;</code>) → <code>"default"</code>. Raw API keys are never stored or logged.</p>
+
+    <pre class="term"><span class="d">$ curl -s http://127.0.0.1:8789/distil/stats | python3 -m json.tool</span>
+{
+  "tenants": [
+    {
+      "tenant": "team-search",
+      "requests": 142,
+      "tokens_saved": 52416,
+      "dollars_saved": 0.026208,
+      "pct_saved": 28.44
+    }
+  ],
+  "totals": {
+    "requests": 142,
+    "tokens_saved": 52416,
+    "dollars_saved": 0.026208,
+    "pct_saved": 28.44
+  }
+}</pre>
+
+    <p>See <a href="deploy-security.html#gateway">Deploy &amp; Security → Managed gateway</a> for the full deployment guide including multi-tenant setup and security model.</p>
+
+    <hr/>
+
+    <!-- train-transformer -->
+    <h2 id="train-transformer">distil train-transformer</h2>
+    <p>Fine-tune a token-classification transformer (default: <code>google/bert_uncased_L-2_H-128_A-2</code>, ~4 MB) for line keep/drop and export it to ONNX. Requires the <code>train</code> extras: <code>pip install 'distil-llm[train]'</code>. The resulting checkpoint is specific to your corpus text distribution — retrain on your own traces for best production results.</p>
+
+    <div class="callout">
+      <b>Default keep-model is the logistic classifier.</b> The <code>LogisticKeepModel</code> (built-in, zero deps, 96.4% acc / 0.98 F1) is the default for all users. Run <code>train-transformer</code> only when you have a corpus of real traces and want to upgrade to the ONNX transformer adapter.
+    </div>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--out</code></td><td><code>distil-keep-transformer</code></td><td>Output directory. Receives <code>model.onnx</code>, tokenizer files, and <code>metrics.json</code>.</td></tr>
+        <tr><td><code>--base-model</code></td><td><code>google/bert_uncased_L-2_H-128_A-2</code></td><td>HuggingFace model ID to fine-tune. Swap for <code>distilbert-base-uncased</code> for higher accuracy at larger size.</td></tr>
+        <tr><td><code>--epochs</code></td><td><code>3</code></td><td>Number of training epochs.</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ pip install 'distil-llm[train]'</span>
+
+<span class="d">$ distil train-transformer --out ./my-keep-model</span>
+Epoch 1/3  train_loss=0.4821
+Epoch 2/3  train_loss=0.2134
+Epoch 3/3  train_loss=0.1589
+Exported ONNX to ./my-keep-model/model.onnx
+Accuracy=0.9630  F1=0.9812
+Load with: TransformerKeepModel.from_pretrained('./my-keep-model/model.onnx', './my-keep-model')</pre>
+
+    <p>Output layout in <code>--out</code> directory:</p>
+    <ul>
+      <li><code>model.onnx</code> — exported ONNX graph (inputs: <code>input_ids</code>, <code>attention_mask</code>)</li>
+      <li><code>tokenizer.json</code>, <code>tokenizer_config.json</code>, <code>vocab.txt</code> — tokenizer for <code>TransformerKeepModel.from_pretrained</code></li>
+      <li><code>metrics.json</code> — held-out accuracy / F1 from the training run</li>
+    </ul>
+
+    <p>A demo checkpoint trained on the bundled corpus (96.3% acc / 0.98 F1) is attached to the <a href="https://github.com/dshakes/distil/releases/tag/v0.1.0">v0.1.0 release</a>. See <a href="techniques.html#keep-model">Techniques → Keep-model codec</a> for the full design.</p>
+
+    <hr/>
+
     <h2>Full CI gate</h2>
     <pre class="term"><span class="d">$ make gate</span>
 <span class="d"># Runs: tests + corpus non-inferiority (distil bench) + byte-fidelity (distil verify)</span>

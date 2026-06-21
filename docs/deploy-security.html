@@ -182,6 +182,105 @@ def log_message(self, fmt: str, *args: object) -&gt; None:
 
     <hr/>
 
+    <h2 id="gateway">Managed gateway</h2>
+
+    <p><strong>Module:</strong> <code>distil/gateway.py</code> · <strong>Command:</strong> <code>distil gateway</code></p>
+
+    <p>The <strong>managed gateway</strong> extends the basic proxy with per-tenant token and dollar accounting, a live auto-refreshing dashboard, and a JSON stats API. It is the right deployment target when multiple teams or applications share one distil instance and you want visibility into who is saving what.</p>
+
+    <h3>Starting the gateway</h3>
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d"># Default: binds 127.0.0.1:8789 and forwards to Anthropic</span>
+<span class="d">$ distil gateway --port 8789 --upstream https://api.anthropic.com</span>
+distil gateway listening on http://127.0.0.1:8789
+  dashboard: http://127.0.0.1:8789/distil/dashboard
+  → upstream: https://api.anthropic.com
+
+<span class="d"># Full flag set</span>
+<span class="d">$ distil gateway \</span>
+    --host 0.0.0.0 \
+    --port 8789 \
+    --upstream https://api.anthropic.com \
+    --pricing claude-opus-4-8 \
+    --lossless-only</pre>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Interface to bind on. Use <code>0.0.0.0</code> for network-accessible deployments (keep behind a firewall).</td></tr>
+        <tr><td><code>--port</code></td><td><code>8789</code></td><td>Port to listen on (distinct from the basic proxy default of 8788).</td></tr>
+        <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL. Set once at startup — cannot be overridden per-request.</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key from the catalog; used for per-tenant dollar accounting in the dashboard.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions).</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Per-tenant accounting</h3>
+    <p>Every compressible request (<code>POST /v1/messages</code>, <code>/v1/chat/completions</code>, <code>/v1/responses</code>) is attributed to a tenant and its token counts are accumulated in-memory. Tenant identification priority:</p>
+
+    <ol>
+      <li><strong><code>x-distil-tenant</code> header</strong> — explicit label set by the caller (e.g. <code>"team-search"</code>, <code>"team-checkout"</code>).</li>
+      <li><strong>Anonymized key hash</strong> — if no explicit label, the gateway derives a stable 8-hex ID from <code>sha256(x-api-key or authorization)</code>, prefixed <code>anon-</code>. The raw key is never stored or logged — only the truncated hash.</li>
+      <li><strong><code>"default"</code></strong> — used when no credential is present at all.</li>
+    </ol>
+
+    <div class="callout good">
+      <b>No raw key ever stored or logged.</b> The <code>tenant_of()</code> function hashes the credential with SHA-256 and keeps only the first 8 hex characters. API keys cannot be reconstructed from the recorded tenant IDs.
+    </div>
+
+    <h3>Management endpoints</h3>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">JSON API</div>
+        <h3><code>GET /distil/stats</code></h3>
+        <p>Returns a JSON snapshot of per-tenant and aggregate token/dollar savings. Suitable for polling from CI, alerting systems, or a cost dashboard.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Live dashboard</div>
+        <h3><code>GET /distil/dashboard</code></h3>
+        <p>Self-contained dark HTML page that auto-refreshes every 5 seconds. Served inline — no CDN or external assets. Shows per-tenant requests, tokens saved, dollars saved, and compression rate.</p>
+      </div>
+    </div>
+
+    <pre class="term"><span class="d">$ curl -s http://127.0.0.1:8789/distil/stats | python3 -m json.tool</span>
+{
+  "tenants": [
+    {
+      "tenant": "team-search",
+      "requests": 142,
+      "tokens_baseline": 184320,
+      "tokens_compressed": 131904,
+      "tokens_saved": 52416,
+      "dollars_saved": 0.026208,
+      "pct_saved": 28.44
+    },
+    {
+      "tenant": "anon-3f9a1c2b",
+      "requests": 31,
+      "tokens_baseline": 40110,
+      "tokens_compressed": 29110,
+      "tokens_saved": 11000,
+      "dollars_saved": 0.005500,
+      "pct_saved": 27.42
+    }
+  ],
+  "totals": {
+    "requests": 173,
+    "tokens_baseline": 224430,
+    "tokens_compressed": 161014,
+    "tokens_saved": 63416,
+    "dollars_saved": 0.031708,
+    "pct_saved": 28.26
+  }
+}</pre>
+
+    <div class="callout">
+      <b>All other paths pass through unchanged.</b> The gateway adds management endpoints at <code>/distil/*</code> and compresses <code>POST /v1/messages</code>-family paths. Every other path and HTTP method is forwarded to the upstream transparently, with the same hop-by-hop header stripping and SSRF protection as the basic proxy.
+    </div>
+
+    <hr/>
+
     <h2>Threat model summary</h2>
 
     <table>
@@ -212,6 +311,10 @@ def log_message(self, fmt: str, *args: object) -&gt; None:
         <tr>
           <td>Data retention beyond request</td>
           <td>Stateless handler; RestoreStore is in-process, not persisted.</td>
+        </tr>
+        <tr>
+          <td>API key exposure in gateway logs</td>
+          <td>Gateway derives tenant ID via <code>sha256(key)[:8]</code>; raw key never stored, never logged, not reconstructable.</td>
         </tr>
       </tbody>
     </table>
