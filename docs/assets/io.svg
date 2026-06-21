@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <radialGradient id="vig" cx="0.74" cy="-0.05" r="0.85"><stop offset="0" stop-color="#1a1640" stop-opacity="0.55"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a2e"/><stop offset="1" stop-color="#0c0f1d"/></linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#000000" flood-opacity="0.55"/></filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7390"/></marker>
+    <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
+    <linearGradient id="oarrow" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+  </defs>
+
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <rect width="1200" height="360" fill="url(#dots)"/>
+  <rect width="1200" height="360" fill="url(#vig)"/>
+
+  <text x="80" y="50" font-size="23" font-weight="800" letter-spacing="-0.3" fill="#f2f3f7">Compress both sides.</text>
+  <text x="302" y="50" font-size="14" fill="#8b91a3">— input and output, in one proxy</text>
+
+  <g filter="url(#sh)">
+    <rect x="80" y="120" width="220" height="120" rx="18" fill="url(#card)" stroke="#252c3e"/>
+  </g>
+  <text x="190" y="186" text-anchor="middle" font-size="20" font-weight="800" fill="#eef0f5">Agent</text>
+  <text x="190" y="206" text-anchor="middle" font-size="11" fill="#8b91a3">your application</text>
+
+  <g filter="url(#glow)" opacity="0.5"><rect x="900" y="120" width="220" height="120" rx="18" fill="#5ad1c9" opacity="0.12"/></g>
+  <rect x="900" y="120" width="220" height="120" rx="18" fill="url(#hero)" stroke="url(#g)" stroke-width="1.6"/>
+  <text x="1010" y="186" text-anchor="middle" font-size="20" font-weight="800" fill="url(#g)">Model</text>
+  <text x="1010" y="206" text-anchor="middle" font-size="11" fill="#8b91a3">Claude / any LLM</text>
+
+  <path d="M300,165 C540,90 660,90 900,165" stroke="#6b7390" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+  <text x="600" y="78" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".12em" fill="#5b6177">INPUT</text>
+  <text x="600" y="96" text-anchor="middle" font-size="13" font-weight="700" fill="#eef0f5">Distil compresses context</text>
+  <text x="600" y="112" text-anchor="middle" font-size="11" fill="#8b91a3">Tier-0/1 · cache-aware · pruning</text>
+  <rect x="505" y="124" width="190" height="24" rx="12" fill="#0e1320" stroke="#2a2550"/>
+  <text x="600" y="140" text-anchor="middle" font-size="12" font-weight="700" fill="#8b7bff">−30% input, losslessly</text>
+
+  <path d="M900,195 C660,270 540,270 300,195" stroke="#5ad1c9" stroke-width="2" fill="none" marker-end="url(#arg)"/>
+  <text x="600" y="248" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".12em" fill="#5b6177">OUTPUT</text>
+  <text x="600" y="266" text-anchor="middle" font-size="13" font-weight="700" fill="#eef0f5">Distil shapes generation + digests re-entry</text>
+  <rect x="490" y="278" width="220" height="24" rx="12" fill="#0e1320" stroke="#1d3030"/>
+  <text x="600" y="294" text-anchor="middle" font-size="12" font-weight="700" fill="#5ad1c9">−72% output, answer preserved</text>
+
+  <text x="600" y="342" text-anchor="middle" font-size="12.5" fill="#8b91a3">compress both sides of the bill — <tspan fill="#eef0f5" font-weight="600">input tokens</tspan> and <tspan fill="#eef0f5" font-weight="600">output tokens</tspan>.</text>
+</svg>

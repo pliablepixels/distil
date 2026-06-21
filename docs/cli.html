@@ -32,6 +32,7 @@
     <a href="cli.html" class="active">CLI Reference</a>
     <a href="adapters.html">Adapters</a>
     <a href="corpus.html">Corpus</a>
+    <a href="output.html">Output &amp; I/O</a>
 
     <div class="sidebar-section">More</div>
     <a href="faq.html">FAQ</a>
@@ -297,6 +298,7 @@ by trajectory:
         <tr><td><code>--port</code></td><td><code>8788</code></td><td>Port to listen on</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions)</td></tr>
+        <tr><td><code>--shape-output</code></td><td>off</td><td>Enable generation-side verbosity shaping: <code>light</code> (conservative) or <code>aggressive</code>. Injects a gated <code>role:"system"</code> directive before the request. PAYG-only — blocked on subscription keys.</td></tr>
       </tbody>
     </table>
 
@@ -317,6 +319,79 @@ response = litellm.completion(api_base=<span class="g">"http://localhost:8788"</
     <p>The proxy adds two response headers: <code>x-distil-compressed: 1</code> and <code>x-distil-tokens-saved: &lt;n&gt;</code>. All other paths and HTTP methods are forwarded unchanged.</p>
 
     <p>See <a href="adapters.html">Adapters</a> for the full story on in-process vs. proxy adoption.</p>
+
+    <!-- output-savings -->
+    <h2 id="output-savings">distil output-savings</h2>
+    <p>Measure the realized output-token reduction from <code>--shape-output</code>. Compares baseline generation length against shaped generation across the trajectory set and reports the A/B result with a bootstrap 95% confidence interval. Requires a live API key (<code>--runner anthropic</code>).</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--trajectory, -t</code></td><td>bundled sample</td><td>Path to a trajectory JSON file</td></tr>
+        <tr><td><code>--mode</code></td><td><code>light</code></td><td><code>light</code> or <code>aggressive</code> — which shaping directive to test</td></tr>
+        <tr><td><code>--runner</code></td><td><code>anthropic</code></td><td>Must be <code>anthropic</code> (live model); output shaping requires a real generation to measure</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil output-savings --mode aggressive</span>
+output-token A/B — mode=aggressive | runner=anthropic | n=8 turns
+
+  baseline mean output tokens:   487
+  shaped   mean output tokens:   134
+
+  reduction: <span class="g">72.5%</span>  [95% CI: 67.5%–77.1%]
+  answer preserved: <span class="g">100%</span>  (semantic match gate, n=8)
+
+<span class="d">note: realized savings require --runner anthropic (live model).</span></pre>
+
+    <hr/>
+
+    <!-- ingest -->
+    <h2 id="ingest">distil ingest</h2>
+    <p>Convert recorded Anthropic or OpenAI request logs (JSONL) into a Distil corpus. Real-trace corpora have no <code>DECISION</code> labels, so the offline gate is savings-only; certify quality live with <code>distil certify --runner anthropic</code>.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--input</code></td><td>required</td><td>Path to the JSONL log file (Anthropic or OpenAI request format)</td></tr>
+        <tr><td><code>--out</code></td><td>required</td><td>Output directory where the corpus will be written</td></tr>
+        <tr><td><code>--format</code></td><td>auto-detect</td><td><code>anthropic</code> or <code>openai</code> — inferred from the first record if omitted</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil ingest --input prod.jsonl --out ./mycorpus</span>
+ingesting prod.jsonl → ./mycorpus
+
+  format detected: anthropic
+  records read:    1,204
+  trajectories:       42  (grouped by session_id)
+  skipped:             3  (malformed or missing messages field)
+
+corpus written to ./mycorpus/
+
+<span class="d">$ distil bench --corpus ./mycorpus --savings-only</span>
+corpus gate — 42 trajectories | savings-only (no DECISION labels)
+
+  aggregate savings: <span class="g">28.3%</span>  [95% CI: 25.1%–31.6%]
+  <span class="d">note: certify with --runner anthropic for a live quality gate.</span></pre>
+
+    <hr/>
+
+    <!-- perf -->
+    <h2 id="perf">distil perf</h2>
+    <p>Throughput benchmark: measures raw distil-compression rate and in-process adapter latency. Runs a tight loop of <code>compress()</code> calls with the bundled trajectory and reports throughput (ops/sec) and p50/p95/p99 latency. No flags.</p>
+
+    <pre class="term"><span class="d">$ distil perf</span>
+distil performance benchmark
+
+  compressor throughput:   <span class="g">~27,000</span> distil-compressions/sec
+  in-process adapter p50:  <span class="g">0.006 ms</span>
+  in-process adapter p95:  0.011 ms
+  in-process adapter p99:  0.018 ms
+
+  (measured on Apple M-series, CPython 3.12, bundled sre-disk-incident trajectory)</pre>
 
     <hr/>
 

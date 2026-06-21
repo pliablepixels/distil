@@ -182,10 +182,13 @@ distil prune
 | Holdout A/B savings + bootstrap CI | `certify/holdout.py` | — |
 | Byte-fidelity invariants (reversible + append-only) | `fidelity.py`, `distil verify` | — |
 | BM25 partial retrieval · delta context · gist caching | `retrieval.py`, `delta.py`, `gist.py` | lossless |
+| **Output compression** — gated shaping + lossless re-entry digest + A/B harness | `output.py`, `distil output-savings` | gated / lossless |
+| **Real-trace ingestion** — run the gate on your own traffic | `ingest.py`, `distil ingest` | — |
+| **Performance benchmark** — p50/p95 latency + throughput | `perf.py`, `distil perf` | — |
 | Billing-grade tokenizer + live runner | `tokenizer.py`, `replay/anthropic_runner.py` | opt-in |
 | Savings ledger + leaderboard (privacy-preserving) | `ledger.py` | local-first |
 
-**Full docs:** [Getting started](https://dshakes.github.io/distil/getting-started.html) · [Concepts](https://dshakes.github.io/distil/concepts.html) · [Techniques](https://dshakes.github.io/distil/techniques.html) · [CLI](https://dshakes.github.io/distil/cli.html) · [Architecture](https://dshakes.github.io/distil/architecture.html) · [Integrations](https://dshakes.github.io/distil/integrations.html) · [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) · [FAQ](https://dshakes.github.io/distil/faq.html)
+**Full docs:** [Getting started](https://dshakes.github.io/distil/getting-started.html) · [Concepts](https://dshakes.github.io/distil/concepts.html) · [Techniques](https://dshakes.github.io/distil/techniques.html) · [CLI](https://dshakes.github.io/distil/cli.html) · [Output & I/O](https://dshakes.github.io/distil/output.html) · [Architecture](https://dshakes.github.io/distil/architecture.html) · [Integrations](https://dshakes.github.io/distil/integrations.html) · [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) · [FAQ](https://dshakes.github.io/distil/faq.html)
 
 ---
 
@@ -209,15 +212,33 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 
 ---
 
-## 🎯 Scope & limits
+## 🎯 Both sides of the bill — input *and* output
 
-Distil compresses the **input / context path** — the request `messages`, tool outputs, history, and retrieved docs your agent re-sends every turn. It is comprehensive there (Tier-0/1, cache stabilization, causal pruning, the proxy and in-process adapter).
+<p align="center"><img src="docs/assets/io.svg" alt="compress both input and output tokens" width="100%"/></p>
 
-What it does **not** do yet, stated plainly:
-- **Output-token reduction.** The model's *generated* output is relayed unchanged — no verbosity steering / output shaping. Output tokens cost ~4–5× input, so this is the next real frontier, not a finished feature.
-- **Production keep-model weights.** A logistic model (96.4%/0.98) ships built-in; the transformer is a real adapter + pipeline with a *demo* checkpoint on the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — retrain on your traces for production (`distil train-transformer`).
-- **Live-model certification** runs offline by default (deterministic runner); `--runner anthropic` certifies against the real model but is **UNVERIFIED** until you run it with a key.
-- The corpus is **realistic but synthetic** (7 domains); production confidence comes from running the gate on *your* captured traces.
+**Input/context** (Tier-0/1, cache stabilization, causal pruning, proxy + adapter) — comprehensive.
+
+**Output** — two real mechanisms (`distil/output.py`):
+- **Generation-side shaping** — a gated `role:"system"` verbosity directive (`distil proxy --shape-output light|aggressive`) so the model *emits* fewer tokens. Lossy by nature, so it's **PAYG-only** and **measured**: `distil output-savings` reports the token cut **and** the rate the answer survived, with a bootstrap CI.
+- **Lossless output-on-re-entry digest** — long answers that become history are digested reversibly, so verbose past output stops costing full price as context.
+
+```
+$ distil output-savings
+output tokens cut 72.5% (95% CI 67.5–77.1%), answer preserved 100.0% of the time, n=6
+```
+
+**Run the gate on *your* traffic, not just the synthetic corpus:**
+```
+$ distil ingest --input prod-requests.jsonl --out ./mycorpus   # Anthropic/OpenAI logs → trajectories
+$ distil bench --corpus ./mycorpus --savings-only
+```
+
+**Performance** (`distil perf`, stdlib, single core): ~27,000 distil-compressions/sec; the in-process adapter compresses a request in **~0.006 ms** (p50).
+
+### Honest limits
+- **Production keep-model weights.** A logistic model (96.4%/0.98) ships built-in; the transformer is a real adapter + pipeline with a *demo* checkpoint on the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — retrain on your traces (`distil train-transformer`).
+- **Output shaping's realized savings are live** — the A/B harness measures it on recorded pairs; the token reduction lands when a real model generates against the directive.
+- **Live-model certification** is offline by default; `--runner anthropic` is implemented but **UNVERIFIED** without a key.
 
 No vanity metrics — every number here is reproducible from the bundled corpus.
 
