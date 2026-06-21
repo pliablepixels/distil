@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c14"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <radialGradient id="glowP" cx="0.86" cy="0.04" r="0.6"><stop offset="0" stop-color="#5b4bd6" stop-opacity="0.55"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="glowT" cx="0.04" cy="1.0" r="0.55"><stop offset="0" stop-color="#168f88" stop-opacity="0.4"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1.1" fill="#ffffff" opacity="0.03"/></pattern>
+    <linearGradient id="chip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141826"/><stop offset="1" stop-color="#0d101a"/></linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+  <rect width="1200" height="630" fill="url(#glowP)"/>
+  <rect width="1200" height="630" fill="url(#glowT)"/>
+  <rect x="0.5" y="0.5" width="1199" height="629" rx="0" fill="none" stroke="#1b2030"/>
+
+  <!-- accent hairline top -->
+  <rect x="0" y="0" width="1200" height="4" fill="url(#g)" opacity="0.9"/>
+
+  <g transform="translate(80,86)">
+    <text x="0" y="0" font-size="17" letter-spacing="3" font-weight="700" fill="#5ad1c9">THE CERTIFIED CONTEXT LAYER FOR AGENTS</text>
+
+    <text x="-3" y="118" font-size="120" font-weight="800" letter-spacing="-4" fill="#f2f3f7">Dist<tspan fill="url(#g)">il</tspan></text>
+
+    <text x="0" y="178" font-size="40" font-weight="700" fill="#f2f3f7">Compression with a <tspan fill="url(#g)">quality contract.</tspan></text>
+
+    <text x="0" y="224" font-size="23" fill="#9aa1b3">Cache-aware, causally-pruned context compression for agentic runtimes —</text>
+    <text x="0" y="256" font-size="23" fill="#9aa1b3">it proves the agent makes the <tspan fill="#f2f3f7">same decisions</tspan>, certified across 7 domains.</text>
+
+    <!-- stat chips -->
+    <g transform="translate(0,300)" font-size="22" font-weight="700">
+      <g>
+        <rect x="0" y="0" width="196" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
+        <text x="22" y="37" fill="#8b7bff">−30%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> input</tspan></text>
+      </g>
+      <g transform="translate(216,0)">
+        <rect x="0" y="0" width="206" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
+        <text x="22" y="37" fill="#5ad1c9">−72%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> output</tspan></text>
+      </g>
+      <g transform="translate(442,0)">
+        <rect x="0" y="0" width="300" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
+        <text x="22" y="37" fill="#5ad19a">100%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> decision-equivalence</tspan></text>
+      </g>
+    </g>
+  </g>
+
+  <!-- footer -->
+  <g transform="translate(80,560)" font-size="21">
+    <text x="0" y="0" font-weight="700" fill="#f2f3f7">github.com/dshakes/distil</text>
+    <text x="360" y="0" fill="#5b6177">Apache-2.0  ·  pip install distil-llm  ·  uvx distil bench</text>
+  </g>
+</svg>
