@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Verifiable savings</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#06070b;color:#f2f3f7;font-family:Inter,system-ui,sans-serif;padding:2rem}
+  h1{font-size:1.75rem;font-weight:700;color:#8b7bff;margin-bottom:.25rem}
+  .sub{color:#5ad1c9;font-size:.85rem;margin-bottom:2rem}
+  .totals{display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:2rem}
+  .card{background:#0d0f17;border:1px solid #1e2030;border-radius:.5rem;padding:1rem 1.5rem}
+  .card .label{font-size:.75rem;color:#8b8ea8;text-transform:uppercase;letter-spacing:.06em}
+  .card .value{font-size:1.4rem;font-weight:600;color:#8b7bff;margin-top:.15rem}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th{text-align:left;padding:.5rem .75rem;border-bottom:2px solid #1e2030;color:#8b8ea8;
+      font-size:.75rem;text-transform:uppercase;letter-spacing:.06em}
+  td{padding:.55rem .75rem;border-bottom:1px solid #1e2030}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#0d0f17}
+  .rank{color:#8b8ea8;width:2.5rem}
+  .iid{font-family:monospace;color:#5ad1c9}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .cert.yes{color:#5ad1c9;font-weight:600}
+  .cert.no{color:#3a3c4e}
+  .badge{display:inline-block;background:#1a1c2e;border:1px solid #8b7bff;
+          color:#8b7bff;font-size:.7rem;padding:.1rem .4rem;border-radius:.25rem;
+          margin-left:.5rem;vertical-align:middle}
+  .rejected{font-size:.8rem;color:#8b8ea8;margin-top:1rem}
+</style>
+</head>
+<body>
+<div style="max-width:980px;margin:0 auto 18px;padding:12px 16px;border:1px solid #2a2550;border-radius:12px;background:linear-gradient(180deg,#12152a,#0b0d18);color:#9aa1b3;font:14px/1.5 Inter,ui-sans-serif,sans-serif">
+  <b style="color:#f2f3f7">Sample.</b> Illustrative data showing what a federated leaderboard looks like.
+  Generate your own (local-first, privacy-preserving) with
+  <code style="color:#5ad1c9">distil federated-leaderboard --dir ./submissions --keys keys.json --html out.html</code>
+  · <a href="index.html" style="color:#8b7bff">← Distil home</a>
+</div>
+<h1>Verifiable savings <span class="badge">HMAC-SHA256</span></h1>
+<p class="sub">Signed, content-free aggregates — every number is tamper-evident</p>
+<div class="totals">
+  <div class="card"><div class="label">Tokens saved</div>
+    <div class="value">3,359,100</div></div>
+  <div class="card"><div class="label">Dollars saved</div>
+    <div class="value">$16.7900</div></div>
+  <div class="card"><div class="label">Runs</div>
+    <div class="value">11,667</div></div>
+  <div class="card"><div class="label">Instances</div>
+    <div class="value">5</div></div>
+</div>
+<table>
+<thead><tr>
+  <th>#</th><th>Instance</th><th style="text-align:right">Tokens saved</th>
+  <th style="text-align:right">Dollars saved</th><th style="text-align:right">Runs</th>
+  <th>Certified</th>
+</tr></thead>
+<tbody>
+<tr><td class="rank">1</td><td class="iid">acme-prod</td><td class="num">1,240,000</td><td class="num">$6.2000</td><td class="num">4210</td><td class="cert yes">&#10004; certified</td></tr>
+<tr><td class="rank">2</td><td class="iid">globex-ai</td><td class="num">890,500</td><td class="num">$4.4500</td><td class="num">3102</td><td class="cert yes">&#10004; certified</td></tr>
+<tr><td class="rank">3</td><td class="iid">hooli</td><td class="num">612,300</td><td class="num">$3.0600</td><td class="num">2040</td><td class="cert yes">&#10004; certified</td></tr>
+<tr><td class="rank">4</td><td class="iid">initech</td><td class="num">410,900</td><td class="num">$2.0500</td><td class="num">1503</td><td class="cert yes">&#10004; certified</td></tr>
+<tr><td class="rank">5</td><td class="iid">pied-piper</td><td class="num">205,400</td><td class="num">$1.0300</td><td class="num">812</td><td class="cert yes">&#10004; certified</td></tr>
+</tbody>
+</table>
+<p class="rejected">Rejected (tampered / unverified): 0</p>
+</body>
+</html>
