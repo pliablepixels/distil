@@ -2,6 +2,15 @@
    Class names match the existing pages; only the styling is elevated.
    ----------------------------------------------------------------- */
 
+/* ── Self-hosted Inter (variable, offline) ─────────────────────────── */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/inter.woff2") format("woff2");
+}
+
 /* ── Design tokens ─────────────────────────────────────────────────── */
 :root {
   --bg:     #06070b;
@@ -294,3 +303,35 @@ hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto; }
 }
+
+/* ── Copy-to-clipboard button on code blocks ───────────────────────── */
+pre { /* room for the button */ }
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 600 11px/1 "Inter", ui-sans-serif, sans-serif;
+  color: var(--mut); background: rgba(255,255,255,.04);
+  border: 1px solid var(--line2); border-radius: 8px;
+  padding: 5px 9px; cursor: pointer; opacity: 0;
+  transition: opacity .15s, color .15s, border-color .15s, background .15s;
+}
+pre:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--ink); border-color: #34405e; background: rgba(255,255,255,.07); }
+.copy-btn.copied { color: var(--good); border-color: rgba(90,209,154,.4); opacity: 1; }
+
+/* ── "On this page" right-rail TOC ─────────────────────────────────── */
+.toc {
+  position: fixed; top: calc(var(--topbar-h) + 40px); right: max(24px, calc((100vw - var(--sidebar-w) - 920px) / 2 - 220px));
+  width: 200px; max-height: calc(100vh - var(--topbar-h) - 80px); overflow-y: auto;
+  padding-left: 14px; border-left: 1px solid var(--line); z-index: 20;
+}
+.toc-title { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin-bottom: 10px; }
+.toc a {
+  display: block; padding: 4px 0; font-size: 12.5px; line-height: 1.4;
+  color: var(--dim); border-left: 2px solid transparent; padding-left: 12px; margin-left: -14px;
+  transition: color .15s, border-color .15s;
+}
+.toc a.lvl-3 { padding-left: 24px; font-size: 12px; }
+.toc a:hover { color: var(--mut); }
+.toc a.active { color: var(--acc2); border-left-color: var(--acc2); }
+@media (max-width: 1340px) { .toc { display: none; } }
