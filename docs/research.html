@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Research &amp; Frontier — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Distil"/>
+<meta property="og:title" content="Research &amp; Frontier — Distil"/>
+<meta property="og:description" content="The certified compression frontier, the never-regressing self-distilling loop, and verifiable federated telemetry — proof artifacts no competitor publishes."/>
+<meta property="og:url" content="https://dshakes.github.io/distil/research.html"/>
+<meta property="og:image" content="https://dshakes.github.io/distil/og.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Research &amp; Frontier — Distil"/>
+<meta name="twitter:description" content="The certified compression frontier, the never-regressing self-distilling loop, and verifiable federated telemetry — proof artifacts no competitor publishes."/>
+<meta name="twitter:image" content="https://dshakes.github.io/distil/og.png"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="research.html" class="active">Research &amp; Frontier</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+    <a href="output.html">Output &amp; I/O</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">&#8592; Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Research <span class="g">&amp; Frontier</span></h1>
+    <p class="lead">The proof artifacts no competitor publishes: a savings-vs-quality curve where every point carries a certification verdict, a never-regressing self-distilling loop, and savings telemetry you can verify yourself.</p>
+
+    <hr/>
+
+    <!-- Feature 1: Certified compression frontier -->
+    <h2 id="frontier">Certified compression frontier</h2>
+    <p><strong>Module:</strong> <code>distil/eval.py</code> &middot; <strong>Command:</strong> <code>distil eval [--corpus --runner --out]</code></p>
+
+    <p>Most compression tools publish a headline savings number. Distil publishes the <em>full curve</em>: a sweep of compression aggressiveness levels where every point is tagged with (token savings, decision-equivalence, certified/not). This locates the cliff past which lossy compression starts dropping agent decisions — and proves that distil sits safely inside the certified region.</p>
+
+    <div class="callout">
+      <b>The proof artifact.</b> The <code>FrontierReport</code> produced by <code>distil eval</code> is the artifact no competitor publishes: a curve where <em>every</em> point carries a TOST non-inferiority verdict. The certified ceiling is the highest savings level the gate accepts; beyond it, lossy strategies start changing agent decisions and are rejected. Distil operates below the cliff.
+    </div>
+
+    <h3>How the sweep works</h3>
+    <p><code>distil/eval.py</code> defines <code>frontier()</code>, which measures two reference operating points (<code>tier-0 lossless</code> and <code>distil (cache-aware)</code>) and then sweeps a range of truncation limits (<code>[4000, 2000, 1200, 700, 450, 300, 220, 160, 120, 90]</code> chars) across the corpus. For each point it measures:</p>
+
+    <ul>
+      <li><strong>Token savings</strong> — average reduction fraction over the corpus.</li>
+      <li><strong>Decision equivalence</strong> — average match rate between compressed and uncompressed decisions.</li>
+      <li><strong>Certified</strong> — both TOST non-inferiority passes <em>and</em> equivalence equals 100%. A single trajectory failure uncertifies the point.</li>
+    </ul>
+
+    <p>Results are sorted by savings ascending and printed as the frontier table. Run offline with the deterministic runner (structural decision-equivalence). For real task-accuracy on a benchmark (tau-bench, SWE-bench, GSM8K) ingest its traces and run with <code>--runner anthropic</code>.</p>
+
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ distil eval</span>
+certified compression frontier  (runner=deterministic)
+
+<span class="d">level                   savings   equiv  certified  curve</span>
+<span class="d">--------------------------------------------------------------------------</span>
+distil (cache-aware)       8.4%    100%    <span class="g">&#10004; PASS</span>   &#9608;&#9608;
+truncate@1200              7.2%     79%       <span class="w">&#10008; &#8212;</span>    &#9608;&#9608;
+truncate@700              20.0%     36%       <span class="w">&#10008; &#8212;</span>    &#9608;&#9608;&#9608;&#9608;
+truncate@300              41.3%      0%       <span class="w">&#10008; &#8212;</span>    &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;
+<span class="d">--------------------------------------------------------------------------</span>
+
+distil: 8.4% savings @ 100% decision-equivalence — certified.
+certified ceiling: 8.4% savings (beyond this, lossy compression drops decisions and the gate rejects it).</pre>
+
+    <p>The raw curve can be written to JSONL with <code>--out &lt;dir&gt;</code> for CI integration or archiving.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">Offline mode</div>
+        <h3>Deterministic runner</h3>
+        <p>Uses structural decision-equivalence (ground-truth <code>DECISION:</code> markers). Runs fully offline, no API key required. Results are reproducible bit-for-bit across machines.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Live mode</div>
+        <h3><code>--runner anthropic</code></h3>
+        <p>Grade the curve with a live model. Use this when evaluating against real benchmarks (tau-bench / SWE-bench / GSM8K) — ingest their traces first with <code>distil ingest</code>.</p>
+      </div>
+    </div>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Custom corpus dir (e.g. from <code>distil ingest</code> on benchmark traces)</td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline) or <code>anthropic</code> (live model, requires API key)</td></tr>
+        <tr><td><code>--out</code></td><td>off</td><td>Write the raw curve as timestamped JSONL to this directory</td></tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <!-- Feature 2: Self-distilling keep-model -->
+    <h2 id="online">Self-distilling keep-model</h2>
+    <p><strong>Module:</strong> <code>distil/online.py</code> &middot; <strong>Command:</strong> <code>distil online [--corpus --promote-to]</code></p>
+
+    <p>Headroom trains a keep-model on a generic judge applied to synthetic data. Distil trains on <strong>causal labels</strong> — certified-safe drops discovered by the ablation engine running on your own real traffic. This is the moat headroom cannot copy.</p>
+
+    <h3>The never-regressing loop</h3>
+    <p>The loop has four steps, each grounded in the source:</p>
+
+    <ol>
+      <li><strong>Collect causal labels</strong> (<code>collect_causal_labels()</code>) — run counterfactual ablation (<code>discover()</code>) on every trajectory. Blocks that never changed a decision are PRUNABLE (label=0). Blocks that changed at least one decision are KEPT (label=1). Only VOLATILE blocks are scanned; the stable cacheable prefix is out of scope. Conflict resolution: keep wins (label=1 is never overridden to 0).</li>
+      <li><strong>Retrain</strong> (<code>retrain()</code>) — featurize the labeled lines (9 features, same as the built-in logistic model) and train logistic regression with full-batch gradient descent, L2 regularization, and a deterministic SHA-256 train/test split. No random seed dependency.</li>
+      <li><strong>Certify promotion</strong> (<code>certify_promotion()</code>) — wrap the new weights as a compression strategy, run the TOST non-inferiority gate on <em>every single corpus trajectory</em>. A single regression anywhere blocks the promotion.</li>
+      <li><strong>Persist iff certified</strong> (<code>online_round()</code>) — write the new weights to <code>--promote-to</code> only if step 3 passed. A cycle that would degrade quality is silently discarded.</li>
+    </ol>
+
+    <div class="callout good">
+      <b>Never-regressing by construction.</b> Because step 3 requires non-inferior TOST on every trajectory before weights are touched, the loop can only improve the keep-model. A candidate that regresses on any trajectory is discarded without modifying production weights.
+    </div>
+
+    <h3>Observed performance on the bundled corpus</h3>
+
+    <div class="stat-row">
+      <div class="stat-box hl">
+        <div class="stat-n">286</div>
+        <div class="stat-l">Causal labels collected</div>
+      </div>
+      <div class="stat-box hl">
+        <div class="stat-n">0.873</div>
+        <div class="stat-l">Accuracy (held-out)</div>
+      </div>
+      <div class="stat-box hl">
+        <div class="stat-n">0.932</div>
+        <div class="stat-l">F1 (held-out)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">PASS</div>
+        <div class="stat-l">Certified (gate)</div>
+      </div>
+    </div>
+
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ distil online --corpus ./mycorpus --promote-to ./weights/keep_model.json</span>
+self-distilling round — keep-model learns from causal labels, gated by non-inferiority
+
+  n_labels: 286
+  accuracy: 0.873
+  f1: 0.932
+  certified: True
+  promoted: True</pre>
+
+    <p>If the gate fails (a regression anywhere in the corpus), promotion is blocked and the output will show <code>certified: False</code> and <code>promoted: False</code> with a message that the candidate failed the non-inferiority gate.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Corpus directory of traffic to learn from. Use <code>distil ingest</code> to convert real logs first.</td></tr>
+        <tr><td><code>--promote-to</code></td><td>off (dry run)</td><td>If certified, persist the new weights as a <code>LogisticKeepModel</code>-compatible JSON file at this path.</td></tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <!-- Feature 3: Verifiable federated telemetry -->
+    <h2 id="federated">Verifiable federated telemetry</h2>
+    <p><strong>Module:</strong> <code>distil/telemetry.py</code> &middot; <strong>Command:</strong> <code>distil federated-leaderboard --dir &lt;dir&gt; [--keys &lt;keys.json&gt; --html &lt;out.html&gt;]</code></p>
+
+    <p>Each opt-in instance contributes a <strong>signed, content-free</strong> savings aggregate with its certification verdict attached. The leaderboard aggregates only verified submissions — every number on the board is tamper-evident. No prompt text, no response content, no tool outputs ever leave the machine: only (instance_id, tokens_saved, dollars_saved, runs, certified, timestamp).</p>
+
+    <h3>How signing works</h3>
+    <p>Signing uses <strong>HMAC-SHA256</strong> (symmetric: both sides share a per-instance key). The canonical form of the aggregate is <code>json.dumps(fields, sort_keys=True, separators=(',', ':'))</code> — deterministic across Python versions and dict orderings. Verification uses <code>hmac.compare_digest</code> for constant-time comparison.</p>
+
+    <div class="callout">
+      <b>ed25519 is the documented upgrade.</b> The module docstring in <code>distil/telemetry.py</code> documents the natural upgrade: if you want a leaderboard anyone can verify without sharing keys, swap HMAC-SHA256 for ed25519. The instance keeps the signing key, publishes the verify key, and the aggregator uses the public key only. The swap is a drop-in change at the <code>sign</code>/<code>verify</code> boundary — nothing else in the module changes.
+    </div>
+
+    <h3>Leaderboard rules</h3>
+    <ul>
+      <li>Submissions whose <code>instance_id</code> has no entry in the keys map are <strong>rejected</strong>.</li>
+      <li>Submissions whose signature does not verify are <strong>rejected</strong>.</li>
+      <li>For each instance, the latest (highest timestamp) verified submission wins.</li>
+      <li><strong>Only certified submissions</strong> (where <code>certified == True</code>) contribute to headline totals. Uncertified instances are shown but their numbers do not roll into the aggregate.</li>
+    </ul>
+
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ distil federated-leaderboard \
+    --dir ./submissions \
+    --keys ./instance-keys.json \
+    --html ./leaderboard.html</span>
+verifiable savings — 3 verified instance(s), 0 rejected
+
+  totals (certified only): {'tokens_saved': 142816, 'dollars_saved': 0.071408, 'runs': 47, 'instances': 3}</pre>
+
+    <p>The <code>--html</code> flag writes a self-contained dark HTML page (the same style as the gateway dashboard) showing per-instance verified savings. The page is served inline — no CDN, no external assets.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">Content-free</div>
+        <h3>Zero prompt leakage</h3>
+        <p>The <code>SavingsAggregate</code> dataclass contains only numeric fields. No text from your prompts, tool results, or model responses is ever included in a submission.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Tamper-evident</div>
+        <h3>Savings you can verify</h3>
+        <p>Every number on the leaderboard was produced by a verified submission. Tampered or unsigned entries are counted in <code>rejected</code> and excluded from totals.</p>
+      </div>
+    </div>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--dir</code></td><td>required</td><td>Directory containing <code>submissions.jsonl</code> (one signed aggregate per line)</td></tr>
+        <tr><td><code>--keys</code></td><td>off</td><td>Path to a JSON file mapping <code>instance_id</code> &rarr; HMAC key. Submissions with no matching key are rejected.</td></tr>
+        <tr><td><code>--html</code></td><td>off</td><td>Write a self-contained leaderboard HTML page to this path</td></tr>
+      </tbody>
+    </table>
+
+    <div class="site-footer">
+      Distil &middot; compression with a quality contract &middot; Apache-2.0 &middot; <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+<script src="site.js" defer></script>
+</body>
+</html>

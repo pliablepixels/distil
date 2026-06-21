@@ -42,6 +42,7 @@
     <a href="concepts.html">Concepts</a>
     <a href="techniques.html">Techniques</a>
     <a href="architecture.html">Architecture</a>
+    <a href="research.html">Research &amp; Frontier</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -277,6 +278,89 @@ distil gateway listening on http://127.0.0.1:8789
 
     <div class="callout">
       <b>All other paths pass through unchanged.</b> The gateway adds management endpoints at <code>/distil/*</code> and compresses <code>POST /v1/messages</code>-family paths. Every other path and HTTP method is forwarded to the upstream transparently, with the same hop-by-hop header stripping and SSRF protection as the basic proxy.
+    </div>
+
+    <hr/>
+
+    <h2 id="async-proxy">Async high-concurrency proxy</h2>
+
+    <p><strong>Module:</strong> <code>distil/aproxy.py</code> &middot; <strong>Flag:</strong> <code>distil proxy --async</code> &middot; <strong>Extra:</strong> <code>pip install 'distil-llm[async]'</code></p>
+
+    <p>The threaded proxy (<code>distil/proxy.py</code>) handles the common case. Under high fan-out — thousands of concurrent streaming sessions — the GIL becomes a bottleneck. The async proxy replaces the threaded HTTP server with an <strong>aiohttp</strong> event loop and a single shared <code>ClientSession</code> with an unlimited connector, sustaining far more concurrent streams at the same compression behavior.</p>
+
+    <div class="callout">
+      <b>Same compression, async I/O.</b> <code>distil/aproxy.py</code> calls the same <code>compress_messages()</code> path as the threaded proxy. Every Tier-0/1 transform, the hop-by-hop header stripping, the SSRF protection, and the <code>x-distil-compressed</code> / <code>x-distil-tokens-saved</code> response headers are identical. The only difference is the concurrency model.
+    </div>
+
+    <h3>Starting the async proxy</h3>
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d"># Install the async extra first</span>
+<span class="d">$ pip install 'distil-llm[async]'</span>
+
+<span class="d"># Start the async proxy (same flags as the threaded proxy)</span>
+<span class="d">$ distil proxy --async --port 8788 --upstream https://api.anthropic.com</span>
+distil async proxy listening on http://127.0.0.1:8788
+  &#8594; upstream: https://api.anthropic.com</pre>
+
+    <p>All other <code>distil proxy</code> flags (<code>--host</code>, <code>--upstream</code>, <code>--lossless-only</code>, <code>--shape-output</code>) work identically with <code>--async</code>. Client configuration is unchanged — point your SDK at the same <code>base_url</code>.</p>
+
+    <h3>Architecture</h3>
+    <p><code>make_app()</code> in <code>distil/aproxy.py</code> builds an <code>aiohttp.web.Application</code> with a single shared <code>ClientSession</code> (created in <code>on_startup</code>, closed in <code>on_cleanup</code>) using <code>TCPConnector(limit=0)</code> — unlimited concurrent connections. Compressible paths (<code>/v1/messages</code>, <code>/v1/chat/completions</code>, <code>/v1/responses</code>) go through the compression handler; everything else is transparent passthrough. aiohttp is lazy-imported so the stdlib core of distil remains dependency-free when the async extra is not installed.</p>
+
+    <hr/>
+
+    <h2 id="rust-core">Native Rust core</h2>
+
+    <p><strong>Crate:</strong> <code>rust/distil-core</code> &middot; <strong>Module:</strong> <code>distil/native.py</code> &middot; <strong>Build:</strong> <code>maturin develop --release</code></p>
+
+    <p>The hot-path Tier-0 transforms and heuristic tokenizer are implemented as a PyO3 Rust crate. When the wheel is built and installed, <code>distil.native</code> transparently uses the fast native implementations and sets <code>BACKEND = "rust"</code>. When the crate is absent (source-only install, CI without Rust), <code>distil.native</code> falls back to the pure-Python implementations from <code>distil.compress.tier0</code> and <code>distil.tokenizer</code> with no import error — <code>BACKEND = "python"</code>. All callers get the same API either way.</p>
+
+    <h3>Functions</h3>
+    <table>
+      <thead><tr><th>Python name</th><th>Description</th><th>Rust signature</th></tr></thead>
+      <tbody>
+        <tr><td><code>minify_json(text)</code></td><td>Parse + re-emit JSON without whitespace; returns <code>None</code> for non-JSON</td><td><code>minify_json(&amp;str) -&gt; Option&lt;String&gt;</code></td></tr>
+        <tr><td><code>collapse_runs(text)</code></td><td>RLE-encode consecutive identical lines</td><td><code>collapse_runs(&amp;str) -&gt; String</code></td></tr>
+        <tr><td><code>count_tokens(text, subword_factor=1.33)</code></td><td>Heuristic token count (<code>\w+|[^\w\s]</code> &times; factor)</td><td><code>count_tokens(&amp;str, f64) -&gt; usize</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="stat-row">
+      <div class="stat-box hl">
+        <div class="stat-n">2.5&thinsp;&micro;s</div>
+        <div class="stat-l">collapse_runs — 30 KB input</div>
+      </div>
+      <div class="stat-box hl">
+        <div class="stat-n">20.2&thinsp;&micro;s</div>
+        <div class="stat-l">count_tokens — 30 KB input</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">26</div>
+        <div class="stat-l">Cargo unit tests passing</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">8</div>
+        <div class="stat-l">Python parity tests passing</div>
+      </div>
+    </div>
+
+    <p>Benchmarks measured on Apple M-series (aarch64-apple-darwin, <code>--release</code>), 100 samples each, on a ~30 KB synthetic log with repeated lines, prose, and JSON snippets. <code>collapse_runs</code> achieves ~12 GB/s throughput. <code>count_tokens</code> is dominated by Unicode character-class scanning.</p>
+
+    <h3>Build and install</h3>
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d"># One-time: install maturin</span>
+<span class="d">$ uv tool install maturin</span>
+
+<span class="d"># Build and install the Rust extension into the project virtualenv</span>
+<span class="d">$ cd rust/distil-core</span>
+<span class="d">$ maturin develop --release</span>
+
+<span class="d"># Verify the Rust backend loaded</span>
+<span class="d">$ python3 -c "import distil.native as n; print(n.BACKEND)"</span>
+rust</pre>
+
+    <p>Run the Rust unit tests with <code>cargo test</code> from <code>rust/distil-core</code> (26 passed; 0 failed). Run the Python parity tests with <code>uv run python -m pytest tests/test_native.py -v</code> (8 passed). Both test suites pass in pure-Python fallback mode too.</p>
+
+    <div class="callout good">
+      <b>Pure-Python parity guaranteed.</b> <code>distil/native.py</code> wraps both backends behind a single API. If the Rust wheel is not installed, every function falls back to the pure-Python equivalent — same semantics, no import error. The core always works; it is transparently accelerated when built with maturin.
     </div>
 
     <hr/>

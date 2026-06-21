@@ -39,6 +39,7 @@
     <a href="concepts.html">Concepts</a>
     <a href="techniques.html">Techniques</a>
     <a href="architecture.html">Architecture</a>
+    <a href="research.html">Research &amp; Frontier</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html" class="active">CLI Reference</a>
@@ -303,7 +304,7 @@ by trajectory:
 
     <p>The proxy is currently available as a Python module (<code>python -m distil.proxy</code>). A CLI subcommand wrapping the same server is being added.</p>
 
-    <h3>Flags (module / upcoming CLI)</h3>
+    <h3>Flags</h3>
     <table>
       <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
@@ -311,6 +312,7 @@ by trajectory:
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions)</td></tr>
         <tr><td><code>--shape-output</code></td><td>off</td><td>Enable generation-side verbosity shaping: <code>light</code> (conservative) or <code>aggressive</code>. Injects a gated <code>role:"system"</code> directive before the request. PAYG-only — blocked on subscription keys.</td></tr>
+        <tr><td><code>--async</code></td><td>off</td><td>Use the async aiohttp backend (<code>distil/aproxy.py</code>) for high-concurrency streaming. Requires <code>pip install 'distil-llm[async]'</code>. Same compression behavior; async event loop handles thousands of concurrent sessions.</td></tr>
       </tbody>
     </table>
 
@@ -489,6 +491,91 @@ Load with: TransformerKeepModel.from_pretrained('./my-keep-model/model.onnx', '.
     </ul>
 
     <p>A demo checkpoint trained on the bundled corpus (96.3% acc / 0.98 F1) is attached to the <a href="https://github.com/dshakes/distil/releases/tag/v0.1.0">v0.1.0 release</a>. See <a href="techniques.html#keep-model">Techniques → Keep-model codec</a> for the full design.</p>
+
+    <hr/>
+
+    <!-- eval -->
+    <h2 id="eval">distil eval</h2>
+    <p>The <strong>certified compression frontier</strong> — the proof artifact no competitor publishes. Sweeps compression aggressiveness levels, measures (token savings, decision-equivalence) per level over the corpus, and marks which are certified by the non-inferiority gate. Locates the cliff past which lossy compression starts dropping agent decisions, with distil sitting safely inside the certified region.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Custom corpus dir (e.g. from <code>distil ingest</code> on benchmark traces)</td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline, structural equivalence) or <code>anthropic</code> (live model, requires API key)</td></tr>
+        <tr><td><code>--out</code></td><td>off</td><td>Write the raw curve as a timestamped JSONL file to this directory</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil eval</span>
+certified compression frontier  (runner=deterministic)
+
+level                   savings   equiv  certified  curve
+--------------------------------------------------------------------------
+distil (cache-aware)       8.4%    100%    <span class="g">&#10004; PASS</span>   &#9608;&#9608;
+truncate@1200              7.2%     79%       <span class="w">&#10008; &#8212;</span>    &#9608;&#9608;
+truncate@700              20.0%     36%       <span class="w">&#10008; &#8212;</span>    &#9608;&#9608;&#9608;&#9608;
+truncate@300              41.3%      0%       <span class="w">&#10008; &#8212;</span>    &#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;
+--------------------------------------------------------------------------
+
+distil: 8.4% savings @ 100% decision-equivalence — certified.
+certified ceiling: 8.4% savings (beyond this, lossy compression drops decisions and the gate rejects it).</pre>
+
+    <p>See <a href="research.html#frontier">Research &amp; Frontier &rarr; Certified compression frontier</a> for the full design.</p>
+
+    <hr/>
+
+    <!-- online -->
+    <h2 id="online">distil online</h2>
+    <p>One <strong>self-distilling round</strong>: collects causal labels from your corpus (certified-safe drops discovered by the ablation engine), retrains the logistic keep-model, and promotes the new weights only if they pass the non-inferiority gate on every trajectory. Never-regressing by construction — a cycle that would degrade quality is silently discarded.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Corpus dir of traffic to learn from. Use <code>distil ingest</code> to convert real logs first.</td></tr>
+        <tr><td><code>--promote-to</code></td><td>off (dry run)</td><td>If certified, write the new weights as a <code>LogisticKeepModel</code>-compatible JSON file to this path.</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil online --corpus ./mycorpus --promote-to ./weights/keep_model.json</span>
+self-distilling round — keep-model learns from causal labels, gated by non-inferiority
+
+  n_labels: 286
+  accuracy: 0.873
+  f1: 0.932
+  certified: True
+  promoted: True</pre>
+
+    <p>See <a href="research.html#online">Research &amp; Frontier &rarr; Self-distilling keep-model</a> for the full loop design.</p>
+
+    <hr/>
+
+    <!-- federated-leaderboard -->
+    <h2 id="federated-leaderboard">distil federated-leaderboard</h2>
+    <p>Build a <strong>verifiable federated savings leaderboard</strong> from HMAC-signed, content-free savings aggregates. Verifies each submission's signature and counts only certified savings toward headline totals — savings you can verify. No prompt or response text ever leaves the contributing instance.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--dir</code></td><td>required</td><td>Directory containing <code>submissions.jsonl</code> (one signed aggregate per line)</td></tr>
+        <tr><td><code>--keys</code></td><td>off</td><td>Path to a JSON file mapping <code>instance_id</code> &rarr; HMAC key. Submissions with no matching key are rejected.</td></tr>
+        <tr><td><code>--html</code></td><td>off</td><td>Write a self-contained leaderboard HTML page to this path</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil federated-leaderboard \
+    --dir ./submissions \
+    --keys ./instance-keys.json \
+    --html ./leaderboard.html</span>
+verifiable savings — 3 verified instance(s), 0 rejected
+
+  totals (certified only): {'tokens_saved': 142816, 'dollars_saved': 0.071408, 'runs': 47, 'instances': 3}
+  leaderboard html &#8594; ./leaderboard.html</pre>
+
+    <p>See <a href="research.html#federated">Research &amp; Frontier &rarr; Verifiable federated telemetry</a> for the signing model and ed25519 upgrade path.</p>
 
     <hr/>
 
