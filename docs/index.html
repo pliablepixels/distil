@@ -75,6 +75,32 @@
   footer{padding:48px 0 70px;color:var(--dim);font-size:13px;border-top:1px solid var(--line)}
   .muted{color:var(--dim)}
   @media(max-width:840px){.stats{grid-template-columns:1fr 1fr}.grid2,.tiers{grid-template-columns:1fr}}
+
+  /* ── world-class cohesion pass (matches the docs design system) ── */
+  :root{--ink:#f2f3f7;--mut:#9aa1b3;--line:#1b2030;--line2:#252c3e;
+    --shadow:0 18px 50px -28px rgba(0,0,0,.8);--shadow2:0 24px 60px -24px rgba(139,123,255,.28)}
+  body{position:relative;background:
+    radial-gradient(1100px 560px at 82% -8%,#19143a 0%,transparent 58%),
+    radial-gradient(900px 500px at 0% 100%,#0c1830 0%,transparent 55%),var(--bg);
+    text-rendering:optimizeLegibility}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:radial-gradient(circle,rgba(255,255,255,.022) 1px,transparent 1.4px);
+    background-size:26px 26px;mask-image:radial-gradient(1400px 900px at 70% 0%,#000 35%,transparent 85%)}
+  .wrap{position:relative;z-index:1}
+  ::selection{background:rgba(139,123,255,.32);color:#fff}
+  *{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+  *::-webkit-scrollbar{width:10px;height:10px}
+  *::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+  nav{background:rgba(6,7,11,.72);backdrop-filter:blur(14px) saturate(140%)}
+  nav::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(139,123,255,.45),rgba(90,209,201,.45),transparent)}
+  .stat,.card,.tier{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;box-shadow:var(--shadow)}
+  .stat:hover,.card:hover,.tier:hover{transform:translateY(-3px);border-color:#2f3a5a;box-shadow:var(--shadow),var(--shadow2)}
+  .btn{transition:transform .15s ease,box-shadow .15s ease}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.primary:hover{box-shadow:0 12px 36px -12px rgba(139,123,255,.6)}
+  pre{box-shadow:var(--shadow)}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
