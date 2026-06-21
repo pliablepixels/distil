@@ -1,0 +1,209 @@
+{
+  "id": "sre-disk-incident",
+  "model": "claude-opus-4-8",
+  "_note": "A 4-turn headless SRE agent loop. Stable system+tools prefix (cacheable), growing history, and a verbose volatile tool output each turn that carries one decision-driving line buried in noise. DECISION: markers are what the offline DeterministicRunner keys on, so ablation/certification have ground truth.",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous SRE incident-response agent operating headless on call.\nYou triage alerts, inspect telemetry, and remediate within policy without a human in the loop.\nOperating policy: prefer the least-disruptive remediation that resolves the alert.\nDECISION: for disk-pressure alerts, follow runbook RB-7 before any restart"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- get_metrics(service, window): returns time-series for cpu/mem/disk/io as JSON.\n- get_logs(service, grep, lines): returns recent matching log lines.\n- describe_pod(namespace, pod): returns pod status, events, and resource limits.\n- exec_runbook(id, target): executes a named runbook step against a target host.\n- restart_service(service, strategy): rolling|recreate; disruptive, requires policy check.\n- page_human(severity, summary): escalate to the on-call human.\n- annotate_incident(id, note): append an audit note to the incident timeline.\n- scale_deployment(deployment, replicas): horizontal scale; capacity changes only.\nDECISION: tool exec_runbook is available for RB-7"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "get_metrics(\"checkout\", \"15m\") -> {\"series\":[{\"metric\":\"disk.used.pct\",\"host\":\"checkout-7f9\",\"points\":[88.1,89.0,90.4,91.7,92.9,93.6,94.2,95.0]}], \"unit\":\"percent\", \"resolution\":\"60s\", \"source\":\"prometheus\", \"scrape_ok\":true}\nfetched 8 points across 1 series in 42ms; cache=miss; tenant=acme; region=us-east-1\nwarn: 3 series dropped by relabel config (irrelevant: node_filesystem_readonly)\ninfo: disk.used.pct trending up monotonically over the last 8 minutes\ninfo: inode usage at 41%, well below threshold\nDECISION: disk-pressure confirmed on checkout-7f9, breach of 90% threshold\ninfo: no correlated cpu or memory anomaly detected in the same window\ninfo: last deploy for checkout was 6 days ago, unlikely cause\ninfo: prometheus scrape latency nominal at 42ms\ndebug: query_hash=9af3 cardinality=1 evaluated_at=2026-06-21T09:14:02Z\ndebug: relabel rules applied: keep job=node, drop fstype=tmpfs"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.71): 'Capacity Planning Quarterly Review Q1' — This document summarizes forecasted growth across the fleet. Checkout traffic is expected to grow 12% QoQ. Historical disk consumption has been linear with order volume. The finance team requested a cost breakdown by namespace. See appendix C for the amortization schedule and appendix D for the reserved-instance commitments. None of this is required to resolve an active alert; it was pulled by a broad semantic retrieval and never cited.\nadditional boilerplate: distribution list, change log, reviewers, and sign-off table omitted for brevity but present in source."
+        },
+        {
+          "id": "user-0",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "ALERT fired: DiskPressureHigh on service=checkout. Investigate and remediate per policy."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous SRE incident-response agent operating headless on call.\nYou triage alerts, inspect telemetry, and remediate within policy without a human in the loop.\nOperating policy: prefer the least-disruptive remediation that resolves the alert.\nDECISION: for disk-pressure alerts, follow runbook RB-7 before any restart"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- get_metrics(service, window): returns time-series for cpu/mem/disk/io as JSON.\n- get_logs(service, grep, lines): returns recent matching log lines.\n- describe_pod(namespace, pod): returns pod status, events, and resource limits.\n- exec_runbook(id, target): executes a named runbook step against a target host.\n- restart_service(service, strategy): rolling|recreate; disruptive, requires policy check.\n- page_human(severity, summary): escalate to the on-call human.\n- annotate_incident(id, note): append an audit note to the incident timeline.\n- scale_deployment(deployment, replicas): horizontal scale; capacity changes only.\nDECISION: tool exec_runbook is available for RB-7"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Pulled checkout disk metrics; confirmed disk-pressure breach on checkout-7f9 at 95%. No cpu/mem correlation. Next: consult RB-7."
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "exec_runbook(\"RB-7\", \"checkout-7f9\") -> {\"runbook\":\"RB-7\",\"title\":\"Disk pressure triage\",\"steps_evaluated\":6,\"host\":\"checkout-7f9\",\"status\":\"completed\",\"elapsed_ms\":1180,\"audit_id\":\"rb7-22c1\"}\nstep 1/6: check for runaway log growth -> /var/log/checkout/*.log = 41GB (anomalous)\nstep 2/6: check core dumps -> none found\nstep 3/6: check orphaned tmp files -> 0.2GB, negligible\nDECISION: RB-7 identifies log growth as root cause, safe remediation is log rotation\nstep 4/6: verify logrotate config present -> yes, but cron disabled on this host\nstep 5/6: estimate reclaim -> ~39GB recoverable, would drop disk to 41%\nstep 6/6: confirm no open file handles block rotation -> clear\ninfo: remediation does not require a service restart\ndebug: runbook engine v2.3, dry_run=false, approver=policy-engine"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.68): 'Onboarding guide: how to add a new microservice to the mesh' — covers sidecar injection, mTLS bootstrap, and dashboard templating. Entirely unrelated to the active disk incident; surfaced by keyword overlap on 'service'. Includes a 9-step checklist and three screenshots described in alt-text, none cited by the agent."
+        },
+        {
+          "id": "user-1",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Continue remediation. Stay within policy."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous SRE incident-response agent operating headless on call.\nYou triage alerts, inspect telemetry, and remediate within policy without a human in the loop.\nOperating policy: prefer the least-disruptive remediation that resolves the alert.\nDECISION: for disk-pressure alerts, follow runbook RB-7 before any restart"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- get_metrics(service, window): returns time-series for cpu/mem/disk/io as JSON.\n- get_logs(service, grep, lines): returns recent matching log lines.\n- describe_pod(namespace, pod): returns pod status, events, and resource limits.\n- exec_runbook(id, target): executes a named runbook step against a target host.\n- restart_service(service, strategy): rolling|recreate; disruptive, requires policy check.\n- page_human(severity, summary): escalate to the on-call human.\n- annotate_incident(id, note): append an audit note to the incident timeline.\n- scale_deployment(deployment, replicas): horizontal scale; capacity changes only.\nDECISION: tool exec_runbook is available for RB-7"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Pulled checkout disk metrics; confirmed disk-pressure breach on checkout-7f9 at 95%. No cpu/mem correlation. Next: consult RB-7."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Ran RB-7; root cause is 41GB of unrotated logs, logrotate cron disabled. Safe fix is rotation, ~39GB reclaim, no restart needed."
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "exec_runbook(\"RB-7.rotate\", \"checkout-7f9\") -> {\"action\":\"logrotate --force\",\"host\":\"checkout-7f9\",\"reclaimed_gb\":39.2,\"disk_used_pct_after\":41.3,\"status\":\"ok\",\"duration_ms\":3400,\"audit_id\":\"rb7-22c1-rot\"}\npost-check: disk.used.pct = 41.3 (was 95.0), threshold 90, healthy margin restored\npost-check: logrotate cron re-enabled and verified on next-tick\npost-check: no service interruption observed, request error rate flat at 0.01%\nDECISION: remediation successful, disk pressure resolved without restart, close incident\ninfo: incident duration 14 minutes from alert to resolution\ninfo: follow-up ticket suggested to investigate why cron was disabled\ndebug: emitting trace span incident.resolve tenant=acme run=run-7731"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.66): 'Postmortem template and blameless culture handbook' — a long-form guide on writing incident retrospectives, including tone guidelines, the five-whys method, and a sample timeline table. Useful eventually, irrelevant to the live remediation step; never cited by the agent this turn."
+        },
+        {
+          "id": "user-2",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Confirm resolution and close out per policy."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous SRE incident-response agent operating headless on call.\nYou triage alerts, inspect telemetry, and remediate within policy without a human in the loop.\nOperating policy: prefer the least-disruptive remediation that resolves the alert.\nDECISION: for disk-pressure alerts, follow runbook RB-7 before any restart"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- get_metrics(service, window): returns time-series for cpu/mem/disk/io as JSON.\n- get_logs(service, grep, lines): returns recent matching log lines.\n- describe_pod(namespace, pod): returns pod status, events, and resource limits.\n- exec_runbook(id, target): executes a named runbook step against a target host.\n- restart_service(service, strategy): rolling|recreate; disruptive, requires policy check.\n- page_human(severity, summary): escalate to the on-call human.\n- annotate_incident(id, note): append an audit note to the incident timeline.\n- scale_deployment(deployment, replicas): horizontal scale; capacity changes only.\nDECISION: tool exec_runbook is available for RB-7"
+        },
+        {
+          "id": "hist-0",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 0 summary] Pulled checkout disk metrics; confirmed disk-pressure breach on checkout-7f9 at 95%. No cpu/mem correlation. Next: consult RB-7."
+        },
+        {
+          "id": "hist-1",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 1 summary] Ran RB-7; root cause is 41GB of unrotated logs, logrotate cron disabled. Safe fix is rotation, ~39GB reclaim, no restart needed."
+        },
+        {
+          "id": "hist-2",
+          "kind": "history",
+          "stability": "settling",
+          "decision_relevant": false,
+          "text": "[turn 2 summary] Rotated logs, reclaimed 39.2GB, disk back to 41.3%, no restart, no interruption. Incident resolved in 14 minutes."
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "annotate_incident(\"inc-5521\", \"...\") -> {\"incident\":\"inc-5521\",\"state\":\"resolved\",\"timeline_entries\":7,\"audit_complete\":true,\"signed_by\":\"policy-engine\",\"closed_at\":\"2026-06-21T09:28:40Z\"}\naudit: all remediation steps recorded with approver and reclaim figures\naudit: no policy exceptions were taken during this incident\naudit: SLA impact none; error budget unaffected\nDECISION: incident inc-5521 closed clean, no human escalation required\ninfo: a follow-up ticket FUP-118 was filed for the disabled logrotate cron\ninfo: notifying stakeholders via the incident channel\ndebug: final span flushed, run=run-7731 status=success"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (speculative context, similarity=0.64): 'Glossary of internal acronyms' — an alphabetical list of 200+ team and system acronyms maintained by the platform org. Pulled because the incident text contained abbreviations; the agent resolved them from context and never consulted this list."
+        },
+        {
+          "id": "user-3",
+          "kind": "user",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "Wrap up and file any follow-ups."
+        }
+      ]
+    }
+  ]
+}

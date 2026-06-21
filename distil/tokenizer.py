@@ -1,0 +1,85 @@
+"""Token counting — pluggable.
+
+The default is an offline heuristic so the whole system runs with zero
+dependencies and no API key. Production should swap in the provider's real
+tokenizer (Anthropic's `count_tokens` endpoint, or a local BPE) via the
+`Tokenizer` protocol.
+
+Honesty note: compression *ratios* are robust to the estimator (they cancel),
+but absolute dollar figures depend on it. Treat the offline numbers as
+directionally correct, not billing-grade, until a real tokenizer is wired in.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Protocol, runtime_checkable
+
+# Word-ish + punctuation segmentation. BPE tends to split long/rare words into
+# multiple sub-word units, so we inflate the raw piece count by a factor that
+# lands within ~10-15% of cl100k/Claude tokenizers on mixed code+prose.
+_PIECE = re.compile(r"\w+|[^\w\s]", re.UNICODE)
+
+
+@runtime_checkable
+class Tokenizer(Protocol):
+    def count(self, text: str) -> int: ...
+
+
+class HeuristicTokenizer:
+    def __init__(self, subword_factor: float = 1.33) -> None:
+        self.subword_factor = subword_factor
+
+    def count(self, text: str) -> int:
+        if not text:
+            return 0
+        pieces = _PIECE.findall(text)
+        return max(1, round(len(pieces) * self.subword_factor))
+
+
+class AnthropicTokenizer:
+    """Billing-grade Claude token counts via the Messages count_tokens endpoint.
+
+    This is the *correct* tokenizer for Claude — tiktoken (OpenAI's BPE)
+    undercounts Claude by ~15-20%, more on code. Requires the `anthropic` SDK
+    and credentials (one network call per unique string). Counts are
+    model-specific, so the model id must match what you price/run against.
+    Results are memoized.
+    """
+
+    def __init__(self, model: str = "claude-opus-4-8", client: object | None = None) -> None:
+        self.model = model
+        self._client = client
+        self._cache: dict[str, int] = {}
+
+    def _ensure_client(self) -> object:
+        if self._client is None:
+            from anthropic import Anthropic  # lazy: keep the core dependency-free
+
+            self._client = Anthropic()
+        return self._client
+
+    def count(self, text: str) -> int:
+        if not text:
+            return 0
+        if text in self._cache:
+            return self._cache[text]
+        client = self._ensure_client()
+        resp = client.messages.count_tokens(  # type: ignore[attr-defined]
+            model=self.model,
+            messages=[{"role": "user", "content": text}],
+        )
+        self._cache[text] = resp.input_tokens
+        return resp.input_tokens
+
+
+DEFAULT: Tokenizer = HeuristicTokenizer()
+
+
+def resolve(name: str = "heuristic", *, model: str = "claude-opus-4-8") -> Tokenizer:
+    """Factory: 'heuristic' (offline, default) or 'anthropic' (billing-grade)."""
+    if name == "heuristic":
+        return HeuristicTokenizer()
+    if name == "anthropic":
+        return AnthropicTokenizer(model=model)
+    raise ValueError(f"unknown tokenizer {name!r}; choose 'heuristic' or 'anthropic'")

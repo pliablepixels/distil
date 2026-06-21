@@ -1,0 +1,26 @@
+[project]
+name = "distil"
+version = "0.1.0"
+description = "Distil — compression with a quality contract. Cache-aware, causally-pruned context compression for agentic runtimes, with a statistical non-inferiority gate. Same potency, less volume."
+requires-python = ">=3.11"
+dependencies = []  # core is stdlib-only by design: it must run anywhere, day one.
+
+[project.optional-dependencies]
+# Production hardening swaps these in; the core does not require them.
+#   - live: billing-grade tokenizer (count_tokens) + live AgentRunner, via the Anthropic SDK
+dev = ["pytest>=8"]
+live = ["anthropic>=0.40"]
+
+[project.scripts]
+distil = "distil.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["distil"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
