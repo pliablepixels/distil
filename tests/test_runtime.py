@@ -1,0 +1,100 @@
+"""Genuine runtime savings — unit + a real end-to-end proxy→ledger test (no mocks)."""
+
+from __future__ import annotations
+
+import json
+import threading
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from distil import ledger
+from distil.proxy import build_handler
+from distil.runtime import RuntimeSavings
+
+
+def test_record_and_flush_to_ledger(tmp_path):
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(1000, 700)
+    rs.record(500, 400)
+    assert rs.tokens_saved == 400
+    assert rs.dollars_saved > 0
+    assert rs.flush() is True
+    s = ledger.summary(led)
+    assert s.total_tokens_saved == 400
+    assert s.by_trajectory.get("live-proxy", 0.0) > 0
+    assert rs.flush() is False  # counters reset after flush
+
+
+def test_accepts_str_ledger_path(tmp_path):
+    led = str(tmp_path / "savings.jsonl")  # a str, not a Path
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(900, 600)
+    assert rs.flush() is True  # would crash on `.parent` if not coerced
+    assert ledger.summary(tmp_path / "savings.jsonl").total_tokens_saved == 300
+
+
+def _start_echo_upstream() -> ThreadingHTTPServer:
+    class Echo(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            n = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(n)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):  # noqa: ANN002
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Echo)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def test_proxy_records_genuine_savings_e2e(tmp_path):
+    upstream = _start_echo_upstream()
+    up_url = f"http://127.0.0.1:{upstream.server_address[1]}"
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    handler = build_handler(up_url, savings=rs, flush_every=1)
+    proxy = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=proxy.serve_forever, daemon=True).start()
+    try:
+        long = "DECISION: keep\n" + "\n".join(f"verbose log line {i}" for i in range(20))
+        payload = json.dumps(
+            {
+                "model": "claude-opus-4-8",
+                "messages": [
+                    {"role": "user", "content": "investigate"},
+                    {"role": "user", "content": [{"type": "tool_result", "content": long}]},
+                ],
+            }
+        ).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{proxy.server_address[1]}/v1/messages",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            assert resp.status == 200
+            assert int(resp.headers.get("x-distil-tokens-saved", "0")) > 0
+        # genuine savings persisted to the ledger (flush_every=1)
+        s = ledger.summary(led)
+        assert s.by_trajectory.get("live-proxy", 0.0) > 0
+        assert s.total_tokens_saved > 0
+    finally:
+        proxy.shutdown()
+        upstream.shutdown()
+
+
+def test_render_html_uses_real_ledger_numbers(tmp_path):
+    led = tmp_path / "s.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(2000, 1200)
+    rs.flush()
+    html = ledger.render_html(ledger.summary(led))
+    assert "savings" in html.lower()
+    assert "live-proxy" in html  # the real source label, not dummy data

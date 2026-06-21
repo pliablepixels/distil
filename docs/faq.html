@@ -175,9 +175,9 @@ distil bench   --tokenizer anthropic</pre>
     <p>By design, savings are <strong>local-first and privacy-preserving</strong> — Distil never sends your prompts or responses anywhere. There are three views:</p>
 
     <ul>
-      <li><code>distil leaderboard</code> — your own cumulative savings across runs (from the local ledger).</li>
+      <li><code>distil leaderboard</code> — your own genuine cumulative savings. <code>distil proxy</code> records real per-request token savings from live traffic into the ledger (the <code>live-proxy</code> source), so this reflects actual usage, not a benchmark.</li>
       <li><code>distil federated-leaderboard --dir ./submissions --keys keys.json --html out.html</code> — a verifiable, multi-instance leaderboard built from <strong>HMAC-signed, content-free</strong> aggregates (numbers + the certification verdict only). Savings you can verify, not just claim.</li>
-      <li>A <a href="leaderboard.html">sample leaderboard page</a> showing what it looks like.</li>
+      <li><code>distil leaderboard --html your-savings.html</code> — render <strong>your real ledger</strong> as a self-contained page (genuine numbers from your usage, including the <code>live-proxy</code> source from real traffic — no dummy data).</li>
     </ul>
 
     <p>There is <strong>no hosted public dashboard</strong> harvesting your data — opt-in federation means you control submission and verification (ed25519 public-key signing is the documented upgrade for share-the-key-free verification).</p>

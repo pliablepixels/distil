@@ -118,17 +118,28 @@ def cmd_savings(args: argparse.Namespace) -> int:
 
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     s = ledger.summary()
+    if args.html:
+        Path(args.html).write_text(ledger.render_html(s))
+        print(f"your savings page → {args.html}")
+        return 0
     print(f"distil savings ledger — {ledger.DEFAULT_PATH}\n")
     if s.runs == 0:
-        print("no runs recorded yet. run:  distil savings --record")
+        print("no genuine savings recorded yet.")
+        print("run `distil proxy` (records real traffic) or `distil savings --record`.")
         return 0
+    live = s.by_trajectory.get("live-proxy", 0.0)
     print(f"runs recorded:        {s.runs}")
     print(f"total tokens saved:   {s.total_tokens_saved:,}")
     print(f"total dollars saved:  ${s.total_dollars_saved:.5f}")
-    print("\nby trajectory:")
+    if live:
+        print(f"  of which genuine live traffic (live-proxy): ${live:.5f}")
+    print("\nby source:")
     for tid, saved in sorted(s.by_trajectory.items(), key=lambda kv: -kv[1]):
         print(f"  {tid:<28} ${saved:.5f}")
-    print("\n(local-first; community sharing is opt-in and not enabled.)")
+    print(
+        "\n(local-first; export a page with --html, or share verifiably with "
+        "`distil federated-leaderboard`.)"
+    )
     return 0
 
 
@@ -327,16 +338,26 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     """Drop-in provider proxy: point any base_url-honoring client at it."""
     if args.use_async:
         from .aproxy import serve  # high-concurrency (needs distil-llm[async])
+
+        serve(
+            host=args.host,
+            port=args.port,
+            upstream=args.upstream,
+            lossless_only=args.lossless_only,
+            shape_output=args.shape_output,
+        )
     else:
         from .proxy import serve
 
-    serve(
-        host=args.host,
-        port=args.port,
-        upstream=args.upstream,
-        lossless_only=args.lossless_only,
-        shape_output=args.shape_output,
-    )
+        serve(
+            host=args.host,
+            port=args.port,
+            upstream=args.upstream,
+            lossless_only=args.lossless_only,
+            shape_output=args.shape_output,
+            record=not args.no_record,
+            pricing_model=args.pricing,
+        )
     return 0
 
 
@@ -504,7 +525,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.set_defaults(func=cmd_savings)
 
-    lb = sub.add_parser("leaderboard", help="cumulative savings ledger across runs")
+    lb = sub.add_parser("leaderboard", help="your genuine cumulative savings (local ledger)")
+    lb.add_argument("--html", help="render your savings as a self-contained HTML page")
     lb.set_defaults(func=cmd_leaderboard)
 
     pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #4)")
@@ -594,6 +616,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="use_async",
         action="store_true",
         help="async high-concurrency proxy (needs distil-llm[async])",
+    )
+    px.add_argument(
+        "--pricing",
+        default="claude-opus-4-8",
+        choices=sorted(pricing.CATALOG),
+        help="model used to price genuine savings recorded to the ledger",
+    )
+    px.add_argument(
+        "--no-record", action="store_true", help="do not record genuine savings to the local ledger"
     )
     px.set_defaults(func=cmd_proxy)
 

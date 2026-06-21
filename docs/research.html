@@ -188,7 +188,7 @@ self-distilling round — keep-model learns from causal labels, gated by non-inf
 
     <!-- Feature 3: Verifiable federated telemetry -->
     <h2 id="federated">Verifiable federated telemetry</h2>
-    <p><strong>Module:</strong> <code>distil/telemetry.py</code> &middot; <strong>Command:</strong> <code>distil federated-leaderboard --dir &lt;dir&gt; [--keys &lt;keys.json&gt; --html &lt;out.html&gt;]</code> &middot; <strong><a href="leaderboard.html">see a sample leaderboard &rarr;</a></strong></p>
+    <p><strong>Module:</strong> <code>distil/telemetry.py</code> &middot; <strong>Command:</strong> <code>distil federated-leaderboard --dir &lt;dir&gt; [--keys &lt;keys.json&gt; --html &lt;out.html&gt;]</code></p>
 
     <p>Each opt-in instance contributes a <strong>signed, content-free</strong> savings aggregate with its certification verdict attached. The leaderboard aggregates only verified submissions — every number on the board is tamper-evident. No prompt text, no response content, no tool outputs ever leave the machine: only (instance_id, tokens_saved, dollars_saved, runs, certified, timestamp).</p>
 

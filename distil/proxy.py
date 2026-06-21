@@ -56,32 +56,33 @@ _HOP_BY_HOP = frozenset(
 # ---------------------------------------------------------------------------
 
 
+def _count_messages(msgs: list[dict[str, Any]]) -> int:
+    """Heuristic token count of an Anthropic/OpenAI messages list."""
+    total = 0
+    for msg in msgs:
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            total += _tokenizer.count(content)
+        elif isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                for key in ("text", "content"):
+                    val = block.get(key)
+                    if isinstance(val, str):
+                        total += _tokenizer.count(val)
+                    elif isinstance(val, list):
+                        for sub in val:
+                            if isinstance(sub, dict):
+                                sv = sub.get("text", "")
+                                if isinstance(sv, str):
+                                    total += _tokenizer.count(sv)
+    return total
+
+
 def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> int:
     """Rough estimate of tokens saved via the default heuristic tokeniser."""
-
-    def _count(msgs: list[dict[str, Any]]) -> int:
-        total = 0
-        for msg in msgs:
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                total += _tokenizer.count(content)
-            elif isinstance(content, list):
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    for key in ("text", "content"):
-                        val = block.get(key)
-                        if isinstance(val, str):
-                            total += _tokenizer.count(val)
-                        elif isinstance(val, list):
-                            for sub in val:
-                                if isinstance(sub, dict):
-                                    sv = sub.get("text", "")
-                                    if isinstance(sv, str):
-                                        total += _tokenizer.count(sv)
-        return total
-
-    return max(0, _count(before) - _count(after))
+    return max(0, _count_messages(before) - _count_messages(after))
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +91,12 @@ def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> 
 
 
 def build_handler(
-    upstream: str, *, lossless_only: bool = False, shape_output: str = "off"
+    upstream: str,
+    *,
+    lossless_only: bool = False,
+    shape_output: str = "off",
+    savings: Any = None,
+    flush_every: int = 50,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a ``BaseHTTPRequestHandler`` subclass configured for *upstream*.
 
@@ -226,12 +232,19 @@ def build_handler(
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
                 compressed, _store = compress_messages(original, lossless_only=lossless_only)
-                saved = _tokens_saved(original, compressed)
+                before_tok = _count_messages(original)
+                after_tok = _count_messages(compressed)
+                saved = max(0, before_tok - after_tok)
                 body = {**body, "messages": compressed}
                 extras = {
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
                 }
+                # Accumulate GENUINE savings from real traffic into the ledger.
+                if savings is not None:
+                    savings.record(before_tok, after_tok)
+                    if savings.requests >= flush_every:
+                        savings.flush()
                 # Output compression: gated by lossless_only (only on PAYG-style).
                 if shape_output != "off" and not lossless_only:
                     from .output import shape_request
@@ -287,6 +300,8 @@ def serve(
     *,
     lossless_only: bool = False,
     shape_output: str = "off",
+    record: bool = True,
+    pricing_model: str = "claude-opus-4-8",
 ) -> None:
     """Run a blocking :class:`ThreadingHTTPServer` proxy.
 
@@ -299,18 +314,35 @@ def serve(
         When *True* only Tier-0 lossless transforms are applied.
     shape_output:
         Output-compression level: ``"off"``/``"light"``/``"aggressive"``.
+    record:
+        When *True* (default), accumulate GENUINE per-request token savings from
+        real traffic into the local ledger (`distil leaderboard`). Numbers only,
+        never content.
+    pricing_model:
+        Model id used to price the genuine dollar savings.
     """
-    handler = build_handler(upstream, lossless_only=lossless_only, shape_output=shape_output)
+    savings = None
+    if record:
+        from .runtime import RuntimeSavings
+
+        savings = RuntimeSavings(model=pricing_model)
+    handler = build_handler(
+        upstream, lossless_only=lossless_only, shape_output=shape_output, savings=savings
+    )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
     if shape_output != "off":
         print(f"  → output shaping: {shape_output}")
+    if savings is not None:
+        print("  → recording genuine savings → distil leaderboard")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        if savings is not None:
+            savings.flush()  # persist remaining genuine savings on shutdown
         server.server_close()
 
 
