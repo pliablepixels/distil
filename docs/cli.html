@@ -42,6 +42,8 @@
     <a href="architecture.html">Architecture</a>
     <a href="research.html">Research &amp; Frontier</a>
 
+    <a href="benchmark.html">Benchmark</a>
+
     <div class="sidebar-section">Reference</div>
     <a href="cli.html" class="active">CLI Reference</a>
     <a href="adapters.html">Adapters</a>
@@ -554,6 +556,39 @@ distil: 8.4% savings @ 100% decision-equivalence — certified.
 certified ceiling: 8.4% savings (beyond this, lossy compression drops decisions and the gate rejects it).</pre>
 
     <p>See <a href="research.html#frontier">Research &amp; Frontier &rarr; Certified compression frontier</a> for the full design.</p>
+
+    <hr/>
+
+    <!-- benchmark -->
+    <h2 id="benchmark">distil benchmark</h2>
+    <p>Head-to-head <strong>against the competing technique families</strong> — sliding-window truncation, extractive importance pruning, abstractive summarization, naive minification — each a faithful reference implementation, all scored through the <em>same</em> decision-equivalence + non-inferiority gate and the <em>same</em> cache-aware cost model. Ranks by certified dollar savings; lossy methods that drop decisions are disqualified however much they saved. Register a real external tool to verify. See the <a href="benchmark.html">Benchmark</a> page for the standings and methodology.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--external</code></td><td>—</td><td><code>module:function[:Name]</code> — register a real compressor (<code>list[str]→list[str]</code> over per-turn block texts), measured on the identical axes. Repeatable.</td></tr>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Custom corpus dir (e.g. ingested benchmark traces)</td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline) or <code>anthropic</code> (live model)</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing for the cache-aware cost model</td></tr>
+        <tr><td><code>--tokenizer</code></td><td><code>heuristic</code></td><td><code>heuristic</code> or <code>anthropic</code> (billing-grade)</td></tr>
+        <tr><td><code>--html</code> / <code>--out</code></td><td>off</td><td>Render the standings as HTML / write raw results JSONL</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil benchmark</span>
+compression benchmark  (model=claude-opus-4-8, runner=deterministic, corpus gate)
+
+technique                tok save  $ save  equiv  certified  reversible
+---------------------------------------------------------------------------------
+distil-causal               33.8%   37.4%   100%     <span class="g">&#10004; PASS</span>       lossy
+truncate-tail               26.9%   33.0%    25%    <span class="w">&#10008; fails</span>       lossy
+summarize                   19.7%   24.2%     0%    <span class="w">&#10008; fails</span>       lossy
+distil-lossless              8.4%   10.3%   100%     <span class="g">&#10004; PASS</span>  byte-exact
+extractive-prune             7.4%    9.0%    68%    <span class="w">&#10008; fails</span>       lossy
+---------------------------------------------------------------------------------
+
+LEADER (certified $ savings): distil-causal — 37.4% cheaper, 100% decision-equivalent.</pre>
 
     <hr/>
 

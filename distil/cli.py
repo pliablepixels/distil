@@ -462,6 +462,48 @@ def cmd_perf(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_benchmark(args: argparse.Namespace) -> int:
+    """Head-to-head: every compression technique through the same gate + cost model."""
+    import time
+
+    from . import benchmark as bm
+
+    runner = None
+    if args.runner == "anthropic":
+        from .replay.anthropic_runner import AnthropicRunner
+
+        runner = AnthropicRunner()
+    price = pricing.get(args.pricing)
+    tok = tokenizer.resolve(args.tokenizer, model=price.name)
+    entries = load_corpus(args.corpus) if args.corpus else load_corpus()
+
+    techniques = bm.builtin_techniques(runner)
+    for spec in args.external or []:
+        try:
+            techniques.append(bm.load_external(spec))
+        except Exception as exc:  # noqa: BLE001 — surface a bad external spec, don't crash
+            print(f"could not load external '{spec}': {exc}")
+            return 2
+
+    rep = bm.run_benchmark(
+        entries,
+        techniques,
+        pricing=price,
+        runner=runner,
+        tok=tok,
+        margin=args.margin,
+        alpha=args.alpha,
+    )
+    print(bm.format_report(rep))
+    if args.html:
+        Path(args.html).write_text(bm.render_html(rep))
+        print(f"\nbenchmark page → {args.html}")
+    if args.out:
+        path = bm.write_raw(rep, args.out, str(int(time.time())))
+        print(f"raw results → {path}")
+    return 0
+
+
 def cmd_eval(args: argparse.Namespace) -> int:
     """The certified compression frontier (savings vs decision-equivalence)."""
     import time
@@ -606,6 +648,26 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
     ev.add_argument("--out", help="write the raw curve JSONL to this dir")
     ev.set_defaults(func=cmd_eval)
+
+    bn = sub.add_parser(
+        "benchmark",
+        help="head-to-head vs competing techniques on the same gate + cost model",
+    )
+    bn.add_argument("--corpus", help="custom corpus dir (e.g. ingested benchmark traces)")
+    bn.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
+    bn.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
+    bn.add_argument("--tokenizer", default="heuristic", choices=("heuristic", "anthropic"))
+    bn.add_argument("--margin", type=float, default=0.02, help="TOST non-inferiority margin")
+    bn.add_argument("--alpha", type=float, default=0.05, help="significance level")
+    bn.add_argument(
+        "--external",
+        action="append",
+        metavar="MODULE:FUNCTION[:NAME]",
+        help="register a real external compressor (list[str]->list[str]); repeatable",
+    )
+    bn.add_argument("--html", help="render the comparison as a self-contained HTML page")
+    bn.add_argument("--out", help="write raw results JSONL to this dir")
+    bn.set_defaults(func=cmd_benchmark)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)
