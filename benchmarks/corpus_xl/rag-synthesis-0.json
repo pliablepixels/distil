@@ -1,0 +1,167 @@
+{
+  "id": "rag-synthesis-0",
+  "model": "claude-opus-4-8",
+  "_note": "generated: rag-synthesis content, reproducible via gen_corpus.py",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a rag-synthesis task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 0):\nRETRIEVED (similarity=0.6): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.6): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.66): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.74): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.74): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \n\nDECISION: retrieved context is speculative; answer from primary source only\nRETRIEVED (similarity=0.72): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.72): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.51): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.63): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.63): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "dbg-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 0):\nRETRIEVED (similarity=0.66): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.51): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.55): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.55): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.75): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.75): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.75): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.75): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "2026-06-22T10:00:17Z INFO request id=req-7891 handled status=200 in 3ms\n2026-06-22T10:01:30Z INFO request id=req-9964 handled status=200 in 41ms\n2026-06-22T10:02:05Z INFO request id=req-4162 handled status=200 in 24ms\n2026-06-22T10:03:13Z INFO request id=req-1603 handled status=200 in 57ms\n2026-06-22T10:04:31Z INFO request id=req-6827 handled status=200 in 79ms\n2026-06-22T10:05:29Z INFO request id=req-7912 handled status=200 in 59ms\n2026-06-22T10:06:36Z INFO request id=req-5944 handled status=200 in 69ms\n2026-06-22T10:07:14Z INFO request id=req-6476 handled status=200 in 11ms\n2026-06-22T10:08:09Z INFO request id=req-9399 handled status=200 in 58ms\n2026-06-22T10:09:35Z INFO request id=req-7142 handled status=200 in 79ms\n2026-06-22T10:10:43Z INFO request id=req-5845 handled status=200 in 12ms\n2026-06-22T10:11:05Z INFO request id=req-3335 handled status=200 in 46ms\n2026-06-22T10:12:56Z INFO request id=req-2197 handled status=200 in 63ms\n2026-06-22T10:13:05Z INFO request id=req-1764 handled status=200 in 73ms\n2026-06-22T10:14:14Z INFO request id=req-8405 handled status=200 in 2ms\n2026-06-22T10:15:29Z INFO request id=req-2244 handled status=200 in 80ms\n2026-06-22T10:16:55Z INFO request id=req-3287 handled status=200 in 2ms\n2026-06-22T10:17:38Z INFO request id=req-9927 handled status=200 in 53ms\n2026-06-22T10:18:02Z INFO request id=req-8124 handled status=200 in 32ms\n2026-06-22T10:19:30Z INFO request id=req-2200 handled status=200 in 73ms\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a rag-synthesis task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 1):\nRETRIEVED (similarity=0.8): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.8): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.66): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.79): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.79): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision.\nDECISION: retrieved context is speculative; answer from primary source only\n \nRETRIEVED (similarity=0.5): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.5): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.51): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.6): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.6): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "dbg-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 1):\nRETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.74): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.74): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.65): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.65): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.66): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.57): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "2026-06-22T10:00:58Z INFO request id=req-3805 handled status=200 in 74ms\n2026-06-22T10:01:04Z INFO request id=req-4335 handled status=200 in 40ms\n2026-06-22T10:02:07Z INFO request id=req-6660 handled status=200 in 32ms\n2026-06-22T10:03:43Z INFO request id=req-9576 handled status=200 in 10ms\n2026-06-22T10:04:55Z INFO request id=req-5000 handled status=200 in 54ms\n2026-06-22T10:05:52Z INFO request id=req-3165 handled status=200 in 51ms\n2026-06-22T10:06:31Z INFO request id=req-3047 handled status=200 in 78ms\n2026-06-22T10:07:52Z INFO request id=req-2045 handled status=200 in 68ms\n2026-06-22T10:08:02Z INFO request id=req-3807 handled status=200 in 25ms\n2026-06-22T10:09:35Z INFO request id=req-4430 handled status=200 in 16ms\n2026-06-22T10:10:35Z INFO request id=req-5501 handled status=200 in 15ms\n2026-06-22T10:11:52Z INFO request id=req-8609 handled status=200 in 63ms\n2026-06-22T10:12:54Z INFO request id=req-5618 handled status=200 in 49ms\n2026-06-22T10:13:20Z INFO request id=req-9524 handled status=200 in 44ms\n2026-06-22T10:14:11Z INFO request id=req-9398 handled status=200 in 79ms\n2026-06-22T10:15:05Z INFO request id=req-6080 handled status=200 in 29ms\n2026-06-22T10:16:52Z INFO request id=req-1054 handled status=200 in 28ms\n2026-06-22T10:17:34Z INFO request id=req-9403 handled status=200 in 36ms\n2026-06-22T10:18:22Z INFO request id=req-6259 handled status=200 in 56ms\n2026-06-22T10:19:24Z INFO request id=req-7144 handled status=200 in 6ms\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a rag-synthesis task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 2):\nRETRIEVED (similarity=0.51): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.57): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.76): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.76): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nDECISION: retrieved context is speculative; answer from primary source only\n\nRETRIEVED (similarity=0.59): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.59): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.77): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.77): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.66): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "dbg-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 2):\nRETRIEVED (similarity=0.69): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.69): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.51): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.71): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.71): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.66): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.65): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.65): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.57): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "2026-06-22T10:00:17Z INFO request id=req-3447 handled status=200 in 46ms\n2026-06-22T10:01:06Z INFO request id=req-7326 handled status=200 in 51ms\n2026-06-22T10:02:26Z INFO request id=req-8036 handled status=200 in 48ms\n2026-06-22T10:03:12Z INFO request id=req-8266 handled status=200 in 37ms\n2026-06-22T10:04:13Z INFO request id=req-8693 handled status=200 in 56ms\n2026-06-22T10:05:17Z INFO request id=req-7703 handled status=200 in 22ms\n2026-06-22T10:06:06Z INFO request id=req-1084 handled status=200 in 76ms\n2026-06-22T10:07:40Z INFO request id=req-6566 handled status=200 in 63ms\n2026-06-22T10:08:52Z INFO request id=req-1494 handled status=200 in 44ms\n2026-06-22T10:09:57Z INFO request id=req-9825 handled status=200 in 71ms\n2026-06-22T10:10:41Z INFO request id=req-3945 handled status=200 in 25ms\n2026-06-22T10:11:59Z INFO request id=req-8362 handled status=200 in 76ms\n2026-06-22T10:12:22Z INFO request id=req-5235 handled status=200 in 39ms\n2026-06-22T10:13:13Z INFO request id=req-9753 handled status=200 in 40ms\n2026-06-22T10:14:31Z INFO request id=req-6056 handled status=200 in 18ms\n2026-06-22T10:15:01Z INFO request id=req-4448 handled status=200 in 36ms\n2026-06-22T10:16:19Z INFO request id=req-9889 handled status=200 in 7ms\n2026-06-22T10:17:52Z INFO request id=req-3955 handled status=200 in 36ms\n2026-06-22T10:18:13Z INFO request id=req-4505 handled status=200 in 73ms\n2026-06-22T10:19:40Z INFO request id=req-7477 handled status=200 in 63ms\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a rag-synthesis task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 3):\nRETRIEVED (similarity=0.71): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.71): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.62): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.76): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.76): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nDECISION: retrieved context is speculative; answer from primary source only\n\nRETRIEVED (similarity=0.73): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.73): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.58): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.58): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "dbg-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 3):\nRETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.56): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.56): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 4: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.59): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.59): Section 5: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "2026-06-22T10:00:31Z INFO request id=req-5306 handled status=200 in 3ms\n2026-06-22T10:01:21Z INFO request id=req-1164 handled status=200 in 57ms\n2026-06-22T10:02:07Z INFO request id=req-9655 handled status=200 in 18ms\n2026-06-22T10:03:43Z INFO request id=req-6896 handled status=200 in 58ms\n2026-06-22T10:04:45Z INFO request id=req-3028 handled status=200 in 69ms\n2026-06-22T10:05:39Z INFO request id=req-9232 handled status=200 in 49ms\n2026-06-22T10:06:36Z INFO request id=req-5934 handled status=200 in 23ms\n2026-06-22T10:07:07Z INFO request id=req-2904 handled status=200 in 6ms\n2026-06-22T10:08:10Z INFO request id=req-2185 handled status=200 in 18ms\n2026-06-22T10:09:23Z INFO request id=req-3857 handled status=200 in 47ms\n2026-06-22T10:10:36Z INFO request id=req-8796 handled status=200 in 3ms\n2026-06-22T10:11:15Z INFO request id=req-5565 handled status=200 in 7ms\n2026-06-22T10:12:29Z INFO request id=req-9364 handled status=200 in 35ms\n2026-06-22T10:13:04Z INFO request id=req-7769 handled status=200 in 11ms\n2026-06-22T10:14:35Z INFO request id=req-9020 handled status=200 in 26ms\n2026-06-22T10:15:29Z INFO request id=req-4849 handled status=200 in 1ms\n2026-06-22T10:16:16Z INFO request id=req-2628 handled status=200 in 63ms\n2026-06-22T10:17:21Z INFO request id=req-6621 handled status=200 in 11ms\n2026-06-22T10:18:20Z INFO request id=req-1164 handled status=200 in 72ms\n2026-06-22T10:19:40Z INFO request id=req-8732 handled status=200 in 40ms\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok\nheartbeat ok"
+        }
+      ]
+    }
+  ]
+}

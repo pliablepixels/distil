@@ -1,0 +1,167 @@
+{
+  "id": "metrics-0",
+  "model": "claude-opus-4-8",
+  "_note": "generated: metrics content, reproducible via gen_corpus.py",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a metrics task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 0):\n[{\"t\": 1718000000, \"cpu\": 0.219, \"mem\": 0.575, \"rps\": 39}, {\"t\": 1718000060, \"cpu\": 0.374, \"mem\": 0.853, \"rps\": 87}, {\"t\": 1718000120, \"cpu\": 0.132, \"mem\": 0.501, \"rps\": 316}, {\"t\": 1718000180, \"cpu\": 0.373, \"mem\": 0.606, \"rps\": 223}, {\"t\": 1718000240, \"cpu\": 0.805, \"mem\": 0.363, \"rps\": 208}, {\"t\": 1718000300, \"cpu\": 0.193, \"mem\": 0.367, \"rps\": 394}, {\"t\": 1718000360, \"cpu\": 0.184, \"mem\": 0.332, \"rps\": 30}, {\"t\": 1718000420, \"cpu\": 0.102, \"mem\": 0.649, \"rps\": 283}, {\"t\": 1718000480, \"cpu\": 0.467, \"mem\": 0.659, \"rps\": 71}, {\"t\": 1718000540, \"cpu\": 0.852, \"mem\": 0.437, \"rps\": 153}, {\"t\": 1718000600, \"cpu\": 0.554, \"mem\": 0.626, \"rps\": 247}, {\"t\": 1718000660, \"cpu\": 0.612, \"mem\": 0.47, \"rps\": 348}, {\"t\": 1718000720, \"cpu\": 0.224, \"mem\": 0.226, \"rps\": 275}, {\"t\": 1718000780, \"cpu\": 0.405, \"mem\": 0.285, \"rps\": 227}, {\"t\": 1718000840, \"cpu\": 0.748, \"mem\": 0.728, \"rps\": 140}, {\"t\": 1718000900, \"cpu\": 0.234, \"mem\": 0.562, \"rps\": 210}, {\"t\": 1718000960, \"cpu\": 0.874, \"mem\": 0.222, \"rps\": 375}, {\"t\": 1718001020, \"cpu\": 0.29, \"mem\": 0.664, \"rps\": 282}, {\"t\": 1718001080, \"cpu\": 0.859, \"mem\": 0.274, \"rps\": 98}, {\"t\": 1718001140, \"cpu\": 0.722, \"mem\": 0.841, \"rps\": 134}, {\nDECISION: cpu trending past 0.9; trigger autoscale before saturation\n\"t\": 1718001200, \"cpu\": 0.655, \"mem\": 0.212, \"rps\": 397}, {\"t\": 1718001260, \"cpu\": 0.298, \"mem\": 0.417, \"rps\": 117}, {\"t\": 1718001320, \"cpu\": 0.523, \"mem\": 0.522, \"rps\": 82}, {\"t\": 1718001380, \"cpu\": 0.561, \"mem\": 0.634, \"rps\": 312}, {\"t\": 1718001440, \"cpu\": 0.485, \"mem\": 0.842, \"rps\": 400}, {\"t\": 1718001500, \"cpu\": 0.186, \"mem\": 0.721, \"rps\": 234}, {\"t\": 1718001560, \"cpu\": 0.783, \"mem\": 0.284, \"rps\": 354}, {\"t\": 1718001620, \"cpu\": 0.527, \"mem\": 0.859, \"rps\": 218}, {\"t\": 1718001680, \"cpu\": 0.78, \"mem\": 0.872, \"rps\": 143}, {\"t\": 1718001740, \"cpu\": 0.124, \"mem\": 0.612, \"rps\": 395}, {\"t\": 1718001800, \"cpu\": 0.356, \"mem\": 0.386, \"rps\": 294}, {\"t\": 1718001860, \"cpu\": 0.168, \"mem\": 0.483, \"rps\": 324}, {\"t\": 1718001920, \"cpu\": 0.791, \"mem\": 0.852, \"rps\": 206}, {\"t\": 1718001980, \"cpu\": 0.684, \"mem\": 0.847, \"rps\": 81}, {\"t\": 1718002040, \"cpu\": 0.757, \"mem\": 0.858, \"rps\": 356}, {\"t\": 1718002100, \"cpu\": 0.685, \"mem\": 0.852, \"rps\": 258}, {\"t\": 1718002160, \"cpu\": 0.573, \"mem\": 0.609, \"rps\": 188}, {\"t\": 1718002220, \"cpu\": 0.933, \"mem\": 0.661, \"rps\": 341}, {\"t\": 1718002280, \"cpu\": 0.763, \"mem\": 0.499, \"rps\": 351}, {\"t\": 1718002340, \"cpu\": 0.639, \"mem\": 0.654, \"rps\": 222}]"
+        },
+        {
+          "id": "dbg-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "[{\"t\": 1718000000, \"cpu\": 0.262, \"mem\": 0.615, \"rps\": 132}, {\"t\": 1718000060, \"cpu\": 0.769, \"mem\": 0.266, \"rps\": 169}, {\"t\": 1718000120, \"cpu\": 0.689, \"mem\": 0.561, \"rps\": 206}, {\"t\": 1718000180, \"cpu\": 0.222, \"mem\": 0.717, \"rps\": 323}, {\"t\": 1718000240, \"cpu\": 0.611, \"mem\": 0.606, \"rps\": 70}, {\"t\": 1718000300, \"cpu\": 0.711, \"mem\": 0.551, \"rps\": 322}, {\"t\": 1718000360, \"cpu\": 0.171, \"mem\": 0.66, \"rps\": 185}, {\"t\": 1718000420, \"cpu\": 0.791, \"mem\": 0.292, \"rps\": 298}, {\"t\": 1718000480, \"cpu\": 0.688, \"mem\": 0.482, \"rps\": 31}, {\"t\": 1718000540, \"cpu\": 0.26, \"mem\": 0.74, \"rps\": 332}, {\"t\": 1718000600, \"cpu\": 0.149, \"mem\": 0.245, \"rps\": 334}, {\"t\": 1718000660, \"cpu\": 0.161, \"mem\": 0.507, \"rps\": 108}, {\"t\": 1718000720, \"cpu\": 0.273, \"mem\": 0.635, \"rps\": 55}, {\"t\": 1718000780, \"cpu\": 0.17, \"mem\": 0.869, \"rps\": 292}, {\"t\": 1718000840, \"cpu\": 0.131, \"mem\": 0.697, \"rps\": 32}, {\"t\": 1718000900, \"cpu\": 0.326, \"mem\": 0.27, \"rps\": 215}, {\"t\": 1718000960, \"cpu\": 0.238, \"mem\": 0.303, \"rps\": 189}, {\"t\": 1718001020, \"cpu\": 0.446, \"mem\": 0.574, \"rps\": 239}, {\"t\": 1718001080, \"cpu\": 0.455, \"mem\": 0.279, \"rps\": 192}, {\"t\": 1718001140, \"cpu\": 0.913, \"mem\": 0.587, \"rps\": 80}, {\"t\": 1718001200, \"cpu\": 0.115, \"mem\": 0.865, \"rps\": 30}, {\"t\": 1718001260, \"cpu\": 0.495, \"mem\": 0.877, \"rps\": 113}, {\"t\": 1718001320, \"cpu\": 0.622, \"mem\": 0.602, \"rps\": 388}, {\"t\": 1718001380, \"cpu\": 0.394, \"mem\": 0.608, \"rps\": 351}, {\"t\": 1718001440, \"cpu\": 0.847, \"mem\": 0.49, \"rps\": 142}, {\"t\": 1718001500, \"cpu\": 0.56, \"mem\": 0.279, \"rps\": 182}, {\"t\": 1718001560, \"cpu\": 0.745, \"mem\": 0.781, \"rps\": 246}, {\"t\": 1718001620, \"cpu\": 0.821, \"mem\": 0.826, \"rps\": 331}, {\"t\": 1718001680, \"cpu\": 0.321, \"mem\": 0.57, \"rps\": 75}, {\"t\": 1718001740, \"cpu\": 0.355, \"mem\": 0.864, \"rps\": 254}, {\"t\": 1718001800, \"cpu\": 0.544, \"mem\": 0.693, \"rps\": 348}, {\"t\": 1718001860, \"cpu\": 0.583, \"mem\": 0.867, \"rps\": 231}, {\"t\": 1718001920, \"cpu\": 0.716, \"mem\": 0.777, \"rps\": 265}, {\"t\": 1718001980, \"cpu\": 0.56, \"mem\": 0.507, \"rps\": 344}, {\"t\": 1718002040, \"cpu\": 0.742, \"mem\": 0.71, \"rps\": 224}, {\"t\": 1718002100, \"cpu\": 0.201, \"mem\": 0.202, \"rps\": 282}, {\"t\": 1718002160, \"cpu\": 0.883, \"mem\": 0.409, \"rps\": 198}, {\"t\": 1718002220, \"cpu\": 0.728, \"mem\": 0.324, \"rps\": 43}, {\"t\": 1718002280, \"cpu\": 0.743, \"mem\": 0.703, \"rps\": 153}, {\"t\": 1718002340, \"cpu\": 0.594, \"mem\": 0.888, \"rps\": 128}]"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.74): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.74): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.51): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.77): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.77): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a metrics task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 1):\n[{\"t\": 1718000000, \"cpu\": 0.87, \"mem\": 0.274, \"rps\": 272}, {\"t\": 1718000060, \"cpu\": 0.267, \"mem\": 0.371, \"rps\": 187}, {\"t\": 1718000120, \"cpu\": 0.876, \"mem\": 0.357, \"rps\": 250}, {\"t\": 1718000180, \"cpu\": 0.562, \"mem\": 0.69, \"rps\": 282}, {\"t\": 1718000240, \"cpu\": 0.702, \"mem\": 0.44, \"rps\": 204}, {\"t\": 1718000300, \"cpu\": 0.911, \"mem\": 0.814, \"rps\": 355}, {\"t\": 1718000360, \"cpu\": 0.789, \"mem\": 0.551, \"rps\": 35}, {\"t\": 1718000420, \"cpu\": 0.64, \"mem\": 0.89, \"rps\": 42}, {\"t\": 1718000480, \"cpu\": 0.787, \"mem\": 0.455, \"rps\": 95}, {\"t\": 1718000540, \"cpu\": 0.125, \"mem\": 0.842, \"rps\": 262}, {\"t\": 1718000600, \"cpu\": 0.111, \"mem\": 0.819, \"rps\": 378}, {\"t\": 1718000660, \"cpu\": 0.653, \"mem\": 0.3, \"rps\": 394}, {\"t\": 1718000720, \"cpu\": 0.559, \"mem\": 0.425, \"rps\": 200}, {\"t\": 1718000780, \"cpu\": 0.689, \"mem\": 0.273, \"rps\": 96}, {\"t\": 1718000840, \"cpu\": 0.683, \"mem\": 0.615, \"rps\": 273}, {\"t\": 1718000900, \"cpu\": 0.474, \"mem\": 0.532, \"rps\": 36}, {\"t\": 1718000960, \"cpu\": 0.606, \"mem\": 0.653, \"rps\": 48}, {\"t\": 1718001020, \"cpu\": 0.636, \"mem\": 0.731, \"rps\": 294}, {\"t\": 1718001080, \"cpu\": 0.525, \"mem\": 0.437, \"rps\": 279}, {\"t\": 1718001140, \"cpu\": 0.53, \"mem\": 0.321, \"rps\": 164}, {\nDECISION: cpu trending past 0.9; trigger autoscale before saturation\n\"t\": 1718001200, \"cpu\": 0.638, \"mem\": 0.476, \"rps\": 179}, {\"t\": 1718001260, \"cpu\": 0.685, \"mem\": 0.897, \"rps\": 323}, {\"t\": 1718001320, \"cpu\": 0.378, \"mem\": 0.776, \"rps\": 245}, {\"t\": 1718001380, \"cpu\": 0.847, \"mem\": 0.786, \"rps\": 350}, {\"t\": 1718001440, \"cpu\": 0.402, \"mem\": 0.567, \"rps\": 308}, {\"t\": 1718001500, \"cpu\": 0.901, \"mem\": 0.62, \"rps\": 281}, {\"t\": 1718001560, \"cpu\": 0.72, \"mem\": 0.307, \"rps\": 247}, {\"t\": 1718001620, \"cpu\": 0.262, \"mem\": 0.431, \"rps\": 277}, {\"t\": 1718001680, \"cpu\": 0.781, \"mem\": 0.752, \"rps\": 349}, {\"t\": 1718001740, \"cpu\": 0.723, \"mem\": 0.888, \"rps\": 81}, {\"t\": 1718001800, \"cpu\": 0.427, \"mem\": 0.498, \"rps\": 119}, {\"t\": 1718001860, \"cpu\": 0.381, \"mem\": 0.7, \"rps\": 179}, {\"t\": 1718001920, \"cpu\": 0.694, \"mem\": 0.683, \"rps\": 359}, {\"t\": 1718001980, \"cpu\": 0.749, \"mem\": 0.507, \"rps\": 47}, {\"t\": 1718002040, \"cpu\": 0.349, \"mem\": 0.87, \"rps\": 40}, {\"t\": 1718002100, \"cpu\": 0.521, \"mem\": 0.827, \"rps\": 347}, {\"t\": 1718002160, \"cpu\": 0.477, \"mem\": 0.201, \"rps\": 79}, {\"t\": 1718002220, \"cpu\": 0.434, \"mem\": 0.365, \"rps\": 267}, {\"t\": 1718002280, \"cpu\": 0.351, \"mem\": 0.328, \"rps\": 103}, {\"t\": 1718002340, \"cpu\": 0.846, \"mem\": 0.707, \"rps\": 224}]"
+        },
+        {
+          "id": "dbg-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "[{\"t\": 1718000000, \"cpu\": 0.549, \"mem\": 0.444, \"rps\": 351}, {\"t\": 1718000060, \"cpu\": 0.798, \"mem\": 0.476, \"rps\": 355}, {\"t\": 1718000120, \"cpu\": 0.273, \"mem\": 0.548, \"rps\": 37}, {\"t\": 1718000180, \"cpu\": 0.219, \"mem\": 0.715, \"rps\": 294}, {\"t\": 1718000240, \"cpu\": 0.888, \"mem\": 0.712, \"rps\": 290}, {\"t\": 1718000300, \"cpu\": 0.81, \"mem\": 0.644, \"rps\": 360}, {\"t\": 1718000360, \"cpu\": 0.487, \"mem\": 0.314, \"rps\": 206}, {\"t\": 1718000420, \"cpu\": 0.657, \"mem\": 0.815, \"rps\": 319}, {\"t\": 1718000480, \"cpu\": 0.301, \"mem\": 0.566, \"rps\": 140}, {\"t\": 1718000540, \"cpu\": 0.706, \"mem\": 0.335, \"rps\": 58}, {\"t\": 1718000600, \"cpu\": 0.183, \"mem\": 0.479, \"rps\": 148}, {\"t\": 1718000660, \"cpu\": 0.195, \"mem\": 0.353, \"rps\": 318}, {\"t\": 1718000720, \"cpu\": 0.895, \"mem\": 0.465, \"rps\": 120}, {\"t\": 1718000780, \"cpu\": 0.267, \"mem\": 0.756, \"rps\": 289}, {\"t\": 1718000840, \"cpu\": 0.325, \"mem\": 0.713, \"rps\": 210}, {\"t\": 1718000900, \"cpu\": 0.348, \"mem\": 0.506, \"rps\": 326}, {\"t\": 1718000960, \"cpu\": 0.14, \"mem\": 0.671, \"rps\": 136}, {\"t\": 1718001020, \"cpu\": 0.901, \"mem\": 0.879, \"rps\": 96}, {\"t\": 1718001080, \"cpu\": 0.885, \"mem\": 0.838, \"rps\": 387}, {\"t\": 1718001140, \"cpu\": 0.858, \"mem\": 0.761, \"rps\": 10}, {\"t\": 1718001200, \"cpu\": 0.862, \"mem\": 0.502, \"rps\": 38}, {\"t\": 1718001260, \"cpu\": 0.895, \"mem\": 0.583, \"rps\": 98}, {\"t\": 1718001320, \"cpu\": 0.802, \"mem\": 0.536, \"rps\": 288}, {\"t\": 1718001380, \"cpu\": 0.415, \"mem\": 0.769, \"rps\": 24}, {\"t\": 1718001440, \"cpu\": 0.661, \"mem\": 0.586, \"rps\": 226}, {\"t\": 1718001500, \"cpu\": 0.769, \"mem\": 0.847, \"rps\": 336}, {\"t\": 1718001560, \"cpu\": 0.721, \"mem\": 0.279, \"rps\": 260}, {\"t\": 1718001620, \"cpu\": 0.488, \"mem\": 0.488, \"rps\": 27}, {\"t\": 1718001680, \"cpu\": 0.36, \"mem\": 0.271, \"rps\": 32}, {\"t\": 1718001740, \"cpu\": 0.171, \"mem\": 0.579, \"rps\": 192}, {\"t\": 1718001800, \"cpu\": 0.768, \"mem\": 0.669, \"rps\": 377}, {\"t\": 1718001860, \"cpu\": 0.539, \"mem\": 0.743, \"rps\": 382}, {\"t\": 1718001920, \"cpu\": 0.802, \"mem\": 0.262, \"rps\": 116}, {\"t\": 1718001980, \"cpu\": 0.82, \"mem\": 0.227, \"rps\": 346}, {\"t\": 1718002040, \"cpu\": 0.134, \"mem\": 0.698, \"rps\": 15}, {\"t\": 1718002100, \"cpu\": 0.705, \"mem\": 0.405, \"rps\": 91}, {\"t\": 1718002160, \"cpu\": 0.661, \"mem\": 0.435, \"rps\": 226}, {\"t\": 1718002220, \"cpu\": 0.409, \"mem\": 0.457, \"rps\": 173}, {\"t\": 1718002280, \"cpu\": 0.737, \"mem\": 0.305, \"rps\": 59}, {\"t\": 1718002340, \"cpu\": 0.713, \"mem\": 0.562, \"rps\": 216}]"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.6): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.6): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.79): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.79): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.76): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.76): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a metrics task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 2):\n[{\"t\": 1718000000, \"cpu\": 0.549, \"mem\": 0.352, \"rps\": 71}, {\"t\": 1718000060, \"cpu\": 0.513, \"mem\": 0.803, \"rps\": 353}, {\"t\": 1718000120, \"cpu\": 0.714, \"mem\": 0.64, \"rps\": 370}, {\"t\": 1718000180, \"cpu\": 0.864, \"mem\": 0.326, \"rps\": 336}, {\"t\": 1718000240, \"cpu\": 0.578, \"mem\": 0.342, \"rps\": 356}, {\"t\": 1718000300, \"cpu\": 0.869, \"mem\": 0.346, \"rps\": 184}, {\"t\": 1718000360, \"cpu\": 0.591, \"mem\": 0.527, \"rps\": 342}, {\"t\": 1718000420, \"cpu\": 0.85, \"mem\": 0.293, \"rps\": 388}, {\"t\": 1718000480, \"cpu\": 0.835, \"mem\": 0.858, \"rps\": 50}, {\"t\": 1718000540, \"cpu\": 0.605, \"mem\": 0.206, \"rps\": 139}, {\"t\": 1718000600, \"cpu\": 0.743, \"mem\": 0.771, \"rps\": 210}, {\"t\": 1718000660, \"cpu\": 0.859, \"mem\": 0.769, \"rps\": 173}, {\"t\": 1718000720, \"cpu\": 0.808, \"mem\": 0.542, \"rps\": 180}, {\"t\": 1718000780, \"cpu\": 0.3, \"mem\": 0.758, \"rps\": 231}, {\"t\": 1718000840, \"cpu\": 0.639, \"mem\": 0.846, \"rps\": 37}, {\"t\": 1718000900, \"cpu\": 0.28, \"mem\": 0.788, \"rps\": 86}, {\"t\": 1718000960, \"cpu\": 0.256, \"mem\": 0.879, \"rps\": 51}, {\"t\": 1718001020, \"cpu\": 0.656, \"mem\": 0.498, \"rps\": 319}, {\"t\": 1718001080, \"cpu\": 0.828, \"mem\": 0.275, \"rps\": 67}, {\"t\": 1718001140, \"cpu\": 0.167, \"mem\": 0.433, \"rps\": 354}\nDECISION: cpu trending past 0.9; trigger autoscale before saturation\n, {\"t\": 1718001200, \"cpu\": 0.486, \"mem\": 0.311, \"rps\": 35}, {\"t\": 1718001260, \"cpu\": 0.854, \"mem\": 0.319, \"rps\": 132}, {\"t\": 1718001320, \"cpu\": 0.296, \"mem\": 0.83, \"rps\": 167}, {\"t\": 1718001380, \"cpu\": 0.136, \"mem\": 0.542, \"rps\": 384}, {\"t\": 1718001440, \"cpu\": 0.215, \"mem\": 0.493, \"rps\": 30}, {\"t\": 1718001500, \"cpu\": 0.503, \"mem\": 0.731, \"rps\": 303}, {\"t\": 1718001560, \"cpu\": 0.38, \"mem\": 0.786, \"rps\": 272}, {\"t\": 1718001620, \"cpu\": 0.132, \"mem\": 0.264, \"rps\": 186}, {\"t\": 1718001680, \"cpu\": 0.228, \"mem\": 0.78, \"rps\": 394}, {\"t\": 1718001740, \"cpu\": 0.157, \"mem\": 0.713, \"rps\": 186}, {\"t\": 1718001800, \"cpu\": 0.59, \"mem\": 0.24, \"rps\": 176}, {\"t\": 1718001860, \"cpu\": 0.788, \"mem\": 0.426, \"rps\": 220}, {\"t\": 1718001920, \"cpu\": 0.271, \"mem\": 0.629, \"rps\": 60}, {\"t\": 1718001980, \"cpu\": 0.782, \"mem\": 0.658, \"rps\": 262}, {\"t\": 1718002040, \"cpu\": 0.468, \"mem\": 0.242, \"rps\": 71}, {\"t\": 1718002100, \"cpu\": 0.585, \"mem\": 0.766, \"rps\": 221}, {\"t\": 1718002160, \"cpu\": 0.91, \"mem\": 0.248, \"rps\": 275}, {\"t\": 1718002220, \"cpu\": 0.169, \"mem\": 0.383, \"rps\": 39}, {\"t\": 1718002280, \"cpu\": 0.884, \"mem\": 0.29, \"rps\": 217}, {\"t\": 1718002340, \"cpu\": 0.167, \"mem\": 0.283, \"rps\": 117}]"
+        },
+        {
+          "id": "dbg-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "[{\"t\": 1718000000, \"cpu\": 0.411, \"mem\": 0.268, \"rps\": 261}, {\"t\": 1718000060, \"cpu\": 0.835, \"mem\": 0.655, \"rps\": 49}, {\"t\": 1718000120, \"cpu\": 0.409, \"mem\": 0.35, \"rps\": 31}, {\"t\": 1718000180, \"cpu\": 0.735, \"mem\": 0.804, \"rps\": 122}, {\"t\": 1718000240, \"cpu\": 0.885, \"mem\": 0.701, \"rps\": 89}, {\"t\": 1718000300, \"cpu\": 0.76, \"mem\": 0.309, \"rps\": 199}, {\"t\": 1718000360, \"cpu\": 0.608, \"mem\": 0.68, \"rps\": 133}, {\"t\": 1718000420, \"cpu\": 0.438, \"mem\": 0.466, \"rps\": 112}, {\"t\": 1718000480, \"cpu\": 0.559, \"mem\": 0.894, \"rps\": 230}, {\"t\": 1718000540, \"cpu\": 0.634, \"mem\": 0.864, \"rps\": 44}, {\"t\": 1718000600, \"cpu\": 0.883, \"mem\": 0.508, \"rps\": 167}, {\"t\": 1718000660, \"cpu\": 0.758, \"mem\": 0.235, \"rps\": 118}, {\"t\": 1718000720, \"cpu\": 0.149, \"mem\": 0.457, \"rps\": 64}, {\"t\": 1718000780, \"cpu\": 0.456, \"mem\": 0.777, \"rps\": 337}, {\"t\": 1718000840, \"cpu\": 0.145, \"mem\": 0.278, \"rps\": 277}, {\"t\": 1718000900, \"cpu\": 0.595, \"mem\": 0.491, \"rps\": 79}, {\"t\": 1718000960, \"cpu\": 0.383, \"mem\": 0.581, \"rps\": 317}, {\"t\": 1718001020, \"cpu\": 0.703, \"mem\": 0.64, \"rps\": 239}, {\"t\": 1718001080, \"cpu\": 0.407, \"mem\": 0.625, \"rps\": 91}, {\"t\": 1718001140, \"cpu\": 0.875, \"mem\": 0.329, \"rps\": 139}, {\"t\": 1718001200, \"cpu\": 0.154, \"mem\": 0.684, \"rps\": 230}, {\"t\": 1718001260, \"cpu\": 0.845, \"mem\": 0.345, \"rps\": 359}, {\"t\": 1718001320, \"cpu\": 0.472, \"mem\": 0.674, \"rps\": 368}, {\"t\": 1718001380, \"cpu\": 0.39, \"mem\": 0.384, \"rps\": 161}, {\"t\": 1718001440, \"cpu\": 0.528, \"mem\": 0.242, \"rps\": 160}, {\"t\": 1718001500, \"cpu\": 0.891, \"mem\": 0.403, \"rps\": 367}, {\"t\": 1718001560, \"cpu\": 0.642, \"mem\": 0.656, \"rps\": 134}, {\"t\": 1718001620, \"cpu\": 0.913, \"mem\": 0.519, \"rps\": 352}, {\"t\": 1718001680, \"cpu\": 0.216, \"mem\": 0.439, \"rps\": 44}, {\"t\": 1718001740, \"cpu\": 0.249, \"mem\": 0.784, \"rps\": 382}, {\"t\": 1718001800, \"cpu\": 0.709, \"mem\": 0.37, \"rps\": 370}, {\"t\": 1718001860, \"cpu\": 0.563, \"mem\": 0.836, \"rps\": 180}, {\"t\": 1718001920, \"cpu\": 0.874, \"mem\": 0.252, \"rps\": 323}, {\"t\": 1718001980, \"cpu\": 0.408, \"mem\": 0.552, \"rps\": 154}, {\"t\": 1718002040, \"cpu\": 0.463, \"mem\": 0.422, \"rps\": 200}, {\"t\": 1718002100, \"cpu\": 0.534, \"mem\": 0.571, \"rps\": 90}, {\"t\": 1718002160, \"cpu\": 0.111, \"mem\": 0.805, \"rps\": 306}, {\"t\": 1718002220, \"cpu\": 0.448, \"mem\": 0.68, \"rps\": 388}, {\"t\": 1718002280, \"cpu\": 0.801, \"mem\": 0.31, \"rps\": 249}, {\"t\": 1718002340, \"cpu\": 0.391, \"mem\": 0.77, \"rps\": 137}]"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.57): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.67): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.67): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.68): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.68): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.76): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.76): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a metrics task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 3):\n[{\"t\": 1718000000, \"cpu\": 0.538, \"mem\": 0.317, \"rps\": 173}, {\"t\": 1718000060, \"cpu\": 0.627, \"mem\": 0.429, \"rps\": 92}, {\"t\": 1718000120, \"cpu\": 0.678, \"mem\": 0.392, \"rps\": 108}, {\"t\": 1718000180, \"cpu\": 0.726, \"mem\": 0.83, \"rps\": 340}, {\"t\": 1718000240, \"cpu\": 0.775, \"mem\": 0.512, \"rps\": 22}, {\"t\": 1718000300, \"cpu\": 0.625, \"mem\": 0.309, \"rps\": 353}, {\"t\": 1718000360, \"cpu\": 0.849, \"mem\": 0.558, \"rps\": 221}, {\"t\": 1718000420, \"cpu\": 0.139, \"mem\": 0.536, \"rps\": 227}, {\"t\": 1718000480, \"cpu\": 0.445, \"mem\": 0.855, \"rps\": 301}, {\"t\": 1718000540, \"cpu\": 0.132, \"mem\": 0.207, \"rps\": 44}, {\"t\": 1718000600, \"cpu\": 0.226, \"mem\": 0.767, \"rps\": 138}, {\"t\": 1718000660, \"cpu\": 0.135, \"mem\": 0.229, \"rps\": 204}, {\"t\": 1718000720, \"cpu\": 0.562, \"mem\": 0.386, \"rps\": 86}, {\"t\": 1718000780, \"cpu\": 0.108, \"mem\": 0.224, \"rps\": 58}, {\"t\": 1718000840, \"cpu\": 0.692, \"mem\": 0.705, \"rps\": 184}, {\"t\": 1718000900, \"cpu\": 0.472, \"mem\": 0.706, \"rps\": 238}, {\"t\": 1718000960, \"cpu\": 0.594, \"mem\": 0.444, \"rps\": 191}, {\"t\": 1718001020, \"cpu\": 0.241, \"mem\": 0.884, \"rps\": 117}, {\"t\": 1718001080, \"cpu\": 0.19, \"mem\": 0.32, \"rps\": 346}, {\"t\": 1718001140, \"cpu\": 0.824, \"mem\": 0.56, \"rps\": 92},\nDECISION: cpu trending past 0.9; trigger autoscale before saturation\n {\"t\": 1718001200, \"cpu\": 0.321, \"mem\": 0.763, \"rps\": 141}, {\"t\": 1718001260, \"cpu\": 0.584, \"mem\": 0.258, \"rps\": 45}, {\"t\": 1718001320, \"cpu\": 0.917, \"mem\": 0.432, \"rps\": 172}, {\"t\": 1718001380, \"cpu\": 0.239, \"mem\": 0.599, \"rps\": 58}, {\"t\": 1718001440, \"cpu\": 0.76, \"mem\": 0.419, \"rps\": 318}, {\"t\": 1718001500, \"cpu\": 0.489, \"mem\": 0.709, \"rps\": 396}, {\"t\": 1718001560, \"cpu\": 0.593, \"mem\": 0.616, \"rps\": 300}, {\"t\": 1718001620, \"cpu\": 0.841, \"mem\": 0.72, \"rps\": 89}, {\"t\": 1718001680, \"cpu\": 0.634, \"mem\": 0.45, \"rps\": 248}, {\"t\": 1718001740, \"cpu\": 0.433, \"mem\": 0.499, \"rps\": 269}, {\"t\": 1718001800, \"cpu\": 0.397, \"mem\": 0.495, \"rps\": 372}, {\"t\": 1718001860, \"cpu\": 0.581, \"mem\": 0.302, \"rps\": 52}, {\"t\": 1718001920, \"cpu\": 0.698, \"mem\": 0.456, \"rps\": 104}, {\"t\": 1718001980, \"cpu\": 0.36, \"mem\": 0.555, \"rps\": 241}, {\"t\": 1718002040, \"cpu\": 0.327, \"mem\": 0.737, \"rps\": 140}, {\"t\": 1718002100, \"cpu\": 0.502, \"mem\": 0.303, \"rps\": 256}, {\"t\": 1718002160, \"cpu\": 0.479, \"mem\": 0.479, \"rps\": 95}, {\"t\": 1718002220, \"cpu\": 0.221, \"mem\": 0.431, \"rps\": 155}, {\"t\": 1718002280, \"cpu\": 0.928, \"mem\": 0.869, \"rps\": 51}, {\"t\": 1718002340, \"cpu\": 0.898, \"mem\": 0.697, \"rps\": 158}]"
+        },
+        {
+          "id": "dbg-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "[{\"t\": 1718000000, \"cpu\": 0.607, \"mem\": 0.2, \"rps\": 166}, {\"t\": 1718000060, \"cpu\": 0.69, \"mem\": 0.757, \"rps\": 356}, {\"t\": 1718000120, \"cpu\": 0.589, \"mem\": 0.675, \"rps\": 323}, {\"t\": 1718000180, \"cpu\": 0.822, \"mem\": 0.723, \"rps\": 176}, {\"t\": 1718000240, \"cpu\": 0.512, \"mem\": 0.281, \"rps\": 216}, {\"t\": 1718000300, \"cpu\": 0.818, \"mem\": 0.61, \"rps\": 103}, {\"t\": 1718000360, \"cpu\": 0.335, \"mem\": 0.726, \"rps\": 315}, {\"t\": 1718000420, \"cpu\": 0.883, \"mem\": 0.885, \"rps\": 304}, {\"t\": 1718000480, \"cpu\": 0.346, \"mem\": 0.389, \"rps\": 311}, {\"t\": 1718000540, \"cpu\": 0.728, \"mem\": 0.579, \"rps\": 117}, {\"t\": 1718000600, \"cpu\": 0.118, \"mem\": 0.49, \"rps\": 192}, {\"t\": 1718000660, \"cpu\": 0.427, \"mem\": 0.747, \"rps\": 379}, {\"t\": 1718000720, \"cpu\": 0.481, \"mem\": 0.67, \"rps\": 154}, {\"t\": 1718000780, \"cpu\": 0.885, \"mem\": 0.86, \"rps\": 251}, {\"t\": 1718000840, \"cpu\": 0.922, \"mem\": 0.808, \"rps\": 377}, {\"t\": 1718000900, \"cpu\": 0.641, \"mem\": 0.421, \"rps\": 373}, {\"t\": 1718000960, \"cpu\": 0.906, \"mem\": 0.667, \"rps\": 94}, {\"t\": 1718001020, \"cpu\": 0.598, \"mem\": 0.291, \"rps\": 205}, {\"t\": 1718001080, \"cpu\": 0.82, \"mem\": 0.293, \"rps\": 139}, {\"t\": 1718001140, \"cpu\": 0.523, \"mem\": 0.638, \"rps\": 383}, {\"t\": 1718001200, \"cpu\": 0.652, \"mem\": 0.767, \"rps\": 61}, {\"t\": 1718001260, \"cpu\": 0.828, \"mem\": 0.766, \"rps\": 383}, {\"t\": 1718001320, \"cpu\": 0.55, \"mem\": 0.568, \"rps\": 154}, {\"t\": 1718001380, \"cpu\": 0.669, \"mem\": 0.504, \"rps\": 39}, {\"t\": 1718001440, \"cpu\": 0.87, \"mem\": 0.549, \"rps\": 301}, {\"t\": 1718001500, \"cpu\": 0.684, \"mem\": 0.779, \"rps\": 31}, {\"t\": 1718001560, \"cpu\": 0.541, \"mem\": 0.248, \"rps\": 245}, {\"t\": 1718001620, \"cpu\": 0.453, \"mem\": 0.365, \"rps\": 250}, {\"t\": 1718001680, \"cpu\": 0.759, \"mem\": 0.886, \"rps\": 103}, {\"t\": 1718001740, \"cpu\": 0.678, \"mem\": 0.498, \"rps\": 230}, {\"t\": 1718001800, \"cpu\": 0.229, \"mem\": 0.691, \"rps\": 30}, {\"t\": 1718001860, \"cpu\": 0.207, \"mem\": 0.476, \"rps\": 107}, {\"t\": 1718001920, \"cpu\": 0.193, \"mem\": 0.412, \"rps\": 208}, {\"t\": 1718001980, \"cpu\": 0.306, \"mem\": 0.4, \"rps\": 361}, {\"t\": 1718002040, \"cpu\": 0.137, \"mem\": 0.233, \"rps\": 258}, {\"t\": 1718002100, \"cpu\": 0.853, \"mem\": 0.258, \"rps\": 176}, {\"t\": 1718002160, \"cpu\": 0.95, \"mem\": 0.559, \"rps\": 99}, {\"t\": 1718002220, \"cpu\": 0.305, \"mem\": 0.42, \"rps\": 43}, {\"t\": 1718002280, \"cpu\": 0.829, \"mem\": 0.629, \"rps\": 225}, {\"t\": 1718002340, \"cpu\": 0.877, \"mem\": 0.539, \"rps\": 328}]"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.72): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.72): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.52): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.52): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.76): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.76): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.69): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.69): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    }
+  ]
+}
