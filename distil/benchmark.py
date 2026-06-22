@@ -176,7 +176,23 @@ def builtin_techniques(runner: AgentRunner | None = None) -> list[Technique]:
             False,
             lambda entry: _stream_make(entry, runner),
         ),
+        Technique(
+            "distil-safe",
+            "certified-fallback (byte-exact where the digest is unsafe)",
+            True,
+            lambda entry: _safe_make(entry, runner),
+        ),
     ]
+
+
+def _safe_make(entry: CorpusEntry, runner: AgentRunner | None) -> Strategy:
+    """Certified-fallback: most aggressive transform per turn whose decision the
+    runner confirms, else byte-exact, else none. 100% decision-equivalent by
+    construction under the runner used to build it."""
+    from .compress.adaptive import certified_fallback
+    from .replay.runner import DeterministicRunner
+
+    return certified_fallback(entry.trajectory, runner or DeterministicRunner())
 
 
 def _stream_make(entry: CorpusEntry, runner: AgentRunner | None) -> Strategy:
