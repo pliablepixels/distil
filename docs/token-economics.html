@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Token Economics — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Distil"/>
+<meta property="og:title" content="Token Economics — Distil"/>
+<meta property="og:description" content="A first-principles guide to tokens, where they get wasted in agent loops, why multi-turn cost grows quadratically, every family of context compression, and how Distil applies them at certified tiers with no accuracy loss."/>
+<meta property="og:url" content="https://dshakes.github.io/distil/token-economics.html"/>
+<meta property="og:image" content="https://dshakes.github.io/distil/og.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Token Economics — Distil"/>
+<meta name="twitter:description" content="Tokens from first principles → where agents waste them → why cost is quadratic → every compression family → how Distil certifies savings with no accuracy loss."/>
+<meta name="twitter:image" content="https://dshakes.github.io/distil/og.png"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="token-economics.html" class="active">Token Economics</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="research.html">Research &amp; Frontier</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+    <a href="output.html">Output &amp; I/O</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">&#8592; Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Token <span class="g">Economics</span></h1>
+    <p class="lead">Before you reach for a compression tool, understand the thing it compresses. This is the whole story — what a token <em>is</em>, where an agent quietly burns thousands of them, why multi-turn loops get expensive faster than you'd guess, every family of compression that has been invented to fight back, and exactly where Distil fits — applied in tiers, certified to change nothing the model decides.</p>
+
+    <div class="callout">
+      <strong>The one-sentence version.</strong> An LLM charges by the token; an agent re-sends its whole history every turn, so cost grows with the <em>square</em> of the conversation; compression removes tokens the answer doesn't depend on; and the only honest compression is the kind you can <em>prove</em> didn't change the model's decision. Distil is the proof-carrying version of that idea.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>1. What a token actually <span class="g">is</span></h2>
+
+    <p>A token is not a character and not a word. It is a <strong>subword unit</strong> — the atomic chunk a model reads and predicts. Modern models build their vocabulary with <strong>Byte-Pair Encoding</strong> (BPE): start from individual bytes, then greedily merge the most frequent adjacent pair over and over until you hit a target vocabulary size. Frequent words collapse into one token; rare words fall back to a handful of subword pieces. There is no <code>&lt;unknown&gt;</code> — every possible string is representable, in any language.</p>
+
+    <svg class="svg-embed" viewBox="0 0 1200 360" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="Anatomy of tokenization: a string passes through a BPE tokenizer and becomes many subword tokens">
+      <defs>
+        <linearGradient id="bgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+        <radialGradient id="vigA" cx="0.74" cy="-0.05" r="0.9"><stop offset="0" stop-color="#1a1640" stop-opacity="0.5"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+        <linearGradient id="gA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+        <linearGradient id="cardA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+        <pattern id="dotsA" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+        <filter id="shA" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="9" flood-color="#000" flood-opacity="0.55"/></filter>
+        <marker id="arA" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
+      </defs>
+      <rect width="1200" height="360" fill="url(#bgA)"/>
+      <rect width="1200" height="360" fill="url(#vigA)"/>
+      <rect width="1200" height="360" fill="url(#dotsA)"/>
+
+      <!-- source string -->
+      <text x="60" y="70" fill="#5b6177" font-size="12" letter-spacing="0.12em" font-weight="700">RAW STRING (a tool result)</text>
+      <rect x="60" y="86" width="360" height="62" rx="12" fill="url(#cardA)" stroke="#252c3e" filter="url(#shA)"/>
+      <text x="80" y="123" fill="#cdd2df" font-size="17" font-family="ui-monospace,Menlo,monospace">{"status":"ok","rows":2}</text>
+
+      <!-- tokenizer -->
+      <line x1="430" y1="117" x2="486" y2="117" stroke="#7d8cff" stroke-width="2" marker-end="url(#arA)"/>
+      <rect x="492" y="92" width="150" height="50" rx="25" fill="#10142a" stroke="#3a3170"/>
+      <text x="567" y="122" fill="#f2f3f7" font-size="14" font-weight="700" text-anchor="middle">BPE tokenizer</text>
+      <line x1="650" y1="117" x2="706" y2="117" stroke="#7d8cff" stroke-width="2" marker-end="url(#arA)"/>
+
+      <!-- token chips -->
+      <text x="716" y="70" fill="#5b6177" font-size="12" letter-spacing="0.12em" font-weight="700">13 TOKENS — STRUCTURE COSTS EXTRA</text>
+      <g font-family="ui-monospace,Menlo,monospace" font-size="13">
+        <g>
+          <rect x="716" y="90" width="34" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="733" y="110" fill="#9aa1ff" text-anchor="middle">{"</text>
+          <rect x="754" y="90" width="62" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="785" y="110" fill="#9aa1ff" text-anchor="middle">status</text>
+          <rect x="820" y="90" width="34" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="837" y="110" fill="#9aa1ff" text-anchor="middle">":"</text>
+          <rect x="858" y="90" width="34" height="30" rx="7" fill="#1a2433" stroke="#2c5a52"/><text x="875" y="110" fill="#5ad1c9" text-anchor="middle">ok</text>
+          <rect x="896" y="90" width="40" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="916" y="110" fill="#9aa1ff" text-anchor="middle">","</text>
+          <rect x="940" y="90" width="44" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="962" y="110" fill="#9aa1ff" text-anchor="middle">rows</text>
+          <rect x="988" y="90" width="34" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="1005" y="110" fill="#9aa1ff" text-anchor="middle">":</text>
+          <rect x="1026" y="90" width="28" height="30" rx="7" fill="#1a2433" stroke="#2c5a52"/><text x="1040" y="110" fill="#5ad1c9" text-anchor="middle">2</text>
+          <rect x="1058" y="90" width="28" height="30" rx="7" fill="#161a2e" stroke="#3a3170"/><text x="1072" y="110" fill="#9aa1ff" text-anchor="middle">}</text>
+        </g>
+      </g>
+      <text x="716" y="140" fill="#5b6177" font-size="11.5">Only <tspan fill="#5ad1c9">ok</tspan> and <tspan fill="#5ad1c9">2</tspan> are signal. The braces, quotes and keys are <tspan fill="#9aa1ff">pure overhead</tspan> — and you pay for every one.</text>
+
+      <!-- density comparison -->
+      <text x="60" y="206" fill="#5b6177" font-size="12" letter-spacing="0.12em" font-weight="700">CHARACTERS PER TOKEN — DENSITY VARIES BY CONTENT</text>
+      <g>
+        <rect x="60" y="224" width="350" height="96" rx="14" fill="url(#cardA)" stroke="#252c3e" filter="url(#shA)"/>
+        <text x="84" y="256" fill="#5ad19a" font-size="30" font-weight="800">~4.0</text>
+        <text x="84" y="280" fill="#f2f3f7" font-size="14" font-weight="700">English prose</text>
+        <text x="84" y="302" fill="#9aa1b3" font-size="12.5">100 tokens ≈ 75 words. The efficient case.</text>
+
+        <rect x="425" y="224" width="350" height="96" rx="14" fill="url(#cardA)" stroke="#252c3e" filter="url(#shA)"/>
+        <text x="449" y="256" fill="#ffd07a" font-size="30" font-weight="800">~2.5</text>
+        <text x="449" y="280" fill="#f2f3f7" font-size="14" font-weight="700">Source code</text>
+        <text x="449" y="302" fill="#9aa1b3" font-size="12.5">camelCase, operators &amp; indentation split hard.</text>
+
+        <rect x="790" y="224" width="350" height="96" rx="14" fill="url(#cardA)" stroke="#252c3e" filter="url(#shA)"/>
+        <text x="814" y="256" fill="#ff8a6b" font-size="30" font-weight="800">~2.0</text>
+        <text x="814" y="280" fill="#f2f3f7" font-size="14" font-weight="700">JSON / logs</text>
+        <text x="814" y="302" fill="#9aa1b3" font-size="12.5">Punctuation-dense. The same bytes cost ~2× the tokens.</text>
+      </g>
+    </svg>
+
+    <p>Three consequences fall straight out of how BPE works, and they drive everything below:</p>
+    <ul>
+      <li><strong>Structured text is expensive.</strong> Prose lands near <strong>~4 characters per token</strong>; JSON, logs and code are roughly <strong>2×</strong> denser because punctuation, indentation and <code>snake_case</code>/<code>camelCase</code> boundaries break merges into many short tokens. Agents traffic almost entirely in structured text — tool calls, file contents, stack traces — so they live in the expensive regime.</li>
+      <li><strong>Tokenizers are not interchangeable.</strong> Every model family segments differently. You cannot estimate one model's tokens with another's tokenizer — and even within a family it can shift: Anthropic's newer tokenizer (introduced with Opus 4.7) produces roughly <strong>30% more tokens</strong> than older models for the same text, and billing follows the new count. Always count with the <em>target</em> model's tokenizer.</li>
+      <li><strong>Tokens are the unit of both the bill and the budget.</strong> The context window is denominated in tokens; price is per-token; and <strong>output costs several times more than input</strong> (Opus 4.8: $5/M in, $25/M out — a 5× ratio). Input dominates agent bills anyway, for the reason in §3.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Distil counts honestly.</strong> Distil ships a tokenizer abstraction that prefers the real model tokenizer when present and falls back to a calibrated heuristic otherwise — so the <a href="cli.html">CLI's</a> savings numbers reflect what you'll actually be billed, not a convenient approximation. See <a href="concepts.html">Concepts</a> for why we measure decisions, not bytes.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>2. Where the tokens <span class="g">go</span> — anatomy of one agent request</h2>
+
+    <p>Here is the part most cost surprises come from. A single agent turn is <em>not</em> "the user's question." The API is <strong>stateless</strong>, so every turn re-sends the entire working set. A typical request, before the model has read a single word of your actual task, already carries:</p>
+
+    <svg class="svg-embed" viewBox="0 0 1200 300" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="A single agent request's token budget broken into system prompt, tool schemas, message history, tool results and the actual query">
+      <defs>
+        <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+        <radialGradient id="vigB" cx="0.5" cy="-0.1" r="0.9"><stop offset="0" stop-color="#1a1640" stop-opacity="0.45"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+        <pattern id="dotsB" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+        <filter id="shB" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#000" flood-opacity="0.5"/></filter>
+      </defs>
+      <rect width="1200" height="300" fill="url(#bgB)"/>
+      <rect width="1200" height="300" fill="url(#vigB)"/>
+      <rect width="1200" height="300" fill="url(#dotsB)"/>
+
+      <text x="60" y="56" fill="#f2f3f7" font-size="16" font-weight="700">One request to the model — token budget</text>
+      <text x="60" y="78" fill="#9aa1b3" font-size="12.5">Widths ≈ proportions commonly seen in tool-heavy agents. The query you care about is the sliver on the right.</text>
+
+      <!-- stacked bar -->
+      <g filter="url(#shB)">
+        <rect x="60" y="104" width="250" height="70" rx="9" fill="#2b2550" stroke="#3a3170"/>
+        <rect x="310" y="104" width="430" height="70" fill="#34507a" stroke="#3a5f8f"/>
+        <rect x="740" y="104" width="250" height="70" fill="#2c5a52" stroke="#2f6b60"/>
+        <rect x="990" y="104" width="120" height="70" fill="#5a4a2c" stroke="#7a6535"/>
+        <rect x="1110" y="104" width="30" height="70" rx="9" fill="#5ad1c9"/>
+      </g>
+      <g font-size="13" font-weight="700" text-anchor="middle" fill="#eef0f6">
+        <text x="185" y="146">System prompt</text>
+        <text x="525" y="146">Tool schemas</text>
+        <text x="865" y="146">Message history</text>
+        <text x="1050" y="139" font-size="11">Tool</text>
+        <text x="1050" y="153" font-size="11">results</text>
+      </g>
+      <g font-size="11.5" text-anchor="middle" fill="#aeb6cc">
+        <text x="185" y="196">persona, rules</text>
+        <text x="525" y="196">every tool's JSON schema — often the biggest block</text>
+        <text x="865" y="196">all prior turns, resent verbatim</text>
+        <text x="1125" y="196" text-anchor="end" fill="#5ad1c9">← your query</text>
+      </g>
+
+      <!-- callout -->
+      <rect x="310" y="230" width="430" height="46" rx="10" fill="#10142a" stroke="#3a3170"/>
+      <text x="330" y="259" fill="#cdd2df" font-size="13">A 5-server tool setup can spend <tspan fill="#ff8a6b" font-weight="700">~55,000 tokens</tspan> before the task is read.</text>
+    </svg>
+
+    <p>The biggest, most-overlooked sources of waste, with the hardest public numbers we have:</p>
+    <ul>
+      <li><strong>Tool definitions, repeated every turn.</strong> Anthropic has reported tool definitions consuming <strong>134K tokens</strong> before optimization, and a typical five-MCP-server setup spending <strong>~55K tokens</strong> before the conversation even starts. This is paid <em>on every single turn</em>.</li>
+      <li><strong>Tool-result bloat.</strong> Logs, JSON dumps, file contents and search results get appended to history and <strong>replayed on every subsequent turn</strong>, long after they're stale. Keeping intermediate results out of context cut one Anthropic research workload from <strong>43,588 → 27,297 tokens (−37%)</strong>.</li>
+      <li><strong>History re-send.</strong> The whole transcript goes back up the wire each turn — the single largest growing cost, and the reason for §3.</li>
+      <li><strong>Redundant retrieval.</strong> RAG often injects overlapping, low-signal chunks; context is a finite <em>attention budget</em> with diminishing returns, so more tokens can mean <em>worse</em> answers, not just costlier ones.</li>
+    </ul>
+
+    <div class="callout good">
+      <strong>The opportunity.</strong> Notice that almost none of those tokens are the <em>task</em>. They're scaffolding, repetition, and verbose machine output — exactly the material a model's decision usually doesn't depend on. That gap between "tokens sent" and "tokens that change the answer" is the entire space compression operates in.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>3. The multi-turn tax: why cost is <span class="g">quadratic</span></h2>
+
+    <p>Single-turn cost is linear and boring. Multi-turn is where bills explode — and the shape is <strong>quadratic, not linear</strong>. Because each turn re-bills <em>all</em> the tokens before it, the cumulative cost of an <em>n</em>-turn loop is the sum 1 + 2 + … + <em>n</em> = <em>n(n+1)/2</em> = <strong>O(n²)</strong>. A four-turn conversation costs <strong>4 + 3 + 2 + 1 = 10×</strong> the first turn's tokens — not 4×.</p>
+
+    <svg class="svg-embed" viewBox="0 0 1200 380" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="Cumulative billed input grows quadratically across turns; prompt caching keeps the same shape but with a roughly 10x smaller coefficient">
+      <defs>
+        <linearGradient id="bgC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+        <radialGradient id="vigC" cx="0.3" cy="-0.1" r="0.95"><stop offset="0" stop-color="#1a1640" stop-opacity="0.45"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+        <pattern id="dotsC" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+        <linearGradient id="naiveC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a6b"/><stop offset="1" stop-color="#a8413a"/></linearGradient>
+        <linearGradient id="cacheC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ad1c9"/><stop offset="1" stop-color="#2f6b60"/></linearGradient>
+      </defs>
+      <rect width="1200" height="380" fill="url(#bgC)"/>
+      <rect width="1200" height="380" fill="url(#vigC)"/>
+      <rect width="1200" height="380" fill="url(#dotsC)"/>
+
+      <text x="60" y="52" fill="#f2f3f7" font-size="16" font-weight="700">Cumulative billed input across a conversation</text>
+      <text x="60" y="74" fill="#9aa1b3" font-size="12.5">Each turn re-sends everything before it. The area under the curve is what you pay.</text>
+
+      <!-- axes -->
+      <line x1="90" y1="300" x2="1140" y2="300" stroke="#252c3e" stroke-width="1.5"/>
+      <line x1="90" y1="110" x2="90" y2="300" stroke="#252c3e" stroke-width="1.5"/>
+      <text x="70" y="305" fill="#5b6177" font-size="11" text-anchor="end">0</text>
+
+      <!-- bars: naive (tall) vs cached (short), 6 turns -->
+      <g>
+        <!-- turn heights ∝ k (cumulative context); naive scale 26px/turn-unit, cached scale 2.6 -->
+        <!-- t1 -->
+        <rect x="150" y="270" width="40" height="30" fill="url(#naiveC)"/><rect x="196" y="297" width="40" height="3" fill="url(#cacheC)"/>
+        <!-- t2 -->
+        <rect x="310" y="248" width="40" height="52" fill="url(#naiveC)"/><rect x="356" y="295" width="40" height="5" fill="url(#cacheC)"/>
+        <!-- t3 -->
+        <rect x="470" y="222" width="40" height="78" fill="url(#naiveC)"/><rect x="516" y="292" width="40" height="8" fill="url(#cacheC)"/>
+        <!-- t4 -->
+        <rect x="630" y="196" width="40" height="104" fill="url(#naiveC)"/><rect x="676" y="290" width="40" height="10" fill="url(#cacheC)"/>
+        <!-- t5 -->
+        <rect x="790" y="170" width="40" height="130" fill="url(#naiveC)"/><rect x="836" y="287" width="40" height="13" fill="url(#cacheC)"/>
+        <!-- t6 -->
+        <rect x="950" y="144" width="40" height="156" fill="url(#naiveC)"/><rect x="996" y="284" width="40" height="16" fill="url(#cacheC)"/>
+      </g>
+      <g fill="#5b6177" font-size="12" text-anchor="middle">
+        <text x="193" y="322">turn 1</text><text x="353" y="322">turn 2</text><text x="513" y="322">turn 3</text>
+        <text x="673" y="322">turn 4</text><text x="833" y="322">turn 5</text><text x="993" y="322">turn 6</text>
+      </g>
+
+      <!-- legend -->
+      <rect x="150" y="344" width="14" height="14" rx="3" fill="url(#naiveC)"/><text x="172" y="356" fill="#cdd2df" font-size="12.5">Naïve — fresh input every turn (1.0×)</text>
+      <rect x="470" y="344" width="14" height="14" rx="3" fill="url(#cacheC)"/><text x="492" y="356" fill="#cdd2df" font-size="12.5">Cached prefix — repeated tokens read at 0.1×</text>
+
+      <!-- formula card -->
+      <rect x="1050" y="120" width="120" height="150" rx="14" fill="#10142a" stroke="#3a3170"/>
+      <text x="1110" y="150" fill="#9aa1b3" font-size="11" text-anchor="middle" letter-spacing="0.1em">N TURNS</text>
+      <text x="1110" y="186" fill="#f2f3f7" font-size="22" font-weight="800" text-anchor="middle" font-family="ui-monospace,Menlo,monospace">n(n+1)</text>
+      <line x1="1075" y1="196" x2="1145" y2="196" stroke="#5ad1c9" stroke-width="1.5"/>
+      <text x="1110" y="220" fill="#f2f3f7" font-size="22" font-weight="800" text-anchor="middle" font-family="ui-monospace,Menlo,monospace">2</text>
+      <text x="1110" y="252" fill="#5ad1c9" font-size="12" text-anchor="middle">= O(n²)</text>
+    </svg>
+
+    <p>Two more mechanics make this concrete:</p>
+    <ul>
+      <li><strong>Prefill vs decode.</strong> Reading the prompt (<em>prefill</em>) is compute-bound and parallel; generating output (<em>decode</em>) is memory-bandwidth-bound and sequential — every output token re-reads the whole model and KV cache from memory. That's <em>why</em> output is priced 3–10× higher than input, and why a cache hit (which skips prefill compute) can discount input so aggressively.</li>
+      <li><strong>Prompt caching rewrites the coefficient, not the shape.</strong> If the prefix (system prompt + tools + frozen early history) is byte-stable, you <em>write</em> it once and <em>read</em> it every later turn. Anthropic's documented model: a 5-minute cache <strong>write costs 1.25×</strong> base input, a <strong>read costs 0.10×</strong> — a 10× gap. The curve is still quadratic; caching just shrinks the dominant term's coefficient by roughly 10×. <strong>Any byte change anywhere in the prefix invalidates everything after it</strong> — a <code>datetime.now()</code> near the top, or editing a tool definition, silently throws the cache away.</li>
+    </ul>
+
+    <!-- interactive calculator -->
+    <h3>Try it: the cost of a loop</h3>
+    <p>Real arithmetic — no marketing. This computes the <em>n(n+1)/2</em> input cost from your inputs, using live catalog pricing and the documented cache multipliers (0.1× read / 1.25× write). The "with Distil" line applies a flat lossless reduction to fresh tokens; the default 26.8% is Distil's measured corpus aggregate (see <a href="research.html">Research</a>). Assumptions are shown so you can check the math.</p>
+
+    <div class="card" style="margin:16px 0 8px;">
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;">
+        <label style="font-size:12.5px;color:#9aa1b3;">Turns
+          <input id="te-turns" type="range" min="1" max="40" value="12" style="display:block;width:170px;margin-top:6px;accent-color:#8b7bff;"/>
+          <span id="te-turns-v" style="color:#5ad1c9;font-weight:700;">12</span></label>
+        <label style="font-size:12.5px;color:#9aa1b3;">Fixed prefix (system + tools), tokens
+          <input id="te-prefix" type="range" min="1000" max="80000" step="1000" value="40000" style="display:block;width:190px;margin-top:6px;accent-color:#8b7bff;"/>
+          <span id="te-prefix-v" style="color:#5ad1c9;font-weight:700;">40,000</span></label>
+        <label style="font-size:12.5px;color:#9aa1b3;">New tokens added per turn
+          <input id="te-step" type="range" min="200" max="12000" step="200" value="3000" style="display:block;width:170px;margin-top:6px;accent-color:#8b7bff;"/>
+          <span id="te-step-v" style="color:#5ad1c9;font-weight:700;">3,000</span></label>
+        <label style="font-size:12.5px;color:#9aa1b3;">Model
+          <select id="te-model" style="display:block;margin-top:6px;background:#0a0c14;color:#cdd2df;border:1px solid #252c3e;border-radius:8px;padding:6px 10px;font:inherit;">
+            <option value="5">Opus 4.8 ($5/M)</option>
+            <option value="3">Sonnet 4.6 ($3/M)</option>
+            <option value="1">Haiku 4.5 ($1/M)</option>
+            <option value="10">Fable 5 ($10/M)</option>
+          </select></label>
+      </div>
+    </div>
+    <div class="stat-row" style="margin-top:10px;">
+      <div class="stat-box"><div class="stat-n" id="te-naive">$0</div><div class="stat-l">Naïve — no caching, no compression</div></div>
+      <div class="stat-box"><div class="stat-n" id="te-cached">$0</div><div class="stat-l">With prompt caching (prefix read @ 0.1×)</div></div>
+      <div class="stat-box hl"><div class="stat-n g" id="te-distil">$0</div><div class="stat-l">With caching <em>+</em> Distil lossless (−26.8%)</div></div>
+    </div>
+    <p style="font-size:12px;color:#5b6177;margin-top:-10px;"><strong>Assumptions:</strong> input-token cost only (output excluded for clarity); prefix is cacheable and byte-stable; per-turn input = prefix + accumulated history; cached line writes the prefix once at 1.25× then reads it at 0.10× while the growing tail stays fresh; Distil line additionally removes 26.8% of fresh tokens losslessly. Illustrative — your numbers depend on your traffic.</p>
+
+    <!-- ============================================================ -->
+    <h2>4. Compression, the whole <span class="g">family tree</span></h2>
+
+    <p>"Compression" is an umbrella over a dozen genuinely different ideas, each trading a different amount of quality risk for savings. The single most common mistake in this space is conflating them — <strong>input-token compression</strong> (fewer tokens enter the model), <strong>KV-cache compression</strong> (the prompt is read in full; the retained attention memory shrinks), and <strong>cost reduction</strong> (same tokens, cheaper compute) are three different axes. Here is the honest map.</p>
+
+    <svg class="svg-embed" viewBox="0 0 1200 440" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="A risk-versus-savings map of compression technique families, from lossless minification at low risk to aggressive learned and KV-cache methods">
+      <defs>
+        <linearGradient id="bgD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+        <radialGradient id="vigD" cx="0.8" cy="0" r="0.95"><stop offset="0" stop-color="#1a1640" stop-opacity="0.4"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+        <pattern id="dotsD" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+        <linearGradient id="frontierD" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+      </defs>
+      <rect width="1200" height="440" fill="url(#bgD)"/>
+      <rect width="1200" height="440" fill="url(#vigD)"/>
+      <rect width="1200" height="440" fill="url(#dotsD)"/>
+
+      <text x="60" y="50" fill="#f2f3f7" font-size="16" font-weight="700">Risk vs. savings — where each family sits</text>
+
+      <!-- axes -->
+      <line x1="120" y1="380" x2="1140" y2="380" stroke="#252c3e" stroke-width="1.5"/>
+      <line x1="120" y1="90" x2="120" y2="380" stroke="#252c3e" stroke-width="1.5"/>
+      <text x="630" y="412" fill="#9aa1b3" font-size="12.5" text-anchor="middle">more savings →</text>
+      <text x="92" y="235" fill="#9aa1b3" font-size="12.5" text-anchor="middle" transform="rotate(-90 92 235)">↑ more quality risk</text>
+
+      <!-- "Distil operates here" safe band -->
+      <rect x="120" y="330" width="1020" height="50" fill="#5ad19a" opacity="0.05"/>
+      <text x="1130" y="350" fill="#5ad19a" font-size="11" text-anchor="end" opacity="0.8">certified-safe band — provably no decision change</text>
+
+      <!-- dots -->
+      <g font-size="12.5" fill="#cdd2df">
+        <!-- lossless minify: low risk, low-mid save -->
+        <circle cx="300" cy="356" r="9" fill="#5ad19a"/><text x="316" y="360">Lossless minify / dedup / RLE</text>
+        <!-- retrieval -->
+        <circle cx="560" cy="300" r="9" fill="#5ad1c9"/><text x="576" y="304">Retrieval (RAG) &amp; semantic cache</text>
+        <!-- extractive prune -->
+        <circle cx="720" cy="250" r="9" fill="#8b7bff"/><text x="736" y="254">Extractive pruning (drop low-info tokens)</text>
+        <!-- abstractive -->
+        <circle cx="820" cy="200" r="9" fill="#8b7bff"/><text x="836" y="204">Abstractive summary / rolling memory</text>
+        <!-- learned keep-model -->
+        <circle cx="900" cy="170" r="9" fill="#ffd07a"/><text x="916" y="174">Learned keep/drop classifier</text>
+        <!-- soft/gist -->
+        <circle cx="980" cy="140" r="9" fill="#ff8a6b"/><text x="900" y="128">Soft-prompt / gist vectors</text>
+        <!-- kv-cache (different axis) -->
+        <circle cx="640" cy="150" r="9" fill="#9aa1b3"/><text x="470" y="140">KV-cache eviction (H2O, SnapKV) — memory, not tokens</text>
+      </g>
+
+      <!-- frontier arrow -->
+      <path d="M300,356 Q620,330 1040,338" fill="none" stroke="url(#frontierD)" stroke-width="2.5" stroke-dasharray="2 6" opacity="0.7"/>
+    </svg>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">Lossless · mechanical</div>
+        <h3 style="margin-top:8px;">Make the same bytes cost fewer tokens</h3>
+        <p>Whitespace and JSON normalization, key shortening, de-duplication, run-length collapse, compact serialization. <strong>Risk: essentially zero</strong> — information is preserved exactly. The ceiling is modest, but it is <em>free</em> savings you should always take first.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Extractive prompt compression</div>
+        <h3 style="margin-top:8px;">Drop the least-informative tokens</h3>
+        <p>Score each token's informativeness (self-information / perplexity) and prune the bottom. Systems like <em>Selective Context</em> and the <em>LLMLingua</em> family reach 2–20× on prose. <strong>Risk: real</strong> — a low-surprisal but load-bearing token (a negation, a constraint) can be dropped, and output is often human-unreadable.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Abstractive · summarization</div>
+        <h3 style="margin-top:8px;">Rewrite the context shorter</h3>
+        <p>Summarize retrieved docs or older turns into a compact form (RECOMP; rolling-summary agent memory; OS-style tiered memory like MemGPT). High ratios. <strong>Risk: lossy</strong> — specific facts, numbers and entities can be distorted or dropped, and errors compound across turns.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Retrieval as compression</div>
+        <h3 style="margin-top:8px;">Keep knowledge outside the window</h3>
+        <p>RAG and semantic caching hold the corpus in an index and pull only the top-k per query — lossy compression of a whole knowledge base into what fits. <strong>Risk: retriever-bounded</strong> — a missed chunk becomes a hallucination; a too-loose semantic-cache hit returns a stale answer.</p>
+      </div>
+      <div class="card">
+        <div class="tag">KV-cache compression</div>
+        <h3 style="margin-top:8px;">Shrink the attention memory, not the input</h3>
+        <p>H2O, Scissorhands, SnapKV, StreamingLLM keep only "heavy-hitter" or recent keys/values in GPU memory. <strong>Different axis</strong>: the model still reads every input token, so this cuts memory/latency, not your input bill. Eviction is permanent — a wrongly-dropped key can't return.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Soft-prompt / gist</div>
+        <h3 style="margin-top:8px;">Compress context into learned vectors</h3>
+        <p>Gisting, AutoCompressors and ICAE fold a long prompt into a few learned "summary" vectors (up to ~26× reported). <strong>Risk: model-specific &amp; trained</strong> — the artifact only works for the model it was trained on, and reconstruction is lossy.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>And two cost-reduction cousins that aren't token compression at all:</strong> <em>speculative decoding</em> (a small draft model proposes tokens the big model verifies in parallel — provably identical output, 2–3× faster) and <em>model cascades / routing</em> (FrugalGPT, RouteLLM — try a cheap model first, escalate only when needed). They lower cost without removing tokens, and they compose cleanly with everything above.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>5. Why training a small model <span class="g">helps</span></h2>
+
+    <p>The most effective compressors stopped using fixed heuristics and started <em>learning</em>. The root idea is <strong>knowledge distillation</strong> (Hinton et al., 2015): train a small "student" to imitate a large "teacher," using the teacher's soft probabilities — which carry far richer signal than a one-hot label.</p>
+
+    <p>Applied to compression, the move is to reframe it as <strong>per-token keep/drop classification</strong>. <em>LLMLingua-2</em> is the clean example: take a small bidirectional encoder (XLM-RoBERTa, ~355M params), and train it on labels <em>distilled from GPT-4</em> — prompt GPT-4 to compress text by word-removal only, then mark each original token "keep" or "drop." A trained classifier beats a perplexity heuristic for three concrete reasons:</p>
+    <ul>
+      <li><strong>It sees both directions.</strong> Perplexity is computed left-to-right by a causal model; a bidirectional encoder uses full left-and-right context to judge importance.</li>
+      <li><strong>It learns task/domain importance</strong> and outputs <em>calibrated</em> keep probabilities, instead of a fixed, task-blind proxy.</li>
+      <li><strong>It's faster</strong> — one encoder pass replaces an autoregressive scoring loop (reported 3–6× faster), and the win is largest <em>out-of-domain</em>.</li>
+    </ul>
+
+    <div class="callout warn">
+      <strong>The risk that comes with learning.</strong> A trained compressor internalizes its training distribution and fails <em>quietly</em>. The documented failure modes are real: out-of-distribution regression; <strong>over-compression dropping exactly the load-bearing tokens</strong> (high-information tokens are often the most important, yet get pruned at the same rate); and task-dependent fragility (classification and code degrade far harder than summarization). Past a point, aggressive compression flips from cost-saving to <em>cost-increasing</em> as garbled outputs trigger retries. This is the central reason a learned keep-model must be <em>gated</em>, never trusted blindly — which is exactly what §7 is about.
+    </div>
+
+    <p>Distil takes this learning seriously but conservatively: it ships a built-in heuristic keep-model, a zero-dependency logistic keep-model, and an optional ONNX transformer keep-model you can <a href="techniques.html">train on your own traces</a> — and critically, it trains on <strong>causal</strong> labels (what actually changed the agent's decision under ablation), then lets a model graduate <em>only</em> if it passes the non-inferiority gate. A keep-model can make Distil better; it can never make it worse.</p>
+
+    <!-- ============================================================ -->
+    <h2>6. Proving it didn't <span class="g">hurt</span></h2>
+
+    <p>Every technique above can quietly degrade quality, and the failure is often invisible — the output still <em>looks</em> reasonable. So the load-bearing question isn't "how much did you save?" It's "<strong>how do you know the model still makes the same decision?</strong>" Three things to internalize:</p>
+
+    <ul>
+      <li><strong>Decision-equivalence, not cosine similarity.</strong> Embedding similarity is invariant to exactly the small changes — a flipped negation, a changed digit, a swapped entity — that flip a discrete answer. Cosine ≈ 0.99 can still cross a decision boundary. The only sound test is whether the model's <em>downstream output</em> is the same. See <a href="concepts.html">Concepts → decision-equivalence</a>.</li>
+      <li><strong>Non-inferiority, not a difference test.</strong> A standard "are they equal?" test can only <em>fail to reject</em> — absence of evidence is not evidence of absence, so it can never <em>prove</em> "as good as." The correct frame is <strong>TOST / non-inferiority</strong> (Schuirmann, 1987, imported from clinical trials): pre-declare a margin δ, and prove the compressed variant is not worse by more than δ. That yields a <em>positive</em> guarantee.</li>
+      <li><strong>This is rare.</strong> The headline compression papers report raw score deltas, not equivalence tests. Carrying a statistical non-inferiority certificate is the upgrade — and it's what Distil's <a href="concepts.html">quality contract</a> does on every certified run.</li>
+    </ul>
+
+    <!-- ============================================================ -->
+    <h2>7. How Distil applies all of this — in <span class="g">tiers</span></h2>
+
+    <p>Distil's design choice is to apply the safe techniques aggressively, the risky ones only under proof, and to <em>refuse</em> anything it can't certify. That's the tier ladder. Each rung saves more and risks more — and a rung is only allowed to ship if it clears the gate above it.</p>
+
+    <svg class="svg-embed" viewBox="0 0 1200 400" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="Distil's tier ladder: Tier 0 lossless, Tier 1 reversible digest, Certified causal pruning, all gated by a non-inferiority quality contract">
+      <defs>
+        <linearGradient id="bgE" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+        <radialGradient id="vigE" cx="0.5" cy="-0.1" r="0.95"><stop offset="0" stop-color="#1a1640" stop-opacity="0.45"/><stop offset="1" stop-color="#06070b" stop-opacity="0"/></radialGradient>
+        <pattern id="dotsE" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.025"/></pattern>
+        <linearGradient id="cardE" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+        <linearGradient id="gateE" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+        <filter id="shE" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.55"/></filter>
+      </defs>
+      <rect width="1200" height="400" fill="url(#bgE)"/>
+      <rect width="1200" height="400" fill="url(#vigE)"/>
+      <rect width="1200" height="400" fill="url(#dotsE)"/>
+
+      <!-- the gate -->
+      <rect x="60" y="40" width="1080" height="54" rx="14" fill="#10142a" stroke="#3a3170" filter="url(#shE)"/>
+      <rect x="60" y="40" width="6" height="54" rx="3" fill="url(#gateE)"/>
+      <text x="92" y="66" fill="#f2f3f7" font-size="15" font-weight="700">⛓ Quality contract — non-inferiority (TOST) gate</text>
+      <text x="92" y="84" fill="#9aa1b3" font-size="12.5">No tier ships unless the agent's decisions are certified statistically not-worse. Fails → fall back a rung.</text>
+      <text x="1116" y="74" fill="#5ad19a" font-size="13" font-weight="700" text-anchor="end">must pass ↓</text>
+
+      <!-- tier 0 -->
+      <rect x="60" y="116" width="1080" height="76" rx="14" fill="url(#cardE)" stroke="#2c5a52" filter="url(#shE)"/>
+      <circle cx="104" cy="154" r="20" fill="#13251f" stroke="#2f6b60"/><text x="104" y="160" fill="#5ad19a" font-size="16" font-weight="800" text-anchor="middle">0</text>
+      <text x="142" y="146" fill="#f2f3f7" font-size="15" font-weight="700">Tier 0 — Lossless</text>
+      <text x="142" y="168" fill="#9aa1b3" font-size="12.5">JSON minify · whitespace · de-dup · run-length collapse. Byte-recoverable. Always on.</text>
+      <text x="1116" y="146" fill="#5ad19a" font-size="13" font-weight="700" text-anchor="end">risk: none</text>
+      <text x="1116" y="168" fill="#5b6177" font-size="12" text-anchor="end">applied to every request</text>
+
+      <!-- tier 1 -->
+      <rect x="60" y="208" width="1080" height="76" rx="14" fill="url(#cardE)" stroke="#34507a" filter="url(#shE)"/>
+      <circle cx="104" cy="246" r="20" fill="#16233a" stroke="#3a5f8f"/><text x="104" y="252" fill="#7db0ff" font-size="16" font-weight="800" text-anchor="middle">1</text>
+      <text x="142" y="238" fill="#f2f3f7" font-size="15" font-weight="700">Tier 1 — Reversible digest</text>
+      <text x="142" y="260" fill="#9aa1b3" font-size="12.5">Verbose tool output replaced by a compact digest + handle the agent can expand on demand. Reconstructable.</text>
+      <text x="1116" y="238" fill="#7db0ff" font-size="13" font-weight="700" text-anchor="end">risk: bounded</text>
+      <text x="1116" y="260" fill="#5b6177" font-size="12" text-anchor="end">reversible by construction</text>
+
+      <!-- tier 2 / certified -->
+      <rect x="60" y="300" width="1080" height="76" rx="14" fill="url(#cardE)" stroke="#3a3170" filter="url(#shE)"/>
+      <circle cx="104" cy="338" r="20" fill="#1c1840" stroke="#5a4eb0"/><text x="104" y="344" fill="#b3a8ff" font-size="15" font-weight="800" text-anchor="middle">★</text>
+      <text x="142" y="330" fill="#f2f3f7" font-size="15" font-weight="700">Certified — Causal / counterfactual pruning</text>
+      <text x="142" y="352" fill="#9aa1b3" font-size="12.5">Ablation finds context the decision doesn't depend on; cache-aware &amp; keep-model guided. Kept only if it passes the gate.</text>
+      <text x="1116" y="330" fill="#b3a8ff" font-size="13" font-weight="700" text-anchor="end">risk: gated to zero</text>
+      <text x="1116" y="352" fill="#5b6177" font-size="12" text-anchor="end">certified per run</text>
+    </svg>
+
+    <p>The pieces that make the ladder work — each documented in depth on <a href="techniques.html">Techniques</a>:</p>
+    <ul>
+      <li><strong>Cache-aware compression.</strong> Distil knows repeated tokens cost 0.1× and fresh tokens cost 1.0×, so it compresses to <em>preserve the cacheable prefix</em> and spends its byte budget where it actually matters. Naïve compression that rewrites the prefix can cost you <em>more</em> by busting the cache.</li>
+      <li><strong>Causal pruning.</strong> Rather than guessing importance from surprisal, Distil <em>ablates</em> context and checks whether the agent's decision changes — removing only what's provably inert.</li>
+      <li><strong>The keep-model codec</strong> (heuristic → logistic → transformer), trained on those causal labels, never-regressing because the gate has the final say.</li>
+      <li><strong>Input <em>and</em> output.</strong> Distil compresses the context going <em>in</em> and shapes the tool output coming <em>back</em> before it re-enters history — attacking both sides of the quadratic.</li>
+      <li><strong>Genuine measurement.</strong> Run it as a drop-in <a href="adapters.html">proxy</a> and every real request's actual token reduction is accumulated into a local ledger — so <code>distil leaderboard</code> shows what you genuinely saved, not a benchmark.</li>
+    </ul>
+
+    <pre class="term"><span class="d"># See the certified frontier and what's safe to take on your own corpus</span>
+distil <span class="c">eval</span>
+distil <span class="c">bench</span>            <span class="d"># lossless + causal savings, with the non-inferiority verdict</span>
+distil <span class="c">proxy</span> --port 8788 <span class="d"># drop-in; records genuine savings as real traffic flows</span>
+distil <span class="c">leaderboard</span>      <span class="d"># your real cumulative savings (local, private)</span></pre>
+
+    <!-- ============================================================ -->
+    <h2>8. A practical <span class="g">playbook</span></h2>
+
+    <p>Independent of any tool, this is the order of operations that saves the most for the least risk:</p>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0;">Do first — free wins</h3>
+        <ul style="margin-bottom:0;">
+          <li><strong>Stabilize your prefix.</strong> Put the system prompt and tool schemas first and keep them byte-identical; move anything volatile (timestamps, IDs) <em>after</em> the last cache breakpoint. This alone can 10× the discount on repeated tokens.</li>
+          <li><strong>Turn on prompt caching</strong> and verify hits via the cache-token counts.</li>
+          <li><strong>Minify structured payloads</strong> losslessly before they enter context.</li>
+          <li><strong>Prune dead tool definitions</strong> — every unused schema is paid on every turn.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Then — measured wins</h3>
+        <ul style="margin-bottom:0;">
+          <li><strong>Digest verbose tool output</strong> reversibly; let the agent expand on demand instead of carrying full dumps forever.</li>
+          <li><strong>Compact or summarize stale history</strong> — but treat summaries as lossy and keep recent turns verbatim.</li>
+          <li><strong>Prune causally,</strong> not by surprisal — remove what the decision doesn't depend on.</li>
+          <li><strong>Certify every aggressive step</strong> with a non-inferiority test; if it can't pass, don't ship it.</li>
+          <li><strong>Measure genuine savings</strong> on real traffic, not a synthetic corpus.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>9. Where the field is <span class="g">heading</span></h2>
+    <p>The frontier as of 2025–2026, in one breath:</p>
+    <ul>
+      <li><strong>"Context engineering" replaced "prompt engineering."</strong> The discipline is now managing the entire token state — system prompt, tools, history, retrieval — against a finite <em>attention budget</em>. Anthropic's framing of <strong>context rot</strong> (quality degrading non-uniformly as the window fills) makes "fewer, higher-signal tokens" a quality strategy, not just a cost one.</li>
+      <li><strong>Agentic memory matured.</strong> Tiered/temporal memory systems (MemGPT/Letta, mem0, Zep) report &gt;90% token savings versus stuffing full context, with comparable accuracy — compression reframed as memory.</li>
+      <li><strong>Prompt caching became table stakes</strong> across every major provider (≈50–90% discounts on cached input) — which is precisely why <em>cache-aware</em> compression beats naïve compression.</li>
+      <li><strong>Self-evolving context.</strong> Newer work (e.g. ACE — Agentic Context Engineering) improves agents by evolving the <em>context</em> rather than the weights, fighting "context collapse" from over-aggressive summarization — the same lesson as Distil's never-regress gate, at the agent level.</li>
+      <li><strong>Sub-quadratic models</strong> (Mamba and linear-attention) attack the cost at the architecture layer — genuinely sub-quadratic, distinct from IO-aware exact attention like FlashAttention (still O(n²) compute). Orthogonal to, and composable with, token compression.</li>
+    </ul>
+
+    <div class="callout good">
+      <strong>The throughline.</strong> Every serious advance in this field is the same move: <em>find the tokens the outcome doesn't depend on, and stop paying for them — without changing the outcome.</em> Distil's contribution is to make that last clause a <em>proof</em>, applied in tiers, measured on your real traffic. Start with <a href="getting-started.html">Install &amp; Quickstart</a>, then read <a href="concepts.html">Concepts</a> and <a href="techniques.html">Techniques</a> for the depth behind each rung.
+    </div>
+
+    <h2>Further reading</h2>
+    <p style="color:#9aa1b3;">Primary sources behind this page — verified, for the curious:</p>
+    <ul style="font-size:13.5px;color:#9aa1b3;">
+      <li>Sennrich et al., <em>Neural Machine Translation of Rare Words with Subword Units</em> (BPE) — arXiv:1508.07909</li>
+      <li>Jiang et al., <em>LLMLingua</em> (2310.05736) · <em>LongLLMLingua</em> (2310.06839) · Pan et al., <em>LLMLingua-2</em> (2403.12968)</li>
+      <li>Li et al., <em>Selective Context</em> (2310.06201) · Xu et al., <em>RECOMP</em> (2310.04408)</li>
+      <li>Zhang et al., <em>H2O</em> (2306.14048) · Li et al., <em>SnapKV</em> (2404.14469) · Xiao et al., <em>StreamingLLM</em> (2309.17453)</li>
+      <li>Mu et al., <em>Gisting</em> (2304.08467) · Chevalier et al., <em>AutoCompressors</em> (2305.14788) · Ge et al., <em>ICAE</em> (2307.06945)</li>
+      <li>Hinton et al., <em>Distilling the Knowledge in a Neural Network</em> (1503.02531) · Chen et al., <em>FrugalGPT</em> (2305.05176) · Ong et al., <em>RouteLLM</em> (2406.18665)</li>
+      <li>Packer et al., <em>MemGPT</em> (2310.08560) · Chhikara et al., <em>mem0</em> (2504.19413) · Rasmussen et al., <em>Zep</em> (2501.13956)</li>
+      <li>Dao et al., <em>FlashAttention</em> (2205.14135) · Gu &amp; Dao, <em>Mamba</em> (2312.00752) · Zhang et al., <em>ACE</em> (2510.04618)</li>
+      <li>Schuirmann, <em>Two One-Sided Tests</em>, J. Pharmacokinet. Biopharm. 15(6):657–680 (1987) · Anthropic, <em>Effective context engineering for AI agents</em> (2025)</li>
+    </ul>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+// Honest loop-cost calculator: real n(n+1)/2 input math + documented cache multipliers.
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var turns = $("te-turns"), prefix = $("te-prefix"), step = $("te-step"), model = $("te-model");
+  if (!turns) return;
+  var fmtN = function (n) { return Math.round(n).toLocaleString(); };
+  var fmt$ = function (d) { return "$" + (d < 10 ? d.toFixed(4) : d.toFixed(2)); };
+  function recalc() {
+    var n = +turns.value, F = +prefix.value, b = +step.value, inP = (+model.value) / 1e6;
+    var CACHE_READ = 0.10, CACHE_WRITE = 1.25, LOSSLESS = 0.268;
+    var naiveTok = 0, cachedCost = 0, distilCost = 0;
+    for (var k = 1; k <= n; k++) {
+      var history = (k - 1) * b;          // accumulated prior turns
+      var fresh = F + history + b;         // naïve: whole context is fresh
+      naiveTok += fresh;
+      // cached: prefix written once (turn 1) then read at 0.1x; history+new stay fresh
+      var prefixCost = (k === 1) ? F * CACHE_WRITE : F * CACHE_READ;
+      cachedCost += (prefixCost + history + b) * inP;
+      // distil: lossless removal of fresh (non-prefix) tokens, on top of caching
+      var freshTail = (history + b) * (1 - LOSSLESS);
+      distilCost += (prefixCost + freshTail) * inP;
+    }
+    $("te-turns-v").textContent = n;
+    $("te-prefix-v").textContent = fmtN(F);
+    $("te-step-v").textContent = fmtN(b);
+    $("te-naive").textContent = fmt$(naiveTok * inP);
+    $("te-cached").textContent = fmt$(cachedCost);
+    $("te-distil").textContent = fmt$(distilCost);
+  }
+  [turns, prefix, step, model].forEach(function (el) {
+    el.addEventListener("input", recalc); el.addEventListener("change", recalc);
+  });
+  recalc();
+})();
+</script>
+<script src="site.js" defer></script>
+</body>
+</html>
