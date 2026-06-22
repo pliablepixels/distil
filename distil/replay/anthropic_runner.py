@@ -37,11 +37,20 @@ class AnthropicRunner:
     name = "anthropic"
 
     def __init__(
-        self, model: str = "claude-opus-4-8", client: object | None = None, max_tokens: int = 4096
+        self,
+        model: str = "claude-opus-4-8",
+        client: object | None = None,
+        max_tokens: int = 4096,
+        samples: int = 1,
     ) -> None:
         self.model = model
         self._client = client
         self.max_tokens = max_tokens
+        # Newer models deprecate `temperature`, so we can't pin sampling to 0.
+        # Instead, take the MAJORITY decision over `samples` calls — the stable
+        # "most-likely action" — which removes the model's own run-to-run variance
+        # that would otherwise masquerade as a compression-induced divergence.
+        self.samples = max(1, samples)
 
     def _ensure_client(self) -> object:
         if self._client is None:
@@ -51,6 +60,14 @@ class AnthropicRunner:
         return self._client
 
     def decide(self, blocks: list[Block]) -> str:
+        if self.samples == 1:
+            return self._sample(blocks)
+        from collections import Counter
+
+        votes = Counter(self._sample(blocks) for _ in range(self.samples))
+        return votes.most_common(1)[0][0]
+
+    def _sample(self, blocks: list[Block]) -> str:
         # Stable system/tool context -> system prompt; everything else -> the user turn.
         system_parts = [
             b.text
