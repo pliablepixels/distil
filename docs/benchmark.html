@@ -178,7 +178,11 @@ export ANTHROPIC_API_KEY=sk-ant-…
 distil <span class="c">benchmark</span> --corpus corpus_taubench --runner anthropic --tokenizer anthropic
 
 <span class="d"># 3) the certified leaders now carry a live-model decision-equivalence verdict</span></pre>
-    <p style="color:#9aa1b3;font-size:13.5px;">What this buys: the <code>equiv</code> column becomes "did the live model make the same decision on the compressed context," graded on τ-bench / SWE-bench / GSM8K episodes instead of the synthetic corpus. The <a href="research.html">non-inferiority gate</a>, the cost model, and the technique set are unchanged — only the judge and the data get more real. That is the concrete bridge from "leads our reproducible benchmark" to "leads on a public benchmark, graded by the model itself."</p>
+    <p style="color:#9aa1b3;font-size:13.5px;">What this buys: the <code>equiv</code> column becomes "did the live model make the same decision on the compressed context," graded on τ-bench / SWE-bench / GSM8K episodes instead of the synthetic corpus. The <a href="research.html">non-inferiority gate</a>, the cost model, and the technique set are unchanged — only the judge and the data get more real.</p>
+
+    <div class="callout warn">
+      <strong>What the live model actually said (and we won't hide it).</strong> We ran exactly this on the bundled corpus, opus-4-8, majority-vote-3, filtered to the turns where the model is self-consistent on identical context (about <strong>half</strong> of all turns — on the other half the model itself varies, so equivalence is undefined and it's nobody's compression that "failed"). On the unambiguous turns: <strong>distil-lossless and byte-exact lead at 86%</strong>; truncate/summarize 79%; <strong>aggressive distil-causal drops to 57%</strong>. Two honest consequences: (1) the deterministic gate is an <em>optimistic proxy</em> for aggressive pruning — the structural "distil-causal leads" result does <em>not</em> hold under the live model; (2) the robust operating point is the conservative, recoverable <strong>distil-lossless</strong>, and aggressive modes should be gated by the live runner or the <a href="#the-equivalence-dial">equivalence dial</a>. No method reaches 100% even on unambiguous turns — a ~14% residual is pure model variance, not compression. That is the real ceiling, reported, not spun.
+    </div>
 
     <div class="site-footer">
       Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
