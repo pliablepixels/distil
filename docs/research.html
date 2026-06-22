@@ -130,7 +130,7 @@ certified ceiling: 8.4% savings (beyond this, lossy compression drops decisions 
     <h2 id="online">Self-distilling keep-model</h2>
     <p><strong>Module:</strong> <code>distil/online.py</code> &middot; <strong>Command:</strong> <code>distil online [--corpus --promote-to]</code></p>
 
-    <p>Headroom trains a keep-model on a generic judge applied to synthetic data. Distil trains on <strong>causal labels</strong> — certified-safe drops discovered by the ablation engine running on your own real traffic. This is the moat headroom cannot copy.</p>
+    <p>Most learned compressors train a keep-model on a generic judge applied to synthetic data. Distil trains on <strong>causal labels</strong> — certified-safe drops discovered by the ablation engine running on your own real traffic. The label source is the moat: a model that learns what <em>actually</em> changed a decision, not what a judge guessed.</p>
 
     <h3>The never-regressing loop</h3>
     <p>The loop has four steps, each grounded in the source:</p>

@@ -62,15 +62,15 @@
     <p class="lead">Every compression method shrinks tokens. The only number that matters is how much it saves <em>without changing what the agent decides</em> — and what it truly costs once prompt caching is priced in. This is a head-to-head on exactly that axis, where every technique runs through the <strong>same</strong> decision-equivalence gate and the <strong>same</strong> cache-aware cost model. The winner is computed, not assumed.</p>
 
     <div class="callout good">
-      <strong>The result, in one line.</strong> Across a <strong>64-trajectory, 8-family corpus</strong> spanning the content agents actually traffic in, <strong>Distil leads on <em>certified</em> savings — 81.5% cheaper at 100% decision-equivalence</strong>. Every other technique — including the real, installed <strong>Headroom</strong> package — posts a raw cut but drops decisions and is disqualified by the gate. Even Distil's <em>byte-exact</em> lossless mode (58%) tops every competitor's certified number, because theirs is zero.
+      <strong>The result, in one line.</strong> Across a <strong>64-trajectory, 8-family corpus</strong> spanning the content agents actually traffic in, <strong>Distil leads on <em>certified</em> savings — 81.5% cheaper at 100% decision-equivalence</strong>. Every lossy technique posts a real <em>raw</em> cut but drops decisions and is disqualified by the gate. Even Distil's <em>byte-exact</em> lossless mode (58%) tops every competitor's certified number, because theirs is zero.
     </div>
 
     <h2>The standings</h2>
-    <p>Ranked by cache-aware dollar savings on the varied corpus (see methodology below). <strong>Certified</strong> means the method passed a statistical non-inferiority test <em>and</em> preserved 100% of decisions; anything less is disqualified, however much it saved. Competitor rows are produced by the real installed packages via the reproducible <code>--external</code> seam — not our reimplementations.</p>
+    <p>Ranked by cache-aware dollar savings on the varied corpus (see methodology below). <strong>Certified</strong> means the method passed a statistical non-inferiority test <em>and</em> preserved 100% of decisions; anything less is disqualified, however much it saved. Want to test a specific tool? Register it through the reproducible <code>--external</code> seam and it's measured on the identical axes.</p>
 
     <table>
       <thead>
-        <tr><th>Technique</th><th>What it is</th><th style="text-align:right">Tokens&nbsp;saved</th><th style="text-align:right">$&nbsp;saved</th><th style="text-align:right">Decision&nbsp;equiv.</th><th>Verdict</th><th>Fidelity</th></tr>
+        <tr><th>Technique</th><th>Family</th><th style="text-align:right">Tokens&nbsp;saved</th><th style="text-align:right">$&nbsp;saved</th><th style="text-align:right">Decision&nbsp;equiv.</th><th>Verdict</th><th>Fidelity</th></tr>
       </thead>
       <tbody>
         <tr style="background:rgba(139,123,255,.08)">
@@ -94,24 +94,16 @@
           <td style="text-align:right">56.5%</td><td style="text-align:right">57.2%</td>
           <td style="text-align:right">39%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
         <tr>
-          <td><strong>Headroom</strong> <span style="color:#5b6177">(headroom-ai, real)</span></td><td>structural crusher (SmartCrusher)</td>
-          <td style="text-align:right">36.1%</td><td style="text-align:right">36.5%</td>
-          <td style="text-align:right">84%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
-        <tr>
           <td>extractive-prune</td><td>extractive importance (LLMLingua family)</td>
           <td style="text-align:right">18.2%</td><td style="text-align:right">18.4%</td>
           <td style="text-align:right">77%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
-        <tr>
-          <td><strong>RTK</strong> <span style="color:#5b6177">(rtk-ai, real)</span></td><td>command-output wrapper — no raw-text mode</td>
-          <td style="text-align:right">n/a</td><td style="text-align:right">n/a</td>
-          <td style="text-align:right">n/a</td><td><span style="color:#9aa1b3">— not comparable</span></td><td>—</td></tr>
         <tr>
           <td>minify-all</td><td>lossless minification</td>
           <td style="text-align:right">0.1%</td><td style="text-align:right">0.1%</td>
           <td style="text-align:right">100%</td><td><span class="badge-pass">✔ certified</span></td><td>byte-exact</td></tr>
       </tbody>
     </table>
-    <p style="font-size:12.5px;color:#5b6177;">*<code>distil-causal</code> drops context that ablation <em>proves</em> never changed a decision — not byte-reversible, but certified decision-equivalent. The three Distil operating points are all certified at 100%: <code>distil-lossless</code> (byte-exact: <strong>structured fold</strong> + <strong>template mining</strong>), <code>distil-stream</code> (adds <strong>cross-turn dedup</strong> of recurring tool output the cache can't reach — fully recoverable), and <code>distil-causal</code> (adds causal pruning). <strong>Headroom</strong> and <strong>RTK</strong> rows are the actual installed packages run through the <code>--external</code> seam: Headroom's SmartCrusher cuts 36% but its lossy transforms flip ~16% of decisions → disqualified; RTK only compresses the output of specific wrapped commands (git/cargo/…) and exposes no text API, so it isn't comparable on the context-compression axis (a layer difference, not a defect). Numbers: <code>claude-opus-4-8</code> pricing, deterministic runner. Reproduce below.</p>
+    <p style="font-size:12.5px;color:#5b6177;">*<code>distil-causal</code> drops context that ablation <em>proves</em> never changed a decision — not byte-reversible, but certified decision-equivalent. The three Distil operating points are all certified at 100%: <code>distil-lossless</code> (byte-exact: <strong>structured fold</strong> + <strong>template mining</strong>), <code>distil-stream</code> (adds <strong>cross-turn dedup</strong> of recurring tool output the cache can't reach — fully recoverable), and <code>distil-causal</code> (adds causal pruning). The lossy families are faithful reference implementations; bring your own tool with <code>--external</code> to add it to the table. Numbers: <code>claude-opus-4-8</code> pricing, deterministic runner. Reproduce below.</p>
 
     <h2>The corpus</h2>
     <p>To avoid any one tool's home-turf advantage, the comparison runs on <strong>64 reproducible trajectories across 8 families</strong> deliberately spanning both regimes: <em>structured/repetitive</em> data (JSON record arrays, SQL rows, metrics, logs) where structural compaction pays off, and <em>diagnostic/prose</em> content (Kubernetes incidents, stack traces, RAG chunks, support transcripts) that conservative crushers protect and lossy methods mangle. Decisions are <strong>buried inside</strong> large tool outputs — as on real agents — so naive head/tail truncation drops them (14% equivalence). A large reference doc is <strong>re-read every turn</strong> (the recurring tool output prompt caching can't reach), which Distil's cross-turn dedup collapses and others re-bill in full.</p>
@@ -131,12 +123,12 @@
       <div class="card">
         <div class="tag">Raw ≠ real</div>
         <h3 style="margin-top:8px;">Two ways to "win" that don't count</h3>
-        <p>A method can post a big <em>raw</em> token cut yet <strong>flip decisions</strong> — Headroom's SmartCrusher cuts 36% but changes ~16% of decisions; summarize cuts 56% but keeps only 39%; truncation cuts 79% but keeps 14%. All disqualified. Or a method can shave tokens yet <strong>bust the prompt cache</strong> and cost <em>more</em> in real dollars. The benchmark prices both, so neither illusion survives.</p>
+        <p>A method can post a big <em>raw</em> token cut yet <strong>flip decisions</strong> — summarize cuts 56% but keeps only 39%; truncation cuts 79% but keeps 14%; extractive importance cuts 18% but keeps 77%. All disqualified. Or a method can shave tokens yet <strong>bust the prompt cache</strong> and cost <em>more</em> in real dollars. The benchmark prices both, so neither illusion survives.</p>
       </div>
       <div class="card">
         <div class="tag">Verify it yourself</div>
         <h3 style="margin-top:8px;">Plug in a real tool</h3>
-        <p>The <strong>Headroom</strong> and <strong>RTK</strong> rows aren't our reimplementations — they're the actual installed packages run through the <code>--external</code> seam (<code>pip install headroom-ai</code>, then one command). Register any other compressor the same way. "Distil leads on certified savings" is reproducible — and falsifiable. That's the point.</p>
+        <p>Don't trust our reference baselines? Register any installed compressor through the <code>--external</code> seam and it's measured on the identical axes. The claim "Distil leads on certified savings" is reproducible — and falsifiable. That's the point.</p>
       </div>
     </div>
 
