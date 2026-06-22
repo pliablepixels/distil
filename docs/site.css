@@ -335,3 +335,61 @@ pre:hover .copy-btn { opacity: 1; }
 .toc a:hover { color: var(--mut); }
 .toc a.active { color: var(--acc2); border-left-color: var(--acc2); }
 @media (max-width: 1340px) { .toc { display: none; } }
+
+/* ── Learn course: hub, module nav, takeaways, pager ──────────────────────── */
+.course-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 18px; }
+.course-kicker { font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--acc2); }
+.read-pill { font-size:11.5px; color:var(--dim); border:1px solid var(--line2); border-radius:20px;
+  padding:3px 11px; background:rgba(255,255,255,.02); }
+
+/* curriculum rail — 3 module chips shown on every course page */
+.curriculum { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 30px; padding:0; list-style:none; }
+.curriculum a { flex:1; min-width:180px; display:block; text-decoration:none; border:1px solid var(--line);
+  border-radius:12px; padding:12px 14px; background:var(--card); transition:transform .18s, border-color .18s; }
+.curriculum a:hover { transform:translateY(-2px); border-color:#2f3a5a; }
+.curriculum a.active { border-color:#3a3170; box-shadow:0 0 0 1px #2a2550, var(--shadow); }
+.curriculum .cn { font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.curriculum a.active .cn { color:var(--acc2); }
+.curriculum .ct { display:block; margin-top:3px; font-size:13.5px; font-weight:650; color:var(--ink);
+  letter-spacing:-.01em; }
+
+/* hub module cards */
+.modules { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:18px 0 30px; }
+@media (max-width:900px){ .modules { grid-template-columns:1fr; } }
+.mod { position:relative; display:flex; flex-direction:column; text-decoration:none; background:var(--card);
+  border:1px solid var(--line2); border-radius:16px; padding:22px; box-shadow:var(--shadow);
+  transition:transform .18s, border-color .18s, box-shadow .18s; }
+.mod:hover { transform:translateY(-4px); border-color:#2f3a5a; box-shadow:var(--shadow), var(--shadow2); }
+.mod .num { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
+  border-radius:12px; font-size:18px; font-weight:800; color:#fff; background:var(--grad); margin-bottom:14px;
+  box-shadow:0 8px 24px -10px rgba(139,123,255,.7); }
+.mod h3 { margin:0 0 6px; font-size:18px; color:var(--ink); }
+.mod p { margin:0 0 14px; font-size:13.5px; color:var(--mut); line-height:1.55; }
+.mod ul { margin:0 0 16px; padding-left:18px; }
+.mod li { font-size:12.5px; color:var(--mut); margin:3px 0; }
+.mod .go { margin-top:auto; font-size:13px; font-weight:700; color:var(--acc2); }
+.mod .rt { position:absolute; top:22px; right:22px; font-size:11px; color:var(--dim); }
+
+/* key takeaway box */
+.takeaway { border:1px solid rgba(90,209,154,.28); border-left:3px solid var(--good);
+  background:linear-gradient(180deg,#0c1a14,#0a0f0c); border-radius:14px; padding:16px 20px; margin:24px 0; }
+.takeaway b { color:var(--good); letter-spacing:.04em; font-size:11px; text-transform:uppercase; }
+.takeaway ul { margin:8px 0 0; padding-left:20px; } .takeaway li { margin:5px 0; color:var(--mut); font-size:13.5px; }
+
+/* what you'll learn */
+.learn-goals { border:1px solid var(--line2); border-radius:14px; background:rgba(255,255,255,.015);
+  padding:16px 20px; margin:0 0 26px; }
+.learn-goals .lg-t { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--acc); margin-bottom:8px; }
+.learn-goals ul { margin:0; padding-left:20px; } .learn-goals li { margin:4px 0; color:var(--mut); font-size:13.5px; }
+
+/* prev / next pager */
+.pager { display:flex; gap:14px; margin:42px 0 0; }
+.pager a { flex:1; text-decoration:none; border:1px solid var(--line2); border-radius:14px; padding:14px 18px;
+  background:var(--card); transition:transform .18s, border-color .18s; }
+.pager a:hover { transform:translateY(-2px); border-color:#2f3a5a; }
+.pager .dir { font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.pager .ttl { display:block; margin-top:3px; font-size:14px; font-weight:650; color:var(--ink); }
+.pager .nx { text-align:right; }
+@media (max-width:640px){ .pager { flex-direction:column; } }
