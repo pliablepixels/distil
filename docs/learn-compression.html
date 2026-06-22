@@ -79,6 +79,8 @@
       </ul>
     </div>
 
+    <p style="color:#9aa1b3;"><a href="learn-tokens.html">Module 1</a> showed where the tokens pile up inside a <em>single</em> request. Now we follow them across a whole conversation — where the real money is.</p>
+
     <h2>The multi-turn tax: why cost is <span class="g">quadratic</span></h2>
     <p>Single-turn cost is linear and boring. Multi-turn is where bills explode — and the shape is <strong>quadratic, not linear</strong>. Because each turn re-bills <em>all</em> the tokens before it, the cumulative cost of an <em>n</em>-turn loop is the sum 1 + 2 + … + <em>n</em> = <em>n(n+1)/2</em> = <strong>O(n²)</strong>. A four-turn conversation costs <strong>4 + 3 + 2 + 1 = 10×</strong> the first turn's tokens — not 4×.</p>
 

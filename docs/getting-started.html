@@ -91,7 +91,7 @@ distil certify</pre>
       <div class="card">
         <span class="tag">macOS / Linux</span>
         <h3>Homebrew</h3>
-        <p>Installs into an isolated keg — doesn't touch your Python. <strong>Prereq:</strong> Homebrew.</p>
+        <p>Installs into an isolated keg — doesn't touch your Python. <strong>Prereq:</strong> Homebrew <em>and</em> <code>git</code> (third-party taps are cloned with git — <code>brew install git</code> if you hit <code>Error: Git is unavailable</code>). No git? Use pipx/uvx above.</p>
         <pre class="term">brew install dshakes/tap/distil
 distil bench</pre>
       </div>
