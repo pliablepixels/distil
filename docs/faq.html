@@ -147,7 +147,7 @@ distil bench   --tokenizer anthropic</pre>
         <tr><td>BM25 partial retrieval · delta context · keep-model codec · gist caching</td><td><span class="badge-pass">Done</span> — all wired, real implementations</td></tr>
         <tr><td>Provider proxy + managed gateway</td><td><span class="badge-pass">Done</span> — <code>distil proxy</code> / <code>distil gateway</code> (live per-tenant dashboard)</td></tr>
         <tr><td>Output compression (input <em>and</em> output)</td><td><span class="badge-pass">Done</span> — gated shaping + lossless re-entry digest, <code>distil output-savings</code></td></tr>
-        <tr><td>Learned keep-model (logistic + transformer)</td><td><span class="badge-pass">Done</span> — logistic ships built-in (96.4%/0.98); transformer adapter + training pipeline + demo checkpoint</td></tr>
+        <tr><td>Learned keep-model (logistic + transformer)</td><td><span class="badge-pass">Done</span> — logistic ships built-in (96.4%/0.98 on held-out lines, labels from the heuristic); transformer adapter + training pipeline + demo checkpoint</td></tr>
         <tr><td>Certified compression frontier (proof pack)</td><td><span class="badge-pass">Done</span> — <code>distil eval</code></td></tr>
         <tr><td>Self-distilling keep-model (causal labels, never-regressing)</td><td><span class="badge-pass">Done</span> — <code>distil online</code></td></tr>
         <tr><td>Verifiable federated telemetry</td><td><span class="badge-pass">Done</span> — <code>distil federated-leaderboard</code></td></tr>

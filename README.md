@@ -221,7 +221,7 @@ distil prune
 
 ---
 
-## 🧩 What's inside (all real, all wired, no stubs)
+## 🧩 What's inside (real implementations, no stubs)
 
 | Capability | Module | Loss profile |
 |---|---|---|
@@ -233,7 +233,7 @@ distil prune
 | **Provider proxy** — drop-in across SDKs | `proxy.py`, `distil proxy` | reversible |
 | **Managed gateway** — multi-tenant + live savings dashboard | `gateway.py`, `distil gateway` | — |
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |
-| **Learned keep-model** (logistic, 96.4% acc / 0.98 F1 held-out) | `codec/learned.py` | pluggable |
+| **Learned keep-model** (logistic, 96.4% / 0.98 F1 on held-out lines; labels distilled from the salience heuristic + bundled corpus) | `codec/learned.py` | pluggable |
 | Transformer keep-model — ONNX adapter + training pipeline | `codec/transformer.py`, `codec/train_transformer.py` | pluggable |
 | Auth-mode gating (lossless-only on subscription/OAuth) | `policy.py` | safety |
 | Holdout A/B savings + bootstrap CI | `certify/holdout.py` | — |
@@ -285,8 +285,8 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 - **Lossless output-on-re-entry digest** — long answers that become history are digested reversibly, so verbose past output stops costing full price as context.
 
 ```
-$ distil output-savings
-output tokens cut 72.5% (95% CI 67.5–77.1%), answer preserved 100.0% of the time, n=6
+$ distil output-savings   # live A/B (needs an API key); small sample — verify on your own workload
+output tokens cut 72.5% (95% CI 67.5–77.1%), answer preserved across the n=6 sample
 ```
 
 **Run the gate on *your* traffic, not just the synthetic corpus:**
