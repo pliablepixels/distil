@@ -60,7 +60,10 @@
   <main class="content">
 
     <h1>Compression <span class="g">Techniques</span></h1>
-    <p class="lead">Every technique in Distil targets a specific slice of agent cost. Two carry the bulk of the win; the rest stack cleanly on top.</p>
+    <p class="lead">Every technique in Distil targets a specific slice of agent cost. Two carry the bulk of the win; the rest stack cleanly on top — and one of them is something no lossy compressor can copy.</p>
+
+    <div class="callout good">
+      <strong>★ The differentiator — recoverable compression.</strong> <strong>Module:</strong> <code>distil/expand.py</code> · <code>distil proxy --expand</code>. Every other compressor is <em>lossy</em> — crush a tool output and the detail is gone. Distil digests behind a content handle and keeps the original locally, then injects a <code>distil_expand</code> tool so the model can <strong>pull back exactly the detail it needs, on demand</strong>: Distil resolves the handle from the local store and re-queries, <em>transparently</em>, before the agent ever sees the response. Two consequences competitors structurally can't match — (1) you can compress fearlessly, because nothing is lost and the model is its own safety net; (2) every <code>distil_expand</code> call is a label that the digested content mattered, training the keep-model to stop digesting what <em>your</em> workload depends on. Compress more, lose nothing, get better with use. Proven end-to-end (<code>tests/test_expand.py</code>).</div>
 
     <hr/>
 

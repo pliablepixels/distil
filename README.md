@@ -63,6 +63,18 @@ Compression reframed as **decision-equivalence** and certified with **TOST non-i
 
 ---
 
+## 🔑 What only Distil can do — recoverable compression
+
+Every other compressor — summarizers, extractive pruners, structural crushers — is **lossy**: once it crushes a tool output, the detail is *gone*. Distil **digests behind a content handle and keeps the original locally**, then hands the agent a `distil_expand` tool. Run with `distil proxy --expand` (or `distil wrap --expand`) and:
+
+- **The model pulls back exactly the detail it needs, on demand** — Distil resolves the handle from the local store and re-queries, *transparently*. Your agent code never changes; it just gets the right answer.
+- **So you can compress fearlessly.** The dangerous failure mode of lossy compression — "it dropped something load-bearing" — is gone, because the safety net is the model recovering the detail itself.
+- **Every expansion is a label.** A `distil_expand` call is ground truth that the digested content *mattered*. Logged (numbers only, never content), these train the keep-model to stop digesting what *your* workload depends on — a compounding moat a lossy tool can't build, because it has nothing to expand and no signal to learn from.
+
+This is the structural advantage: **compress more, lose nothing, and get better the more you use it.** Lossy competitors can't follow here without rebuilding around reversibility.
+
+---
+
 ## ⚡ 60-second start
 
 ```bash

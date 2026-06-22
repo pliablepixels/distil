@@ -97,6 +97,7 @@ def build_handler(
     shape_output: str = "off",
     savings: Any = None,
     flush_every: int = 50,
+    expand: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a ``BaseHTTPRequestHandler`` subclass configured for *upstream*.
 
@@ -220,6 +221,7 @@ def build_handler(
             raw = self._read_body()
             headers = self._client_headers()
             extras: dict[str, str] = {}
+            store: Any = None  # RestoreStore once messages are compressed (for expand)
 
             try:
                 body: dict[str, Any] = json.loads(raw)
@@ -231,7 +233,7 @@ def build_handler(
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
-                compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                compressed, store = compress_messages(original, lossless_only=lossless_only)
                 before_tok = _count_messages(original)
                 after_tok = _count_messages(compressed)
                 saved = max(0, before_tok - after_tok)
@@ -240,6 +242,12 @@ def build_handler(
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
                 }
+                # Recoverable compression: if anything was digested, offer the model
+                # the distil_expand tool so it can pull back detail on demand.
+                if expand and getattr(store, "handles", None):
+                    from .expand import inject_expand_tool
+
+                    body = inject_expand_tool(body)
                 # Accumulate GENUINE savings from real traffic into the ledger.
                 if savings is not None:
                     savings.record(before_tok, after_tok)
@@ -254,6 +262,25 @@ def build_handler(
 
             new_raw = json.dumps(body).encode()
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
+
+            # Transparent expand loop: resolve any distil_expand tool calls against
+            # the local store and re-query, invisibly, before returning to the agent.
+            if expand and getattr(store, "handles", None):
+                try:
+                    resp_json = json.loads(rbody)
+                except (ValueError, TypeError):
+                    resp_json = None
+                if isinstance(resp_json, dict):
+                    from .expand import run_expand_loop
+
+                    def _post(b: dict[str, Any]) -> dict[str, Any]:
+                        _s, _h, rb = self._post_upstream(self.path, json.dumps(b).encode(), headers)
+                        return json.loads(rb)
+
+                    final = run_expand_loop(body, resp_json, store, _post)
+                    if final is not resp_json:
+                        rbody = json.dumps(final).encode()
+                        extras["x-distil-expanded"] = "1"
             self._relay(status, rhdrs, rbody, extras=extras)
 
         # ----------------------------------------------------------------
@@ -302,6 +329,7 @@ def serve(
     shape_output: str = "off",
     record: bool = True,
     pricing_model: str = "claude-opus-4-8",
+    expand: bool = False,
 ) -> None:
     """Run a blocking :class:`ThreadingHTTPServer` proxy.
 
@@ -327,11 +355,19 @@ def serve(
 
         savings = RuntimeSavings(model=pricing_model)
     handler = build_handler(
-        upstream, lossless_only=lossless_only, shape_output=shape_output, savings=savings
+        upstream,
+        lossless_only=lossless_only,
+        shape_output=shape_output,
+        savings=savings,
+        expand=expand,
     )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
+    if expand:
+        print(
+            "  → recoverable compression: distil_expand tool active (agent recovers detail on demand)"
+        )
     if shape_output != "off":
         print(f"  → output shaping: {shape_output}")
     if savings is not None:
@@ -356,6 +392,7 @@ def wrap_run(
     record: bool = True,
     pricing_model: str = "claude-opus-4-8",
     env_var: str = "ANTHROPIC_BASE_URL",
+    expand: bool = False,
 ) -> int:
     """Run *command* with its API base URL transparently pointed at a Distil proxy.
 
@@ -376,7 +413,11 @@ def wrap_run(
 
         savings = RuntimeSavings(model=pricing_model)
     handler = build_handler(
-        upstream, lossless_only=lossless_only, shape_output=shape_output, savings=savings
+        upstream,
+        lossless_only=lossless_only,
+        shape_output=shape_output,
+        savings=savings,
+        expand=expand,
     )
     server = ThreadingHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
     base = f"http://{host}:{server.server_address[1]}"

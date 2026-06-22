@@ -357,6 +357,7 @@ def cmd_proxy(args: argparse.Namespace) -> int:
             shape_output=args.shape_output,
             record=not args.no_record,
             pricing_model=args.pricing,
+            expand=args.expand,
         )
     return 0
 
@@ -380,6 +381,7 @@ def cmd_wrap(args: argparse.Namespace) -> int:
         record=not args.no_record,
         pricing_model=args.pricing,
         env_var=args.env_var,
+        expand=args.expand,
     )
 
 
@@ -764,6 +766,12 @@ def build_parser() -> argparse.ArgumentParser:
     px.add_argument(
         "--no-record", action="store_true", help="do not record genuine savings to the local ledger"
     )
+    px.add_argument(
+        "--expand",
+        action="store_true",
+        help="recoverable compression: inject the distil_expand tool so the agent can "
+        "pull back digested detail on demand (transparent server-side recovery loop)",
+    )
     px.set_defaults(func=cmd_proxy)
 
     wr = sub.add_parser(
@@ -798,6 +806,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     wr.add_argument(
         "--no-record", action="store_true", help="do not record genuine savings to the local ledger"
+    )
+    wr.add_argument(
+        "--expand",
+        action="store_true",
+        help="recoverable compression: the agent can pull back digested detail on demand",
     )
     wr.add_argument(
         "command",
