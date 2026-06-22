@@ -132,6 +132,22 @@
       </div>
     </div>
 
+    <h2>The equivalence <span class="g">dial</span></h2>
+    <p>100% decision-equivalence is the default — but it's a <em>setting</em>, not a wall. Some teams will trade a little equivalence for deeper savings. Distil makes that trade <strong>explicit and bounded</strong> instead of hidden: you set a target, and the compressor spends a <em>divergence budget</em> — <code>floor((1−target) × turns)</code> turns — on the <strong>highest-value</strong> turns first, falling back to byte-exact everywhere else. You always know exactly what you traded.</p>
+    <pre class="term"><span class="d">$ distil frontier --corpus benchmarks/corpus_xl</span>
+savings-vs-equivalence dial  (runner=deterministic)
+
+   target   achieved equiv  token savings   curve
+----------------------------------------------------------------------
+     100%             100%          58.1%   ████████████████
+      95%             100%          58.1%   ████████████████
+      90%             100%          58.1%   ████████████████
+      80%              82%          62.9%   ██████████████████
+----------------------------------------------------------------------
+At 100% you get the certified-safe result. Relax the target and the budget is
+spent on the highest-value turns — deeper savings, a known equivalence cost.</pre>
+    <p style="font-size:12.5px;color:#5b6177;">Honest notes: the dial's resolution is bounded by session length — on 5-turn trajectories the budget steps in 20% increments, so 95% and 90% round to the certified-safe point; longer sessions dial finer. The extra savings are real but modest (a principled risk knob, not a magic unlock), and the trade is always reported, never silent. Grade the frontier against the live model with <code>--runner anthropic</code>.</p>
+
     <h2>Reproduce it</h2>
     <pre class="term"><span class="d"># the bundled 7-domain standings, offline, zero API key</span>
 distil <span class="c">benchmark</span>

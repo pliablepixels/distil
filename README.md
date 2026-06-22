@@ -125,6 +125,15 @@ Every technique through the **same** decision-equivalence gate and the **same** 
 
 **The only methods that pass the gate are Distil's** — every lossy alternative posts a raw cut but changes decisions. Even byte-exact `distil-lossless` beats every competitor's *certified* number, because theirs is zero. Reproduce: `python benchmarks/gen_corpus.py && distil benchmark --corpus benchmarks/corpus_xl`. Bring your own tool with `--external module:function`. → full methodology: [docs/benchmark](https://dshakes.github.io/distil/benchmark.html)
 
+**Tune the trade — the equivalence dial.** 100% decision-equivalence is the default, not a wall. Set a lower target and Distil spends a bounded *divergence budget* on the highest-value turns — deeper savings for a **measured, explicit** equivalence cost, with byte-exact fallback everywhere else. The trade is always reported, never hidden:
+
+```
+$ distil frontier --corpus benchmarks/corpus_xl
+   target   achieved equiv  token savings
+     100%             100%          58.1%      ← certified-safe
+      80%              82%          62.9%      ← deeper, by an amount you chose
+```
+
 ---
 
 ## 🔌 Works with every SDK

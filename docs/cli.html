@@ -592,6 +592,33 @@ LEADER (certified $ savings): distil-causal — 37.4% cheaper, 100% decision-equ
 
     <hr/>
 
+    <!-- frontier -->
+    <h2 id="frontier">distil frontier</h2>
+    <p>The <strong>savings-vs-equivalence dial</strong>. 100% decision-equivalence is the certified-safe default; relax the target and Distil spends a bounded <em>divergence budget</em> (<code>floor((1−target) × turns)</code> turns) on the highest-value turns, falling back to byte-exact everywhere else. The trade is explicit and reported — never hidden. See <a href="benchmark.html#the-equivalence-dial">Benchmark → the equivalence dial</a>.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--targets</code></td><td><code>1.0,0.97,0.95,0.90,0.80</code></td><td>Comma-separated equivalence targets in (0,1]</td></tr>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Custom corpus dir</td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> or <code>anthropic</code> (live model)</td></tr>
+        <tr><td><code>--samples</code></td><td><code>3</code></td><td>Majority-vote samples for the anthropic runner</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil frontier --corpus benchmarks/corpus_xl</span>
+savings-vs-equivalence dial  (runner=deterministic)
+
+   target   achieved equiv  token savings   curve
+----------------------------------------------------------------------
+     100%             100%          58.1%   <span class="g">████████████████</span>
+      95%             100%          58.1%   <span class="g">████████████████</span>
+      80%              82%          62.9%   <span class="g">██████████████████</span>
+----------------------------------------------------------------------</pre>
+
+    <hr/>
+
     <!-- online -->
     <h2 id="online">distil online</h2>
     <p>One <strong>self-distilling round</strong>: collects causal labels from your corpus (certified-safe drops discovered by the ablation engine), retrains the logistic keep-model, and promotes the new weights only if they pass the non-inferiority gate on every trajectory. Never-regressing by construction — a cycle that would degrade quality is silently discarded.</p>

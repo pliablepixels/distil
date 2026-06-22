@@ -504,6 +504,44 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_frontier(args: argparse.Namespace) -> int:
+    """The savings-vs-equivalence dial: how much more you save as you relax the
+    decision-equivalence target below 100%."""
+    from .compress.adaptive import frontier
+    from .replay.runner import DeterministicRunner
+
+    runner = DeterministicRunner()
+    if args.runner == "anthropic":
+        from .replay.anthropic_runner import AnthropicRunner
+
+        runner = AnthropicRunner(samples=args.samples)
+    entries = load_corpus(args.corpus) if args.corpus else load_corpus()
+    try:
+        targets = tuple(float(x) for x in args.targets.split(","))
+    except ValueError:
+        print("--targets must be comma-separated numbers in (0,1], e.g. 1.0,0.97,0.95")
+        return 2
+
+    points = frontier(entries, runner, targets=targets)
+    print(f"savings-vs-equivalence dial  (runner={getattr(runner, 'name', 'deterministic')})\n")
+    print(f"{'target':>9}{'achieved equiv':>17}{'token savings':>15}   curve")
+    print("-" * 70)
+    for p in points:
+        bar = "█" * round(p.savings * 28)
+        print(
+            f"{p.target * 100:>8.0f}%{p.equivalence * 100:>16.0f}%{p.savings * 100:>14.1f}%   {bar}"
+        )
+    print("-" * 70)
+    top = points[0]
+    print(
+        f"\nAt 100% you get the certified-safe result ({top.savings * 100:.1f}% saved, "
+        "every decision preserved). Relax the target and Distil spends a bounded "
+        "'divergence budget' on the highest-value turns — deeper savings, a known "
+        "equivalence cost. You choose the point; the trade is explicit, not hidden."
+    )
+    return 0
+
+
 def cmd_eval(args: argparse.Namespace) -> int:
     """The certified compression frontier (savings vs decision-equivalence)."""
     import time
@@ -645,9 +683,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ev = sub.add_parser("eval", help="certified compression frontier (savings vs accuracy)")
     ev.add_argument("--corpus", help="custom corpus dir (e.g. ingested benchmark traces)")
-    ev.add_argument(
-        "--runner", default="deterministic", choices=("deterministic", "anthropic")
-    )
+    ev.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
     ev.add_argument("--out", help="write the raw curve JSONL to this dir")
     ev.set_defaults(func=cmd_eval)
 
@@ -656,9 +692,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="head-to-head vs competing techniques on the same gate + cost model",
     )
     bn.add_argument("--corpus", help="custom corpus dir (e.g. ingested benchmark traces)")
-    bn.add_argument(
-        "--runner", default="deterministic", choices=("deterministic", "anthropic")
-    )
+    bn.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
     bn.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
     bn.add_argument("--tokenizer", default="heuristic", choices=("heuristic", "anthropic"))
     bn.add_argument("--margin", type=float, default=0.02, help="TOST non-inferiority margin")
@@ -672,6 +706,22 @@ def build_parser() -> argparse.ArgumentParser:
     bn.add_argument("--html", help="render the comparison as a self-contained HTML page")
     bn.add_argument("--out", help="write raw results JSONL to this dir")
     bn.set_defaults(func=cmd_benchmark)
+
+    fr = sub.add_parser(
+        "frontier",
+        help="savings-vs-equivalence dial: deeper compression as you relax the target",
+    )
+    fr.add_argument("--corpus", help="custom corpus dir")
+    fr.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
+    fr.add_argument(
+        "--samples", type=int, default=3, help="majority-vote samples (anthropic runner)"
+    )
+    fr.add_argument(
+        "--targets",
+        default="1.0,0.97,0.95,0.90,0.80",
+        help="comma-separated equivalence targets in (0,1]",
+    )
+    fr.set_defaults(func=cmd_frontier)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)
