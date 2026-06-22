@@ -58,7 +58,7 @@
   <main class="content">
 
     <h1>Adapters <span class="g">&amp; Integration</span></h1>
-    <p class="lead">Two paths to production: a one-line Python wrapper that compresses in-process, or a standalone HTTP proxy that works with any SDK or framework.</p>
+    <p class="lead">Three paths to production: a one-line Python wrapper that compresses in-process, a standalone HTTP proxy that works with any SDK or framework, or <code>distil wrap</code> — a zero-config launcher that routes any existing command through the proxy automatically.</p>
 
     <hr/>
 
@@ -125,7 +125,7 @@ original = store.expand(<span class="g">"a3f92b1c"</span>)  <span class="d"># re
 
     <p>This approach works with <strong>any SDK, framework, or language</strong> — you do not need to touch your application code at all.</p>
 
-    <pre class="term"><span class="d">$ python -m distil.proxy --port 8788 --upstream https://api.anthropic.com</span>
+    <pre class="term"><span class="d">$ distil proxy --port 8788 --upstream https://api.anthropic.com</span>
 distil proxy listening on http://127.0.0.1:8788
   → upstream: https://api.anthropic.com</pre>
 
@@ -190,7 +190,18 @@ llm = ChatAnthropic(
 
     <hr/>
 
-    <h2>Choosing between in-process and proxy</h2>
+    <h2>Path 3 — Transparent: <code>distil wrap</code></h2>
+    <p><strong>Module:</strong> <code>distil/proxy.py</code> · <code>wrap_run()</code></p>
+    <p>When you don't own the agent's code — it's a CLI, a third-party tool, or any process that reads <code>ANTHROPIC_BASE_URL</code> — <code>distil wrap</code> gives you Path 2's compression with none of the setup. It spawns the proxy on an ephemeral port, injects the env var into the child, runs your command, and tears everything down on exit (flushing genuine savings to your ledger).</p>
+    <pre class="term"><span class="d">$ distil wrap -- claude -p <span class="g">"summarize this repo"</span></span>
+distil wrap → proxy http://127.0.0.1:54xxx (upstream https://api.anthropic.com)
+  → ANTHROPIC_BASE_URL=http://127.0.0.1:54xxx
+  → recording genuine savings → distil leaderboard</pre>
+    <p>Everything after <code>--</code> runs verbatim and its exit code is propagated. Use <code>--env-var</code> to point a different variable (e.g. an OpenAI-compatible client) at the proxy. See the <a href="cli.html#wrap">CLI reference</a> for all flags.</p>
+
+    <hr/>
+
+    <h2>Choosing your path</h2>
 
     <table>
       <thead><tr><th></th><th><code>wrap(client)</code></th><th><code>distil proxy</code></th></tr></thead>

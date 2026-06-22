@@ -361,6 +361,28 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_wrap(args: argparse.Namespace) -> int:
+    """Transparently wrap a command: spawn the proxy, point its env at it, run it."""
+    command = list(args.command)
+    if command and command[0] == "--":  # argparse REMAINDER keeps the separator
+        command = command[1:]
+    if not command:
+        print("distil wrap: nothing to run — usage: distil wrap [opts] -- <command> [args...]")
+        return 2
+    from .proxy import wrap_run
+
+    return wrap_run(
+        command,
+        host=args.host,
+        upstream=args.upstream,
+        lossless_only=args.lossless_only,
+        shape_output=args.shape_output,
+        record=not args.no_record,
+        pricing_model=args.pricing,
+        env_var=args.env_var,
+    )
+
+
 def cmd_gateway(args: argparse.Namespace) -> int:
     """Managed multi-tenant gateway with a live per-tenant savings dashboard."""
     from .gateway import serve_gateway
@@ -627,6 +649,46 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-record", action="store_true", help="do not record genuine savings to the local ledger"
     )
     px.set_defaults(func=cmd_proxy)
+
+    wr = sub.add_parser(
+        "wrap",
+        help="run a command with its API base URL transparently routed through Distil",
+    )
+    wr.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
+    wr.add_argument(
+        "--upstream", default="https://api.anthropic.com", help="upstream provider base URL"
+    )
+    wr.add_argument(
+        "--env-var",
+        default="ANTHROPIC_BASE_URL",
+        help="environment variable to point at the proxy (default: ANTHROPIC_BASE_URL)",
+    )
+    wr.add_argument(
+        "--lossless-only",
+        action="store_true",
+        help="lossless compression only (safe for subscription/OAuth sessions)",
+    )
+    wr.add_argument(
+        "--shape-output",
+        default="off",
+        choices=("off", "light", "aggressive"),
+        help="output-token compression via a gated verbosity directive (PAYG only)",
+    )
+    wr.add_argument(
+        "--pricing",
+        default="claude-opus-4-8",
+        choices=sorted(pricing.CATALOG),
+        help="model used to price genuine savings recorded to the ledger",
+    )
+    wr.add_argument(
+        "--no-record", action="store_true", help="do not record genuine savings to the local ledger"
+    )
+    wr.add_argument(
+        "command",
+        nargs=argparse.REMAINDER,
+        help="the command to run, after `--` (e.g. distil wrap -- claude -p 'hi')",
+    )
+    wr.set_defaults(func=cmd_wrap)
 
     on = sub.add_parser(
         "online", help="self-distilling round: causal labels → retrain → certify → promote"

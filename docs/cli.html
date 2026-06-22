@@ -300,10 +300,8 @@ by trajectory:
     <hr/>
 
     <!-- proxy -->
-    <h2 id="proxy">distil proxy <span style="font-size:13px;font-weight:400;color:var(--acc2)">(in progress)</span></h2>
-    <p>HTTP proxy that applies Distil compression to every LLM API request passing through it. Drop-in for any client that honours a <code>base_url</code> parameter — Anthropic SDK, OpenAI SDK, LiteLLM, LangChain, etc.</p>
-
-    <p>The proxy is currently available as a Python module (<code>python -m distil.proxy</code>). A CLI subcommand wrapping the same server is being added.</p>
+    <h2 id="proxy">distil proxy</h2>
+    <p>HTTP proxy that applies Distil compression to every LLM API request passing through it. Drop-in for any client that honours a <code>base_url</code> parameter — Anthropic SDK, OpenAI SDK, LiteLLM, LangChain, etc. As real traffic flows through it, the actual per-request token reduction is accumulated into your local ledger (see <a href="#leaderboard">distil leaderboard</a>) — genuine savings, numbers only, never content.</p>
 
     <h3>Flags</h3>
     <table>
@@ -314,12 +312,15 @@ by trajectory:
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions)</td></tr>
         <tr><td><code>--shape-output</code></td><td>off</td><td>Enable generation-side verbosity shaping: <code>light</code> (conservative) or <code>aggressive</code>. Injects a gated <code>role:"system"</code> directive before the request. PAYG-only — blocked on subscription keys.</td></tr>
         <tr><td><code>--async</code></td><td>off</td><td>Use the async aiohttp backend (<code>distil/aproxy.py</code>) for high-concurrency streaming. Requires <code>pip install 'distil-llm[async]'</code>. Same compression behavior; async event loop handles thousands of concurrent sessions.</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model used to price the genuine dollar savings recorded to the ledger</td></tr>
+        <tr><td><code>--no-record</code></td><td>off</td><td>Do not record genuine savings to the local ledger</td></tr>
       </tbody>
     </table>
 
-    <pre class="term"><span class="d">$ python -m distil.proxy --port 8788 --upstream https://api.anthropic.com</span>
+    <pre class="term"><span class="d">$ distil proxy --port 8788 --upstream https://api.anthropic.com</span>
 distil proxy listening on http://127.0.0.1:8788
-  → upstream: https://api.anthropic.com</pre>
+  → upstream: https://api.anthropic.com
+  → recording genuine savings → distil leaderboard</pre>
 
     <p>Point your SDK at the proxy:</p>
     <pre class="term"><span class="d"># Anthropic SDK</span>
@@ -334,6 +335,35 @@ response = litellm.completion(api_base=<span class="g">"http://localhost:8788"</
     <p>The proxy adds two response headers: <code>x-distil-compressed: 1</code> and <code>x-distil-tokens-saved: &lt;n&gt;</code>. All other paths and HTTP methods are forwarded unchanged.</p>
 
     <p>See <a href="adapters.html">Adapters</a> for the full story on in-process vs. proxy adoption.</p>
+
+    <!-- wrap -->
+    <h2 id="wrap">distil wrap</h2>
+    <p>The zero-config way to route an existing agent or CLI through Distil. <code>distil wrap</code> starts the proxy on an ephemeral local port, injects <code>ANTHROPIC_BASE_URL</code> into the child process's environment, runs your command to completion, then tears the proxy down — flushing genuine savings to your ledger. No code change, no manual env wiring, no leftover server.</p>
+
+    <pre class="term"><span class="d"># Run any base-url-honoring agent with compression transparently applied</span>
+$ distil <span class="c">wrap</span> -- claude -p <span class="g">"summarize this repo"</span>
+distil wrap → proxy http://127.0.0.1:54xxx (upstream https://api.anthropic.com)
+  → ANTHROPIC_BASE_URL=http://127.0.0.1:54xxx
+  → recording genuine savings → distil leaderboard
+<span class="d"># ... your command runs, every request compressed ...</span>
+
+<span class="d"># Lossless-only (safe for subscription / OAuth sessions)</span>
+$ distil <span class="c">wrap</span> --lossless-only -- my-agent --task build</pre>
+
+    <p>Everything after <code>--</code> is the command and its arguments, run verbatim. The child's exit code is propagated. Use <code>--env-var</code> to point a different variable at the proxy (e.g. an OpenAI-compatible tool), and the same <code>--upstream</code>, <code>--lossless-only</code>, <code>--shape-output</code>, <code>--pricing</code> and <code>--no-record</code> flags as <a href="#proxy">distil proxy</a>.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--env-var</code></td><td><code>ANTHROPIC_BASE_URL</code></td><td>Environment variable to point at the proxy in the child process</td></tr>
+        <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions)</td></tr>
+        <tr><td><code>--shape-output</code></td><td>off</td><td>Generation-side verbosity shaping (PAYG-only)</td></tr>
+        <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model used to price genuine dollar savings recorded to the ledger</td></tr>
+        <tr><td><code>--no-record</code></td><td>off</td><td>Do not record genuine savings to the local ledger</td></tr>
+      </tbody>
+    </table>
 
     <!-- output-savings -->
     <h2 id="output-savings">distil output-savings</h2>

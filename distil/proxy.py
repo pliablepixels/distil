@@ -346,5 +346,66 @@ def serve(
         server.server_close()
 
 
+def wrap_run(
+    command: list[str],
+    *,
+    host: str = "127.0.0.1",
+    upstream: str = "https://api.anthropic.com",
+    lossless_only: bool = False,
+    shape_output: str = "off",
+    record: bool = True,
+    pricing_model: str = "claude-opus-4-8",
+    env_var: str = "ANTHROPIC_BASE_URL",
+) -> int:
+    """Run *command* with its API base URL transparently pointed at a Distil proxy.
+
+    Starts the proxy on an ephemeral local port in a background thread, injects
+    ``env_var`` (default ``ANTHROPIC_BASE_URL``) into the child's environment so
+    any base-url-honoring SDK routes through compression with no code change,
+    runs the command to completion, then tears the proxy down — flushing genuine
+    savings to the local ledger. Returns the child process's exit code.
+    """
+    import os
+    import subprocess
+    import sys
+    import threading
+
+    savings = None
+    if record:
+        from .runtime import RuntimeSavings
+
+        savings = RuntimeSavings(model=pricing_model)
+    handler = build_handler(
+        upstream, lossless_only=lossless_only, shape_output=shape_output, savings=savings
+    )
+    server = ThreadingHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
+    base = f"http://{host}:{server.server_address[1]}"
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    child_env = dict(os.environ)
+    child_env[env_var] = base
+    print(f"distil wrap → proxy {base} (upstream {upstream})")
+    print(f"  → {env_var}={base}")
+    if lossless_only:
+        print("  → lossless-only")
+    if savings is not None:
+        print("  → recording genuine savings → distil leaderboard")
+
+    code = 0
+    try:
+        code = subprocess.run(command, env=child_env).returncode
+    except FileNotFoundError:
+        print(f"distil wrap: command not found: {command[0]}", file=sys.stderr)
+        code = 127
+    except KeyboardInterrupt:
+        code = 130
+    finally:
+        server.shutdown()
+        if savings is not None:
+            savings.flush()
+        server.server_close()
+    return code
+
+
 if __name__ == "__main__":
     serve()
