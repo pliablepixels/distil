@@ -170,7 +170,30 @@ def builtin_techniques(runner: AgentRunner | None = None) -> list[Technique]:
             False,
             lambda entry: _causal_make(entry, runner),
         ),
+        Technique(
+            "distil-stream",
+            "distil (causal + cross-turn dedup)",
+            False,
+            lambda entry: _stream_make(entry, runner),
+        ),
     ]
+
+
+def _stream_make(entry: CorpusEntry, runner: AgentRunner | None) -> Strategy:
+    """The maximal REVERSIBLE Distil: cache-aware lossless (fold + template) PLUS
+    cross-turn reversible dedup of recurring tool output the cache can't reach —
+    everything recoverable, nothing pruned. Stateful per trajectory; the dedup
+    memory auto-resets when a measurement pass restarts."""
+    from .compress.dedup import StreamingDedup
+
+    dd = StreamingDedup()
+
+    def strat(blocks: list[Block], turn: int) -> list[Block]:
+        compressed = _distil(blocks, turn)  # lossless fold/template, no pruning
+        out, _restore = dd.compress(compressed, turn)
+        return out
+
+    return strat
 
 
 def register_external(

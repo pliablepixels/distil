@@ -196,6 +196,12 @@ def make_trajectory(family, idx, turns=5, size=None):
         "- act(plan): take the chosen action\n"
         "DECISION: tools query and act are available"
     )
+    # A large artifact the agent RE-READS every turn (a pinned design doc / spec).
+    # Caching only covers the contiguous prefix, so this recurring tail block is
+    # re-billed each turn unless something dedups it — the realistic streaming case.
+    pin_rng = random.Random(f"{family}-{idx}-pin")
+    pinned = "DESIGN DOC (re-read each turn for reference):\n" + _rag(pin_rng, 10)
+
     out_turns = []
     for t in range(turns):
         gen = FAMILIES[family]
@@ -220,6 +226,7 @@ def make_trajectory(family, idx, turns=5, size=None):
             _blk(f"obs-{t}", "tool_output", "volatile", primary, True),
             _blk(f"dbg-{t}", "tool_output", "volatile", noise1, False),
             _blk(f"doc-{t}", "retrieved", "volatile", noise2, False),
+            _blk("pin-doc", "retrieved", "volatile", pinned, False),  # recurs verbatim
         ]
         out_turns.append({"index": t, "blocks": blocks})
     return tid, {

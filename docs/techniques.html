@@ -310,6 +310,18 @@ score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span 
 
     <p>When a context block is digested (Tier 1) and represented by a handle, BM25 partial retrieval lets the agent query for the most relevant chunks of the original without re-expanding the entire block. This keeps the context window focused while preserving access to the full original content on demand — useful for large tool outputs, retrieved documents, or log dumps where only a fraction is decision-relevant.</p>
 
+    <h2>Reversible structured compaction <span class="g">(SOTA)</span></h2>
+    <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; in the Tier-1 path</p>
+    <p>The token-dense content agents actually traffic in — JSON record arrays, SQL rows, telemetry — is re-encoded into a compact <strong>columnar</strong> form: the repeated keys are stated once, the values listed as rows. A homogeneous <code>[{"id":1,"name":"a","ok":true}, …]</code> of N records pays its keys and punctuation N times in JSON; the folded form pays them once — typically a 40–70% reduction with no loss of meaning. Unlike a lossy structural crusher, <strong>nothing is discarded</strong>: the byte-exact original is kept in the restore table and is one <code>expand()</code> away. This is the reversible counterpart to the lossy "crushers" other tools use — same savings on clean structured data, but it never changes a value.</p>
+
+    <h2>Template mining <span class="g">(Drain / LogPai family)</span></h2>
+    <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; <code>template_fold()</code></p>
+    <p>Logs and telemetry are runs of <em>near</em>-identical lines that differ only by a timestamp, id, or number. Where run-length encoding only collapses byte-identical lines, template mining masks the varying tokens, groups lines by their skeleton, and collapses a run into <strong>one template + a compact variable table</strong> — the production log-parsing technique (Drain / LogPai), applied to agent context. Every variable is retained (information-preserving) and the original is recoverable. On log/metric-heavy content this lifts the byte-exact lossless savings several points on its own.</p>
+
+    <h2>Cross-turn dedup <span class="g">(streaming)</span></h2>
+    <p><strong>Module:</strong> <code>distil/compress/dedup.py</code> &middot; <code>StreamingDedup</code></p>
+    <p>Agents re-read the same artifact — a file, a log, a design doc — every turn. Prompt caching only discounts the <em>contiguous prefix</em>, so a large block that recurs in the volatile tail is re-billed in full each time it reappears. The streaming compressor remembers what it has already sent and replaces a recurring inert block with a compact reference, recoverable on demand. It only references blocks that carry no decision marker, so the decision signal is never perturbed. This is the lever that turns a multi-turn loop's quadratic re-read into near-linear, on exactly the content the cache can't reach. See the <a href="benchmark.html">Benchmark</a> for the measured contribution.</p>
+
     <div class="site-footer">
       Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
     </div>
