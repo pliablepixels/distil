@@ -68,54 +68,65 @@
 
     <!-- Install -->
     <h2>Install</h2>
-    <p>Distil has a <strong>zero-dependency stdlib-only core</strong>. Pick the format that fits your workflow — the corpus is bundled in every distribution.</p>
+    <p>Distil has a <strong>zero-dependency stdlib-only core</strong> and ships as a <strong>command-line app</strong> (PyPI package <code>distil-llm</code>; the command is <code>distil</code>). Pick the format that fits your workflow — the corpus is bundled in every distribution.</p>
+
+    <div class="callout">
+      <strong>Prerequisite for all Python methods:</strong> Python <strong>3.11+</strong>. Because Distil is a CLI, install it <em>isolated</em> (pipx / uv / Homebrew / Docker) rather than into a system Python — modern macOS &amp; Linux Pythons reject <code>pip install</code> system-wide with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). The methods below all avoid that.
+    </div>
 
     <div class="grid2">
       <div class="card">
-        <span class="tag">Zero install</span>
+        <span class="tag">Zero install · recommended</span>
         <h3>uvx</h3>
-        <p>Run straight from PyPI with no local install step — great for a one-off check.</p>
-        <pre class="term">uvx distil bench</pre>
+        <p>Run straight from PyPI, no install step. <strong>Prereq:</strong> <a href="https://docs.astral.sh/uv/">uv</a>.</p>
+        <pre class="term">uvx --from distil-llm distil bench</pre>
       </div>
       <div class="card">
-        <span class="tag">PyPI</span>
-        <h3>pip</h3>
-        <p>Install the package for permanent use. No transitive dependencies pulled in.</p>
-        <pre class="term">pip install distil-llm
+        <span class="tag">Isolated CLI · recommended</span>
+        <h3>pipx</h3>
+        <p>Permanent install in its own venv — PEP&nbsp;668-safe. <strong>Prereq:</strong> Python 3.11+, <a href="https://pipx.pypa.io/">pipx</a> (<code>brew install pipx</code>).</p>
+        <pre class="term">pipx install distil-llm
 distil certify</pre>
+      </div>
+      <div class="card">
+        <span class="tag">macOS / Linux</span>
+        <h3>Homebrew</h3>
+        <p>Installs into an isolated keg — doesn't touch your Python. <strong>Prereq:</strong> Homebrew.</p>
+        <pre class="term">brew install dshakes/tap/distil
+distil bench</pre>
       </div>
       <div class="card">
         <span class="tag">Container</span>
         <h3>Docker</h3>
-        <p>Reproducible image, ideal for CI or sandboxed environments.</p>
+        <p>Reproducible image, ideal for CI or sandboxed environments. <strong>Prereq:</strong> Docker.</p>
         <pre class="term">docker build -t distil .
 docker run distil bench</pre>
       </div>
       <div class="card">
         <span class="tag">Single file</span>
         <h3>Zipapp (.pyz)</h3>
-        <p>One portable executable — copy it anywhere that has Python 3.11+.</p>
+        <p>One portable executable — copy it anywhere. <strong>Prereq:</strong> Python 3.11+ (no install).</p>
         <pre class="term">make pyz
 python dist/distil.pyz bench</pre>
       </div>
       <div class="card">
-        <span class="tag">macOS / Linux</span>
-        <h3>Homebrew</h3>
-        <p>Install via the tap; runs in an isolated keg, doesn't touch your Python.</p>
-        <pre class="term">brew install dshakes/tap/distil
-distil bench</pre>
-      </div>
-      <div class="card">
-        <span class="tag">Node launcher</span>
-        <h3>npx</h3>
-        <p>Launch the proxy from a JS/TS stack — a thin wrapper around the Python proxy.</p>
-        <pre class="term">npx @distil/proxy --upstream https://api.anthropic.com</pre>
+        <span class="tag">In a venv / project</span>
+        <h3>pip</h3>
+        <p>For embedding the library in your own project. <strong>Prereq:</strong> an active virtualenv.</p>
+        <pre class="term">python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install distil-llm</pre>
       </div>
     </div>
 
+    <div class="callout good">
+      <strong>Node / TypeScript / other languages?</strong> Distil's universal path is the proxy — run <code>distil proxy</code> (or <code>distil wrap -- &lt;your-agent&gt;</code>) and point your SDK's <code>baseURL</code> at it. No code change, any language. The CLI itself needs Python 3.11+; your app does not.
+    </div>
+
     <h3>Billing-grade tokenizer (optional)</h3>
-    <p>The default tokenizer is an offline heuristic — compression <em>ratios</em> are robust, but absolute dollar figures are approximate. To get billing-grade token counts and certify against the live model, install the extras and export your key:</p>
-    <pre class="term">pip install 'distil-llm[live]'
+    <p>The default tokenizer is an offline heuristic — compression <em>ratios</em> are robust, but absolute dollar figures are approximate. To get billing-grade token counts and certify against the live model, install the <code>live</code> extra and export your key:</p>
+    <pre class="term"><span class="d"># with pipx (isolated):</span>
+pipx install 'distil-llm[live]'
+<span class="d"># or one-off with uvx:  uvx --from 'distil-llm[live]' distil certify --runner anthropic</span>
 <span class="d">export ANTHROPIC_API_KEY=sk-ant-…</span>
 distil savings --tokenizer anthropic
 distil certify --runner anthropic</pre>

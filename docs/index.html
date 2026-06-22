@@ -271,10 +271,13 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
   <p class="lead">The stdlib-only core makes the packaging clean: zero runtime deps, corpus bundled.</p>
   <div class="grid2">
     <div class="card"><span class="tag">ZERO INSTALL</span><h3>uvx</h3>
-      <pre style="margin-top:10px">uvx distil bench</pre></div>
-    <div class="card"><span class="tag">PYPI</span><h3>pip</h3>
-      <pre style="margin-top:10px">pip install distil
+      <pre style="margin-top:10px">uvx --from distil-llm distil bench</pre></div>
+    <div class="card"><span class="tag">ISOLATED CLI</span><h3>pipx</h3>
+      <pre style="margin-top:10px">pipx install distil-llm
 distil certify</pre></div>
+    <div class="card"><span class="tag">HOMEBREW</span><h3>brew</h3>
+      <pre style="margin-top:10px">brew install dshakes/tap/distil
+distil bench</pre></div>
     <div class="card"><span class="tag">CONTAINER</span><h3>Docker</h3>
       <pre style="margin-top:10px">docker build -t distil .
 docker run distil bench</pre></div>
@@ -282,6 +285,7 @@ docker run distil bench</pre></div>
       <pre style="margin-top:10px">make pyz
 python dist/distil.pyz bench</pre></div>
   </div>
+  <p style="color:var(--dim);font-size:12.5px;margin-top:10px">Needs Python 3.11+. Install isolated (pipx/uv/brew/Docker) — system <code>pip install</code> is blocked by <a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a> on modern macOS/Linux. Node/other stacks: point your SDK <code>baseURL</code> at <code>distil proxy</code>.</p>
   <div class="callout" style="margin-top:18px">
     Drop-in, no call-site change:
     <pre style="margin-top:10px"><span class="c">from</span> distil.adapters.anthropic <span class="c">import</span> wrap

@@ -223,10 +223,13 @@ response = litellm.completion(
 
     <hr/>
 
-    <h2>Node.js launcher</h2>
-    <p>No Python on PATH? Use the npx launcher — it locates or installs the Python package and starts the proxy:</p>
-    <pre class="term">npx @distil/proxy --port 8788 --upstream https://api.anthropic.com</pre>
-    <p>This is a thin launcher around the Python package, not a reimplementation. See <a href="https://github.com/dshakes/distil/tree/main/packaging/npx">packaging/npx/</a> for details.</p>
+    <h2>Node.js / TypeScript</h2>
+    <p>Distil's universal path is the proxy — it's language-agnostic, so JS/TS stacks need no Distil-specific package. Start the proxy (or wrap your agent) and point your SDK's <code>baseURL</code> at it:</p>
+    <pre class="term"><span class="d"># start the proxy (needs Python 3.11+ — see Install)</span>
+distil proxy --port 8788 --upstream https://api.anthropic.com</pre>
+    <pre class="term"><span class="d">// then in your Node/TS app — no code change beyond baseURL</span>
+const client = new Anthropic({ baseURL: <span class="g">"http://localhost:8788"</span> });</pre>
+    <p>Or wrap an existing CLI/agent in one shot: <code>distil wrap -- &lt;your-command&gt;</code> starts the proxy and injects <code>ANTHROPIC_BASE_URL</code> automatically.</p>
 
     <h2>Homebrew</h2>
     <pre class="term">brew tap dshakes/tap

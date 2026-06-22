@@ -42,7 +42,7 @@ Agents re-send their whole context every turn — you pay for it every turn. Dis
 
 **🛠️ For developers**
 
-`pip install distil-llm`, point your client's `base_url` at the proxy, done — **no code change, any language or SDK**. Or `wrap(client)` in-process. Lossless by default, reversible on demand.
+`pipx install distil-llm` (or `uvx --from distil-llm distil …`), point your client's `base_url` at the proxy, done — **no code change, any language or SDK**. Or `wrap(client)` in-process. Lossless by default, reversible on demand.
 
 </td>
 <td width="33%" valign="top">
@@ -66,7 +66,7 @@ Compression reframed as **decision-equivalence** and certified with **TOST non-i
 ## ⚡ 60-second start
 
 ```bash
-uvx distil bench          # certify savings + quality across 7 domains, in seconds
+uvx --from distil-llm distil bench   # certify savings + quality across 7 domains, in seconds
 ```
 
 ```
@@ -141,16 +141,16 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 <p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
 
-| Format | Command |
-|---|---|
-| **Zero install** | `uvx distil bench` |
-| **PyPI** | `pip install distil-llm` → `distil bench` |
-| **Homebrew** | `brew install dshakes/tap/distil` |
-| **Docker** | `docker build -t distil . && docker run distil bench` |
-| **Single file** | `make pyz` → `python dist/distil.pyz bench` |
-| **Node launcher** | `npx @distil/proxy --upstream https://api.anthropic.com` |
+| Format | Command | Prereq |
+|---|---|---|
+| **Zero install** | `uvx --from distil-llm distil bench` | [uv](https://docs.astral.sh/uv/) |
+| **Isolated CLI** | `pipx install distil-llm` → `distil bench` | Python 3.11+, [pipx](https://pipx.pypa.io/) |
+| **Homebrew** | `brew install dshakes/tap/distil` | Homebrew |
+| **Docker** | `docker build -t distil . && docker run distil bench` | Docker |
+| **Single file** | `make pyz` → `python dist/distil.pyz bench` | Python 3.11+ |
+| **In a venv** | `pip install distil-llm` (inside an active virtualenv) | Python 3.11+ |
 
-> The import package and CLI are `distil`; the PyPI distribution is `distil-llm` (the bare name was taken). The `npx` path is a thin launcher around the Python proxy — the real cross-language story is pointing your SDK's `base_url` at it.
+> The import package and CLI are `distil`; the PyPI distribution is `distil-llm` (the bare name was taken — so `uvx`/`pip` must reference `distil-llm`, not `distil`). Distil is a CLI: install it **isolated** (pipx/uv/brew/Docker), because modern macOS/Linux block system-wide `pip install` ([PEP 668](https://peps.python.org/pep-0668/)). **Node / any language:** point your SDK's `base_url` at `distil proxy`, or use `distil wrap -- <agent>` — no Distil-specific package needed.
 
 ---
 
