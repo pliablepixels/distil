@@ -1,0 +1,207 @@
+{
+  "id": "support-chat-3",
+  "model": "claude-opus-4-8",
+  "_note": "generated: support-chat content, reproducible via gen_corpus.py",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a support-chat task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 0):\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Thanks for waiting while I check that for you.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Could you refund the expedited shipping fee at least?\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can se\nDECISION: approve refund of expedited shipping fee for the delayed order\ne the shipment is delayed at the carrier hub.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub."
+        },
+        {
+          "id": "dbg-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 0):\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Thanks for waiting while I check that for you.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Thanks for waiting while I check that for you.\nagent: Thanks for waiting while I check that for you.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub."
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.64): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.64): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.7): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.7): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.65): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.65): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.51): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.51): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a support-chat task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 1):\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Could you refund the expedited shipping fee at least?\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Thanks for waiting while I check that for you.\ncustomer: My order hasn't arrived and the tracking hasn't \nDECISION: approve refund of expedited shipping fee for the delayed order\nmoved in days.\nagent: Thanks for waiting while I check that for you.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Thanks for waiting while I check that for you.\ncustomer: Thanks for waiting while I check that for you.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?"
+        },
+        {
+          "id": "dbg-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 1):\ncustomer: Thanks for waiting while I check that for you.\nagent: Thanks for waiting while I check that for you.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Thanks for waiting while I check that for you.\ncustomer: Thanks for waiting while I check that for you.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days."
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.59): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.59): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.57): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.65): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.65): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a support-chat task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 2):\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Thanks for waiting while I check that for you.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: My order hasn't arrived and the tracking hasn't\nDECISION: approve refund of expedited shipping fee for the delayed order\n moved in days.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Thanks for waiting while I check that for you.\ncustomer: Thanks for waiting while I check that for you.\nagent: Thanks for waiting while I check that for you.\ncustomer: Thanks for waiting while I check that for you.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub."
+        },
+        {
+          "id": "dbg-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 2):\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Thanks for waiting while I check that for you.\ncustomer: Thanks for waiting while I check that for you.\nagent: Thanks for waiting while I check that for you.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Thanks for waiting while I check that for you.\nagent: Thanks for waiting while I check that for you.\ncustomer: Thanks for waiting while I check that for you.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.71): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.71): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.57): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.74): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.74): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a support-chat task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 3):\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved i\nDECISION: approve refund of expedited shipping fee for the delayed order\nn days.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Thanks for waiting while I check that for you.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Could you refund the expedited shipping fee at least?"
+        },
+        {
+          "id": "dbg-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 3):\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Thanks for waiting while I check that for you.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: Thanks for waiting while I check that for you."
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.54): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.54): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.55): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.55): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.73): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.73): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.64): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.64): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a support-chat task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-4",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 4):\ncustomer: Thanks for waiting while I check that for you.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least\nDECISION: approve refund of expedited shipping fee for the delayed order\n?\nagent: Thanks for waiting while I check that for you.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: I can see the shipment is delayed at the carrier hub."
+        },
+        {
+          "id": "dbg-4",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 4):\ncustomer: Could you refund the expedited shipping fee at least?\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: I can see the shipment is delayed at the carrier hub.\ncustomer: Thanks for waiting while I check that for you.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: Thanks for waiting while I check that for you.\nagent: Thanks for waiting while I check that for you.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Thanks for waiting while I check that for you.\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: Could you refund the expedited shipping fee at least?\nagent: My order hasn't arrived and the tracking hasn't moved in days.\ncustomer: My order hasn't arrived and the tracking hasn't moved in days.\nagent: Could you refund the expedited shipping fee at least?\ncustomer: I can see the shipment is delayed at the carrier hub.\nagent: Thanks for waiting while I check that for you."
+        },
+        {
+          "id": "doc-4",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.73): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.73): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.5): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.5): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.79): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.79): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.66): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.66): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    }
+  ]
+}

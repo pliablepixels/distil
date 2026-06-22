@@ -181,8 +181,9 @@ DECISIONS = {
 }
 
 
-def make_trajectory(family, idx, turns=4, size=40):
+def make_trajectory(family, idx, turns=5, size=None):
     rng = random.Random(f"{family}-{idx}")  # deterministic per trajectory
+    size = size if size is not None else 24 + idx * 10  # varied content volume
     tid = f"{family}-{idx}"
     decision = DECISIONS[family]
     sys_text = (
@@ -229,7 +230,7 @@ def make_trajectory(family, idx, turns=4, size=40):
     }
 
 
-def main(per_family=3):
+def main(per_family=8):
     OUT.mkdir(parents=True, exist_ok=True)
     from distil.trajectory import Trajectory
     from distil.corpus import validate

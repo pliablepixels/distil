@@ -1,0 +1,207 @@
+{
+  "id": "k8s-incident-4",
+  "model": "claude-opus-4-8",
+  "_note": "generated: k8s-incident content, reproducible via gen_corpus.py",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a k8s-incident task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 0):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-4597\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"\nDECISION: checkout pod OOMKilled; raise memory limit and redeploy\nrestartCount\": 29, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "dbg-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 0):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-2981\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"restartCount\": 31, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.55): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.55): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.76): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.76): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.69): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.69): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.7): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.7): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a k8s-incident task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 1):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-8280\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"\nDECISION: checkout pod OOMKilled; raise memory limit and redeploy\nrestartCount\": 8, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "dbg-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 1):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-9179\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"restartCount\": 7, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.67): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.67): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.72): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.72): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.6): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.6): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.62): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a k8s-incident task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 2):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-5774\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"\nDECISION: checkout pod OOMKilled; raise memory limit and redeploy\nrestartCount\": 38, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "dbg-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 2):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-7335\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"restartCount\": 20, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.62): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.63): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.63): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.52): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.52): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.77): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.77): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a k8s-incident task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 3):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-2377\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"\nDECISION: checkout pod OOMKilled; raise memory limit and redeploy\nrestartCount\": 33, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "dbg-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 3):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-3373\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"restartCount\": 19, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.79): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.79): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.79): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.79): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.63): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.63): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.53): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.53): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a k8s-incident task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-4",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 4):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-5661\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"\nDECISION: checkout pod OOMKilled; raise memory limit and redeploy\nrestartCount\": 38, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "dbg-4",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 4):\nkubectl_get(\"pods\",\"prod\",\"app=checkout\") -> {\"items\": [{\"metadata\": {\"name\": \"checkout-2922\"}, \"status\": {\"phase\": \"CrashLoopBackOff\", \"containerStatuses\": [{\"restartCount\": 24, \"lastState\": {\"terminated\": {\"reason\": \"OOMKilled\", \"exitCode\": 137}}}]}}]}\nERROR back-off restarting failed container; OOMKilled exitCode=137"
+        },
+        {
+          "id": "doc-4",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.59): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.59): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.73): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.73): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.6): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.6): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    }
+  ]
+}

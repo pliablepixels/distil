@@ -65,17 +65,17 @@ class Tier1Reversible:
         self.min_lines = min_lines
 
     def compress(self, blocks: list[Block]) -> CompressResult:
-        from .structured import fold  # local import: avoids formatter stripping it
+        from .structured import fold, template_fold  # local: avoids formatter stripping
 
         out: list[Block] = []
         restore: dict[str, str] = {}
         for b in blocks:
             if b.kind in _DIGESTIBLE:
-                # 1) reversible structured compaction (columnar fold) where it applies
-                folded = fold(b.text)
-                if folded is not None:
+                # 1) reversible structured compaction: columnar fold, then template mining
+                compact = fold(b.text) or template_fold(b.text)
+                if compact is not None:
                     restore[_handle(b.text)] = b.text  # byte-exact original, expandable
-                    out.append(b.copy_with(folded))
+                    out.append(b.copy_with(compact))
                     continue
                 # 2) otherwise, decision-aware reversible digest for verbose blocks
                 if b.text.count("\n") + 1 >= self.min_lines:

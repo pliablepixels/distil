@@ -1,0 +1,207 @@
+{
+  "id": "stacktrace-6",
+  "model": "claude-opus-4-8",
+  "_note": "generated: stacktrace content, reproducible via gen_corpus.py",
+  "turns": [
+    {
+      "index": 0,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a stacktrace task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 0):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 273, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 172, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 119, in handle_2\n    result = process(payload[2])\n  F\nDECISION: missing tenant_id in payload; add validation at the handler\nile \"service/handler_3.py\", line 144, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 372, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 196, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "dbg-0",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 0):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 358, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 18, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 315, in handle_2\n    result = process(payload[2])\n  File \"service/handler_3.py\", line 121, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 76, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 120, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "doc-0",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.61): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.61): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.55): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.55): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.69): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.69): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.5): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.5): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a stacktrace task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 1):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 59, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 64, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 68, in handle_2\n    result = process(payload[2])\n  Fil\nDECISION: missing tenant_id in payload; add validation at the handler\ne \"service/handler_3.py\", line 203, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 112, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 254, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "dbg-1",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 1):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 192, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 14, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 35, in handle_2\n    result = process(payload[2])\n  File \"service/handler_3.py\", line 252, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 279, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 11, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "doc-1",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.72): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.72): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.68): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.68): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.58): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.58): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a stacktrace task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 2):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 36, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 90, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 167, in handle_2\n    result = process(payload[2])\n  Fi\nDECISION: missing tenant_id in payload; add validation at the handler\nle \"service/handler_3.py\", line 152, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 185, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 364, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "dbg-2",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 2):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 128, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 335, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 282, in handle_2\n    result = process(payload[2])\n  File \"service/handler_3.py\", line 377, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 164, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 343, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "doc-2",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.68): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.68): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.64): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.64): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.62): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.57): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.57): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a stacktrace task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 3):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 19, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 321, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 372, in handle_2\n    result = process(payload[2])\n  Fi\nDECISION: missing tenant_id in payload; add validation at the handler\nle \"service/handler_3.py\", line 293, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 267, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 395, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "dbg-3",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 3):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 139, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 103, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 148, in handle_2\n    result = process(payload[2])\n  File \"service/handler_3.py\", line 319, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 365, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 351, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "doc-3",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.67): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.67): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.52): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.52): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.65): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.65): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.59): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.59): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "blocks": [
+        {
+          "id": "system",
+          "kind": "system",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "You are an autonomous agent handling a stacktrace task.\nDECISION: always re-read the latest tool output before acting"
+        },
+        {
+          "id": "tools",
+          "kind": "tools",
+          "stability": "stable",
+          "decision_relevant": true,
+          "text": "AVAILABLE TOOLS (json schema, abbreviated):\n- query(args): run the domain query\n- act(plan): take the chosen action\nDECISION: tools query and act are available"
+        },
+        {
+          "id": "obs-4",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": true,
+          "text": "query() -> result set (turn 4):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 366, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 195, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 329, in handle_2\n    result = process(payload[2])\n  F\nDECISION: missing tenant_id in payload; add validation at the handler\nile \"service/handler_3.py\", line 107, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 68, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 307, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "dbg-4",
+          "kind": "tool_output",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "query_debug() -> verbose trace (turn 4):\nTraceback (most recent call last):\n  File \"service/handler_0.py\", line 357, in handle_0\n    result = process(payload[0])\n  File \"service/handler_1.py\", line 59, in handle_1\n    result = process(payload[1])\n  File \"service/handler_2.py\", line 290, in handle_2\n    result = process(payload[2])\n  File \"service/handler_3.py\", line 362, in handle_3\n    result = process(payload[3])\n  File \"service/handler_4.py\", line 140, in handle_4\n    result = process(payload[4])\n  File \"service/handler_5.py\", line 225, in handle_5\n    result = process(payload[5])\nKeyError: 'tenant_id' missing from payload"
+        },
+        {
+          "id": "doc-4",
+          "kind": "retrieved",
+          "stability": "volatile",
+          "decision_relevant": false,
+          "text": "RETRIEVED (similarity=0.7): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.7): Section 0: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.58): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.58): Section 1: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.58): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.58): Section 2: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. \nRETRIEVED (similarity=0.78): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. RETRIEVED (similarity=0.78): Section 3: general background prose about the platform that is plausibly relevant but not load-bearing for this decision. "
+        }
+      ]
+    }
+  ]
+}
