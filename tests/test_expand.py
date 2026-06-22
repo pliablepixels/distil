@@ -45,7 +45,7 @@ def test_resolve_expands_returns_tool_results_and_signals():
         ]
     }
     signals = []
-    out = resolve_expands(resp, store, on_signal=lambda h, n: signals.append((h, n)))
+    out = resolve_expands(resp, store, on_signal=lambda h, t: signals.append((h, len(t))))
     assert out == [
         {
             "type": "tool_result",
@@ -117,7 +117,7 @@ def test_signal_log_is_content_free(tmp_path):
     from distil.expand import record_signal
 
     p = tmp_path / "sig.jsonl"
-    record_signal("abc12345", 1234, path=p)
+    record_signal("abc12345", "x" * 1234, path=p)
     rec = json.loads(p.read_text().splitlines()[0])
     assert rec["handle"] == "abc12345" and rec["recovered_chars"] == 1234
     assert "content" not in rec and "text" not in rec  # numbers only, never content

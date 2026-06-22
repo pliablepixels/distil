@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-202%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-401%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -35,7 +35,7 @@ Most context compressors ship a token-savings <em>estimate</em>.<br/>
 
 **👔 For decision-makers**
 
-Agents re-send their whole context every turn — you pay for it every turn. Distil cuts that **~30% with zero quality loss**, and *proves* it: the savings and the accuracy are measured on the **same runs**, gated in CI. No "trust us."
+Agents re-send their whole context every turn — you pay for it every turn. Distil cuts that **~27% (up to 33% per domain) with certified zero decision change**, and *proves* it: the savings and the accuracy are measured on the **same runs**, gated in CI. No "trust us."
 
 </td>
 <td width="33%" valign="top">
@@ -63,15 +63,15 @@ Compression reframed as **decision-equivalence** and certified with **TOST non-i
 
 ---
 
-## 🔑 What only Distil can do — recoverable compression
+## 🔑 Distil's structural edge — recoverable compression
 
 Every other compressor — summarizers, extractive pruners, structural crushers — is **lossy**: once it crushes a tool output, the detail is *gone*. Distil **digests behind a content handle and keeps the original locally**, then hands the agent a `distil_expand` tool. Run with `distil proxy --expand` (or `distil wrap --expand`) and:
 
 - **The model pulls back exactly the detail it needs, on demand** — Distil resolves the handle from the local store and re-queries, *transparently*. Your agent code never changes; it just gets the right answer.
 - **So you can compress fearlessly.** The dangerous failure mode of lossy compression — "it dropped something load-bearing" — is gone, because the safety net is the model recovering the detail itself.
-- **Every expansion is a label.** A `distil_expand` call is ground truth that the digested content *mattered*. Logged (numbers only, never content), these train the keep-model to stop digesting what *your* workload depends on — a compounding moat a lossy tool can't build, because it has nothing to expand and no signal to learn from.
+- **Every expansion is a label.** A `distil_expand` call is ground truth that the digested content *mattered*. Logged (numbers only, never content), these feed a learned policy (`distil learn` shows it) that stops digesting the content *signatures* your agents keep expanding — keeping them byte-exact instead. It only ever makes Distil **more** conservative, so it's never-regressing by construction.
 
-This is the structural advantage: **compress more, lose nothing, and get better the more you use it.** Lossy competitors can't follow here without rebuilding around reversibility.
+This is the structural advantage: **compress more, lose nothing, and get better the more you use it.** Recoverable compression is uncommon among the lossy tools in this space — and the learning loop compounds on top of it.
 
 ---
 
@@ -117,18 +117,19 @@ truncate@700              20.0%     36%        ✘ —    ████
 truncate@300              41.3%      0%        ✘ —    █████████
 --------------------------------------------------------------------------
 distil: 8.4% token savings @ 100% decision-equivalence — certified.
-certified ceiling beyond which lossy compression drops decisions and the gate rejects it.
+(this is the bundled-corpus, cache-aware-only operating point; the varied-corpus
+ certified savings are much higher — see the Benchmark section below.)
 ```
 
 ---
 
 ## 📊 Benchmark — head-to-head on *certified* savings
 
-Every technique through the **same** decision-equivalence gate and the **same** cache-aware cost model, on a reproducible 64-trajectory, 8-family corpus. The winner is computed, not assumed — lossy methods that drop decisions are disqualified, however much raw they cut.
+Every technique through the **same** decision-equivalence gate and the **same** cache-aware cost model, on a reproducible 64-trajectory, 8-family corpus, graded by the **deterministic (structural)** runner. The winner is computed, not assumed — lossy methods that drop decisions are disqualified, however much raw they cut.
 
 | Technique | Tokens | $ saved | Decision-equiv | Verdict |
 |---|--:|--:|--:|---|
-| **distil-causal** | 80.5% | **81.5%** | 100% | ✅ certified — leader |
+| **distil-causal** | 80.5% | **81.5%** | 100% | ✅ certified — leader\* |
 | truncate / sliding-window | 78.7% | 79.6% | 14% | ❌ fails gate |
 | **distil-stream** (+ cross-turn dedup) | 61.0% | 61.7% | 100% | ✅ certified |
 | **distil-lossless** (fold + template mining) | 57.4% | 58.1% | 100% | ✅ certified · byte-exact |
@@ -136,6 +137,8 @@ Every technique through the **same** decision-equivalence gate and the **same** 
 | extractive importance (LLMLingua family) | 18.2% | 18.4% | 77% | ❌ fails gate |
 
 **The only methods that pass the gate are Distil's** — every lossy alternative posts a raw cut but changes decisions. Even byte-exact `distil-lossless` beats every competitor's *certified* number, because theirs is zero. Reproduce: `python benchmarks/gen_corpus.py && distil benchmark --corpus benchmarks/corpus_xl`. Bring your own tool with `--external module:function`. → full methodology: [docs/benchmark](https://dshakes.github.io/distil/benchmark.html)
+
+> **\*Honest caveat — these are *structural* numbers.** Graded by the live model itself, the aggressive `distil-causal` lead does **not** hold (it drops to ~57% on unambiguous decisions); the robust operating point is **`distil-lossless`** (~86% live, leading). The structural gate is an optimistic proxy for aggressive pruning. Details + the live-model run: [the Benchmark page](https://dshakes.github.io/distil/benchmark.html).
 
 **Tune the trade — the equivalence dial.** 100% decision-equivalence is the default, not a wall. Set a lower target and Distil spends a bounded *divergence budget* on the highest-value turns — deeper savings for a **measured, explicit** equivalence cost, with byte-exact fallback everywhere else. The trade is always reported, never hidden:
 

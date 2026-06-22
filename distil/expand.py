@@ -71,13 +71,15 @@ def _expand_calls(resp: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def record_signal(handle: str, length: int, *, path: Path = DEFAULT_SIGNAL_PATH) -> None:
-    """Append a content-free expand event — the label the keep-model learns from."""
+def record_signal(handle: str, original: str, *, path: Path = DEFAULT_SIGNAL_PATH) -> None:
+    """Append a content-free expand event — the label the keep-model learns from.
+    Only the handle and recovered length are written; never the content itself."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as f:
             f.write(
-                json.dumps({"handle": handle, "recovered_chars": length, "ts": time.time()}) + "\n"
+                json.dumps({"handle": handle, "recovered_chars": len(original), "ts": time.time()})
+                + "\n"
             )
     except OSError:
         pass  # logging the moat signal must never break the request path
@@ -87,7 +89,7 @@ def resolve_expands(
     resp: dict[str, Any],
     store: Any,
     *,
-    on_signal: Callable[[str, int], None] | None = record_signal,
+    on_signal: Callable[[str, str], None] | None = record_signal,
 ) -> list[dict[str, Any]] | None:
     """If *resp* contains distil_expand tool calls, resolve each handle against the
     RestoreStore and return the tool_result blocks to feed back. Else None."""
@@ -102,7 +104,7 @@ def resolve_expands(
         except Exception:  # noqa: BLE001 — unknown/expired handle must not 500 the agent
             original = f"[distil: no original found for handle {handle!r}]"
         if on_signal is not None:
-            on_signal(handle, len(original))
+            on_signal(handle, original)
         results.append({"type": "tool_result", "tool_use_id": c.get("id"), "content": original})
     return results
 
@@ -114,7 +116,7 @@ def run_expand_loop(
     post: Callable[[dict[str, Any]], dict[str, Any]],
     *,
     max_iters: int = 4,
-    on_signal: Callable[[str, int], None] | None = record_signal,
+    on_signal: Callable[[str, str], None] | None = record_signal,
 ) -> dict[str, Any]:
     """Server-side recovery loop. While the model asks to expand, resolve the handles
     and re-query ``post`` with the recovered content appended — transparently to the

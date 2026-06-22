@@ -36,6 +36,17 @@ from ..compress.tier1 import digest as _tier1_digest
 # Minimum line count for a tool_result to be digested (matches Tier1Reversible default).
 _MIN_LINES = 6
 
+# Thread-local learned "keep byte-exact" predicate, scoped per compress_messages call
+# (ThreadingHTTPServer handles requests on separate threads, so this must be per-thread).
+import threading as _threading  # noqa: E402
+
+_keep_tls = _threading.local()
+
+
+def _active_keep(text: str) -> bool:
+    fn = getattr(_keep_tls, "fn", None)
+    return bool(fn and fn(text))
+
 
 # ---------------------------------------------------------------------------
 # RestoreStore
@@ -104,6 +115,11 @@ def _compress_tool_result_text(text: str, store: RestoreStore) -> str:
     lines = text.splitlines()
     if len(lines) < _MIN_LINES:
         # Too short to digest — apply lossless transforms only.
+        return _apply_tier0(text)
+
+    # Learned policy: if your agents keep expanding this kind of content, keep it
+    # byte-exact (strictly safer — only ever reduces savings, never equivalence).
+    if _active_keep(text):
         return _apply_tier0(text)
 
     digested, changed = _tier1_digest(text)
@@ -220,6 +236,7 @@ def compress_messages(
     messages: list[dict[str, Any]],
     *,
     lossless_only: bool = False,
+    keep: Any = None,
 ) -> tuple[list[dict[str, Any]], RestoreStore]:
     """Compress an Anthropic Messages API messages list in place (non-mutating).
 
@@ -240,11 +257,15 @@ def compress_messages(
         ``store`` maps every 8-hex handle embedded in digest markers back to the
         original text; call ``store.expand(handle)`` to recover it.
     """
-    store = RestoreStore()
-    new_messages: list[dict[str, Any]] = []
-    for msg in messages:
-        new_messages.append(_compress_message(msg, store, lossless_only))
-    return new_messages, store
+    _keep_tls.fn = keep  # learned keep-byte-exact policy for this call (per-thread)
+    try:
+        store = RestoreStore()
+        new_messages: list[dict[str, Any]] = []
+        for msg in messages:
+            new_messages.append(_compress_message(msg, store, lossless_only))
+        return new_messages, store
+    finally:
+        _keep_tls.fn = None
 
 
 def place_cache_control(

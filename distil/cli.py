@@ -506,6 +506,33 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_learn(args: argparse.Namespace) -> int:
+    """Show the keep policy Distil has learned from your real expand signals."""
+    from .learn import ExpandStats
+
+    stats = ExpandStats.load()
+    if not stats.digested:
+        print("no expand signals yet.")
+        print("run `distil proxy --expand` (or `distil wrap --expand`) so agents can")
+        print("recover digested detail — every recovery teaches Distil your workload.")
+        return 0
+    prone = stats.expand_prone(min_digested=args.min_samples, threshold=args.threshold)
+    print("learned digest policy — from your real expand signals (content-free)\n")
+    print(f"{'signature':<14}{'digested':>9}{'expanded':>9}{'rate':>7}  policy")
+    print("-" * 60)
+    for sig in sorted(stats.digested, key=lambda s: -stats.expand_rate(s)):
+        d, e, r = stats.digested[sig], stats.expanded.get(sig, 0), stats.expand_rate(sig)
+        pol = "KEEP byte-exact" if sig in prone else "digest"
+        print(f"{sig:<14}{d:>9}{e:>9}{r * 100:>6.0f}%  {pol}")
+    print("-" * 60)
+    print(
+        f"\n{len(prone)} signature(s) are now kept byte-exact because your agents expand "
+        "them often.\nThis applies automatically under `--expand`. It only ever makes "
+        "Distil more\nconservative — savings may drop on those, decision-equivalence never does."
+    )
+    return 0
+
+
 def cmd_frontier(args: argparse.Namespace) -> int:
     """The savings-vs-equivalence dial: how much more you save as you relax the
     decision-equivalence target below 100%."""
@@ -724,6 +751,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated equivalence targets in (0,1]",
     )
     fr.set_defaults(func=cmd_frontier)
+
+    ln = sub.add_parser(
+        "learn",
+        help="show the keep policy learned from your real distil_expand signals",
+    )
+    ln.add_argument("--threshold", type=float, default=0.25, help="expand-rate to keep byte-exact")
+    ln.add_argument(
+        "--min-samples", type=int, default=5, help="min digests before a policy applies"
+    )
+    ln.set_defaults(func=cmd_learn)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)

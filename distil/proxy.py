@@ -116,6 +116,16 @@ def build_handler(
 
     _upstream = upstream.rstrip("/")
 
+    # Learning flywheel state (loaded once when expand is on): the learned
+    # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
+    _learn_stats = None
+    _learn_keep = None
+    if expand:
+        from .learn import ExpandStats, keep_predicate
+
+        _learn_stats = ExpandStats.load()
+        _learn_keep = keep_predicate(_learn_stats)
+
     class _DistilHandler(BaseHTTPRequestHandler):
         # ----------------------------------------------------------------
         # Silence request logs — quiet by design
@@ -233,7 +243,18 @@ def build_handler(
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
-                compressed, store = compress_messages(original, lossless_only=lossless_only)
+                compressed, store = compress_messages(
+                    original, lossless_only=lossless_only, keep=_learn_keep
+                )
+                # Learning: tally what we digested, by content-free signature.
+                if _learn_stats is not None and getattr(store, "handles", None):
+                    from .learn import signature
+
+                    for h in store.handles:
+                        try:
+                            _learn_stats.record_digest(signature(store.expand(h)))
+                        except Exception:  # noqa: BLE001 — learning never breaks a request
+                            pass
                 before_tok = _count_messages(original)
                 after_tok = _count_messages(compressed)
                 saved = max(0, before_tok - after_tok)
@@ -271,16 +292,25 @@ def build_handler(
                 except (ValueError, TypeError):
                     resp_json = None
                 if isinstance(resp_json, dict):
-                    from .expand import run_expand_loop
+                    from .expand import record_signal, run_expand_loop
 
                     def _post(b: dict[str, Any]) -> dict[str, Any]:
                         _s, _h, rb = self._post_upstream(self.path, json.dumps(b).encode(), headers)
                         return json.loads(rb)
 
-                    final = run_expand_loop(body, resp_json, store, _post)
+                    def _on_signal(handle: str, original: str) -> None:
+                        record_signal(handle, original)  # content-free expand log
+                        if _learn_stats is not None:  # learn the expanded signature
+                            from .learn import signature
+
+                            _learn_stats.record_expand(signature(original))
+
+                    final = run_expand_loop(body, resp_json, store, _post, on_signal=_on_signal)
                     if final is not resp_json:
                         rbody = json.dumps(final).encode()
                         extras["x-distil-expanded"] = "1"
+            if _learn_stats is not None:  # persist the learned policy (atomic)
+                _learn_stats.save()
             self._relay(status, rhdrs, rbody, extras=extras)
 
         # ----------------------------------------------------------------
