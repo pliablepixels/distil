@@ -645,7 +645,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     ev = sub.add_parser("eval", help="certified compression frontier (savings vs accuracy)")
     ev.add_argument("--corpus", help="custom corpus dir (e.g. ingested benchmark traces)")
-    ev.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
+    ev.add_argument(
+        "--runner", default="deterministic", choices=("deterministic", "anthropic")
+    )
     ev.add_argument("--out", help="write the raw curve JSONL to this dir")
     ev.set_defaults(func=cmd_eval)
 
@@ -654,7 +656,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="head-to-head vs competing techniques on the same gate + cost model",
     )
     bn.add_argument("--corpus", help="custom corpus dir (e.g. ingested benchmark traces)")
-    bn.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
+    bn.add_argument(
+        "--runner", default="deterministic", choices=("deterministic", "anthropic")
+    )
     bn.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
     bn.add_argument("--tokenizer", default="heuristic", choices=("heuristic", "anthropic"))
     bn.add_argument("--margin", type=float, default=0.02, help="TOST non-inferiority margin")
