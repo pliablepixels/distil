@@ -18,6 +18,5 @@ rust/**/target/
 
 # Named competitor comparison — kept local-only (public docs stay neutral)
 benchmarks/named-comparison.local.md
-benchmarks/headroom_adapter.py
-benchmarks/rtk_adapter.py
+benchmarks/*_adapter.py
 benchmarks/README.md

@@ -110,6 +110,23 @@ certified ceiling beyond which lossy compression drops decisions and the gate re
 
 ---
 
+## 📊 Benchmark — head-to-head on *certified* savings
+
+Every technique through the **same** decision-equivalence gate and the **same** cache-aware cost model, on a reproducible 64-trajectory, 8-family corpus. The winner is computed, not assumed — lossy methods that drop decisions are disqualified, however much raw they cut.
+
+| Technique | Tokens | $ saved | Decision-equiv | Verdict |
+|---|--:|--:|--:|---|
+| **distil-causal** | 80.5% | **81.5%** | 100% | ✅ certified — leader |
+| truncate / sliding-window | 78.7% | 79.6% | 14% | ❌ fails gate |
+| **distil-stream** (+ cross-turn dedup) | 61.0% | 61.7% | 100% | ✅ certified |
+| **distil-lossless** (fold + template mining) | 57.4% | 58.1% | 100% | ✅ certified · byte-exact |
+| summarize / rolling memory | 56.5% | 57.2% | 39% | ❌ fails gate |
+| extractive importance (LLMLingua family) | 18.2% | 18.4% | 77% | ❌ fails gate |
+
+**The only methods that pass the gate are Distil's** — every lossy alternative posts a raw cut but changes decisions. Even byte-exact `distil-lossless` beats every competitor's *certified* number, because theirs is zero. Reproduce: `python benchmarks/gen_corpus.py && distil benchmark --corpus benchmarks/corpus_xl`. Bring your own tool with `--external module:function`. → full methodology: [docs/benchmark](https://dshakes.github.io/distil/benchmark.html)
+
+---
+
 ## 🔌 Works with every SDK
 
 One proxy. Point any `base_url`-honoring client at it — **Python, TypeScript, any language** — and get cache-aware lossless compression with **no code change**.
