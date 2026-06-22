@@ -20,3 +20,7 @@ rust/**/target/
 benchmarks/named-comparison.local.md
 benchmarks/*_adapter.py
 benchmarks/README.md
+
+# Local secrets — never commit
+.env
+.env.*
