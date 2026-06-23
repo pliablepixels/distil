@@ -290,9 +290,15 @@ td code { font-size: 11.5px; }
   margin: 16px 0 8px; box-shadow: var(--shadow); overflow: hidden; background: #07080d;
 }
 /* Break the figure out of the narrow content column on wide screens so the
-   diagram text stays legible (the column caps at ~808px otherwise). */
-@media (min-width: 1080px) {
-  .archfig { width: calc(100vw - var(--sidebar-w) - 104px); max-width: 1320px; }
+   diagram text stays legible (the column caps at ~808px otherwise). Below 1340px
+   there is no right-hand TOC, so the figure can use the whole gutter. */
+@media (min-width: 1080px) and (max-width: 1339.98px) {
+  .archfig { width: calc(100vw - var(--sidebar-w) - 104px); max-width: 1240px; }
+}
+/* At >=1340px the fixed .toc appears on the right — keep the figure clear of it.
+   The min() caps the right edge well before the TOC's left edge at every width. */
+@media (min-width: 1340px) {
+  .archfig { width: min(calc(100vw - 640px), calc(50vw + 200px), 1240px); }
 }
 .archfig svg { width: 100%; height: auto; display: block; }
 .archfig a { cursor: pointer; }
