@@ -90,3 +90,27 @@ def test_protect_noop_on_lossless_identity():
 
     out = protect(identity)([block], 0)[0]
     assert out.text == block.text  # unchanged input -> unchanged output
+
+
+def test_salient_tokens_pluggable_scorer():
+    from distil.compress.salience import salient_tokens
+
+    base = salient_tokens("the deployment looks fine and normal today")
+    # A scorer (stand-in for a semantic/NER model) contributes extra spans.
+    with_scorer = salient_tokens(
+        "the deployment looks fine and normal today",
+        scorer=lambda t: ["deployment", "normal"],
+    )
+    assert {"deployment", "normal"} <= with_scorer
+    assert base <= with_scorer  # seam only ADDS coverage
+
+
+def test_salient_tokens_bad_scorer_never_crashes():
+    from distil.compress.salience import salient_tokens
+
+    def boom(_t):
+        raise RuntimeError("model down")
+
+    # A broken scorer must not break compression — falls back to model-free signals.
+    out = salient_tokens("rotate node N7 now", scorer=boom)
+    assert isinstance(out, set)

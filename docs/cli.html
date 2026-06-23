@@ -347,11 +347,12 @@ client = openai.OpenAI(base_url=<span class="g">"http://localhost:8788/v1"</span
 <span class="d"># LiteLLM</span>
 response = litellm.completion(api_base=<span class="g">"http://localhost:8788"</span>, ...)</pre>
 
-    <p>The proxy adds up to 8 response headers (not all appear on every request):</p>
+    <p>The proxy adds up to 9 response headers (not all appear on every request):</p>
     <ul>
       <li><code>x-distil-compressed: 1</code> — compression was applied</li>
       <li><code>x-distil-tokens-saved: &lt;n&gt;</code> — heuristic estimate of tokens saved</li>
       <li><code>x-distil-expanded: 1</code> — present when <code>--expand</code> fired and a digest was resolved</li>
+      <li><code>x-distil-cache-prefix-msgs: &lt;n&gt;</code> — leading messages left byte-identical vs the previous turn, the prompt-cache-read region (with <code>--session-delta</code>)</li>
       <li><code>x-distil-cache-refs: &lt;n&gt;</code> — total cache-delta references (with <code>--session-delta</code>)</li>
       <li><code>x-distil-cache-delta: &lt;n&gt;</code> — delta-encoded references (with <code>--session-delta</code>)</li>
       <li><code>x-distil-cache-tokens-saved: &lt;n&gt;</code> — tokens saved by cache-delta (with <code>--session-delta</code>)</li>

@@ -327,6 +327,11 @@ def build_handler(
                     extras["x-distil-cache-refs"] = str(_dstats.exact_refs + _dstats.delta_refs)
                     extras["x-distil-cache-delta"] = str(_dstats.delta_refs)
                     extras["x-distil-cache-tokens-saved"] = str(_dstats.tokens_saved)
+                    # Cache-prefix observability: how many leading messages were
+                    # byte-stable vs the previous turn (the prompt-cache-read region).
+                    # Stateful, content-free — the verifiable benefit of a prefix-freeze
+                    # router, without the lossy rewrite (distil is cache-monotonic).
+                    extras["x-distil-cache-prefix-msgs"] = str(_dstats.prefix_msgs)
                 # Recoverable compression: if anything was digested, offer the model
                 # the distil_expand tool so it can pull back detail on demand.
                 if expand and getattr(store, "handles", None):

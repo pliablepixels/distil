@@ -229,6 +229,14 @@ from distil.adapters.anthropic import wrap
 client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache warm
 ```
 
+**Framework hooks (no proxy, no network hop)** — for agent frameworks that own the message list, compress it where it lives:
+
+| Framework | Hook | Example |
+|---|---|---|
+| LiteLLM | `distil.integrations.litellm.compress(kwargs)` | [`examples/python_litellm.py`](examples/python_litellm.py) |
+| LangChain | `distil.integrations.langchain.compress_messages(msgs)` | — |
+| LangGraph | `pre_model_hook=pre_model_hook()` (compresses graph state before the model node) | [`examples/python_langgraph.py`](examples/python_langgraph.py) |
+
 ---
 
 ## 📦 Install your way
@@ -344,7 +352,7 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **Causal / counterfactual pruning** | `replay/ablation.py` | certified |
 | **TOST non-inferiority gate** + 7-domain corpus + `distil bench` | `certify/`, `corpus.py` | the contract |
 | **Decision-Equivalence Risk Certificate** — conformal risk control (LTT/CRC) | `conformal.py`, `distil conformal` | distribution-free guarantee |
-| **Salience protection** — model-free (pattern + entropy + cross-reference), keeps the decision-bearing lines while crushing the rest | `compress/salience.py` | frontier shifter |
+| **Salience protection** — model-free (pattern + entropy + cross-reference), keeps the decision-bearing lines while crushing the rest; **pluggable scorer seam** (`scorer=`) to bolt on a semantic/NER model that only *adds* protected spans | `compress/salience.py` | frontier shifter |
 | **Shadow-mode live equivalence** — sample live traffic, run it compressed *and* uncompressed in the background, record the live decision-change rate (streaming-aware) | `shadow.py`, `distil proxy --shadow` / `distil shadow-stats` | live, content-free |
 | **Edit-equivalence** — the agent's produced code is normalized by AST (`ast.dump`), so whitespace/comment-only differences count as equivalent while real logic changes don't — decision-equivalence made precise for coding | `shadow.py` (stdlib `ast`) | the motto, for code |
 | **Provider proxy** — drop-in across SDKs (Anthropic · OpenAI-compatible · Google Gemini) | `proxy.py`, `distil proxy` | reversible |
@@ -354,7 +362,7 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **Cache-delta coding** — cross-turn dedup + **cross-version delta** (a re-read-after-edit is sent as a diff, not re-sent whole); cache-monotonic, reversible | `cachedelta.py`, `distil proxy --session-delta` | decision-equivalent |
 | **AST-structural delta** — Python re-reads diffed by parsed structure (`ast.dump`), invariant to reformatting/comments/import-order; references unchanged defs, sends only changed ones | `astdelta.py` (stdlib `ast`, model-free) | decision-equivalent |
 | **MCP server** — zero-dep stdio JSON-RPC; `distil_compress` / `distil_expand` / `distil_savings` tools | `mcp_server.py`, `distil mcp` | reversible |
-| **Framework hooks** — in-process LiteLLM + LangChain message compression (no proxy) | `integrations/litellm.py`, `integrations/langchain.py` | reversible |
+| **Framework hooks** — in-process LiteLLM + LangChain + LangGraph (`pre_model_hook`) message compression (no proxy) | `integrations/litellm.py`, `integrations/langchain.py`, `integrations/langgraph.py` | reversible |
 | **Claude Code plugin** — `/distil` command + live savings status line | `plugins/distil/`, `distil statusline` | — |
 | **Learned keep-model** (logistic, 96.4% / 0.98 F1 on held-out lines; labels distilled from the salience heuristic + bundled corpus) | `codec/learned.py` | pluggable |
 | Transformer keep-model — ONNX adapter + training pipeline | `codec/transformer.py`, `codec/train_transformer.py` | pluggable |
@@ -394,6 +402,18 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 - **The default runner is a deterministic stand-in** so the gate runs offline with ground truth. `--runner anthropic` certifies against the live model — implemented, **UNVERIFIED** until you run it with a key.
 - The learned keep-model is a real trained **logistic** classifier (96.4%/0.98 on held-out lines). The **transformer** path ships a real ONNX adapter + training pipeline; a **demo checkpoint** (96.3%/0.98, trained on the bundled corpus) is on the v0.1.0 release, and you retrain on your own traces for production (`distil train-transformer`). We don't fabricate weights to claim "done."
 - Numbers here are reproducible from the bundled corpus with the heuristic tokenizer. No vanity metrics.
+
+### Deliberately *not* a platform
+
+Distil is a **compression engine with a correctness gate**, not a context-management suite. Some adjacent products bundle a memory/knowledge-graph store, a hosted semantic cache, and editor-auth plumbing. We've looked at each and **declined the ones that can't be put under the certificate** — bundling them would dilute the one promise that matters (decision-equivalence) and add state we can't prove safe:
+
+| Adjacent feature | Our stance |
+|---|---|
+| Persistent memory / knowledge graph | **Out of scope.** A lossy store of "what mattered" is the opposite of byte-reversible. Use a real memory tool; Distil compresses what you *do* send. |
+| Hosted semantic cache | **Out of scope as a service.** We make the *provider's* prompt cache pay off (cache-monotonic prefixes); we don't add a second, lossy, similarity-keyed cache that can return a near-but-wrong hit. |
+| Editor/Copilot auth | **Out of scope.** Distil sits on the wire (proxy) or in-process (hooks); it never brokers your credentials. |
+
+What we **did** adopt from that space — because it survives the gate — is on-motto: a **pluggable salience scorer** seam (`salient_tokens(scorer=…)`) so you can bolt on a semantic/NER model to *protect* entities, never to drop them; **cache-prefix observability** (`x-distil-cache-prefix-msgs`) exposing exactly how many leading messages stayed byte-stable; and **first-class framework hooks** (LiteLLM/LangChain/LangGraph). The seam adds *coverage*; the certificate still owns the *guarantee*.
 
 ---
 

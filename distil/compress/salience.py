@@ -29,6 +29,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Callable
+from typing import Any
 
 from ..trajectory import Block
 
@@ -88,8 +89,17 @@ def salient_tokens(
     ref_index: Counter | None = None,
     min_entropy: float = 3.2,
     min_len: int = 10,
+    scorer: Callable[[str], Any] | None = None,
 ) -> set[str]:
-    """The set of tokens in ``text`` worth protecting, from the three signals."""
+    """The set of tokens in ``text`` worth protecting, from the three model-free
+    signals (pattern + entropy + cross-reference).
+
+    ``scorer`` is an optional pluggable seam: a callable ``(text) -> Iterable[str]``
+    returning extra spans/tokens to protect (e.g. a semantic / NER / embedding
+    scorer for free-form prose, where the model-free signals are weaker). It stays
+    **off by default** so the runtime is model-free and zero-dependency; whatever it
+    returns is unioned in and then judged by the same certificate — the seam adds
+    coverage, never an unverified guarantee."""
     out: set[str] = set(m.group(0) for m in _PATTERNS.finditer(text))
     for tok in _TOKEN.findall(text):
         if tok in out:
@@ -100,6 +110,13 @@ def salient_tokens(
             ref_index is not None and ref_index.get(tok, 0) >= 2 and any(ch.isdigit() for ch in tok)
         ):
             out.add(tok)  # cross-referenced identifier-like anchor
+    if scorer is not None:
+        try:
+            for span in scorer(text) or ():
+                if isinstance(span, str) and span:
+                    out.add(span)
+        except Exception:  # noqa: BLE001 — a bad scorer must never break compression
+            pass
     return out
 
 

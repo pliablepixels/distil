@@ -197,11 +197,12 @@ genai.configure(
     </table>
 
     <h3>Response headers</h3>
-    <p>The proxy adds up to 8 response headers to compressed responses (not all appear on every request):</p>
+    <p>The proxy adds up to 9 response headers to compressed responses (not all appear on every request):</p>
     <ul>
       <li><code>x-distil-compressed: 1</code> — compression was applied</li>
       <li><code>x-distil-tokens-saved: &lt;n&gt;</code> — heuristic estimate of tokens saved (not billing-grade)</li>
       <li><code>x-distil-expanded: 1</code> — present when <code>--expand</code> fired and a digest was resolved in the transparent expand loop</li>
+      <li><code>x-distil-cache-prefix-msgs: &lt;n&gt;</code> — leading messages left byte-identical vs the previous turn, i.e. the prompt-cache-read region (only with <code>--session-delta</code>)</li>
       <li><code>x-distil-cache-refs: &lt;n&gt;</code> — total cache-delta references (only with <code>--session-delta</code>)</li>
       <li><code>x-distil-cache-delta: &lt;n&gt;</code> — delta-encoded references (only with <code>--session-delta</code>)</li>
       <li><code>x-distil-cache-tokens-saved: &lt;n&gt;</code> — tokens saved by cache-delta encoding (only with <code>--session-delta</code>)</li>

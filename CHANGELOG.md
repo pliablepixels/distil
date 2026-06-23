@@ -3,6 +3,35 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.24.0] — Ecosystem hooks + on-motto gap-closing
+
+New surface area for agent frameworks and observability — every addition kept
+under the decision-equivalence certificate, with the platform scope-creep
+deliberately declined.
+
+- **LangGraph hook** (`distil/integrations/langgraph.py`) — a drop-in
+  `pre_model_hook()` that compresses graph state right before the model node, plus
+  a `compress_state()` helper for manual use inside any node. Duck-typed (never
+  imports langgraph/langchain); returns only the updated message list so every
+  other state field is untouched. Joins the existing LiteLLM + LangChain hooks.
+  Example: `examples/python_langgraph.py`.
+- **Cache-prefix observability** — the proxy now emits
+  `x-distil-cache-prefix-msgs: <n>` under `--session-delta`, exposing exactly how
+  many leading messages stayed byte-identical vs the previous turn (the
+  prompt-cache-read region). The verifiable benefit of a prefix-freeze router,
+  content-free — distil is cache-monotonic by construction, so the prefix is real,
+  not rewritten.
+- **Pluggable salience scorer seam** — `salient_tokens(..., scorer=…)` accepts an
+  optional callable (a semantic / NER / embedding model) whose spans are unioned
+  into the model-free signals. Off by default (runtime stays model-free,
+  zero-dep); a bad scorer can never break compression (guarded), and whatever it
+  returns is still judged by the same certificate — the seam adds *coverage*,
+  never an unverified guarantee.
+- **Docs:** README now documents the framework hooks and a "Deliberately *not* a
+  platform" section — why memory/knowledge-graph, hosted semantic cache, and
+  editor-auth are out of scope (they can't be put under the certificate), and what
+  we adopted instead because it survives the gate.
+
 ## [0.23.2] — Mobile docs, animated architecture diagram, distribution fix
 
 - **Fixed a broken Homebrew distribution.** Both formulas (repo + tap) had frozen

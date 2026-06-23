@@ -77,3 +77,37 @@ def test_langchain_non_string_content_untouched():
     blocks = [{"type": "text", "text": "x"}]
     out = dlc.compress_messages([{"type": "human", "content": blocks}])
     assert out[0]["content"] is blocks
+
+
+# --- LangGraph hook -------------------------------------------------------- #
+
+
+def test_langgraph_compress_state_dict():
+    from distil.integrations.langgraph import compress_state
+
+    state = {"messages": [{"type": "tool", "content": BIG}], "other": 42}
+    out = compress_state(state)
+    assert out["other"] == 42  # untouched
+    assert out["messages"][0]["content"] != BIG  # compressed
+    assert len(out["messages"][0]["content"]) < len(BIG)
+
+
+def test_langgraph_pre_model_hook_returns_only_messages():
+    from distil.integrations.langgraph import pre_model_hook
+
+    hook = pre_model_hook(verbatim=True)
+    upd = hook({"messages": [{"type": "human", "content": "hi"}], "x": 1})
+    assert set(upd.keys()) == {"messages"}  # merges back only messages
+
+
+def test_langgraph_state_without_messages_untouched():
+    from distil.integrations.langgraph import compress_state
+
+    assert compress_state({"foo": "bar"}) == {"foo": "bar"}
+    assert pre_model_hook_empty()
+
+
+def pre_model_hook_empty():
+    from distil.integrations.langgraph import pre_model_hook
+
+    return pre_model_hook()({"foo": "bar"}) == {}

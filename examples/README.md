@@ -16,6 +16,19 @@ distil proxy --port 8788 --upstream https://api.anthropic.com
 | `js_vercel_ai_sdk.ts` | Vercel AI SDK (`@ai-sdk/anthropic`) | `baseURL` in `createAnthropic({…})` | `http://127.0.0.1:8788` |
 | `js_langchain.ts` | LangChain.js (`@langchain/anthropic`) | `anthropicApiUrl` in `ChatAnthropic({…})` | `http://127.0.0.1:8788` |
 
+### In-process (no proxy)
+
+Some frameworks let you compress state directly, with no network hop:
+
+| Example file | Framework | Seam |
+|---|---|---|
+| `python_langgraph.py` | LangGraph | `pre_model_hook=pre_model_hook()` (compresses graph state before the model node) |
+
+```sh
+pip install langgraph langchain-anthropic
+ANTHROPIC_API_KEY=sk-ant-… python examples/python_langgraph.py
+```
+
 ## Running the examples
 
 ### Python
@@ -64,3 +77,12 @@ Two extra response headers are added for observability:
 |---|---|
 | `x-distil-compressed: 1` | Compression was applied this turn |
 | `x-distil-tokens-saved: <n>` | Estimated input tokens saved |
+
+With `distil proxy --session-delta` (cross-turn cache-delta coding), four more headers expose the cache picture:
+
+| Header | Meaning |
+|---|---|
+| `x-distil-cache-prefix-msgs: <n>` | Leading messages left byte-identical vs the previous turn (the prompt-cache-read region) |
+| `x-distil-cache-refs: <n>` | Blocks replaced by a back-reference (exact or delta) |
+| `x-distil-cache-delta: <n>` | Of those, how many were cross-version diffs (re-read-after-edit) |
+| `x-distil-cache-tokens-saved: <n>` | Volatile (fresh-billed) tokens removed by delta coding |
