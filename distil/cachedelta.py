@@ -210,21 +210,28 @@ def _encode_block(
             return marker
         return text
 
-    # 2) Near-duplicate (e.g. a file re-read after an edit) → reference + diff.
+    # 2) Near-duplicate (e.g. a file re-read after an edit) → reference + delta.
     base = _best_base(text, bases)
     if base is not None:
         base_h, base_text = base
-        diff = "".join(
-            difflib.unified_diff(
-                base_text.splitlines(keepends=True),
-                text.splitlines(keepends=True),
-                fromfile=base_h,
-                tofile="current",
-                n=2,
+        # Prefer an AST-structural delta (formatting/comment/import-order invariant);
+        # fall back to a textual unified diff for non-Python / unparseable source.
+        from .astdelta import structural_delta
+
+        marker = structural_delta(base_text, text, base_h, h)
+        if marker is None:
+            diff = "".join(
+                difflib.unified_diff(
+                    base_text.splitlines(keepends=True),
+                    text.splitlines(keepends=True),
+                    fromfile=base_h,
+                    tofile="current",
+                    n=2,
+                )
             )
-        )
-        marker = _delta_marker(base_h, h, diff, nlines)
-        if len(marker) < len(text):
+            cand = _delta_marker(base_h, h, diff, nlines)
+            marker = cand if len(cand) < len(text) else None
+        if marker is not None and len(marker) < len(text):
             store._record(h, text)  # full current version recoverable by expand
             stats.delta_refs += 1
             stats.tokens_saved += max(0, _tok.count(text) - _tok.count(marker))

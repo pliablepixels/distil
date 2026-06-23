@@ -3,6 +3,21 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.20.0] — AST-structural delta (the deepest cache-delta layer)
+
+- **AST-structural delta** (`astdelta.py`, stdlib `ast`, model-free): for Python,
+  cross-version delta now diffs by *parsed structure*. Each top-level definition is
+  fingerprinted with `ast.dump` (attributes off) — invariant to whitespace,
+  comments, and import order. A reformat-only re-read is recognised as "no
+  definition changed" and referenced; only definitions whose AST actually changed
+  are sent in full. Textual diff explodes on reformatting; the structural delta
+  isolates exactly what changed.
+- Wired as the preferred near-duplicate path in `cachedelta.py` (the `--session-delta`
+  feature); non-Python or unparseable (mid-edit) source falls back to the textual
+  unified diff, so it never fails a request. Decision-equivalent (unchanged defs are
+  still in cached context) and reversible (`distil_expand` recovers the full file).
+- 8 tests. Full suite 490 passed, ruff clean, verify + bench PASS.
+
 ## [0.19.0] — Cache-delta context coding (cross-version delta)
 
 The coding-agent moat. The hot path is read → edit → **re-read**, and the re-read

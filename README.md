@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-482%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-490%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -310,6 +310,7 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |
 | **Gemini adapter** — compresses the `generateContent` shape (contents/parts/functionResponse) | `adapters/gemini.py` | reversible |
 | **Cache-delta coding** — cross-turn dedup + **cross-version delta** (a re-read-after-edit is sent as a diff, not re-sent whole); cache-monotonic, reversible | `cachedelta.py`, `distil proxy --session-delta` | decision-equivalent |
+| **AST-structural delta** — Python re-reads diffed by parsed structure (`ast.dump`), invariant to reformatting/comments/import-order; references unchanged defs, sends only changed ones | `astdelta.py` (stdlib `ast`, model-free) | decision-equivalent |
 | **MCP server** — zero-dep stdio JSON-RPC; `distil_compress` / `distil_expand` / `distil_savings` tools | `mcp_server.py`, `distil mcp` | reversible |
 | **Framework hooks** — in-process LiteLLM + LangChain message compression (no proxy) | `integrations/litellm.py`, `integrations/langchain.py` | reversible |
 | **Claude Code plugin** — `/distil` command + live savings status line | `plugins/distil/`, `distil statusline` | — |
