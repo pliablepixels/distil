@@ -9,6 +9,7 @@ distil certify   --trajectory T --strategy non-inferiority gate (the quality con
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from . import __version__, ledger, pricing, tokenizer
@@ -381,6 +382,67 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
         "\n  Each sampled request was run BOTH compressed and uncompressed; "
         "equivalence\n  means the agent chose the same next action. Numbers only, never content."
     )
+    return 0
+
+
+def _humanize_tokens(n: int) -> str:
+    """Compact human form: 14417 -> '14.4K', 1_200_000 -> '1.2M'."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return str(n)
+
+
+def cmd_statusline(args: argparse.Namespace) -> int:
+    """Render a compact one-line savings status for the Claude Code status line.
+
+    Reads the optional Claude Code status-line JSON on stdin (for the model name)
+    and the genuine savings from the local ledger; prints a single line to stdout.
+    Wired via the distil Claude Code plugin (or any ``statusLine`` command). Never
+    raises — a status line must always print something.
+    """
+    import os
+    import sys
+
+    model = ""
+    if not sys.stdin.isatty():  # Claude Code pipes JSON; a bare TTY would block.
+        try:
+            raw = sys.stdin.read()
+            if raw.strip():
+                data = json.loads(raw)
+                model = (data.get("model") or {}).get("display_name") or ""
+        except (json.JSONDecodeError, ValueError, AttributeError, OSError):
+            model = ""
+
+    use_color = (not args.no_color) and os.environ.get("NO_COLOR") is None
+
+    def c(code: str, text: str) -> str:
+        return f"\033[{code}m{text}\033[0m" if use_color else text
+
+    try:
+        s = ledger.summary()
+    except Exception:  # noqa: BLE001 — a status line must never error out
+        s = None
+
+    parts = [c("38;5;79", "distil")]
+    if s is None or s.runs == 0:
+        parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
+    else:
+        parts.append(c("36", f"{_humanize_tokens(s.total_tokens_saved)} tok"))
+        parts.append(c("32", f"${s.total_dollars_saved:,.4f}"))
+        parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
+        try:
+            from .shadow import ShadowLedger
+
+            led = ShadowLedger.load()
+            if led.samples:
+                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}%"))
+        except Exception:  # noqa: BLE001 — shadow stats are best-effort
+            pass
+    if model:
+        parts.append(c("90", model))
+    print(" · ".join(parts))
     return 0
 
 
@@ -905,6 +967,12 @@ def build_parser() -> argparse.ArgumentParser:
         "shadow-stats", help="show live decision-equivalence measured by shadow mode"
     )
     ss.set_defaults(func=cmd_shadow_stats)
+
+    sl = sub.add_parser(
+        "statusline", help="compact savings status line (for the Claude Code plugin)"
+    )
+    sl.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    sl.set_defaults(func=cmd_statusline)
 
     wr = sub.add_parser(
         "wrap",

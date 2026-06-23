@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "distil",
+  "description": "Distil — certified, reversible LLM context compression",
+  "owner": {
+    "name": "Distil",
+    "email": "chandu1221@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "distil",
+      "description": "Live token-savings status line + /distil controls for distil context compression",
+      "source": "./plugins/distil",
+      "category": "development",
+      "homepage": "https://github.com/dshakes/distil"
+    }
+  ]
+}

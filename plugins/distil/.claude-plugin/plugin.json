@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "distil",
+  "description": "Live token-savings status line + controls for distil context compression",
+  "version": "0.14.0",
+  "author": {
+    "name": "Distil",
+    "email": "chandu1221@gmail.com"
+  },
+  "homepage": "https://github.com/dshakes/distil",
+  "repository": {
+    "url": "https://github.com/dshakes/distil",
+    "type": "git"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["compression", "context", "llm", "tokens", "savings"]
+}

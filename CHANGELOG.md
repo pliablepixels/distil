@@ -3,6 +3,19 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.15.0] — Claude Code plugin + status line
+
+- **`distil statusline`** (new CLI command): renders a compact one-line savings
+  summary from the local ledger (tokens, dollars, runs, and live decision-
+  equivalence when shadow-mode has samples). Reads the optional Claude Code status-
+  line JSON on stdin for the model name; never raises.
+- **Claude Code plugin** (`plugins/distil/` + `.claude-plugin/marketplace.json`):
+  installable via `/plugin marketplace add dshakes/distil`. Ships a `/distil`
+  command (savings report + setup help) and a `statusline.sh` that calls
+  `distil statusline`. Honest scope: a plugin cannot reroute a running session or
+  set the main status line from its manifest, so the README documents the one-line
+  `settings.json` addition; traffic is compressed via `distil wrap` / `distil proxy`.
+
 ## [0.14.0] — Google Gemini adapter + true lossless-only
 
 - **Gemini adapter** (`adapters/gemini.py`): the proxy, async proxy, and gateway now

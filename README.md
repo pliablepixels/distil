@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-441%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-448%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -186,6 +186,15 @@ distil shadow-stats
 For periodic certification under drift: `distil ingest` your captured traffic → `distil conformal --runner anthropic` to re-certify. With `--expand`, the **expand rate** (`x-distil-expanded`) is also a free live canary — the model itself signalling it needed detail back.
 
 **Enforce it once, org-wide.** Run `distil proxy` as a sidecar and set `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` in managed settings or container env — every client (Claude Code via `ANTHROPIC_BASE_URL`, Codex, any SDK) routes through it with **zero per-developer change**. **Google Gemini** is supported too (point `--upstream` at `generativelanguage.googleapis.com`): the proxy compresses the `generateContent` shape (`contents` / `parts` / `functionResponse`) reversibly, and shadow-mode works for it.
+
+**Claude Code plugin.** A plugin ([`plugins/distil`](plugins/distil)) adds a live **savings status line** and a **`/distil`** command:
+
+```
+/plugin marketplace add dshakes/distil
+/plugin install distil@distil
+```
+
+Then wire the status line in `~/.claude/settings.json` (`"statusLine": {"type":"command","command":"${CLAUDE_PLUGIN_ROOT}/statusline.sh"}`) to see, e.g. `distil · 1.2M tok · $3.41 · 128 runs · eq 99.5%`. The line is rendered by `distil statusline` (reads the local ledger; never errors). Honest scope: a plugin can't reroute a running session — compress traffic with `distil wrap`/`distil proxy`, and the savings surface here.
 
 ---
 
