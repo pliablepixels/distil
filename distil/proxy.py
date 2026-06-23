@@ -105,6 +105,7 @@ def build_handler(
     flush_every: int = 50,
     expand: bool = False,
     shadow_rate: float = 0.0,
+    session_delta: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a ``BaseHTTPRequestHandler`` subclass configured for *upstream*.
 
@@ -280,12 +281,31 @@ def build_handler(
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
+                # Cache-delta coding (opt-in): cross-turn dedup + cross-version delta,
+                # applied to the ORIGINALS before compression so re-reads match across
+                # turns. Cache-monotonic (suffix-only) and reversible.
+                pre = original
+                _dstats = None
+                _dstore = None
+                if session_delta:
+                    try:
+                        from .cachedelta import delta_encode, get_session, session_key
+
+                        _sess = get_session(session_key(original))
+                        pre, _dstore, _dstats = delta_encode(original, session=_sess)
+                    except Exception:  # noqa: BLE001 — never break a request
+                        pre, _dstore, _dstats = original, None, None
                 try:
-                    compressed, store = compress_messages(
-                        original, verbatim=verbatim, keep=_learn_keep
-                    )
+                    compressed, store = compress_messages(pre, verbatim=verbatim, keep=_learn_keep)
                 except Exception:  # noqa: BLE001 — compression must never break a request
-                    compressed, store = original, None
+                    compressed, store = pre, None
+                # Merge cache-delta references into the store so distil_expand recovers them.
+                if _dstore is not None and store is not None:
+                    for _h in _dstore.handles:
+                        try:
+                            store._record(_h, _dstore.expand(_h))
+                        except Exception:  # noqa: BLE001
+                            pass
                 # Learning: tally what we digested, by content-free signature.
                 if _learn_stats is not None and getattr(store, "handles", None):
                     from .learn import signature
@@ -303,6 +323,10 @@ def build_handler(
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
                 }
+                if _dstats is not None:
+                    extras["x-distil-cache-refs"] = str(_dstats.exact_refs + _dstats.delta_refs)
+                    extras["x-distil-cache-delta"] = str(_dstats.delta_refs)
+                    extras["x-distil-cache-tokens-saved"] = str(_dstats.tokens_saved)
                 # Recoverable compression: if anything was digested, offer the model
                 # the distil_expand tool so it can pull back detail on demand.
                 if expand and getattr(store, "handles", None):
@@ -462,6 +486,7 @@ def serve(
     pricing_model: str = "claude-opus-4-8",
     expand: bool = False,
     shadow_rate: float = 0.0,
+    session_delta: bool = False,
 ) -> None:
     """Run a blocking :class:`ThreadingHTTPServer` proxy.
 
@@ -499,6 +524,7 @@ def serve(
         savings=savings,
         expand=expand,
         shadow_rate=shadow_rate,
+        session_delta=session_delta,
     )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil proxy listening on http://{host}:{port}")
@@ -538,6 +564,7 @@ def wrap_run(
     pricing_model: str = "claude-opus-4-8",
     env_var: str = "ANTHROPIC_BASE_URL",
     expand: bool = False,
+    session_delta: bool = False,
 ) -> int:
     """Run *command* with its API base URL transparently pointed at a Distil proxy.
 
@@ -563,6 +590,7 @@ def wrap_run(
         shape_output=shape_output,
         savings=savings,
         expand=expand,
+        session_delta=session_delta,
     )
     server = ThreadingHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
     base = f"http://{host}:{server.server_address[1]}"

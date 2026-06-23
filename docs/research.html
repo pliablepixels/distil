@@ -221,6 +221,25 @@ Decision-Equivalence Risk Certificate (DERC)
 
     <hr/>
 
+    <!-- Feature 1e: Cache-delta context coding -->
+    <h2 id="cachedelta">Cache-delta context coding <span class="g">— cross-version delta, decision-equivalent</span></h2>
+    <p><strong>Module:</strong> <code>distil/cachedelta.py</code> &middot; <strong>Command:</strong> <code>distil proxy --session-delta</code> &middot; <strong>For:</strong> coding agents (Claude Code / Codex / Gemini CLI)</p>
+
+    <p>The coding-agent hot path is <strong>read &rarr; edit &rarr; re-read</strong>. The re-read file is <em>not</em> byte-identical to the first read &mdash; one hunk changed &mdash; so exact-duplicate dedup (the state of the art elsewhere, e.g. Headroom's <code>dedup_identical_items</code>) <strong>misses it</strong> and re-sends the whole file as fresh tokens. Cache-delta coding instead sends only the <strong>diff</strong> against the previously-delivered version, referencing the rest.</p>
+
+    <div class="callout">
+      <b>Why it is decision-equivalent (the motto).</b> The prior version is still present earlier in the (cached) conversation, so <em>prior-version + diff</em> carries exactly the information the agent needs for its next action &mdash; the decision is unchanged. It is <strong>reversible</strong> (the full current version is kept locally; <code>distil_expand</code> recovers it byte-exact) and <strong>measurable</strong> (shadow mode records the live decision-change rate), so the equivalence is proven, not asserted.
+    </div>
+
+    <div class="grid2">
+      <div class="card"><div class="tag">Win 1 — exact re-send</div><h3>Back-reference</h3><p>Content delivered earlier this session is replaced by a compact handle reference. Table stakes &mdash; competitors do this too.</p></div>
+      <div class="card"><div class="tag">Win 2 — near-duplicate</div><h3>Cross-version delta</h3><p>A re-read-after-edit is replaced by a reference <em>plus a unified diff</em>. The leap exact-only dedup can't make &mdash; and it's the most common coding pattern.</p></div>
+      <div class="card"><div class="tag">Cache-monotonic</div><h3>Never bust the prefix</h3><p>Only the volatile suffix is touched; the stable, already-cached prefix is left byte-identical, so prompt-cache hits survive. Optimising the real bill (<code>cached&middot;0.1 + writes&middot;1.25 + new&middot;1.0</code>), not raw tokens.</p></div>
+      <div class="card"><div class="tag">Measured</div><h3>~85% on the re-read</h3><p>End-to-end through the proxy, a re-read-after-edit (1063 tokens) was delta-encoded for a <strong>902-token</strong> saving &mdash; where identical-item dedup re-sends it whole.</p></div>
+    </div>
+
+    <hr/>
+
     <!-- Feature 2: Self-distilling keep-model -->
     <h2 id="online">Self-distilling keep-model</h2>
     <p><strong>Module:</strong> <code>distil/online.py</code> &middot; <strong>Command:</strong> <code>distil online [--corpus --promote-to]</code></p>

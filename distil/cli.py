@@ -362,6 +362,7 @@ def cmd_proxy(args: argparse.Namespace) -> int:
             pricing_model=args.pricing,
             expand=args.expand,
             shadow_rate=args.shadow,
+            session_delta=args.session_delta,
         )
     return 0
 
@@ -477,6 +478,7 @@ def cmd_wrap(args: argparse.Namespace) -> int:
         pricing_model=args.pricing,
         env_var=args.env_var,
         expand=args.expand,
+        session_delta=args.session_delta,
     )
 
 
@@ -980,6 +982,12 @@ def build_parser() -> argparse.ArgumentParser:
         "(e.g. 0.05) and run them uncompressed too, in the background, to measure the "
         "live decision-change rate on real traffic (`distil shadow-stats`). Adds ~RATE cost.",
     )
+    px.add_argument(
+        "--session-delta",
+        action="store_true",
+        help="cache-delta coding: cross-turn dedup + cross-version delta (re-reads after "
+        "edits sent as a diff), cache-monotonic and reversible (sync proxy only)",
+    )
     px.set_defaults(func=cmd_proxy)
 
     ss = sub.add_parser(
@@ -1042,6 +1050,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--expand",
         action="store_true",
         help="recoverable compression: the agent can pull back digested detail on demand",
+    )
+    wr.add_argument(
+        "--session-delta",
+        action="store_true",
+        help="cache-delta coding: cross-turn dedup + cross-version delta (re-reads after "
+        "edits sent as a diff), cache-monotonic and reversible",
     )
     wr.add_argument(
         "command",

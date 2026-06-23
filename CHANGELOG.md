@@ -3,6 +3,25 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.19.0] — Cache-delta context coding (cross-version delta)
+
+The coding-agent moat. The hot path is read → edit → **re-read**, and the re-read
+file is a *near-duplicate* (one hunk changed), so exact-duplicate dedup misses it
+and re-sends the whole file. Cache-delta coding (`cachedelta.py`,
+`distil proxy --session-delta`, opt-in) sends only the diff:
+
+- **Cross-version delta** — a re-read-after-edit is replaced by a reference to the
+  prior version + a unified diff of what changed; exact re-sends become a compact
+  back-reference. Both confined to the **volatile suffix** — the stable cached
+  prefix is never mutated (*cache-monotonicity*), so prompt-cache hits survive.
+- **Decision-equivalent + reversible**: prior-version (still in cached context) +
+  diff carries the same information for the next action; the full current version is
+  kept locally and recovered byte-exact via `distil_expand`. Shadow mode measures it.
+- Wired into `distil proxy` / `distil wrap` (messages format) behind `--session-delta`;
+  emits `x-distil-cache-refs` / `-delta` / `-tokens-saved` headers. End-to-end a
+  re-read-after-edit saved ~85% of the re-read (902 of 1063 tokens) vs re-sending whole.
+- 10 tests. Full suite 482 passed, ruff clean, verify + bench PASS.
+
 ## [0.18.0] — Streaming-aware shadow mode (Claude Code / Codex / Gemini)
 
 - **Shadow-mode now works on streaming sessions.** Real agent sessions (Claude Code,

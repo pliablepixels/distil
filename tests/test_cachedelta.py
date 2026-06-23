@@ -1,0 +1,139 @@
+"""Cache-delta context coding — cross-turn dedup, cross-version delta, monotonicity.
+
+The invention vs exact-only dedup: a file RE-READ after an edit is a near-duplicate,
+not identical, so it is delta-encoded (reference + diff) rather than re-sent whole.
+"""
+
+from __future__ import annotations
+
+from distil.cachedelta import (
+    CacheStats,
+    DeltaSession,
+    delta_encode,
+    get_session,
+    reset_sessions,
+    session_key,
+)
+from distil.pricing import get as pricing_get
+
+V1 = "\n".join(f"line {i}: value {i} status=ok" for i in range(60))
+V2 = V1.replace("line 30: value 30 status=ok", "line 30: value THIRTY status=EDITED")
+assert V1 != V2 and len(V1) > 400
+
+
+def _tr(text: str) -> dict:
+    return {
+        "role": "user",
+        "content": [{"type": "tool_result", "tool_use_id": "t", "content": text}],
+    }
+
+
+def _u(text: str) -> dict:
+    return {"role": "user", "content": text}
+
+
+def _block_text(msg: dict) -> str:
+    return msg["content"][0]["content"]
+
+
+# --- exact cross-turn dedup ------------------------------------------------ #
+
+
+def test_exact_resend_becomes_reference_and_is_recoverable():
+    s = DeltaSession()
+    delta_encode([_u("q"), _tr(V1)], session=s)  # turn 1 — remembers V1
+    out, store, stats = delta_encode([_u("q"), _tr(V1), _u("again"), _tr(V1)], session=s)
+    assert stats.prefix_msgs == 2  # first two messages are the cache-stable prefix
+    assert stats.exact_refs == 1
+    seen = _block_text(out[3])
+    assert "«distil-ref handle=" in seen and len(seen) < len(V1)
+    # Reversible: the original is recoverable byte-exact via expand.
+    assert any(store.expand(h) == V1 for h in store.handles)
+
+
+# --- cross-version delta (the invention) ----------------------------------- #
+
+
+def test_reread_after_edit_is_delta_encoded():
+    s = DeltaSession()
+    delta_encode([_u("q"), _tr(V1)], session=s)  # turn 1 — remembers V1
+    out, store, stats = delta_encode([_u("q"), _tr(V1), _u("edit"), _tr(V2)], session=s)
+    assert stats.delta_refs == 1  # near-duplicate, NOT exact -> delta, not full re-send
+    seen = _block_text(out[3])
+    assert "«distil-delta base=" in seen
+    assert "THIRTY" in seen  # the diff carries exactly what changed
+    assert len(seen) < len(V2)  # smaller than re-sending the whole file
+    assert stats.tokens_saved > 0
+    # The full current version is recoverable byte-exact.
+    assert any(store.expand(h) == V2 for h in store.handles)
+
+
+def test_exact_only_dedup_would_miss_the_reread():
+    # Sanity: V2 is genuinely not identical to V1, so exact-only dedup (the state of
+    # the art elsewhere) cannot dedup it — only cross-version delta can.
+    s = DeltaSession()
+    delta_encode([_u("q"), _tr(V1)], session=s)
+    _out, _store, stats = delta_encode([_u("q"), _tr(V1), _u("x"), _tr(V2)], session=s)
+    assert stats.exact_refs == 0 and stats.delta_refs == 1
+
+
+# --- cache-monotonicity ---------------------------------------------------- #
+
+
+def test_stable_prefix_is_never_mutated():
+    s = DeltaSession()
+    t1 = [_u("q"), _tr(V1)]
+    delta_encode(t1, session=s)
+    t2 = [_u("q"), _tr(V1), _u("more"), _tr(V2)]
+    out, _store, stats = delta_encode(t2, session=s)
+    # Prefix messages are returned as the SAME objects — byte-identical, cache-safe.
+    for i in range(stats.prefix_msgs):
+        assert out[i] is t2[i]
+
+
+# --- first turn / small blocks / robustness -------------------------------- #
+
+
+def test_first_turn_changes_nothing():
+    s = DeltaSession()
+    out, _store, stats = delta_encode([_u("q"), _tr(V1)], session=s)
+    assert stats.exact_refs == 0 and stats.delta_refs == 0
+    assert _block_text(out[1]) == V1
+
+
+def test_small_blocks_untouched():
+    s = DeltaSession()
+    small = "short tool output"
+    delta_encode([_u("q"), _tr(small)], session=s)
+    out, _store, stats = delta_encode([_u("q"), _tr(small), _u("z"), _tr(small)], session=s)
+    assert stats.exact_refs == 0  # below the size threshold
+    assert _block_text(out[3]) == small
+
+
+def test_malformed_messages_do_not_crash():
+    s = DeltaSession()
+    out, _store, _stats = delta_encode([None, 1, "x", {"role": "user"}], session=s)
+    assert isinstance(out, list) and len(out) == 4
+
+
+# --- session registry + economics ------------------------------------------ #
+
+
+def test_session_key_stable_and_distinct():
+    a = [_u("project A bug")]
+    b = [_u("project B bug")]
+    assert session_key(a) == session_key(a)
+    assert session_key(a) != session_key(b)
+
+
+def test_get_session_is_per_key():
+    reset_sessions()
+    s1 = get_session("k1")
+    assert get_session("k1") is s1
+    assert get_session("k2") is not s1
+
+
+def test_dollars_saved_uses_input_rate():
+    p = pricing_get("claude-opus-4-8")
+    stats = CacheStats(tokens_saved=1000)
+    assert stats.dollars_saved(p) == 1000 * p.input
