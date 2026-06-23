@@ -298,7 +298,13 @@ td code { font-size: 11.5px; }
 /* At >=1340px the fixed .toc appears on the right — keep the figure clear of it.
    The min() caps the right edge well before the TOC's left edge at every width. */
 @media (min-width: 1340px) {
-  .archfig { width: min(calc(100vw - 640px), calc(50vw + 200px), 1240px); }
+  /* Track the .toc's own positioning formula exactly, leaving a 28px gap, so the
+     figure's right edge always lands just left of the TOC regardless of width.
+     figure-left = sidebar(252) + content-pad(56) = 308; toc box width = 200;
+     toc right-offset = max(24, (100vw - 252 - 920)/2 - 220); 1172 = 252 + 920. */
+  .archfig {
+    width: min(1200px, calc(100vw - 536px - max(24px, calc((100vw - 1172px) / 2 - 220px))));
+  }
 }
 .archfig svg { width: 100%; height: auto; display: block; }
 .archfig a { cursor: pointer; }
