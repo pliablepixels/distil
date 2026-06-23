@@ -63,7 +63,7 @@
     <p class="lead">Distil is a cost-optimized cache hierarchy with a statistical quality contract. Six components, one invariant: the agent makes the same decisions on compressed context as on the original — provably, not heuristically.</p>
 
     <figure class="archfig" aria-label="Interactive Distil architecture diagram — click a block to open its concept">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="Distil architecture: agent to cache-aware compression pipeline to upstream LLM, with the recovery loop and the decision-equivalence quality contract">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 540" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="Distil architecture: agent to cache-aware compression pipeline to upstream LLM, with the recovery loop and the decision-equivalence quality contract">
       <defs>
         <linearGradient id="iabg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
         <linearGradient id="iag" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
@@ -73,51 +73,66 @@
         <marker id="iaar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
         <marker id="iaarb" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5ad19a"/></marker>
       </defs>
-      <rect width="1200" height="600" fill="url(#iabg)"/><rect width="1200" height="600" fill="url(#iadots)"/>
+      <rect width="1200" height="540" fill="url(#iabg)"/><rect width="1200" height="540" fill="url(#iadots)"/>
 
       <text x="48" y="50" font-size="24" font-weight="800" letter-spacing="-0.4" fill="#f2f3f7">How Distil works <tspan fill="#9aa0b2" font-weight="500" font-size="15">— a cache-aware compression pipeline with a quality contract</tspan></text>
 
-      <g font-size="10.5" letter-spacing="2" font-weight="700" text-anchor="middle"><text x="125" y="92" fill="#717892">AGENT</text><text x="600" y="92" fill="#717892">DISTIL PROXY · localhost</text><text x="1075" y="92" fill="#717892">PROVIDER</text></g>
+      <g font-size="10.5" letter-spacing="2" font-weight="700" text-anchor="middle"><text x="140" y="92" fill="#717892">AGENT</text><text x="600" y="92" fill="#717892">DISTIL PROXY · localhost</text><text x="1059" y="92" fill="#717892">PROVIDER</text></g>
 
-      <line x1="232" y1="170" x2="316" y2="170" stroke="#7d8cff" stroke-width="2.6" class="flow" marker-end="url(#iaar)"/>
-      <line x1="884" y1="170" x2="966" y2="170" stroke="#7d8cff" stroke-width="2.6" class="flow" marker-end="url(#iaar)"/>
+      <line x1="232" y1="162" x2="316" y2="162" stroke="#7d8cff" stroke-width="2.6" class="flow" marker-end="url(#iaar)"/>
+      <line x1="884" y1="162" x2="966" y2="162" stroke="#7d8cff" stroke-width="2.6" class="flow" marker-end="url(#iaar)"/>
 
-      <g transform="translate(48,128)"><rect width="184" height="84" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
+      <g transform="translate(48,120)"><rect width="184" height="84" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
         <text x="18" y="30" font-size="13.5" font-weight="700" fill="#eef0f5">Claude Code · Codex</text>
         <text x="18" y="49" font-size="13.5" font-weight="700" fill="#eef0f5">Gemini · any SDK</text>
         <text x="18" y="69" font-size="10.5" fill="#9aa0b2">re-sends full context every turn</text>
       </g>
 
-      <rect x="320" y="108" width="560" height="300" rx="20" fill="url(#iahero)" stroke="url(#iag)" stroke-width="1.8"/>
+      <rect x="320" y="108" width="560" height="232" rx="20" fill="url(#iahero)" stroke="url(#iag)" stroke-width="1.8"/>
       <text x="600" y="138" text-anchor="middle" font-size="14" font-weight="800" fill="url(#iag)">compress → cache-pin → forward</text>
 
       <g font-size="11" text-anchor="middle">
-        <a href="techniques.html#tiers"><title>Tier-0 — lossless verbatim transforms (always on)</title><rect x="342" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="402" y="178" fill="#dbe0ee" font-weight="700">Tier-0</text><text x="402" y="193" fill="#9aa0b2" font-size="9.5">lossless (verbatim)</text></a>
-        <a href="techniques.html#tiers"><title>Tier-1 — reversible decision-aware digest</title><rect x="474" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="534" y="178" fill="#dbe0ee" font-weight="700">Tier-1 digest</text><text x="534" y="193" fill="#9aa0b2" font-size="9.5">reversible</text></a>
-        <a href="techniques.html#causal"><title>Causal / counterfactual pruning — ablation-proven</title><rect x="606" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="666" y="178" fill="#dbe0ee" font-weight="700">causal prune</text><text x="666" y="193" fill="#9aa0b2" font-size="9.5">ablation-proven</text></a>
-        <a href="techniques.html#salience-protection"><title>Salience protection — model-free needle-keeping</title><rect x="738" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="798" y="178" fill="#dbe0ee" font-weight="700">salience</text><text x="798" y="193" fill="#9aa0b2" font-size="9.5">model-free</text></a>
+        <a href="techniques.html#tiers"><title>Tier-0 — lossless verbatim transforms (always on)</title><g><rect x="342" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="402" y="178" fill="#dbe0ee" font-weight="700">Tier-0</text><text x="402" y="193" fill="#9aa0b2" font-size="9.5">lossless (verbatim)</text></g></a>
+        <a href="techniques.html#tiers"><title>Tier-1 — reversible decision-aware digest</title><g><rect x="474" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="534" y="178" fill="#dbe0ee" font-weight="700">Tier-1 digest</text><text x="534" y="193" fill="#9aa0b2" font-size="9.5">reversible</text></g></a>
+        <a href="techniques.html#causal"><title>Causal / counterfactual pruning — ablation-proven</title><g><rect x="606" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="666" y="178" fill="#dbe0ee" font-weight="700">causal prune</text><text x="666" y="193" fill="#9aa0b2" font-size="9.5">ablation-proven</text></g></a>
+        <a href="techniques.html#salience-protection"><title>Salience protection — model-free needle-keeping</title><g><rect x="738" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="798" y="178" fill="#dbe0ee" font-weight="700">salience</text><text x="798" y="193" fill="#9aa0b2" font-size="9.5">model-free</text></g></a>
       </g>
       <g stroke="#3a486a" stroke-width="1.4" fill="none"><path d="M462,179 L474,179"/><path d="M594,179 L606,179"/><path d="M726,179 L738,179"/></g>
 
-      <a href="techniques.html#cache-aware"><title>Cache-aware placement — pin the stable prefix at the 0.1× cache-read rate</title><rect x="342" y="220" width="516" height="34" rx="9" fill="#0e1320" stroke="#2a5740"/><circle cx="362" cy="237" r="3.5" fill="#5ad19a"/><text x="376" y="241" font-size="11" fill="#dbe0ee">cache-aware placement — the stable prefix is billed at the <tspan fill="#6fe0aa" font-weight="700">0.1× cache-read</tspan> rate</text></a>
+      <a href="techniques.html#cache-aware"><title>Cache-aware placement — pin the stable prefix at the 0.1× cache-read rate</title><rect x="342" y="216" width="516" height="34" rx="9" fill="#0e1320" stroke="#2a5740"/>
+      <circle cx="362" cy="233" r="3.5" fill="#5ad19a"/>
+      <text x="376" y="237" font-size="11" fill="#dbe0ee">cache-aware placement — the stable prefix is billed at the <tspan fill="#6fe0aa" font-weight="700">0.1× cache-read</tspan> rate</text></a>
 
-      <a href="techniques.html#tiers"><title>RestoreStore — originals kept locally, never sent to the model</title><g transform="translate(342,268)"><rect width="246" height="58" rx="10" fill="#0e1320" stroke="#343f63"/><text x="14" y="24" font-size="11.5" font-weight="700" fill="#bcacff">RestoreStore</text><text x="14" y="42" font-size="10" fill="#9aa0b2">originals kept locally · 0 tokens on the wire</text><text x="14" y="54" font-size="9.5" fill="#727a92">never sent to the model</text></g></a>
-      <a href="techniques.html#tiers"><title>distil_expand — the model recovers any digested detail on demand</title><g transform="translate(602,268)"><rect width="256" height="58" rx="10" fill="#0e1320" stroke="#343f63"/><text x="14" y="24" font-size="11.5" font-weight="700" fill="#5ad1c9">distil_expand</text><text x="14" y="42" font-size="10" fill="#9aa0b2">model recovers any digested detail</text><text x="14" y="54" font-size="9.5" fill="#727a92">transparent re-query · PAYG</text></g></a>
+      <a href="techniques.html#tiers"><title>RestoreStore — originals kept locally, never sent to the model</title><g transform="translate(342,264)"><rect width="246" height="58" rx="10" fill="#0e1320" stroke="#343f63"/><text x="14" y="24" font-size="11.5" font-weight="700" fill="#bcacff">RestoreStore</text><text x="14" y="42" font-size="10" fill="#9aa0b2">originals kept locally · 0 tokens on the wire</text><text x="14" y="54" font-size="9.5" fill="#727a92">never sent to the model</text></g></a>
+      <a href="techniques.html#tiers"><title>distil_expand — the model recovers any digested detail on demand</title><g transform="translate(602,264)"><rect width="256" height="58" rx="10" fill="#0e1320" stroke="#343f63"/><text x="14" y="24" font-size="11.5" font-weight="700" fill="#5ad1c9">distil_expand</text><text x="14" y="42" font-size="10" fill="#9aa0b2">model recovers any digested detail</text><text x="14" y="54" font-size="9.5" fill="#727a92">transparent re-query · PAYG</text></g></a>
 
-      <g transform="translate(966,128)"><rect width="186" height="84" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
+      <g transform="translate(966,120)"><rect width="186" height="84" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
         <text x="18" y="30" font-size="13.5" font-weight="700" fill="#eef0f5">Anthropic · OpenAI</text>
         <text x="18" y="49" font-size="13.5" font-weight="700" fill="#eef0f5">Google Gemini</text>
         <text x="18" y="69" font-size="10.5" fill="#9aa0b2">prompt cache + LLM</text>
       </g>
 
-      <path d="M1059,214 C1059,360 992,452 866,452" fill="none" stroke="#5ad19a" stroke-width="2" class="rflow"/>
-      <path d="M334,452 C208,452 150,360 140,220" fill="none" stroke="#5ad19a" stroke-width="2" class="rflow" marker-end="url(#iaarb)"/>
-      <text x="600" y="456" text-anchor="middle" font-size="10.5" fill="#6fe0aa">response → transparent expand loop → agent (it just gets the right answer)</text>
+      <!-- recovery loop: provider → expand → agent, two arcs leaving a center lane for the label -->
+      <path d="M1059,206 C1059,330 992,384 866,384" fill="none" stroke="#5ad19a" stroke-width="2" class="rflow"/>
+      <path d="M334,384 C208,384 150,322 140,210" fill="none" stroke="#5ad19a" stroke-width="2" class="rflow" marker-end="url(#iaarb)"/>
+      <text x="600" y="388" text-anchor="middle" font-size="10.5" fill="#6fe0aa">response → transparent expand loop → agent (it just gets the right answer)</text>
 
-      <text x="48" y="486" font-size="11" letter-spacing="2" font-weight="700" fill="#717892">THE QUALITY CONTRACT — every operating point is certified decision-equivalent</text>
-      <a href="concepts.html#contract"><title>Decision-Equivalence Certificate — the conformal guarantee</title><g transform="translate(48,498)"><rect width="360" height="78" rx="14" fill="url(#iacard)" stroke="#2c344a"/><circle cx="26" cy="30" r="6" fill="#8b7bff" class="pulse"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Decision-Equivalence Certificate</text><text x="20" y="50" font-size="10.5" fill="#9aa0b2">conformal risk control (LTT/CRC) · distribution-free</text><text x="20" y="66" font-size="10.5" fill="#9aa0b2">P(decision-change ≤ α) ≥ 1 − δ</text></g></a>
-      <a href="concepts.html#contract"><title>Shadow mode — live decision-equivalence on real traffic</title><g transform="translate(420,498)"><rect width="360" height="78" rx="14" fill="url(#iacard)" stroke="#2c344a"/><circle cx="26" cy="30" r="6" fill="#5ad1c9" class="pulse"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Shadow mode — live</text><text x="20" y="50" font-size="10.5" fill="#9aa0b2">samples real traffic, runs it both ways</text><text x="20" y="66" font-size="10.5" fill="#9aa0b2">rolling decision-change rate · streaming-aware</text></g></a>
-      <a href="techniques.html#keep-model"><title>Learned keep-model — the self-improving, never-regressing flywheel</title><g transform="translate(792,498)"><rect width="360" height="78" rx="14" fill="url(#iacard)" stroke="#2c344a"/><circle cx="26" cy="30" r="6" fill="#5ad19a" class="pulse"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Learned keep-model — flywheel</text><text x="20" y="50" font-size="10.5" fill="#9aa0b2">every expand is a label; only ever gets</text><text x="20" y="66" font-size="10.5" fill="#9aa0b2">more conservative — never-regressing</text></g></a>
+      <text x="48" y="432" font-size="11" letter-spacing="2" font-weight="700" fill="#717892">THE QUALITY CONTRACT — every operating point is certified decision-equivalent</text>
+      <a href="concepts.html#contract"><title>Decision-Equivalence Certificate — the conformal guarantee</title><g transform="translate(48,444)"><rect width="360" height="78" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
+        <circle cx="26" cy="30" r="6" fill="#8b7bff"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Decision-Equivalence Certificate</text>
+        <text x="20" y="50" font-size="10.5" fill="#9aa0b2">conformal risk control (LTT/CRC) · distribution-free</text>
+        <text x="20" y="66" font-size="10.5" fill="#9aa0b2">P(decision-change ≤ α) ≥ 1 − δ</text>
+      </g></a>
+      <a href="concepts.html#contract"><title>Shadow mode — live decision-equivalence on real traffic</title><g transform="translate(420,444)"><rect width="360" height="78" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
+        <circle cx="26" cy="30" r="6" fill="#5ad1c9"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Shadow mode — live</text>
+        <text x="20" y="50" font-size="10.5" fill="#9aa0b2">samples real traffic, runs it both ways</text>
+        <text x="20" y="66" font-size="10.5" fill="#9aa0b2">rolling decision-change rate · streaming-aware</text>
+      </g></a>
+      <a href="techniques.html#keep-model"><title>Learned keep-model — the self-improving, never-regressing flywheel</title><g transform="translate(792,444)"><rect width="360" height="78" rx="14" fill="url(#iacard)" stroke="#2c344a"/>
+        <circle cx="26" cy="30" r="6" fill="#5ad19a"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Learned keep-model — flywheel</text>
+        <text x="20" y="50" font-size="10.5" fill="#9aa0b2">every expand is a label; only ever gets</text>
+        <text x="20" y="66" font-size="10.5" fill="#9aa0b2">more conservative — never-regressing</text>
+      </g></a>
     </svg>
     </figure>
     <p class="archfig-hint"><b>Interactive</b> — click any block to open the concept or technique behind it.</p>
