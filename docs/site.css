@@ -289,6 +289,11 @@ td code { font-size: 11.5px; }
   position: relative; border: 1px solid var(--line2); border-radius: 16px;
   margin: 16px 0 8px; box-shadow: var(--shadow); overflow: hidden; background: #07080d;
 }
+/* Break the figure out of the narrow content column on wide screens so the
+   diagram text stays legible (the column caps at ~808px otherwise). */
+@media (min-width: 1080px) {
+  .archfig { width: calc(100vw - var(--sidebar-w) - 104px); max-width: 1320px; }
+}
 .archfig svg { width: 100%; height: auto; display: block; }
 .archfig a { cursor: pointer; }
 .archfig a rect, .archfig a text, .archfig a circle { transition: fill .15s ease, stroke .15s ease, opacity .15s ease; }

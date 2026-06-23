@@ -4,68 +4,69 @@
     <linearGradient id="ag" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
     <linearGradient id="acard" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
     <linearGradient id="ahero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a2e"/><stop offset="1" stop-color="#0c0f1d"/></linearGradient>
-    <pattern id="adots2" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.02"/></pattern>
+    <pattern id="adots2" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.02"/></pattern>
     <marker id="aar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
     <marker id="aarb" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5ad19a"/></marker>
   </defs>
   <rect width="1200" height="540" fill="url(#abg)"/><rect width="1200" height="540" fill="url(#adots2)"/>
 
-  <text x="48" y="50" font-size="24" font-weight="800" letter-spacing="-0.4" fill="#f2f3f7">How Distil works <tspan fill="#9aa0b2" font-weight="500" font-size="15">— a cache-aware compression pipeline with a quality contract</tspan></text>
+  <text x="48" y="52" font-size="26" font-weight="800" letter-spacing="-0.4" fill="#f2f3f7">How Distil works <tspan fill="#9aa0b2" font-weight="500" font-size="16">— a cache-aware compression pipeline with a quality contract</tspan></text>
 
-  <g font-size="10.5" letter-spacing="2" font-weight="700" text-anchor="middle"><text x="140" y="92" fill="#717892">AGENT</text><text x="600" y="92" fill="#717892">DISTIL PROXY · localhost</text><text x="1059" y="92" fill="#717892">PROVIDER</text></g>
+  <g font-size="12" letter-spacing="2" font-weight="700" text-anchor="middle"><text x="140" y="94" fill="#7b8298">AGENT</text><text x="600" y="94" fill="#7b8298">DISTIL PROXY · localhost</text><text x="1059" y="94" fill="#7b8298">PROVIDER</text></g>
 
-  <line x1="232" y1="162" x2="316" y2="162" stroke="#7d8cff" stroke-width="2.6" stroke-dasharray="5 9" marker-end="url(#aar)"/>
-  <line x1="884" y1="162" x2="966" y2="162" stroke="#7d8cff" stroke-width="2.6" stroke-dasharray="5 9" marker-end="url(#aar)"/>
+  <line x1="232" y1="164" x2="316" y2="164" stroke="#7d8cff" stroke-width="2.8" stroke-dasharray="5 9" marker-end="url(#aar)"/>
+  <line x1="884" y1="164" x2="966" y2="164" stroke="#7d8cff" stroke-width="2.8" stroke-dasharray="5 9" marker-end="url(#aar)"/>
 
-  <g transform="translate(48,120)"><rect width="184" height="84" rx="14" fill="url(#acard)" stroke="#2c344a"/>
-    <text x="18" y="30" font-size="13.5" font-weight="700" fill="#eef0f5">Claude Code · Codex</text>
-    <text x="18" y="49" font-size="13.5" font-weight="700" fill="#eef0f5">Gemini · any SDK</text>
-    <text x="18" y="69" font-size="10.5" fill="#9aa0b2">re-sends full context every turn</text>
+  <g transform="translate(48,122)"><rect width="184" height="84" rx="14" fill="url(#acard)" stroke="#2c344a"/>
+    <text x="18" y="31" font-size="14" font-weight="700" fill="#eef0f5">Claude Code · Codex</text>
+    <text x="18" y="51" font-size="14" font-weight="700" fill="#eef0f5">Gemini · any SDK</text>
+    <text x="18" y="71" font-size="11" fill="#9aa0b2">re-sends full context every turn</text>
   </g>
 
-  <rect x="320" y="108" width="560" height="232" rx="20" fill="url(#ahero)" stroke="url(#ag)" stroke-width="1.8"/>
-  <text x="600" y="138" text-anchor="middle" font-size="14" font-weight="800" fill="url(#ag)">compress → cache-pin → forward</text>
+  <rect x="320" y="108" width="560" height="236" rx="20" fill="url(#ahero)" stroke="url(#ag)" stroke-width="1.8"/>
+  <text x="600" y="140" text-anchor="middle" font-size="16" font-weight="800" fill="url(#ag)">compress → cache-pin → forward</text>
 
-  <g font-size="11" text-anchor="middle">
-    <g><rect x="342" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="402" y="178" fill="#dbe0ee" font-weight="700">Tier-0</text><text x="402" y="193" fill="#9aa0b2" font-size="9.5">lossless (verbatim)</text></g>
-    <g><rect x="474" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="534" y="178" fill="#dbe0ee" font-weight="700">Tier-1 digest</text><text x="534" y="193" fill="#9aa0b2" font-size="9.5">reversible</text></g>
-    <g><rect x="606" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="666" y="178" fill="#dbe0ee" font-weight="700">causal prune</text><text x="666" y="193" fill="#9aa0b2" font-size="9.5">ablation-proven</text></g>
-    <g><rect x="738" y="156" width="120" height="46" rx="10" fill="#111726" stroke="#2a3650"/><text x="798" y="178" fill="#dbe0ee" font-weight="700">salience</text><text x="798" y="193" fill="#9aa0b2" font-size="9.5">model-free</text></g>
+  <g font-size="12.5" text-anchor="middle">
+    <g><rect x="340" y="158" width="122" height="48" rx="10" fill="#111726" stroke="#2a3650"/><text x="401" y="181" fill="#dbe0ee" font-weight="700">Tier-0</text><text x="401" y="197" fill="#9aa0b2" font-size="10.5">lossless</text></g>
+    <g><rect x="472" y="158" width="122" height="48" rx="10" fill="#111726" stroke="#2a3650"/><text x="533" y="181" fill="#dbe0ee" font-weight="700">Tier-1 digest</text><text x="533" y="197" fill="#9aa0b2" font-size="10.5">reversible</text></g>
+    <g><rect x="604" y="158" width="122" height="48" rx="10" fill="#111726" stroke="#2a3650"/><text x="665" y="181" fill="#dbe0ee" font-weight="700">causal prune</text><text x="665" y="197" fill="#9aa0b2" font-size="10.5">ablation-proven</text></g>
+    <g><rect x="736" y="158" width="122" height="48" rx="10" fill="#111726" stroke="#2a3650"/><text x="797" y="181" fill="#dbe0ee" font-weight="700">salience</text><text x="797" y="197" fill="#9aa0b2" font-size="10.5">model-free</text></g>
   </g>
-  <g stroke="#3a486a" stroke-width="1.4" fill="none"><path d="M462,179 L474,179"/><path d="M594,179 L606,179"/><path d="M726,179 L738,179"/></g>
+  <g stroke="#3a486a" stroke-width="1.4" fill="none"><path d="M462,182 L472,182"/><path d="M594,182 L604,182"/><path d="M726,182 L736,182"/></g>
 
-  <rect x="342" y="216" width="516" height="34" rx="9" fill="#0e1320" stroke="#2a5740"/>
-  <circle cx="362" cy="233" r="3.5" fill="#5ad19a"/>
-  <text x="376" y="237" font-size="11" fill="#dbe0ee">cache-aware placement — the stable prefix is billed at the <tspan fill="#6fe0aa" font-weight="700">0.1× cache-read</tspan> rate</text>
+  <rect x="340" y="220" width="518" height="36" rx="9" fill="#0e1320" stroke="#2a5740"/>
+  <circle cx="361" cy="238" r="4" fill="#5ad19a"/>
+  <text x="377" y="243" font-size="12.5" fill="#dbe0ee">cache-aware placement — stable prefix billed at the <tspan fill="#6fe0aa" font-weight="700">0.1× cache-read</tspan> rate</text>
 
-  <g transform="translate(342,264)"><rect width="246" height="58" rx="10" fill="#0e1320" stroke="#343f63"/><text x="14" y="24" font-size="11.5" font-weight="700" fill="#bcacff">RestoreStore</text><text x="14" y="42" font-size="10" fill="#9aa0b2">originals kept locally · 0 tokens on the wire</text><text x="14" y="54" font-size="9.5" fill="#727a92">never sent to the model</text></g>
-  <g transform="translate(602,264)"><rect width="256" height="58" rx="10" fill="#0e1320" stroke="#343f63"/><text x="14" y="24" font-size="11.5" font-weight="700" fill="#5ad1c9">distil_expand</text><text x="14" y="42" font-size="10" fill="#9aa0b2">model recovers any digested detail</text><text x="14" y="54" font-size="9.5" fill="#727a92">transparent re-query · PAYG</text></g>
+  <g transform="translate(340,268)"><rect width="248" height="60" rx="10" fill="#0e1320" stroke="#343f63"/><text x="15" y="25" font-size="13" font-weight="700" fill="#bcacff">RestoreStore</text><text x="15" y="43" font-size="11" fill="#9aa0b2">originals kept locally · 0 tokens on wire</text><text x="15" y="55" font-size="10" fill="#727a92">never sent to the model</text></g>
+  <g transform="translate(602,268)"><rect width="256" height="60" rx="10" fill="#0e1320" stroke="#343f63"/><text x="15" y="25" font-size="13" font-weight="700" fill="#5ad1c9">distil_expand</text><text x="15" y="43" font-size="11" fill="#9aa0b2">model recovers any digested detail</text><text x="15" y="55" font-size="10" fill="#727a92">transparent re-query · PAYG</text></g>
 
-  <g transform="translate(966,120)"><rect width="186" height="84" rx="14" fill="url(#acard)" stroke="#2c344a"/>
-    <text x="18" y="30" font-size="13.5" font-weight="700" fill="#eef0f5">Anthropic · OpenAI</text>
-    <text x="18" y="49" font-size="13.5" font-weight="700" fill="#eef0f5">Google Gemini</text>
-    <text x="18" y="69" font-size="10.5" fill="#9aa0b2">prompt cache + LLM</text>
+  <g transform="translate(966,122)"><rect width="186" height="84" rx="14" fill="url(#acard)" stroke="#2c344a"/>
+    <text x="18" y="31" font-size="14" font-weight="700" fill="#eef0f5">Anthropic · OpenAI</text>
+    <text x="18" y="51" font-size="14" font-weight="700" fill="#eef0f5">Google Gemini</text>
+    <text x="18" y="71" font-size="11" fill="#9aa0b2">prompt cache + LLM</text>
   </g>
 
-  <!-- recovery loop: provider → expand → agent, two arcs leaving a center lane for the label -->
-  <path d="M1059,206 C1059,330 992,384 866,384" fill="none" stroke="#5ad19a" stroke-width="2" stroke-dasharray="0.1 8" stroke-linecap="round"/>
-  <path d="M334,384 C208,384 150,322 140,210" fill="none" stroke="#5ad19a" stroke-width="2" stroke-dasharray="0.1 8" stroke-linecap="round" marker-end="url(#aarb)"/>
-  <text x="600" y="388" text-anchor="middle" font-size="10.5" fill="#6fe0aa">response → transparent expand loop → agent (it just gets the right answer)</text>
+  <!-- recovery loop: ONE continuous dotted line, provider → expand → agent.
+       The label sits on a pill that rides the line, so the line stays connected. -->
+  <path d="M1059,206 C1059,332 916,392 600,392 C284,392 150,322 140,210" fill="none" stroke="#5ad19a" stroke-width="2.2" stroke-dasharray="0.1 8" stroke-linecap="round" marker-end="url(#aarb)"/>
+  <rect x="352" y="380" width="496" height="24" rx="12" fill="#0a0b12" stroke="#21402f"/>
+  <text x="600" y="396" text-anchor="middle" font-size="12.5" fill="#7fe6ad">response → transparent expand loop → agent (it just gets the right answer)</text>
 
-  <text x="48" y="432" font-size="11" letter-spacing="2" font-weight="700" fill="#717892">THE QUALITY CONTRACT — every operating point is certified decision-equivalent</text>
-  <g transform="translate(48,444)"><rect width="360" height="78" rx="14" fill="url(#acard)" stroke="#2c344a"/>
-    <circle cx="26" cy="30" r="6" fill="#8b7bff"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Decision-Equivalence Certificate</text>
-    <text x="20" y="50" font-size="10.5" fill="#9aa0b2">conformal risk control (LTT/CRC) · distribution-free</text>
-    <text x="20" y="66" font-size="10.5" fill="#9aa0b2">P(decision-change ≤ α) ≥ 1 − δ</text>
+  <text x="48" y="436" font-size="12" letter-spacing="2" font-weight="700" fill="#7b8298">THE QUALITY CONTRACT — every operating point is certified decision-equivalent</text>
+  <g transform="translate(48,448)"><rect width="360" height="80" rx="14" fill="url(#acard)" stroke="#2c344a"/>
+    <circle cx="26" cy="31" r="6" fill="#8b7bff"/><text x="44" y="29" font-size="14" font-weight="700" fill="#eef0f5">Decision-Equivalence Certificate</text>
+    <text x="20" y="52" font-size="11.5" fill="#9aa0b2">conformal risk control (LTT/CRC) · distribution-free</text>
+    <text x="20" y="69" font-size="11.5" fill="#9aa0b2">P(decision-change ≤ α) ≥ 1 − δ</text>
   </g>
-  <g transform="translate(420,444)"><rect width="360" height="78" rx="14" fill="url(#acard)" stroke="#2c344a"/>
-    <circle cx="26" cy="30" r="6" fill="#5ad1c9"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Shadow mode — live</text>
-    <text x="20" y="50" font-size="10.5" fill="#9aa0b2">samples real traffic, runs it both ways</text>
-    <text x="20" y="66" font-size="10.5" fill="#9aa0b2">rolling decision-change rate · streaming-aware</text>
+  <g transform="translate(420,448)"><rect width="360" height="80" rx="14" fill="url(#acard)" stroke="#2c344a"/>
+    <circle cx="26" cy="31" r="6" fill="#5ad1c9"/><text x="44" y="29" font-size="14" font-weight="700" fill="#eef0f5">Shadow mode — live</text>
+    <text x="20" y="52" font-size="11.5" fill="#9aa0b2">samples real traffic, runs it both ways</text>
+    <text x="20" y="69" font-size="11.5" fill="#9aa0b2">rolling decision-change rate · streaming-aware</text>
   </g>
-  <g transform="translate(792,444)"><rect width="360" height="78" rx="14" fill="url(#acard)" stroke="#2c344a"/>
-    <circle cx="26" cy="30" r="6" fill="#5ad19a"/><text x="44" y="28" font-size="13" font-weight="700" fill="#eef0f5">Learned keep-model — flywheel</text>
-    <text x="20" y="50" font-size="10.5" fill="#9aa0b2">every expand is a label; only ever gets</text>
-    <text x="20" y="66" font-size="10.5" fill="#9aa0b2">more conservative — never-regressing</text>
+  <g transform="translate(792,448)"><rect width="360" height="80" rx="14" fill="url(#acard)" stroke="#2c344a"/>
+    <circle cx="26" cy="31" r="6" fill="#5ad19a"/><text x="44" y="29" font-size="14" font-weight="700" fill="#eef0f5">Learned keep-model — flywheel</text>
+    <text x="20" y="52" font-size="11.5" fill="#9aa0b2">every expand is a label; only ever gets</text>
+    <text x="20" y="69" font-size="11.5" fill="#9aa0b2">more conservative — never-regressing</text>
   </g>
 </svg>
