@@ -23,6 +23,7 @@ import json
 from typing import Any
 
 from .adapters.anthropic import compress_messages
+from .httpguard import MAX_BODY_BYTES, safe_forward_path
 from .tokenizer import DEFAULT as _tokenizer
 
 # ---------------------------------------------------------------------------
@@ -137,7 +138,9 @@ def make_app(
     # -----------------------------------------------------------------------
 
     async def _on_startup(app: web.Application) -> None:
-        connector = aiohttp.TCPConnector(limit=0)  # unlimited concurrent connections
+        # Bound concurrent upstream connections so inbound load can't fan out into
+        # an unbounded socket count (backpressure + self-DoS protection).
+        connector = aiohttp.TCPConnector(limit=100)
         app[_client_key] = aiohttp.ClientSession(connector=connector)
 
     async def _on_cleanup(app: web.Application) -> None:
@@ -148,6 +151,8 @@ def make_app(
     # -----------------------------------------------------------------------
 
     async def _handle_compressible(request: web.Request) -> web.Response:
+        if safe_forward_path(request.path) is None:
+            return web.json_response({"error": "invalid request path"}, status=400)
         raw = await request.read()
         fwd_headers = _filter_headers(request.headers)
         extras: dict[str, str] = {}
@@ -159,7 +164,10 @@ def make_app(
         else:
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
-                compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                try:
+                    compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                except Exception:  # noqa: BLE001 — compression must never break a request
+                    compressed = original
                 saved = _tokens_saved(original, compressed)
                 body = {**body, "messages": compressed}
                 extras = {
@@ -206,6 +214,8 @@ def make_app(
     # -----------------------------------------------------------------------
 
     async def _passthrough(request: web.Request) -> web.Response:
+        if safe_forward_path(request.path) is None:
+            return web.json_response({"error": "invalid request path"}, status=400)
         raw = await request.read()
         fwd_headers = _filter_headers(request.headers)
         if raw:
@@ -247,7 +257,9 @@ def make_app(
             return await _handle_compressible(request)
         return await _passthrough(request)
 
-    app = web.Application()
+    # Cap inbound body size so a giant POST can't exhaust memory (aiohttp returns
+    # 413 automatically past this); matches the sync servers' guard.
+    app = web.Application(client_max_size=MAX_BODY_BYTES)
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
 

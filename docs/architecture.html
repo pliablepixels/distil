@@ -8,14 +8,14 @@
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="Distil"/>
 <meta property="og:title" content="Architecture — Distil"/>
-<meta property="og:description" content="Cache-aware, causally-pruned context compression for LLM agentic runtimes — certified non-inferior across 7 domains. Compress input and output; prove the agent makes the same decisions."/>
+<meta property="og:description" content="How Distil works: a cost-optimized cache hierarchy with a statistical quality contract — cache-stable prefixes, lossless tiers, causal pruning, and a conformal DERC certificate. Sub-millisecond, no model in the path."/>
 <meta property="og:url" content="https://dshakes.github.io/distil/architecture.html"/>
 <meta property="og:image" content="https://dshakes.github.io/distil/og.png"/>
 <meta property="og:image:width" content="1200"/>
 <meta property="og:image:height" content="630"/>
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="Architecture — Distil"/>
-<meta name="twitter:description" content="Cache-aware, causally-pruned context compression for LLM agentic runtimes — certified non-inferior across 7 domains. Compress input and output; prove the agent makes the same decisions."/>
+<meta name="twitter:description" content="How Distil works: a cost-optimized cache hierarchy with a statistical quality contract — cache-stable prefixes, lossless tiers, causal pruning, and a conformal DERC certificate. Sub-millisecond, no model in the path."/>
 <meta name="twitter:image" content="https://dshakes.github.io/distil/og.png"/>
 </head>
 <body>
@@ -60,45 +60,70 @@
   <main class="content">
 
     <h1>Architecture <span class="g">Overview</span></h1>
-    <p class="lead">How the parts fit together: the tier model, the measure→discover→certify loop, byte-fidelity invariants, auth-mode gating, and holdout A/B validation.</p>
+    <p class="lead">Distil is a cost-optimized cache hierarchy with a statistical quality contract. Six components, one invariant: the agent makes the same decisions on compressed context as on the original — provably, not heuristically.</p>
 
     <img src="assets/architecture.svg" alt="Distil architecture diagram" class="svg-embed"/>
 
+    <div class="callout">
+      <strong>The six-layer story.</strong> (1) Cache-aware compression keeps the prefix byte-stable. (2) Tier-0 lossless transforms run unconditionally. (3) Tier-1 reversible digests handle large tool outputs behind content handles. (4) Causal/counterfactual pruning discovers what is safe to drop. (5) The conformal DERC certificate gates everything lossy. (6) Salience protection and a sub-millisecond, model-free hot path make it viable as an inline proxy.
+    </div>
+
     <hr/>
 
-    <h2>The tier model</h2>
-    <p>Distil organises every compression operation into three tiers, ordered by safety. Higher tiers require stronger evidence before they are permitted.</p>
+    <h2 id="cache-aware">Cache-aware prefix stability</h2>
+    <p><strong>Module:</strong> <code>compress/cache_aware.py</code> · <code>compress/stabilize.py</code></p>
+
+    <p>The dominant cost in a multi-turn agent loop is not context size — it is cache miss rate. A cache read costs ~0.1× fresh input price; a naive compressor that rewrites the context each turn destroys the prefix match and loses that discount on every turn. The result: naive recompression sends fewer tokens yet costs <em>more</em> than not compressing at all (measured: −11% vs. the baseline on an SRE trajectory).</p>
+
+    <p>Distil models this explicitly. Two lossless pre-processing steps keep the prefix byte-stable before any compression runs:</p>
+
+    <ul>
+      <li><strong>Schema canonicalization</strong> — recursively sorts JSON object keys so semantically identical payloads hash identically and keep hitting the cache regardless of key-insertion order.</li>
+      <li><strong>Volatile-field extraction</strong> — timestamps, UUIDs, JWT tokens, and request IDs are lifted out of the stable prefix into the volatile tail. The stable portion stops churning; the tail is compressed separately.</li>
+    </ul>
+
+    <div class="callout good">
+      <strong>Result:</strong> the prefix cache hit rate stays near 100% across turns. Compression targets only the volatile tail — where there is no cache to bust. Distil clocks a <strong>33% cost reduction</strong> on the same trajectory where naive recompression costs 11% more.
+    </div>
+
+    <img src="assets/cache-aware.svg" alt="Cache-aware savings vs naive recompression" class="svg-embed"/>
+
+    <hr/>
+
+    <h2 id="tier-model">The tier model</h2>
+    <p>Every compression operation is assigned to a tier based on its loss profile. Higher tiers require stronger evidence before they are permitted.</p>
 
     <div class="tiers">
       <div class="tier">
         <div class="k">Tier 0 — Always on</div>
-        <h4>Provably lossless transforms</h4>
-        <p>Reconstructable by construction — no state required. Applied unconditionally to every block.</p>
+        <h4>Provably lossless</h4>
+        <p>Reconstructable by construction — no stored state required. Applied unconditionally to every block.</p>
         <ul style="margin-top:8px;font-size:13px;color:var(--mut)">
           <li><b style="color:var(--ink)">JSON minification</b> — strips whitespace from valid JSON payloads; semantics unchanged.</li>
-          <li><b style="color:var(--ink)">Run-length collapse</b> — replaces repetitive patterns (repeated separators, blank lines) with a compact representation.</li>
-          <li><b style="color:var(--ink)">Reject-if-bigger invariant</b> — Tier 0 never emits a block larger than its original; the transform is a no-op if it would grow the content.</li>
+          <li><b style="color:var(--ink)">Run-length collapse</b> — replaces repetitive lines and separators with a compact form.</li>
+          <li><b style="color:var(--ink)">Reject-if-bigger</b> — a transform that would grow the content is a no-op.</li>
         </ul>
         <p style="margin-top:10px;font-size:12px">Module: <code>compress/tier0.py</code></p>
       </div>
       <div class="tier">
         <div class="k">Tier 1 — Reversible</div>
         <h4>Decision-aware digest</h4>
-        <p>Large tool results (≥ 6 lines) are replaced with a compact digest. The original is kept locally in a <code>RestoreStore</code> keyed by an 8-hex SHA-256 handle.</p>
+        <p>Large tool results (≥ 6 lines) are replaced with a compact digest. The original is kept in a <code>RestoreStore</code> keyed by an 8-hex SHA-256 content handle.</p>
         <ul style="margin-top:8px;font-size:13px;color:var(--mut)">
-          <li>The handle is embedded inline in the compressed text — re-expansion is always possible.</li>
-          <li>BM25 partial retrieval lets the agent query the original content without full re-expansion.</li>
-          <li>Reject-if-bigger also applied at Tier 1.</li>
+          <li>The handle is embedded inline — re-expansion is always possible.</li>
+          <li>BM25 partial retrieval lets the agent query the original without full re-expansion.</li>
+          <li>Reject-if-bigger also applies.</li>
         </ul>
         <p style="margin-top:10px;font-size:12px">Module: <code>compress/tier1.py</code></p>
       </div>
       <div class="tier">
         <div class="k">Certified — Gated</div>
         <h4>Lossy strategies</h4>
-        <p>Pruning, summarization, and aggressive rewriting only apply at ratios the TOST non-inferiority gate certifies. A strategy that fails the gate is blocked — it does not ship.</p>
+        <p>Pruning and aggressive rewriting are applied only at ratios the DERC gate certifies. A strategy that fails the gate is blocked — it does not ship.</p>
         <ul style="margin-top:8px;font-size:13px;color:var(--mut)">
-          <li>Ablation discovers which blocks are causally inert before any pruning runs.</li>
-          <li>Subscription / OAuth sessions are locked to lossless-only (see auth gating).</li>
+          <li>Causal ablation discovers inert blocks before any pruning runs.</li>
+          <li>Subscription / OAuth sessions are locked to lossless-only.</li>
+          <li>Non-zero exit code on gate failure.</li>
         </ul>
         <p style="margin-top:10px;font-size:12px">Gate: <code>certify/gate.py</code></p>
       </div>
@@ -106,40 +131,101 @@
 
     <hr/>
 
-    <h2>The measure → discover → certify loop</h2>
-
-    <p>This is the architecture that makes the quality contract meaningful — and that separates Distil from estimators that measure quality and savings in separate runs.</p>
+    <h2 id="measure-discover-certify">The measure → discover → certify loop</h2>
 
     <div class="callout">
-      <b>The invariant:</b> the accuracy claim and the compression ratio are measured on the <em>same trajectories in the same run</em>. There is no separate "quality benchmark at low compression" — you see both numbers for the same corpus, or you see nothing.
+      <strong>The invariant:</strong> the accuracy claim and the compression ratio are measured on the <em>same trajectories in the same run</em>. There is no separate "quality benchmark at low compression" — you see both numbers for the same corpus, or you see nothing.
     </div>
 
     <h3>Step 1 — Measure</h3>
-    <p>For each trajectory and strategy, the cache-aware cost engine (<code>compress/cache_aware.py</code>) simulates the full multi-turn loop with four variants: baseline (no cache, no compress), cache only, naive compress + cache, and distil. It computes per-turn cost breakdowns and reports the total dollar cost of each strategy.</p>
+    <p>The cache-aware cost engine (<code>compress/cache_aware.py</code>) simulates the full multi-turn loop with four variants: baseline (no cache, no compress), cache-only, naive compress + cache, and Distil. It computes per-turn cost breakdowns — cache reads, cache writes, fresh tokens — and reports the total dollar cost of each strategy. Run <code>distil savings</code> to see the numbers on any trajectory.</p>
 
     <h3>Step 2 — Discover</h3>
-    <p>The causal ablation engine (<code>replay/ablation.py</code>) systematically removes each context block, replays the trajectory through the runner, and records whether any decision changed. The output is a per-block verdict: <em>causally inert</em> (safe to prune) or <em>decision-driving</em> (must be kept). This step <strong>produces</strong> the compression policy — it does not assume one.</p>
+    <p>The causal ablation engine (<code>replay/ablation.py</code>) is not a ruler bolted to compression — it is a <strong>discovery engine</strong>. For each context block, it removes the block, replays the trajectory, and records whether any decision changed. The output is a per-block verdict: <em>causally inert</em> (safe to prune) or <em>decision-driving</em> (must be kept). This step <strong>produces</strong> the compression policy; it does not assume one.</p>
+
+    <pre class="term"><span class="d">$ distil prune</span>
+causal ablation over 'sre-disk-incident' — what is free to drop?
+
+block                  occ   tokens  verdict
+doc-0                    4      312  <span class="g">PRUNE (causally inert)</span>
+doc-1                    4      303  <span class="g">PRUNE (causally inert)</span>
+obs-0                    4      234  <span class="d">keep (changed a decision)</span>
+obs-1                    4      198  <span class="d">keep (changed a decision)</span>
+system                   4      218  <span class="d">keep (changed a decision)</span>
+
+tokens provably free to drop: 615 across 2 block(s).</pre>
 
     <h3>Step 3 — Certify</h3>
-    <p>The TOST gate (<code>certify/stats.py</code> via <code>certify/gate.py</code>) computes paired differences (compressed score − baseline score) across all turns and runs a one-sided Student-t test against the pre-registered margin. The implementation uses a hand-rolled regularised incomplete beta function — zero scipy/numpy.</p>
+    <p>The conformal DERC certificate (<code>certify/stats.py</code> via <code>certify/gate.py</code> and <code>conformal.py</code>) computes the decision-change rate across all turns and certifies it. The implementation uses Learn-Then-Test with Hoeffding–Bentkus p-values — distribution-free, valid at finite sample size, zero scipy/numpy. The guarantee: <strong>P(R(λ̂) ≤ α) ≥ 1 − δ</strong>.</p>
 
-    <p>A non-inferior strategy has its policy registered in the compress registry. A failing strategy is rejected and produces a non-zero exit code from <code>distil certify</code> and <code>distil bench</code>.</p>
+    <p>A certified strategy has its policy registered in the compress registry. A failing strategy is rejected and produces a non-zero exit code from <code>distil certify</code> and <code>distil bench</code>.</p>
+
+    <pre class="term"><span class="d">$ distil certify --strategy distil</span>
+decision-equivalence match rate: <span class="g">100.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=+0.000, p=0.0000
+
+VERDICT: <span class="g">PASS</span>  (certified non-inferior)
+
+<span class="d">$ distil certify --strategy aggressive</span>
+decision-equivalence match rate: <span class="w">0.0%</span>
+TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=−1.000, p=1.0000
+
+VERDICT: <span class="w">FAIL</span>  (NOT certified — would degrade quality)</pre>
 
     <hr/>
 
-    <h2>Byte-fidelity invariants</h2>
+    <h2 id="derc">The DERC certificate</h2>
+    <p><strong>Module:</strong> <code>distil/conformal.py</code></p>
+
+    <p>DERC — the Decision-Equivalence Risk Certificate — is the conformal certificate that gates every lossy strategy. It answers one question: is this compression level's decision-change rate provably bounded at α with confidence 1 − δ?</p>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">The loss</div>
+        <h3 style="margin-top:8px;">Decision-change rate</h3>
+        <p>The loss on a turn is <code>1</code> iff the agent's <code>{action, target}</code> changes versus the uncompressed context. R(λ) is the mean over calibration turns. We certify the most aggressive compression level λ̂ whose risk is controlled at α.</p>
+      </div>
+      <div class="card">
+        <div class="tag">The method</div>
+        <h3 style="margin-top:8px;">Learn-Then-Test / CRC</h3>
+        <p>Learn-Then-Test (Angelopoulos et al., <em>Ann. Appl. Stat.</em> 2025) with Hoeffding–Bentkus p-values: finite-sample, distribution-free, no monotonicity assumed. Conformal Risk Control (Angelopoulos et al., ICLR 2024) bounds the expected rate to O(1/n).</p>
+      </div>
+      <div class="card">
+        <div class="tag">The guarantee</div>
+        <h3 style="margin-top:8px;">P(R(λ̂) ≤ α) ≥ 1 − δ</h3>
+        <p>With default settings (α = 0.05, δ = 0.05), the certificate bounds the live decision-change rate to ≤ 5% with 95% confidence. The benchmark result: <strong>0% live decision-change rate, certified</strong> on <code>claude-opus-4-8</code>.</p>
+      </div>
+      <div class="card">
+        <div class="tag">The assumption</div>
+        <h3 style="margin-top:8px;">Exchangeability</h3>
+        <p>The guarantee holds for the distribution you calibrated on. Under distribution shift — a new agent, a prompt change, a workload drift — recalibrate on a rolling window of recent traffic. The bound is real, not magic.</p>
+      </div>
+    </div>
+
+    <hr/>
+
+    <h2 id="salience">Salience protection</h2>
+    <p><strong>Module:</strong> <code>compress/salience.py</code> · <code>codec/keep_model.py</code></p>
+
+    <p>The salience layer is a model-free safety net that runs before the DERC gate, not instead of it. It protects content the gate might not have seen enough of to certify. The default is <code>SalienceKeepModel</code> — a deterministic rule-set that forces a keep score of 1.0 on decision markers (<code>DECISION:</code>), error keywords, structured data, and high digit-density lines. No model in the path, no training step required.</p>
+
+    <p>Because it only ever <em>widens</em> the set of blocks kept, salience protection is strictly conservative relative to the DERC certificate — it shifts the safe frontier further out, never closer in. The logistic keep-model (<code>codec/learned.py</code>) improves on the rules via a zero-dependency, pure-Python logistic classifier that ships in the wheel.</p>
+
+    <hr/>
+
+    <h2 id="byte-fidelity">Byte-fidelity invariants</h2>
     <p><strong>Module:</strong> <code>distil/fidelity.py</code> · Gate: <code>distil verify</code></p>
 
     <p>Two structural invariants are enforced across the entire corpus by the verify gate:</p>
 
     <h3>Reversibility</h3>
-    <p>Every original block is recoverable, either because the compressed text is byte-identical to the original, or because the original lives in the local restore table (keyed by block ID for Tier-0, by content handle for Tier-1). Recovery is confirmed via SHA-256 equality — auditable and machine-checkable.</p>
+    <p>Every original block is recoverable — either because the compressed text is byte-identical to the original, or because the original lives in the local restore table (keyed by block ID for Tier-0, by content handle for Tier-1). Recovery is confirmed via SHA-256 equality: auditable and machine-checkable.</p>
 
     <h3>Append-only history</h3>
-    <p>A block ID that appears in two consecutive turns must carry identical bytes. Mutating a previously-seen block ID is a violation. This invariant ensures the prefix cache is never invalidated by history rewriting — the cache hit rate depends on it.</p>
+    <p>A block ID that appears in two consecutive turns must carry identical bytes. Mutating a previously-seen block ID is a violation. This invariant is what makes the prefix cache hit rate reliable — the cache cannot be invalidated by history rewriting.</p>
 
     <h3>Numeric precision</h3>
-    <p>JSON canonicalization must not lose numeric precision. <code>numeric_precision_preserved()</code> confirms that both the original and transformed strings parse to the same JSON value.</p>
+    <p>JSON canonicalization must not lose numeric precision. <code>numeric_precision_preserved()</code> confirms that the original and transformed strings parse to the same JSON value.</p>
 
     <pre class="term"><span class="d">$ distil verify</span>
 byte-fidelity gate — reversibility + append-only across the corpus
@@ -156,7 +242,31 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
 
     <hr/>
 
-    <h2>Auth-mode gating</h2>
+    <h2 id="inline-proxy">Sub-millisecond inline proxy</h2>
+    <p><strong>Module:</strong> <code>distil/proxy.py</code> · <code>distil/native.py</code></p>
+
+    <p>Distil compresses at <strong>~0.026 ms/turn</strong> — roughly 1,000× faster than model-based compressors (LLMLingua-2: ~1,480 ms/turn; Headroom: ~26 ms/turn). The reason: there is no model in the path. Tier-0/1 transforms are pure string operations; the causal ablation cache is populated offline. The hot path runs on stdlib-only Python with an optional Rust extension (<code>distil/native.py</code>, <code>rust/distil-core</code>) for JSON minification and run-length encoding when the wheel is built.</p>
+
+    <p>This is what makes inline proxy deployment viable. LLMLingua-2 loads a transformer; Headroom loads ModernBERT. Both add hundreds of milliseconds per turn. Distil adds less than one.</p>
+
+    <div class="stat-row">
+      <div class="stat-box hl">
+        <div class="stat-n">0.026</div>
+        <div class="stat-l">ms/turn — Distil compression latency</div>
+      </div>
+      <div class="stat-box hl">
+        <div class="stat-n">83.2<s>%</s></div>
+        <div class="stat-l">Token savings — certified, live on <code>claude-opus-4-8</code></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-n">0</div>
+        <div class="stat-l">Runtime dependencies — stdlib-only Python core</div>
+      </div>
+    </div>
+
+    <hr/>
+
+    <h2 id="auth-gating">Auth-mode gating</h2>
     <p><strong>Module:</strong> <code>distil/policy.py</code></p>
 
     <p>Aggressive compression applied to a subscription or OAuth session can alter conversations in ways that violate provider terms — injected retrieval tools the user never authorized, rewritten history that changes the conversation record. Auth-mode gating is a safety boundary, not an optimization.</p>
@@ -177,14 +287,14 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
       </tbody>
     </table>
 
-    <p>The policy is a <strong>tightening boundary</strong> — a project's config can never loosen it. A <code>PolicyError</code> is raised if a non-permitted strategy is requested under the active auth mode. This maps cleanly onto the proxy's <code>--lossless-only</code> flag for subscription-context deployments.</p>
+    <p>The policy is a <strong>tightening boundary</strong> — a project's config can never loosen it. A <code>PolicyError</code> is raised if a non-permitted strategy is requested under the active auth mode. This maps onto the proxy's <code>--lossless-only</code> flag for subscription-context deployments.</p>
 
     <hr/>
 
-    <h2>Holdout A/B with bootstrap CI</h2>
+    <h2 id="holdout">Holdout A/B validation</h2>
     <p><strong>Module:</strong> <code>distil/certify/holdout.py</code> · Command: <code>distil holdout</code></p>
 
-    <p>The holdout module provides an additional validation layer on top of the TOST gate. It:</p>
+    <p>The holdout module is an additional validation layer on top of the DERC gate. It:</p>
 
     <ol>
       <li><strong>Deterministically partitions</strong> the corpus into a control group (default: 20%, held out and not counted toward the headline) and a treatment group, using a hash-based split for reproducibility.</li>
@@ -192,18 +302,19 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
       <li><strong>Bootstrap-resamples</strong> the treatment group to compute a 95% confidence interval on the savings estimate.</li>
     </ol>
 
-    <p>The reported confidence interval is honest: it reflects the uncertainty in the savings measurement given the finite corpus size. The control group acts as a sanity check — if control and treatment savings diverge significantly, something is wrong with the partition or the measurement.</p>
+    <p>The reported confidence interval is honest: it reflects the uncertainty given the finite corpus size. If control and treatment savings diverge significantly, something is wrong with the partition or the measurement — not with Distil's estimate.</p>
 
     <hr/>
 
-    <h2>Module map</h2>
+    <h2 id="module-map">Module map</h2>
     <table>
       <thead><tr><th>Module</th><th>Role</th></tr></thead>
       <tbody>
         <tr><td><code>compress/cache_aware.py</code></td><td>Cache-aware cost simulation — the dominant cost lever</td></tr>
         <tr><td><code>compress/stabilize.py</code></td><td>Schema canonicalization + volatile-field extraction</td></tr>
-        <tr><td><code>compress/tier0.py</code></td><td>Tier-0 lossless transforms (JSON minify, RLE)</td></tr>
-        <tr><td><code>compress/tier1.py</code></td><td>Tier-1 reversible digest + handle embedding</td></tr>
+        <tr><td><code>compress/tier0.py</code></td><td>Tier-0 lossless transforms (JSON minify, run-length collapse)</td></tr>
+        <tr><td><code>compress/tier1.py</code></td><td>Tier-1 reversible digest + content handle embedding</td></tr>
+        <tr><td><code>compress/salience.py</code></td><td>Model-free salience protection (pre-gate safety net)</td></tr>
         <tr><td><code>compress/strategies.py</code></td><td>Strategy registry + reject-if-bigger invariant</td></tr>
         <tr><td><code>replay/ablation.py</code></td><td>Causal/counterfactual pruning discovery engine</td></tr>
         <tr><td><code>replay/runner.py</code></td><td>Agent runner protocol + deterministic stand-in</td></tr>
@@ -211,17 +322,20 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
         <tr><td><code>certify/stats.py</code></td><td>TOST non-inferiority (hand-rolled Student-t)</td></tr>
         <tr><td><code>certify/gate.py</code></td><td>Gate: replay + TOST → verdict</td></tr>
         <tr><td><code>certify/holdout.py</code></td><td>Holdout A/B savings with bootstrap CI</td></tr>
+        <tr><td><code>conformal.py</code></td><td>Conformal DERC certificate (Learn-Then-Test / CRC, Hoeffding–Bentkus)</td></tr>
         <tr><td><code>fidelity.py</code></td><td>Byte-fidelity invariants (reversibility + append-only)</td></tr>
         <tr><td><code>policy.py</code></td><td>Auth-mode gating (PAYG vs subscription)</td></tr>
+        <tr><td><code>native.py</code></td><td>Rust hot-path bridge with pure-Python fallback (<code>rust/distil-core</code>)</td></tr>
         <tr><td><code>corpus.py</code></td><td>Multi-domain corpus loader + structural validation</td></tr>
         <tr><td><code>adapters/anthropic.py</code></td><td>In-process drop-in adapter (wrap + cache-control)</td></tr>
         <tr><td><code>proxy.py</code></td><td>HTTP proxy for framework-agnostic adoption</td></tr>
-        <tr><td><code>codec/learned.py</code></td><td>Logistic-regression keep classifier</td></tr>
+        <tr><td><code>codec/learned.py</code></td><td>Logistic-regression keep classifier (zero deps, ships in wheel)</td></tr>
+        <tr><td><code>codec/keep_model.py</code></td><td>SalienceKeepModel — deterministic heuristic baseline</td></tr>
         <tr><td><code>gist.py</code></td><td>Content-addressed gist caching for tool schemas</td></tr>
         <tr><td><code>delta.py</code></td><td>Append-only delta context management</td></tr>
         <tr><td><code>retrieval.py</code></td><td>BM25 partial retrieval from digest handles</td></tr>
         <tr><td><code>ledger.py</code></td><td>Local-first savings ledger</td></tr>
-        <tr><td><code>tokenizer.py</code></td><td>Heuristic tokenizer + Anthropic billing-grade count_tokens</td></tr>
+        <tr><td><code>tokenizer.py</code></td><td>Heuristic tokenizer + Anthropic billing-grade <code>count_tokens</code></td></tr>
         <tr><td><code>pricing.py</code></td><td>Model pricing catalog</td></tr>
         <tr><td><code>cli.py</code></td><td>Entry point — all subcommands</td></tr>
       </tbody>

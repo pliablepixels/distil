@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import html as _html
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -202,7 +203,7 @@ def render_leaderboard_html(lb: Leaderboard) -> str:
         rows_html += (
             f"<tr>"
             f'<td class="rank">{i}</td>'
-            f'<td class="iid">{r.get("instance_id", "")}</td>'
+            f'<td class="iid">{_html.escape(str(r.get("instance_id", "")))}</td>'
             f'<td class="num">{_fmt_tokens(r.get("tokens_saved", 0))}</td>'
             f'<td class="num">{_fmt_dollars(r.get("dollars_saved", 0.0))}</td>'
             f'<td class="num">{r.get("runs", 0)}</td>'

@@ -60,20 +60,22 @@
   <main class="content">
 
     <h1>Frequently Asked <span class="g">Questions</span></h1>
-    <p class="lead">Honest answers to the questions that matter most — including the things Distil won't pretend.</p>
+    <p class="lead">Honest answers to the questions that matter most — including the things Distil won't paper over.</p>
 
     <hr/>
 
     <h2>"Is 100% decision-equivalence real, or is it marketing?"</h2>
 
-    <p>It is real, in a specific and honest sense. <strong>100% decision-equivalence means 100% of turns in the default corpus trajectories produced the same decision (tool call name + arguments, or final answer) when using the distil strategy versus the uncompressed baseline, as measured by the deterministic offline runner.</strong></p>
+    <p>It is real, in a specific and honest sense. <strong>100% decision-equivalence means every turn in the benchmark trajectories produced the same decision (tool call name + arguments, or final answer) when using the Distil strategy versus the uncompressed baseline.</strong></p>
 
-    <p>Three caveats the numbers depend on:</p>
+    <p>The default corpus gate uses a deterministic offline runner. The live head-to-head benchmark also confirmed this: graded by <strong><code>claude-opus-4-8</code> (majority-of-3)</strong> on a realistic 120-turn corpus, Distil certified <strong>83.2% token savings at a 0% live decision-change rate</strong> — with the non-inferiority bound (≤5% at 95% confidence) met with margin (<code>hb_p = 0.0058</code>). See the <a href="benchmark.html#live-head-to-head">live head-to-head</a> for the full methodology and caveats.</p>
+
+    <p>Three things the number depends on:</p>
 
     <ul>
-      <li><strong>Decision-equivalence, not byte-equivalence.</strong> The compressed context may differ byte-for-byte from the original — what is certified is that the <em>agent's decisions</em> match, not that the two texts are identical strings.</li>
-      <li><strong>Deterministic offline runner.</strong> The default runner is a keyed stand-in, not the live Claude model. It produces reproducible, ground-truth decisions based on decision markers embedded in the trajectories. Running with <code>--runner anthropic</code> against the live model is implemented but marked UNVERIFIED until you exercise it with a key (real model outputs have non-determinism at temperature > 0).</li>
-      <li><strong>Bundled corpus.</strong> The 7 trajectories are real, captured-style agent workflows — but they are a finite corpus. The gate certifies the strategies work on these domains; generalization to new domains is a reasonable assumption, not a guarantee.</li>
+      <li><strong>Decision-equivalence, not byte-equivalence.</strong> The compressed context may differ byte-for-byte from the original. What is certified is that the <em>agent's decisions</em> match, not that two texts are identical strings.</li>
+      <li><strong>Decision-determined corpus.</strong> Certification only makes sense on traffic where the model reproduces its own decision on identical context — confirmed by the <code>byte-exact = 0%</code> precondition check. On ambiguous traffic the model varies by itself, and the number is undefined (that's the model's noise, not the compressor's fault).</li>
+      <li><strong>Marginal guarantee, not per-prompt promise.</strong> The non-inferiority bound holds over the calibration distribution. Generalization to new domains is a reasonable assumption, not a certificate — run <code>distil ingest</code> + <code>distil bench --runner anthropic</code> on your own traffic to certify your domain.</li>
     </ul>
 
     <div class="callout">
@@ -82,9 +84,27 @@
 
     <hr/>
 
+    <h2>"How did you run the live benchmark, and how do I reproduce it?"</h2>
+
+    <p>The live head-to-head used actual installed packages — <code>llmlingua</code> 0.2.2, <code>headroom-ai</code> 0.27.0, and Distil 0.12.1 — run against the same 120-turn, 5-domain corpus (4.5–6.5 KB/turn) where decisions are the agent's real next <code>{action, target}</code>. Each compressed context was graded by <code>claude-opus-4-8</code> majority-of-3, independently of the compression step. Latency is wall-clock per turn on the same hardware.</p>
+
+    <p>Results in brief: Distil certified <strong>83.2% savings / 0% decision-change / 0.026 ms per turn</strong>. LLMLingua-2 achieved 53.1% savings but flipped 1-in-5 decisions (fails the ≤5% gate). Headroom passed the gate at 35.3% savings but runs a ModernBERT scorer at ~26 ms per turn.</p>
+
+    <p>To reproduce:</p>
+    <pre class="term"><span class="d"># Run with pinned versions and the live model</span>
+python benchmarks/derc_live_compare.py
+
+<span class="d"># Or run the same gate on your own corpus</span>
+<span class="d">export ANTHROPIC_API_KEY=sk-ant-…</span>
+distil <span class="c">benchmark</span> --corpus benchmarks/corpus_xl --runner anthropic --tokenizer anthropic</pre>
+
+    <p>Full methodology, corpus generation script, and caveats are in <a href="https://github.com/dshakes/distil/blob/main/BENCHMARKS.md" target="_blank" rel="noopener">BENCHMARKS.md</a>.</p>
+
+    <hr/>
+
     <h2>"Is the compression lossless?"</h2>
 
-    <p>Depends on the tier — and the answer is precise:</p>
+    <p>Depends on the tier — the answer is precise:</p>
 
     <table>
       <thead><tr><th>Tier</th><th>Lossless?</th><th>How</th></tr></thead>
@@ -102,7 +122,7 @@
         <tr>
           <td><strong>Certified</strong> — Pruning</td>
           <td>Not lossless — but causally certified</td>
-          <td>Pruned blocks are causally inert: ablation confirmed they never changed any decision. The bytes are dropped but the agent behaviour is preserved within the non-inferiority margin.</td>
+          <td>Pruned blocks are causally inert: ablation confirmed they never changed any decision. The bytes are dropped but agent behaviour is preserved within the non-inferiority margin.</td>
         </tr>
       </tbody>
     </table>
@@ -116,8 +136,8 @@
     <p>The default tokenizer is an <strong>offline heuristic</strong> — it estimates tokens by a character-based approximation without calling any API. This means:</p>
 
     <ul>
-      <li><strong>Compression ratios are robust.</strong> The numerator and denominator of the ratio use the same heuristic, so the ratio is a good estimate regardless of the absolute token count.</li>
-      <li><strong>Absolute dollar figures are approximate.</strong> The heuristic is not calibrated to Claude's actual tokenizer, which uses BPE. Dollar amounts should be treated as directional, not billing-grade.</li>
+      <li><strong>Compression ratios are robust.</strong> The numerator and denominator of the ratio use the same heuristic, so the ratio is a good estimate regardless of the absolute count.</li>
+      <li><strong>Absolute dollar figures are approximate.</strong> The heuristic is not calibrated to Claude's BPE tokenizer. Dollar amounts are directional, not billing-grade.</li>
       <li><strong>tiktoken undercounts Claude.</strong> If you use OpenAI's tiktoken to count tokens for Claude pricing, you will systematically undercount — Claude's vocabulary differs. Use <code>--tokenizer anthropic</code> for accurate counts.</li>
     </ul>
 
@@ -131,9 +151,7 @@ distil bench   --tokenizer anthropic</pre>
 
     <hr/>
 
-    <h2>"What is not done yet?"</h2>
-
-    <p>From the roadmap — implemented items that are real and wired, and items that are planned seams:</p>
+    <h2>"What is and isn't done?"</h2>
 
     <table>
       <thead><tr><th>Item</th><th>Status</th></tr></thead>
@@ -153,8 +171,8 @@ distil bench   --tokenizer anthropic</pre>
         <tr><td>Verifiable federated telemetry</td><td><span class="badge-pass">Done</span> — <code>distil federated-leaderboard</code></td></tr>
         <tr><td>Async high-concurrency proxy · Rust hot-path core</td><td><span class="badge-pass">Done</span> — <code>distil proxy --async</code> · <code>rust/distil-core</code> (python parity fallback)</td></tr>
         <tr><td>Real-trace ingestion · performance benchmark</td><td><span class="badge-pass">Done</span> — <code>distil ingest</code> · <code>distil perf</code></td></tr>
+        <tr><td>Live head-to-head vs. real competitor packages</td><td><span class="badge-pass">Done</span> — <code>python benchmarks/derc_live_compare.py</code>; graded by <code>claude-opus-4-8</code>, majority-of-3. See <a href="benchmark.html#live-head-to-head">Benchmark</a>.</td></tr>
         <tr><td>Production keep-model <em>checkpoint</em></td><td><span class="badge-new">Your turn</span> — a demo checkpoint ships on the release; production = retrain on your traces (<code>distil train-transformer</code>)</td></tr>
-        <tr><td><code>--runner anthropic</code> verified against live model</td><td><span class="badge-new">Needs a key</span> — implemented but <b>UNVERIFIED</b> without one; the deterministic runner covers all offline measurements</td></tr>
         <tr><td>Proven at scale / adoption</td><td><span class="badge-new">Needs real traffic</span> — every tool to prove it ships (<code>distil ingest</code> + <code>distil eval --runner anthropic</code>); run it on your traces and publish</td></tr>
       </tbody>
     </table>
@@ -163,11 +181,11 @@ distil bench   --tokenizer anthropic</pre>
 
     <h2>"Does it work with models other than Claude?"</h2>
 
-    <p>The core techniques — cache-aware compression, causal pruning, TOST certification, byte-fidelity invariants — are model-agnostic and apply to any LLM with prompt caching. The corpus trajectories and the adapter are built around the Anthropic Messages API format, but:</p>
+    <p>The core techniques — cache-aware compression, causal pruning, TOST certification, byte-fidelity invariants — are model-agnostic and apply to any LLM with prompt caching. The corpus and adapter are built around the Anthropic Messages API format, but:</p>
 
     <ul>
       <li>The proxy intercepts <code>/v1/chat/completions</code> and <code>/v1/responses</code> in addition to <code>/v1/messages</code>, making it compatible with OpenAI-format APIs.</li>
-      <li>The token count and dollar figures use Anthropic pricing by default; other models can be added to the pricing catalog.</li>
+      <li>Token counts and dollar figures use Anthropic pricing by default; other models can be added to the pricing catalog.</li>
       <li>The TOST gate and causal ablation are purely statistical and format-independent.</li>
     </ul>
 
@@ -175,15 +193,15 @@ distil bench   --tokenizer anthropic</pre>
 
     <h2>"Where can I see community savings?"</h2>
 
-    <p>By design, savings are <strong>local-first and privacy-preserving</strong> — Distil never sends your prompts or responses anywhere. There are three views:</p>
+    <p>By design, savings are <strong>local-first and privacy-preserving</strong> — Distil never sends your prompts or responses anywhere. Three views:</p>
 
     <ul>
-      <li><code>distil leaderboard</code> — your own genuine cumulative savings. <code>distil proxy</code> records real per-request token savings from live traffic into the ledger (the <code>live-proxy</code> source), so this reflects actual usage, not a benchmark.</li>
-      <li><code>distil federated-leaderboard --dir ./submissions --keys keys.json --html out.html</code> — a verifiable, multi-instance leaderboard built from <strong>HMAC-signed, content-free</strong> aggregates (numbers + the certification verdict only). Savings you can verify, not just claim.</li>
-      <li><code>distil leaderboard --html your-savings.html</code> — render <strong>your real ledger</strong> as a self-contained page (genuine numbers from your usage, including the <code>live-proxy</code> source from real traffic — no dummy data).</li>
+      <li><code>distil leaderboard</code> — your own cumulative savings. The proxy records real per-request token savings from live traffic into the ledger (the <code>live-proxy</code> source), so this reflects actual usage, not benchmark projections.</li>
+      <li><code>distil federated-leaderboard --dir ./submissions --keys keys.json --html out.html</code> — a verifiable multi-instance leaderboard built from <strong>HMAC-signed, content-free</strong> aggregates (numbers + certification verdict only). Savings you can verify, not just claim.</li>
+      <li><code>distil leaderboard --html your-savings.html</code> — render your real ledger as a self-contained page (genuine numbers from your usage, including the <code>live-proxy</code> source — no dummy data).</li>
     </ul>
 
-    <p>There is <strong>no hosted public dashboard</strong> harvesting your data — opt-in federation means you control submission and verification (ed25519 public-key signing is the documented upgrade for share-the-key-free verification).</p>
+    <p>There is <strong>no hosted public dashboard</strong> harvesting your data. Opt-in federation means you control submission and verification (ed25519 public-key signing is the documented upgrade for share-the-key-free verification).</p>
 
     <hr/>
 
@@ -191,7 +209,7 @@ distil bench   --tokenizer anthropic</pre>
 
     <p>Apache-2.0. See <a href="https://github.com/dshakes/distil/blob/main/LICENSE" target="_blank" rel="noopener"><code>LICENSE</code></a> in the repository.</p>
 
-    <p>The short version: you can use it commercially, modify it, distribute it, and sublicense it. The only requirements are attribution and preservation of the license notice. There are no patent traps beyond the standard Apache-2.0 patent grant.</p>
+    <p>You can use it commercially, modify it, distribute it, and sublicense it. The only requirements are attribution and preservation of the license notice. No patent traps beyond the standard Apache-2.0 patent grant.</p>
 
     <hr/>
 

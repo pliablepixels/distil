@@ -20,7 +20,11 @@ from __future__ import annotations
 
 import json
 
-_SCALAR = (str, int, float, bool, type(None))
+# NOTE: None is deliberately EXCLUDED. In the columnar form a null cell and a
+# missing key would both render empty, so a record carrying any null is left
+# byte-exact (not folded) rather than shown in an ambiguous compact form. The
+# original is byte-recoverable regardless; this keeps the in-context form honest.
+_SCALAR = (str, int, float, bool)
 _SEP = "\t"
 _HDR = "«"  # « — an unambiguous, rare marker so the compact form is recognisable
 

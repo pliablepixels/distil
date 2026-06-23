@@ -56,7 +56,11 @@ def ingest_anthropic_request(body: dict, *, turn_index: int = 0) -> list[Block]:
         else:
             # list of content blocks — join all text parts
             parts = [
-                c["text"] for c in system_raw if isinstance(c, dict) and c.get("type") == "text"
+                c["text"]
+                for c in system_raw
+                if isinstance(c, dict)
+                and c.get("type") == "text"
+                and isinstance(c.get("text"), str)
             ]
             system_text = "\n".join(parts)
         blocks.append(
@@ -151,7 +155,9 @@ def ingest_anthropic_request(body: dict, *, turn_index: int = 0) -> list[Block]:
                         parts = [
                             rc["text"]
                             for rc in result_content
-                            if isinstance(rc, dict) and rc.get("type") == "text"
+                            if isinstance(rc, dict)
+                            and rc.get("type") == "text"
+                            and isinstance(rc.get("text"), str)
                         ]
                         result_text = "\n".join(parts)
                     else:
@@ -273,7 +279,11 @@ def _openai_content_to_text(content: object) -> str:
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
+            if (
+                isinstance(item, dict)
+                and item.get("type") == "text"
+                and isinstance(item.get("text"), str)
+            ):
                 parts.append(item["text"])
             # image_url and other types are skipped
         return "\n".join(parts)
@@ -347,8 +357,12 @@ def ingest_file(
         requests: list[dict] = []
         for line in p.read_text(encoding="utf-8").splitlines():
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            try:
                 requests.append(json.loads(line))
+            except (json.JSONDecodeError, ValueError):
+                continue  # skip a malformed line rather than abort the whole ingest
     else:
         raw = json.loads(p.read_text(encoding="utf-8"))
         if isinstance(raw, list):

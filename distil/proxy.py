@@ -27,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .adapters.anthropic import compress_messages
+from .httpguard import parse_content_length, safe_forward_path, strip_query
 from .tokenizer import DEFAULT as _tokenizer
 
 # ---------------------------------------------------------------------------
@@ -139,7 +140,7 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def do_POST(self) -> None:  # noqa: N802
-            if self.path in _COMPRESSIBLE_PATHS:
+            if strip_query(self.path) in _COMPRESSIBLE_PATHS:
                 self._handle_compressible()
             else:
                 self._passthrough()
@@ -166,9 +167,16 @@ def build_handler(
         # Helpers
         # ----------------------------------------------------------------
 
-        def _read_body(self) -> bytes:
-            length = int(self.headers.get("Content-Length", 0))
+        def _read_body(self) -> bytes | None:
+            """Read the request body, or None if Content-Length is malformed/oversized."""
+            length = parse_content_length(self.headers.get("Content-Length"))
+            if length is None:
+                return None
             return self.rfile.read(length) if length else b""
+
+        def _reject(self, code: int, message: str) -> None:
+            body = json.dumps({"error": message}).encode()
+            self._relay(code, {"Content-Type": "application/json"}, body)
 
         def _client_headers(self) -> dict[str, str]:
             """Client headers with hop-by-hop stripped (Content-Length excluded
@@ -201,6 +209,12 @@ def build_handler(
             headers: dict[str, str],
         ) -> tuple[int, dict[str, str], bytes]:
             """POST *body* to upstream *path*. Returns (status, headers, body)."""
+            if safe_forward_path(path) is None:
+                return (
+                    400,
+                    {"Content-Type": "application/json"},
+                    b'{"error":"invalid request path"}',
+                )
             url = _upstream + path
             req = urllib.request.Request(
                 url,
@@ -228,7 +242,13 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def _handle_compressible(self) -> None:
+            if safe_forward_path(self.path) is None:
+                self._reject(400, "invalid request path")
+                return
             raw = self._read_body()
+            if raw is None:
+                self._reject(413, "request body too large or malformed Content-Length")
+                return
             headers = self._client_headers()
             extras: dict[str, str] = {}
             store: Any = None  # RestoreStore once messages are compressed (for expand)
@@ -243,9 +263,12 @@ def build_handler(
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
-                compressed, store = compress_messages(
-                    original, lossless_only=lossless_only, keep=_learn_keep
-                )
+                try:
+                    compressed, store = compress_messages(
+                        original, lossless_only=lossless_only, keep=_learn_keep
+                    )
+                except Exception:  # noqa: BLE001 — compression must never break a request
+                    compressed, store = original, None
                 # Learning: tally what we digested, by content-free signature.
                 if _learn_stats is not None and getattr(store, "handles", None):
                     from .learn import signature
@@ -318,7 +341,13 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def _passthrough(self) -> None:
+            if safe_forward_path(self.path) is None:
+                self._reject(400, "invalid request path")
+                return
             raw = self._read_body()
+            if raw is None:
+                self._reject(413, "request body too large or malformed Content-Length")
+                return
             headers = self._client_headers()
             url = _upstream + self.path
             req = urllib.request.Request(

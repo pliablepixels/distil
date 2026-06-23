@@ -60,35 +60,36 @@
   <main class="content">
 
     <h1>Compression <span class="g">Techniques</span></h1>
-    <p class="lead">Every technique in Distil targets a specific slice of agent cost. Two carry the bulk of the win; the rest stack cleanly on top — and one of them is something no lossy compressor can copy.</p>
+    <p class="lead">Each technique targets a specific slice of agent cost. Two carry the bulk of the win: <strong>cache-aware lossless compression</strong> keeps the prefix byte-stable so every cached token stays cached, and <strong>causal pruning</strong> drops what ablation proves never changed a decision. The rest stack cleanly on top — and one of them, recoverable compression, is something no lossy compressor can structurally replicate.</p>
 
     <div class="callout good">
-      <strong>★ The differentiator — recoverable compression.</strong> <strong>Module:</strong> <code>distil/expand.py</code> · <code>distil proxy --expand</code>. Every other compressor is <em>lossy</em> — crush a tool output and the detail is gone. Distil digests behind a content handle and keeps the original locally, then injects a <code>distil_expand</code> tool so the model can <strong>pull back exactly the detail it needs, on demand</strong>: Distil resolves the handle from the local store and re-queries, <em>transparently</em>, before the agent ever sees the response. Two consequences a lossy compressor structurally can't offer — (1) you can compress fearlessly, because nothing is lost and the model is its own safety net; (2) every <code>distil_expand</code> call is a label that the digested content mattered, feeding the <a href="#the-learning-flywheel-self-improving">learning flywheel</a> that stops digesting what <em>your</em> workload depends on. Compress more, lose nothing, get better with use. Proven end-to-end (<code>tests/test_expand.py</code>).</div>
+      <strong>The unique differentiator: recoverable compression.</strong> <strong>Module:</strong> <code>distil/expand.py</code> &middot; <code>distil proxy --expand</code>. Every other compressor is <em>lossy</em> — crush a tool output and the detail is gone. Distil digests large outputs behind a content handle and keeps the original locally, then injects a <code>distil_expand</code> tool so the model can pull back exactly the detail it needs, on demand. Distil resolves the handle from the local store and re-queries transparently, before the agent ever sees the response. Two consequences a lossy compressor cannot offer: (1) you compress fearlessly, because nothing is permanently discarded and the model is its own safety net; (2) every <code>distil_expand</code> call is a label that the digested content mattered, feeding the <a href="#the-learning-flywheel-self-improving">learning flywheel</a> that stops digesting what <em>your</em> workload depends on. Proven end-to-end in <code>tests/test_expand.py</code>.
+    </div>
 
     <hr/>
 
     <!-- Technique 1 -->
     <h2>① Cache-aware compression</h2>
-    <p><strong>Module:</strong> <code>distil/compress/cache_aware.py</code> · Loss profile: lossless</p>
+    <p><strong>Module:</strong> <code>distil/compress/cache_aware.py</code> &middot; Loss profile: lossless</p>
 
-    <p>The dominant cost lever in a multi-turn agent loop is not token count — it is cache hit rate. A cache read costs ~0.1× fresh input; a cache miss costs the full price. Distil models the full multi-turn loop, tracking the longest contiguous prefix that is identical between consecutive turns. Any compressor that rewrites the prefix (even to save tokens) destroys this prefix match and loses the 10× discount.</p>
+    <p>The dominant cost lever in a multi-turn agent loop is not token count — it is cache hit rate. A cache read costs roughly 0.1× fresh input; a cache miss costs full price. Distil models the full multi-turn loop, tracking the longest contiguous prefix that is identical between consecutive turns. Any compressor that rewrites that prefix — even to save tokens — destroys the prefix match and loses the 10× discount.</p>
 
     <img src="assets/cache-aware.svg" alt="Cache-aware savings vs naive recompression" class="svg-embed"/>
 
     <h3>Cache stabilization</h3>
-    <p>To keep the prefix byte-stable turn over turn, Distil applies two lossless pre-processing steps before any compression runs:</p>
+    <p>Two lossless pre-processing steps run before any compression, keeping the prefix byte-stable turn over turn:</p>
 
     <ul>
-      <li><strong>Schema canonicalization</strong> — recursively sorts JSON object keys in tool payloads and API responses. Two semantically identical JSON objects with different key orders produce byte-identical text after canonicalization, which means they hash identically and hit the prefix cache.</li>
-      <li><strong>Volatile-field extraction</strong> — fields whose values change every turn (timestamps, UUIDs, JWT tokens, request IDs) are lifted out of the stable prefix into the volatile tail. The stable portion stops churning; the volatile tail is compressed separately.</li>
+      <li><strong>Schema canonicalization</strong> — recursively sorts JSON object keys in tool payloads and API responses. Two semantically identical JSON objects with different key orders produce byte-identical text after canonicalization and hit the prefix cache.</li>
+      <li><strong>Volatile-field extraction</strong> — fields that change every turn (timestamps, UUIDs, JWT tokens, request IDs) are lifted out of the stable prefix into the volatile tail. The stable portion stops churning; the volatile tail is compressed separately.</li>
     </ul>
 
     <div class="callout">
-      <b>Result:</b> the prefix cache hit rate stays near 100% across turns. Compression is applied <em>only</em> to the volatile tail, where there is no cache to bust. The savings from keeping the prefix stable outweigh the savings from naively shrinking it.
+      <b>Result:</b> the prefix cache hit rate stays near 100% across turns. Compression applies <em>only</em> to the volatile tail, where there is no cache to bust. Keeping the prefix stable outweighs naively shrinking it.
     </div>
 
     <h3>The simulation</h3>
-    <p><code>cache_aware.simulate()</code> models four strategies across a full trajectory and reports per-turn cost breakdown (cache reads, cache writes, fresh tokens). Run <code>distil savings</code> to see the numbers on any trajectory.</p>
+    <p><code>cache_aware.simulate()</code> models four strategies across a full trajectory and reports per-turn cost breakdown — cache reads, cache writes, fresh tokens. Run <code>distil savings</code> to see the numbers on any trajectory.</p>
 
     <pre class="term"><span class="d">$ distil savings --pricing claude-opus-4-8</span>
 strategy                               $ / run   vs baseline  cache hits
@@ -100,19 +101,41 @@ distil (cache-aware lossless)          0.01019         <span class="g">33.1%</sp
 
     <hr/>
 
-    <!-- Technique 4 -->
-    <h2>④ Causal / counterfactual pruning</h2>
-    <p><strong>Module:</strong> <code>distil/replay/ablation.py</code> · Loss profile: certified</p>
+    <!-- Technique 2 -->
+    <h2 id="salience-protection">② Salience protection <span class="g">(frontier shifter)</span></h2>
+    <p><strong>Module:</strong> <code>distil/compress/cache_aware.py</code> &middot; Loss profile: lossless</p>
 
-    <p>The eval engine in Distil is not a ruler bolted on the side of compression — it is a <strong>discovery engine</strong>. The algorithm:</p>
+    <p>Lossless compression is safe by construction, but it is also blind — it will happily drop the one line that carries the agent's decision if that line happens to be compressible. Salience protection is a model-free guard that runs before any content reduction and marks lines that must survive regardless of savings pressure.</p>
+
+    <p>Three signals combine, all computed from the text alone (no external model call, no learned weights):</p>
+
+    <ul>
+      <li><strong>Pattern matching</strong> — decision markers (<code>DECISION:</code>), error keywords, structured-data signals (key:value, pipe tables, digit-dense lines).</li>
+      <li><strong>Entropy scoring</strong> — high-entropy lines carry information-dense content (IDs, hashes, addresses) and are protected regardless of keyword matches.</li>
+      <li><strong>Cross-reference detection</strong> — a line referenced elsewhere in the context (an ID that reappears, a filename cited later) is treated as load-bearing even if it looks inert in isolation.</li>
+    </ul>
+
+    <p>Protection is line-aware: the guard operates on individual lines, not blocks, so it can preserve a single critical row inside an otherwise-compressible table. The cost is a small savings reduction — roughly 2.4 percentage points on the benchmark corpus — in exchange for a structural guarantee.</p>
+
+    <div class="callout good">
+      <strong>What this fixed.</strong> On the certified frontier, blind truncation at a 200-token target produced a 0/120 survival rate on decision-carrying lines — every compressed context dropped the directive. With salience protection enabled, that becomes 120/120 at approximately the same token budget. That is not a tuning improvement; it is a qualitative shift. This is why we call it a frontier shifter: it moves the boundary at which aggressive compression stays safe, rather than moving a point along the existing curve.
+    </div>
+
+    <hr/>
+
+    <!-- Technique 3 -->
+    <h2>③ Causal / counterfactual pruning</h2>
+    <p><strong>Module:</strong> <code>distil/replay/ablation.py</code> &middot; Loss profile: certified</p>
+
+    <p>The eval engine in Distil is a <strong>discovery engine</strong>. The algorithm:</p>
 
     <ol>
-      <li>For each context block present in the trajectory, remove it and replay the trajectory.</li>
+      <li>For each context block in the trajectory, remove it and replay the trajectory.</li>
       <li>Record whether any turn's decision changed.</li>
-      <li>A block that <em>never</em> changed a decision in any of its occurrences is <strong>causally inert</strong> — provably free to drop.</li>
+      <li>A block that never changed a decision across all its occurrences is <strong>causally inert</strong> — provably safe to drop.</li>
     </ol>
 
-    <p>This is the sense in which the measurement produces the compression policy. Speculative retrievals that were never cited, stale history that no longer affects any tool call, diagnostic context that was superseded — these all show up as zero-impact in ablation and can be pruned with a causal guarantee, not a heuristic guess.</p>
+    <p>This is the sense in which measurement produces the compression policy. Speculative retrievals never cited, stale history that no longer affects any tool call, diagnostic context superseded by later turns — these all show up as zero-impact in ablation and can be pruned with a causal guarantee, not a heuristic guess.</p>
 
     <pre class="term"><span class="d">$ distil prune</span>
 causal ablation over 'sre-disk-incident' — what is free to drop?
@@ -126,17 +149,21 @@ system                   4      218  <span class="d">keep (changed a decision)</
 
 tokens provably free to drop: 615 across 2 block(s).</pre>
 
+    <div class="callout">
+      <strong>Live result.</strong> Causal pruning is the technique that takes Distil to its <a href="benchmark.html#live-head-to-head">live-certified result</a> of <strong>83.2% token savings at 0% decision-change rate</strong> (≤5% guaranteed at 95% confidence, graded live by <code>claude-opus-4-8</code>), running at ~0.026 ms/turn — roughly 1,000× faster than model-based alternatives. The certified guarantee uses Learn-Then-Test / CRC (<a href="https://arxiv.org/abs/2110.01052">arXiv:2110.01052</a> / <a href="https://arxiv.org/abs/2208.02814">2208.02814</a>), distribution-free and valid at finite sample size.
+    </div>
+
     <hr/>
 
     <!-- Tier model -->
     <h2>Risk-graded tiers</h2>
-    <p>Every technique is assigned to a tier based on its loss profile. Distil applies them in order — the safest ones unconditionally, the certified ones only when the gate passes.</p>
+    <p>Every technique is assigned to a tier based on its loss profile. Distil applies them in order — lossless ones unconditionally, certified-lossy ones only when the gate passes.</p>
 
     <div class="tiers">
       <div class="tier">
         <div class="k">Tier 0</div>
         <h4>Provably lossless</h4>
-        <p>Reconstructable transforms that make no assumptions about content semantics. Applied unconditionally.</p>
+        <p>Reconstructable transforms with no assumptions about content semantics. Applied unconditionally.</p>
         <ul style="margin-top:10px;font-size:13px;color:var(--mut)">
           <li>JSON minification</li>
           <li>Run-length encoding collapse</li>
@@ -158,7 +185,7 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
       <div class="tier">
         <div class="k">Certified</div>
         <h4>Lossy, gated</h4>
-        <p>Pruning and summarization are applied only at ratios the non-inferiority gate certifies. Never ships without a TOST PASS.</p>
+        <p>Pruning applied only at ratios the non-inferiority gate certifies. Never ships without a TOST PASS.</p>
         <ul style="margin-top:10px;font-size:13px;color:var(--mut)">
           <li>Causal pruning (ablation-discovered)</li>
           <li>Lossy strategies blocked if gate fails</li>
@@ -172,7 +199,7 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
 
     <!-- Keep-model codec (pluggable) -->
     <h2 id="keep-model">Keep-model codec <span class="g">(pluggable)</span></h2>
-    <p><strong>Modules:</strong> <code>distil/codec/learned.py</code> · <code>distil/codec/transformer.py</code> · Loss profile: pluggable</p>
+    <p><strong>Modules:</strong> <code>distil/codec/learned.py</code> &middot; <code>distil/codec/transformer.py</code> &middot; Loss profile: pluggable</p>
 
     <p>For per-line decisions about which content in a tool result is worth keeping, Distil exposes a pluggable <strong>KeepModel</strong> seam. Three implementations ship, from the heuristic default through to a retrain-on-your-traces transformer.</p>
 
@@ -208,22 +235,22 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
           <td><span class="badge-pass">96.3%</span> <span style="color:var(--dim);font-size:12px">(demo)</span></td>
           <td><span class="badge-pass">0.98</span> <span style="color:var(--dim);font-size:12px">(demo)</span></td>
           <td><code>pip install 'distil-llm[train]'</code></td>
-          <td>ONNX inference adapter. Retrain on YOUR traces for best results. Demo checkpoint on the v0.1.0 release.</td>
+          <td>ONNX inference adapter. Retrain on your own traces for production quality. Demo checkpoint on the v0.1.0 release.</td>
         </tr>
       </tbody>
     </table>
 
     <h3>Heuristic default — SalienceKeepModel</h3>
-    <p><code>distil/codec/keep_model.py</code> · The baseline. A deterministic rule-set that fires on error keywords, structured data markers (<code>DECISION:</code>, key:value lines, pipe tables), digit density, and debug-noise keywords. Always available, no training step, no external dependencies.</p>
+    <p><code>distil/codec/keep_model.py</code> &middot; A deterministic rule-set that fires on error keywords, structured data markers (<code>DECISION:</code>, key:value lines, pipe tables), digit density, and debug-noise keywords. Always available; no training step, no external dependencies.</p>
 
     <h3>Logistic keep-model — built-in, zero-dep</h3>
-    <p><code>distil/codec/learned.py</code> · A logistic-regression classifier trained entirely in pure Python (stdlib only), implementing the same <code>KeepModel</code> protocol. Key design decisions grounded in the source:</p>
+    <p><code>distil/codec/learned.py</code> &middot; A logistic-regression classifier trained entirely in pure Python (stdlib only), implementing the same <code>KeepModel</code> protocol. Key design decisions grounded in the source:</p>
 
     <ul>
       <li><strong>Feature set:</strong> nine features defined in <code>codec/features.py</code> — bias, decision-marker indicator, error keywords, structured-data signal, digit density, length, debug keywords, uppercase ratio, blank-line flag. All normalized to [0, 1].</li>
       <li><strong>Training:</strong> full-batch gradient descent on binary cross-entropy with L2 regularization (<code>l2=1e-4</code>, 400 epochs). Labels are derived from <code>SalienceKeepModel</code>: a line is labelled <em>keep</em> (1.0) if the heuristic scores it ≥ 0.6.</li>
       <li><strong>Train/test split:</strong> deterministic, SHA-256 hash of the raw line — reproducible across machines with no random seed dependency.</li>
-      <li><strong>Held-out performance:</strong> 96.4% accuracy, 0.98 F1 on the bundled corpus test split — note the labels are distilled from the salience heuristic, so this measures agreement with that label source, not an independent ground truth.</li>
+      <li><strong>Held-out performance:</strong> 96.4% accuracy, 0.98 F1 on the bundled corpus test split. Note that the labels are distilled from the salience heuristic, so this measures agreement with that label source, not an independent ground truth.</li>
       <li><strong>Weights:</strong> persisted to <code>distil/codec/weights.json</code>; load with <code>LogisticKeepModel.load()</code>. The weights ship inside the installed wheel — no training step required.</li>
     </ul>
 
@@ -247,21 +274,21 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
     </div>
 
     <h3>Transformer keep-model — ONNX inference adapter</h3>
-    <p><code>distil/codec/transformer.py</code> · An ONNX-backed token-classification transformer that implements the same <code>KeepModel</code> protocol. Heavy deps (<code>onnxruntime</code>, <code>transformers</code>) are lazy-imported so the stdlib core of distil runs untouched. The class is <strong>the inference adapter only</strong> — it does not ship a pretrained checkpoint.</p>
+    <p><code>distil/codec/transformer.py</code> &middot; An ONNX-backed token-classification transformer implementing the same <code>KeepModel</code> protocol. Heavy deps (<code>onnxruntime</code>, <code>transformers</code>) are lazy-imported so the stdlib core runs untouched. This class is <strong>the inference adapter only</strong> — it does not ship a pretrained checkpoint.</p>
 
     <ul>
       <li><strong>Inference:</strong> tokenizes each line, runs the ONNX session, applies softmax over the label axis, and aggregates per-token keep-probabilities via mean of top-3 — more robust than plain mean on mixed-content lines.</li>
       <li><strong>Never-drop floor:</strong> any line containing <code>DECISION:</code> is forced to score 1.0 regardless of model output, matching the <code>SalienceKeepModel</code> guarantee.</li>
       <li><strong>Demo checkpoint:</strong> a checkpoint trained on the bundled corpus (96.3% acc / 0.98 F1) is attached to the <a href="https://github.com/dshakes/distil/releases/tag/v0.1.0">v0.1.0 release</a>. This is a <em>demo</em> — for production quality, retrain on your own traces.</li>
-      <li><strong>Loading:</strong> <code>TransformerKeepModel.from_pretrained(onnx_path, tokenizer_dir)</code>. Requires <code>pip install 'distil-llm[onnx]'</code> for inference only, or <code>'distil-llm[train]'</code> to train.</li>
+      <li><strong>Loading:</strong> <code>TransformerKeepModel.from_pretrained(onnx_path, tokenizer_dir)</code>. Requires <code>pip install 'distil-llm[onnx]'</code> for inference, or <code>'distil-llm[train]'</code> to train.</li>
     </ul>
 
     <div class="callout warn">
-      <b>Retrain on your traces.</b> The demo checkpoint was trained on the bundled corpus. Its performance on your production text distribution will vary. Use <code>distil ingest</code> to convert your request logs into a corpus, then <code>distil train-transformer --out ./my-keep-model</code> to produce a checkpoint tuned to your traffic.
+      <b>Retrain on your traces.</b> The demo checkpoint was trained on the bundled corpus. Performance on your production text distribution will vary. Use <code>distil ingest</code> to convert your request logs into a corpus, then <code>distil train-transformer --out ./my-keep-model</code> to produce a checkpoint tuned to your traffic.
     </div>
 
     <h3>Training the transformer on your traces</h3>
-    <p><code>distil/codec/train_transformer.py</code> · Fine-tunes a HuggingFace token-classification model (default: <code>google/bert_uncased_L-2_H-128_A-2</code>, ~4 MB) using the same label pipeline as the logistic model, then exports to ONNX. Requires the <code>train</code> extras.</p>
+    <p><code>distil/codec/train_transformer.py</code> &middot; Fine-tunes a HuggingFace token-classification model (default: <code>google/bert_uncased_L-2_H-128_A-2</code>, ~4 MB) using the same label pipeline as the logistic model, then exports to ONNX. Requires the <code>train</code> extras.</p>
 
     <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ pip install 'distil-llm[train]'</span>
 
@@ -284,26 +311,24 @@ score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span 
 <span class="d"># → 0.97  (keep)</span></pre>
 
     <div class="callout">
-      <b>Honesty note:</b> The logistic keep-model is a real, wired, deterministic implementation — the default for all users, zero extra dependencies. The transformer adapter is also real and wired; the demo checkpoint trains on the bundled corpus. For production, retrain on your own traces. Both implement the same <code>KeepModel</code> protocol and are interchangeable at the seam.
+      <b>Implementation note:</b> The logistic keep-model is a real, wired, deterministic implementation — the default for all users, zero extra dependencies. The transformer adapter is also real and wired; the demo checkpoint trains on the bundled corpus. For production, retrain on your own traces. Both implement the same <code>KeepModel</code> protocol and are interchangeable at the seam.
     </div>
 
     <hr/>
 
     <!-- Gist caching -->
     <h2>Gist caching</h2>
-    <p><strong>Module:</strong> <code>distil/gist.py</code> · Loss profile: lossless</p>
+    <p><strong>Module:</strong> <code>distil/gist.py</code> &middot; Loss profile: lossless</p>
 
-    <p>Tool schemas are verbose and essentially never change within a session. Gist caching detects when the same tool schema has been sent before (by content hash) and replaces subsequent occurrences with a compact reference handle. The model only needs to see the full schema once; subsequent turns pay only for the reference token.</p>
-
-    <p>This is implemented as a content-addressed local cache — no network calls, no external state. The handle is embedded inline in the message; a session-aware proxy or adapter layer resolves it back to the full schema if needed.</p>
+    <p>Tool schemas are verbose and change rarely within a session. Gist caching detects when the same tool schema has been sent before (by content hash) and replaces subsequent occurrences with a compact reference handle. The model sees the full schema once; subsequent turns pay only for the reference token. Implemented as a content-addressed local cache — no network calls, no external state.</p>
 
     <hr/>
 
     <!-- Delta context -->
     <h2>Delta / append-only context</h2>
-    <p><strong>Module:</strong> <code>distil/delta.py</code> · Loss profile: lossless</p>
+    <p><strong>Module:</strong> <code>distil/delta.py</code> &middot; Loss profile: lossless</p>
 
-    <p>Context history is append-only — a block present in turn N must carry identical bytes in turn N+1 (this is enforced by the byte-fidelity gate). The delta engine exploits this: only the <em>new</em> blocks added since the last turn need to be transmitted at full cost. Stable history is already in the cache and costs only cache-read price. The delta layer ensures no block is re-sent in a way that would corrupt the prefix hash.</p>
+    <p>Context history is append-only — a block present in turn N must carry identical bytes in turn N+1 (enforced by the byte-fidelity gate). The delta engine exploits this: only the <em>new</em> blocks added since the last turn are transmitted at full cost. Stable history is already in the cache and costs only cache-read price. The delta layer ensures no block is re-sent in a way that would corrupt the prefix hash.</p>
 
     <hr/>
 
@@ -311,28 +336,36 @@ score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span 
     <h2>BM25 partial retrieval</h2>
     <p><strong>Module:</strong> <code>distil/retrieval.py</code></p>
 
-    <p>When a context block is digested (Tier 1) and represented by a handle, BM25 partial retrieval lets the agent query for the most relevant chunks of the original without re-expanding the entire block. This keeps the context window focused while preserving access to the full original content on demand — useful for large tool outputs, retrieved documents, or log dumps where only a fraction is decision-relevant.</p>
+    <p>When a context block is digested (Tier 1) and represented by a handle, BM25 partial retrieval lets the agent query the most relevant chunks of the original without re-expanding the entire block. This keeps the context window focused while preserving access to the full original content — useful for large tool outputs, retrieved documents, or log dumps where only a fraction is decision-relevant.</p>
+
+    <hr/>
 
     <h2>Reversible structured compaction</h2>
-    <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; in the Tier-1 path</p>
-    <p>The token-dense content agents actually traffic in — JSON record arrays, SQL rows, telemetry — is re-encoded into a compact <strong>columnar</strong> form: the repeated keys are stated once, the values listed as rows. A homogeneous <code>[{"id":1,"name":"a","ok":true}, …]</code> of N records pays its keys and punctuation N times in JSON; the folded form pays them once — typically a 40–70% reduction with no loss of meaning. Unlike a lossy structural crusher, <strong>nothing is discarded</strong>: the byte-exact original is kept in the restore table and is one <code>expand()</code> away. This is the reversible counterpart to the lossy "crushers" other tools use — same savings on clean structured data, but it never changes a value.</p>
+    <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; in the Tier-1 path &middot; Loss profile: lossless</p>
+
+    <p>The content agents actually traffic in — JSON record arrays, SQL rows, telemetry — is re-encoded into a compact <strong>columnar</strong> form: repeated keys stated once, values listed as rows. A homogeneous array of N records pays its keys and punctuation N times in JSON; the folded form pays them once — typically a 40–70% reduction with no loss of meaning. Unlike lossy structural crushing, <strong>nothing is discarded</strong>: the byte-exact original is kept in the restore table and is one <code>expand()</code> away.</p>
 
     <h2>Template mining <span class="g">(Drain / LogPai family)</span></h2>
-    <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; <code>template_fold()</code></p>
-    <p>Logs and telemetry are runs of <em>near</em>-identical lines that differ only by a timestamp, id, or number. Where run-length encoding only collapses byte-identical lines, template mining masks the varying tokens, groups lines by their skeleton, and collapses a run into <strong>one template + a compact variable table</strong> — the production log-parsing technique (Drain / LogPai), applied to agent context. Every variable is retained (information-preserving) and the original is recoverable. On log/metric-heavy content this lifts the byte-exact lossless savings several points on its own.</p>
+    <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; <code>template_fold()</code> &middot; Loss profile: lossless</p>
+
+    <p>Logs and telemetry are runs of near-identical lines that differ only by a timestamp, ID, or number. Where run-length encoding only collapses byte-identical lines, template mining masks the varying tokens, groups lines by their skeleton, and collapses a run into <strong>one template + a compact variable table</strong> — the production log-parsing technique (Drain / LogPai), applied to agent context. Every variable is retained; the original is fully recoverable. On log-heavy content this lifts lossless savings several points on its own.</p>
 
     <h2>Cross-turn dedup <span class="g">(streaming)</span></h2>
-    <p><strong>Module:</strong> <code>distil/compress/dedup.py</code> &middot; <code>StreamingDedup</code></p>
-    <p>Agents re-read the same artifact — a file, a log, a design doc — every turn. Prompt caching only discounts the <em>contiguous prefix</em>, so a large block that recurs in the volatile tail is re-billed in full each time it reappears. The streaming compressor remembers what it has already sent and replaces a recurring inert block with a compact reference, recoverable on demand. It only references blocks that carry no decision marker, so the decision signal is never perturbed. This is the lever that turns a multi-turn loop's quadratic re-read into near-linear, on exactly the content the cache can't reach. See the <a href="benchmark.html">Benchmark</a> for the measured contribution.</p>
+    <p><strong>Module:</strong> <code>distil/compress/dedup.py</code> &middot; <code>StreamingDedup</code> &middot; Loss profile: lossless</p>
+
+    <p>Agents re-read the same artifact — a file, a log, a design doc — every turn. Prompt caching only discounts the <em>contiguous prefix</em>, so a large block that recurs in the volatile tail is re-billed in full each time it reappears. The streaming compressor remembers what it has already sent and replaces a recurring inert block with a compact reference, recoverable on demand. It only references blocks that carry no decision marker. This is the lever that turns a multi-turn loop's quadratic re-read cost into near-linear, on exactly the content the prefix cache cannot reach. See the <a href="benchmark.html">Benchmark</a> for the measured contribution.</p>
 
     <h2>Certified-fallback &amp; the equivalence <span class="g">dial</span></h2>
-    <p><strong>Module:</strong> <code>distil/compress/adaptive.py</code> &middot; <code>certified_fallback</code> · <code>distil frontier</code></p>
-    <p>The aggressive digest is <em>recoverable</em> but not byte-identical to the model's eye, so on genuinely ambiguous decisions it can occasionally tip a (still reasonable) different choice. Certified-fallback removes that risk by construction: for each turn it keeps the most aggressive transform <strong>only if a runner confirms the decision is unchanged</strong> — else it falls back to byte-exact Tier-0, else to no compression. The result is <strong>100% decision-equivalent by construction</strong> under whichever runner you pass — the free structural runner, or the live model itself (<code>--runner anthropic</code>).</p>
-    <p>On top of that sits the <strong>equivalence dial</strong>, <code>target_equivalence</code>. 100% is certified-safe. Relax it — say 0.95 — and Distil grants a bounded <em>divergence budget</em> of <code>floor((1−target) × turns)</code> turns that keep the deepest transform even though it changes the decision, spending the budget on the <strong>highest-saving</strong> turns first. So you trade a measured, explicit amount of equivalence for deeper savings — never a hidden one. Trace the whole curve with <code>distil frontier</code>; see the <a href="benchmark.html#the-equivalence-dial">Benchmark → equivalence dial</a>.</p>
+    <p><strong>Module:</strong> <code>distil/compress/adaptive.py</code> &middot; <code>certified_fallback</code> &middot; <code>distil frontier</code></p>
 
-    <h2>The learning flywheel <span class="g">(self-improving)</span></h2>
-    <p><strong>Module:</strong> <code>distil/learn.py</code> · <code>distil learn</code></p>
-    <p>This is what makes recoverable compression <em>compound</em>. Every <code>distil_expand</code> call is ground truth that a digested block was load-bearing. Distil tallies these by a coarse, <strong>content-free signature</strong> (content class × size bucket, e.g. <code>json:l</code> — never the content itself) and learns which signatures your agents keep expanding. Those it stops digesting, keeping them byte-exact. Because the policy only ever makes Distil <em>more</em> conservative, it is <strong>never-regressing by construction</strong> — it can lower savings on an expand-prone signature, never lower decision-equivalence — so it needs no gate to be safe. The stats live locally (atomic writes, content-free); inspect the learned policy with <code>distil learn</code>. The more your agents run, the better the fit to <em>your</em> workload.</p>
+    <p>The aggressive digest is recoverable but not byte-identical to the model's eye, so on genuinely ambiguous decisions it can occasionally tip a different (still reasonable) choice. Certified-fallback removes that risk by construction: for each turn it keeps the most aggressive transform <strong>only if a runner confirms the decision is unchanged</strong> — else it falls back to byte-exact Tier-0, else to no compression. The result is <strong>100% decision-equivalent by construction</strong> under whichever runner you pass — the free structural runner, or the live model itself (<code>--runner anthropic</code>).</p>
+
+    <p>On top of that sits the <strong>equivalence dial</strong>, <code>target_equivalence</code>. At 100% you get certified-safe compression. Relax it — say 0.95 — and Distil grants a bounded divergence budget of <code>floor((1−target) × turns)</code> turns that keep the deepest transform even when it changes the decision, spending the budget on the <strong>highest-saving</strong> turns first. You trade a measured, explicit amount of equivalence for deeper savings — never a hidden one. Trace the full curve with <code>distil frontier</code>; see <a href="benchmark.html#the-equivalence-dial">Benchmark → equivalence dial</a>.</p>
+
+    <h2 id="the-learning-flywheel-self-improving">The learning flywheel <span class="g">(self-improving)</span></h2>
+    <p><strong>Module:</strong> <code>distil/learn.py</code> &middot; <code>distil learn</code></p>
+
+    <p>This is what makes recoverable compression compound. Every <code>distil_expand</code> call is ground truth that a digested block was load-bearing. Distil tallies these by a coarse, <strong>content-free signature</strong> (content class × size bucket, e.g. <code>json:l</code> — never the content itself) and learns which signatures your agents keep expanding. Those it stops digesting, keeping them byte-exact. Because the policy only ever makes Distil <em>more</em> conservative, it is <strong>never-regressing by construction</strong> — it can reduce savings on an expand-prone signature, never reduce decision-equivalence — so it needs no gate to be safe. The stats live locally (atomic writes, content-free); inspect the learned policy with <code>distil learn</code>. The more your agents run, the better the fit to <em>your</em> workload.</p>
 
     <div class="site-footer">
       Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>

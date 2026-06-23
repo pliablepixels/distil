@@ -31,7 +31,7 @@ def minify_json(text: str) -> str | None:
 def collapse_runs(text: str) -> str:
     """Run-length-encode consecutive identical lines, reversibly.
 
-    Three+ identical lines `L` collapse to `L\\n<<x N>>`. The marker preserves
+    Two+ identical lines `L` collapse to `L\\n<<x N>>`. The marker preserves
     the exact count, so the original is fully recoverable.
     """
 

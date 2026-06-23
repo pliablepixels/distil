@@ -60,30 +60,30 @@
   <main class="content">
 
     <h1>Output <span class="g">&amp; I/O</span></h1>
-    <p class="lead">Distil now compresses <strong>both sides of the bill</strong>: input tokens going in, and output tokens coming back. This page covers output compression, real-trace ingestion, and the performance benchmark.</p>
+    <p class="lead">Most compressors only touch the input side. Distil compresses <strong>both sides</strong>: input context going in, and generation verbosity coming back — plus a lossless re-entry digest that keeps long outputs from re-billing as full history. This page covers all three, plus real-trace ingestion and the performance benchmark.</p>
 
     <img src="assets/io.svg" alt="Distil compresses both input and output tokens" class="svg-embed"/>
 
     <hr/>
 
-    <h2>Both sides of the bill</h2>
-    <p>Classic context compression only addresses the input side — the tokens you send to the model. That leaves half the invoice untouched. Distil's output compression closes the loop:</p>
+    <h2>Input and output, together</h2>
+    <p>Input compression has always been Distil's core: cache-aware pruning certified to change 0% of live agent decisions at 83.2% token savings. Output compression closes the other half of the invoice:</p>
 
     <div class="grid2">
       <div class="card">
         <div class="tag">Input side</div>
         <h3>Context compression</h3>
-        <p>Tier-0/1 lossless transforms + cache-aware pruning. Cuts input tokens by <strong>~30%</strong>, losslessly, without busting the prefix cache. Always on.</p>
+        <p>Cache-aware pruning + lossless transforms. Certified <strong>83.2% token savings at 0% live decision-change</strong> (≤5% @ 95% confidence, <code>claude-opus-4-8</code>). Always on. See <a href="benchmark.html">Benchmark</a>.</p>
       </div>
       <div class="card">
         <div class="tag">Output side</div>
         <h3>Generation shaping</h3>
-        <p>A gated <code>role:"system"</code> directive shapes verbosity before generation. A/B measured: <strong>−72.5% output tokens</strong> (95% CI 67.5–77.1%), answer preserved 100%.</p>
+        <p>A gated <code>role:"system"</code> directive shapes verbosity before generation. A/B measured: <strong>−72.5% output tokens</strong> (95% CI 67.5–77.1%), answer preserved 100%. Lossy, opt-in, PAYG-only.</p>
       </div>
     </div>
 
     <div class="callout good">
-      <b>Combined effect:</b> for a typical agentic workload where input and output costs are roughly equal, compressing both sides can cut total API spend by 50%+ per run — without any change to application logic.
+      <b>Combined effect:</b> for a typical agentic workload where input and output costs are roughly equal, compressing both sides cuts total API spend by 50%+ per run — with no change to application logic.
     </div>
 
     <hr/>
@@ -91,18 +91,18 @@
     <h2>Output compression</h2>
     <p><strong>Module:</strong> <code>distil/output.py</code></p>
 
-    <p>Output compression has two mechanisms that work together:</p>
+    <p>Two mechanisms work together, with different fidelity guarantees:</p>
 
     <h3>Generation-side shaping (<code>--shape-output</code>)</h3>
-    <p>Before the request is forwarded to the model, the proxy injects a <code>role:"system"</code> directive that instructs the model to be concise. Two modes:</p>
+    <p>Before forwarding the request, the proxy injects a <code>role:"system"</code> directive instructing the model to be concise. Two modes:</p>
 
     <ul>
-      <li><strong><code>light</code></strong> — conservative; trims unnecessary preamble and padding. Typical reduction: 20–35%.</li>
+      <li><strong><code>light</code></strong> — trims preamble and padding. Typical reduction: 20–35%.</li>
       <li><strong><code>aggressive</code></strong> — strong brevity constraint; omits elaboration and hedging. Measured reduction: 72.5% (95% CI 67.5–77.1%), answer preserved 100% in A/B.</li>
     </ul>
 
     <div class="callout warn">
-      <b>PAYG-only:</b> output shaping requires a pay-as-you-go API key. The proxy detects subscription keys and silently skips injection — it never attempts to shape output in a context where injecting a system directive would be disallowed or ineffective.
+      <b>Lossy and PAYG-only.</b> Generation shaping is not lossless — it shortens real model output. It is also gated to pay-as-you-go API keys. The proxy detects subscription keys and skips injection rather than injecting into a context where the directive would be disallowed or ineffective.
     </div>
 
     <pre class="term"><span class="d"># Start the proxy with aggressive output shaping</span>
@@ -112,9 +112,9 @@ distil proxy listening on http://127.0.0.1:8788
   → output shaping: <span class="g">aggressive</span> (PAYG-only; will verify key tier on first request)</pre>
 
     <h3>Lossless re-entry digest</h3>
-    <p>When the model's output is long and is about to be re-injected as history in the next turn, Distil compresses it using the same Tier-1 digest mechanism used for input blocks: the full output is stored in the local RestoreStore under an 8-hex handle, and only the handle is forwarded as history. The model never sees the full prior output again — it sees the digest. On demand, the original expands from the handle.</p>
+    <p>When a long model response is about to be re-injected as history on the next turn, Distil compresses it using the same Tier-1 digest mechanism used for input blocks: the full output is stored in the local RestoreStore under an 8-hex handle, and only the handle travels as history. The model never re-reads the full prior output.</p>
 
-    <p>This is fully lossless and transparent to the application. The output digest is re-expanded on any path that reads history (e.g. certify, replay, or export).</p>
+    <p>This is fully lossless and transparent to the application. The digest expands back to the original on any path that reads history — certify, replay, or export.</p>
 
     <h3>Measuring output savings</h3>
     <pre class="term"><span class="d">$ distil output-savings --mode aggressive</span>
@@ -130,7 +130,7 @@ output-token A/B — mode=aggressive | runner=anthropic | n=8 turns
 <span class="d">      offline --runner deterministic gives a lower-bound proxy only.</span></pre>
 
     <div class="callout">
-      <b>Honest note on measurement:</b> the 72.5% figure is a live A/B result from <code>--runner anthropic</code>. The offline deterministic runner cannot measure output length because generation is not simulated — it uses ground-truth markers. Always verify output savings with a live run against your own workload.
+      <b>Honest scope:</b> the 72.5% figure is a live A/B result from <code>--runner anthropic</code>. The offline deterministic runner cannot measure output length — generation is not simulated there. Always verify output savings with a live run against your own workload, since verbosity shaping interacts with prompt design.
     </div>
 
     <hr/>
@@ -138,17 +138,17 @@ output-token A/B — mode=aggressive | runner=anthropic | n=8 turns
     <h2>Real-trace ingestion</h2>
     <p><strong>Module:</strong> <code>distil/ingest.py</code> · Command: <code>distil ingest</code></p>
 
-    <p>Distil ships with a bundled synthetic corpus, but your production workload may differ significantly. <code>distil ingest</code> converts your own recorded API request logs into a Distil corpus so you can measure savings on real traffic.</p>
+    <p>Distil ships a bundled synthetic corpus, but your production traffic may differ. <code>distil ingest</code> converts recorded API request logs into a Distil corpus so you can measure savings on real traffic.</p>
 
     <h3>Supported formats</h3>
     <ul>
       <li><strong>Anthropic</strong> — JSONL where each record is an Anthropic <code>messages.create</code> request body.</li>
       <li><strong>OpenAI-compatible</strong> — JSONL where each record is an OpenAI <code>chat.completions.create</code> request body.</li>
     </ul>
-    <p>The format is auto-detected from the first record; pass <code>--format anthropic</code> or <code>--format openai</code> to override.</p>
+    <p>Format is auto-detected from the first record. Pass <code>--format anthropic</code> or <code>--format openai</code> to override.</p>
 
     <h3>Grouping into trajectories</h3>
-    <p>Ingest groups records into trajectories by <code>session_id</code> (or <code>x-session-id</code> header if present in metadata). Records without a session ID are each treated as a single-turn trajectory.</p>
+    <p>Ingest groups records into trajectories by <code>session_id</code> (or <code>x-session-id</code> header if present in metadata). Records without a session ID are treated as single-turn trajectories.</p>
 
     <pre class="term"><span class="d">$ distil ingest --input prod.jsonl --out ./mycorpus</span>
 ingesting prod.jsonl → ./mycorpus
@@ -161,9 +161,9 @@ ingesting prod.jsonl → ./mycorpus
 corpus written to ./mycorpus/</pre>
 
     <h3>Benchmarking real traces</h3>
-    <p>Real-trace corpora have no <code>DECISION</code> labels, so the offline non-inferiority gate cannot run. Use <code>--savings-only</code> to get input-token savings; certify quality with a live runner:</p>
+    <p>Real-trace corpora have no <code>DECISION</code> labels, so the offline non-inferiority gate cannot run. Use <code>--savings-only</code> to measure input-token savings; certify quality with a live runner:</p>
 
-    <pre class="term"><span class="d"># Savings-only gate on real traces (no DECISION labels needed)</span>
+    <pre class="term"><span class="d"># Savings gate on real traces (no DECISION labels required)</span>
 <span class="d">$ distil bench --corpus ./mycorpus --savings-only</span>
 corpus gate — 42 trajectories | savings-only (no DECISION labels)
 
@@ -181,20 +181,20 @@ VERDICT: <span class="g">PASS</span>  (certified non-inferior)</pre>
     <h2>Performance benchmark</h2>
     <p><strong>Module:</strong> <code>distil/perf.py</code> · Command: <code>distil perf</code></p>
 
-    <p>Distil is designed to add negligible latency to the critical path. The performance benchmark measures the raw compression throughput and the per-request overhead of the in-process adapter.</p>
+    <p>Distil is designed to add negligible latency to the critical path. The performance benchmark measures raw compression throughput and per-request overhead of the in-process adapter.</p>
 
     <div class="stat-row">
       <div class="stat-box hl">
         <div class="stat-n">~27k<s>/s</s></div>
-        <div class="stat-l">distil-compressions per second</div>
+        <div class="stat-l">distil-compressions per second (in-process)</div>
       </div>
       <div class="stat-box">
         <div class="stat-n">0.006<s>ms</s></div>
         <div class="stat-l">in-process adapter p50 latency</div>
       </div>
       <div class="stat-box">
-        <div class="stat-n">0.018<s>ms</s></div>
-        <div class="stat-l">in-process adapter p99 latency</div>
+        <div class="stat-n">0.026<s>ms</s></div>
+        <div class="stat-l">per-turn overhead (live benchmark)</div>
       </div>
     </div>
 
@@ -208,10 +208,10 @@ distil performance benchmark
 
   (measured on Apple M-series, CPython 3.12, bundled sre-disk-incident trajectory)</pre>
 
-    <p>At 0.006 ms p50, the in-process adapter adds less than 1% to a typical LLM round-trip (which is measured in seconds). The proxy path adds a small additional network hop but the compression itself is the same cost.</p>
+    <p>At 0.006 ms p50, the in-process adapter adds under 1% to a typical LLM round-trip (which runs in seconds). The live head-to-head benchmark confirms 0.026 ms per turn — <strong>~1,000× faster</strong> than LLMLingua-2's ~1,480 ms and ~1,000× faster than Headroom's ~26 ms. The proxy path adds a small network hop; the compression cost is identical either way.</p>
 
     <div class="callout">
-      <b>What the benchmark measures:</b> the bundled <code>sre-disk-incident</code> trajectory (4 turns, ~8,000 tokens) is compressed in a tight loop with no warm-up exclusion. The throughput number reflects realistic multi-turn context, not a trivial microbenchmark. Run <code>distil perf</code> on your own hardware to get a machine-specific baseline.
+      <b>What the benchmark measures:</b> the bundled <code>sre-disk-incident</code> trajectory (4 turns, ~8,000 tokens) is compressed in a tight loop with no warm-up exclusion. The throughput reflects realistic multi-turn context, not a trivial microbenchmark. Run <code>distil perf</code> on your hardware for a machine-specific baseline.
     </div>
 
     <hr/>
@@ -221,7 +221,7 @@ distil performance benchmark
       <thead><tr><th>Command / Flag</th><th>What it does</th></tr></thead>
       <tbody>
         <tr><td><code>distil output-savings</code></td><td>Measure realized output-token reduction via live A/B</td></tr>
-        <tr><td><code>proxy --shape-output light|aggressive</code></td><td>Enable generation-side verbosity shaping (PAYG-only)</td></tr>
+        <tr><td><code>proxy --shape-output light|aggressive</code></td><td>Enable generation-side verbosity shaping (PAYG-only, lossy)</td></tr>
         <tr><td><code>distil ingest --input &lt;file&gt; --out &lt;dir&gt;</code></td><td>Convert production API logs into a Distil corpus</td></tr>
         <tr><td><code>bench --corpus &lt;dir&gt; --savings-only</code></td><td>Savings gate on a real-trace corpus (no labels required)</td></tr>
         <tr><td><code>distil perf</code></td><td>Throughput and latency benchmark</td></tr>

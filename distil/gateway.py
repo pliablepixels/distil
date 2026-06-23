@@ -19,7 +19,9 @@ Or from the module::
 from __future__ import annotations
 
 import hashlib
+import html
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -28,8 +30,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .adapters.anthropic import compress_messages
+from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
 from .tokenizer import DEFAULT as _tokenizer
+
+# Safe tenant label: bounded length, no markup / control characters.
+_TENANT_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 # ---------------------------------------------------------------------------
 # Paths that carry a ``messages`` payload worth compressing
@@ -157,7 +163,12 @@ def tenant_of(headers: Any) -> str:
     """
     explicit = headers.get("x-distil-tenant")
     if explicit:
-        return explicit.strip()
+        label = explicit.strip()
+        # Only accept a bounded, safe label; an unsafe value (injection attempt,
+        # control chars, overlong) falls through to the credential-derived id
+        # rather than being trusted into accounting or rendered into the dashboard.
+        if _TENANT_RE.match(label):
+            return label
 
     for header in ("x-api-key", "authorization"):
         val = headers.get(header)
@@ -209,7 +220,7 @@ def _dashboard_html(snap: dict[str, Any]) -> str:
     for t in tenants:
         rows += (
             f"<tr>"
-            f"<td>{t['tenant']}</td>"
+            f"<td>{html.escape(str(t['tenant']))}</td>"
             f"<td>{t['requests']}</td>"
             f"<td>{t['tokens_saved']:,}</td>"
             f"<td>${t['dollars_saved']:.4f}</td>"
@@ -478,8 +489,7 @@ def build_gateway_handler(
 
         def _handle_dashboard(self) -> None:
             snap = state.snapshot()
-            html = _dashboard_html(snap)
-            body = html.encode()
+            body = _dashboard_html(snap).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -491,7 +501,13 @@ def build_gateway_handler(
         # ----------------------------------------------------------------
 
         def _handle_compressible(self) -> None:
+            if safe_forward_path(self.path) is None:
+                self._reject(400, "invalid request path")
+                return
             raw = self._read_body()
+            if raw is None:
+                self._reject(413, "request body too large or malformed Content-Length")
+                return
             headers = self._client_headers()
             tenant = tenant_of(self.headers)
 
@@ -507,7 +523,10 @@ def build_gateway_handler(
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
-                compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                try:
+                    compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                except Exception:  # noqa: BLE001 — compression must never break a request
+                    compressed = original
 
                 baseline_tokens = _count_tokens(original)
                 compressed_tokens = _count_tokens(compressed)
@@ -527,7 +546,13 @@ def build_gateway_handler(
         # ----------------------------------------------------------------
 
         def _passthrough(self) -> None:
+            if safe_forward_path(self.path) is None:
+                self._reject(400, "invalid request path")
+                return
             raw = self._read_body()
+            if raw is None:
+                self._reject(413, "request body too large or malformed Content-Length")
+                return
             headers = self._client_headers()
             url = _upstream + self.path
             req = urllib.request.Request(
@@ -555,9 +580,15 @@ def build_gateway_handler(
         # Shared helpers
         # ----------------------------------------------------------------
 
-        def _read_body(self) -> bytes:
-            length = int(self.headers.get("Content-Length", 0))
+        def _read_body(self) -> bytes | None:
+            length = parse_content_length(self.headers.get("Content-Length"))
+            if length is None:
+                return None
             return self.rfile.read(length) if length else b""
+
+        def _reject(self, code: int, message: str) -> None:
+            body = json.dumps({"error": message}).encode()
+            self._relay(code, {"Content-Type": "application/json"}, body)
 
         def _client_headers(self) -> dict[str, str]:
             """Client headers with hop-by-hop stripped."""
@@ -587,6 +618,12 @@ def build_gateway_handler(
             body: bytes,
             headers: dict[str, str],
         ) -> tuple[int, dict[str, str], bytes]:
+            if safe_forward_path(path) is None:
+                return (
+                    400,
+                    {"Content-Type": "application/json"},
+                    b'{"error":"invalid request path"}',
+                )
             url = _upstream + path
             req = urllib.request.Request(
                 url,

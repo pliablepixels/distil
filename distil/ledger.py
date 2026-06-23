@@ -11,6 +11,7 @@ The `share=` seam is where an explicit, consented uploader would plug in.
 
 from __future__ import annotations
 
+import html as _html
 import json
 import time
 from dataclasses import asdict, dataclass
@@ -106,7 +107,7 @@ def render_html(s: LedgerSummary) -> str:
     from your own usage (the `live-proxy` source is real proxy traffic)."""
     rows = (
         "".join(
-            f'<tr><td>{tid}</td><td class="r">${saved:,.4f}</td></tr>'
+            f'<tr><td>{_html.escape(str(tid))}</td><td class="r">${saved:,.4f}</td></tr>'
             for tid, saved in sorted(s.by_trajectory.items(), key=lambda kv: -kv[1])
         )
         or '<tr><td colspan="2" class="muted">no runs recorded yet</td></tr>'

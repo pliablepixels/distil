@@ -138,13 +138,16 @@ def protect(strategy: Strategy, **salience_kw) -> Strategy:
                 fixed.append(c)
                 continue
             want = salient_lines(orig.text, ref_index=ref, **salience_kw)
-            missing = [ln for ln in want if ln.strip() and ln not in c.text]
+            c_lines = set(c.text.splitlines())  # exact line membership, not substring
+            missing = [ln for ln in want if ln.strip() and ln not in c_lines]
             if not missing:
                 fixed.append(c)
                 continue
             patched = c.text + "\n⟦keep⟧ " + " ⟦keep⟧ ".join(ln.strip() for ln in missing)
-            # reject-if-bigger: never let protection exceed the original block
-            fixed.append(c if len(patched) >= len(orig.text) else orig.copy_with(patched))
+            # Guarantee the needle survives: if the patched form would exceed the
+            # original (so re-injection saves nothing), fall back to the ORIGINAL
+            # block byte-exact — never to ``c``, which has the salient line removed.
+            fixed.append(orig.copy_with(patched) if len(patched) < len(orig.text) else orig)
         return fixed
 
     wrapped.__name__ = f"protect({getattr(strategy, '__name__', 'strategy')})"

@@ -64,16 +64,16 @@
   <main class="content">
 
     <h1>Getting <span class="g">Started</span></h1>
-    <p class="lead">Install Distil in seconds, run the corpus gate, and drop compression into your existing agent with one line of code.</p>
+    <p class="lead">Install in one command, verify the corpus gate passes in 60 seconds, then drop compression into your agent with a single <code>wrap(client)</code> call. No API key required for the first two steps.</p>
 
     <hr/>
 
     <!-- Install -->
     <h2>Install</h2>
-    <p>Distil has a <strong>zero-dependency stdlib-only core</strong> and ships as a <strong>command-line app</strong> (PyPI package <code>distil-llm</code>; the command is <code>distil</code>). Pick the format that fits your workflow — the corpus is bundled in every distribution.</p>
+    <p>Distil ships as a PyPI package (<code>distil-llm</code>) with a <strong>stdlib-only core — zero runtime dependencies</strong>. The corpus is bundled in every distribution. Pick the format that fits your workflow.</p>
 
     <div class="callout">
-      <strong>Prerequisite for all Python methods:</strong> Python <strong>3.11+</strong>. Because Distil is a CLI, install it <em>isolated</em> (pipx / uv / Homebrew / Docker) rather than into a system Python — modern macOS &amp; Linux Pythons reject <code>pip install</code> system-wide with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). The methods below all avoid that.
+      <strong>Python 3.11+ required.</strong> Install Distil <em>isolated</em> from your system Python — modern macOS and Linux reject system-wide <code>pip install</code> with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). All methods below are safe.
     </div>
 
     <div class="grid2">
@@ -93,7 +93,7 @@ distil certify</pre>
       <div class="card">
         <span class="tag">macOS / Linux</span>
         <h3>Homebrew</h3>
-        <p>Installs into an isolated keg — doesn't touch your Python. <strong>Prereq:</strong> Homebrew <em>and</em> <code>git</code> (third-party taps are cloned with git — <code>brew install git</code> if you hit <code>Error: Git is unavailable</code>). No git? Use pipx/uvx above.</p>
+        <p>Installs into an isolated keg — doesn't touch your Python. <strong>Prereq:</strong> Homebrew and <code>git</code> (third-party taps are cloned with git — run <code>brew install git</code> if you see <code>Error: Git is unavailable</code>).</p>
         <pre class="term">brew install dshakes/tap/distil
 distil bench</pre>
       </div>
@@ -121,11 +121,11 @@ pip install distil-llm</pre>
     </div>
 
     <div class="callout good">
-      <strong>Node / TypeScript / other languages?</strong> Distil's universal path is the proxy — run <code>distil proxy</code> (or <code>distil wrap -- &lt;your-agent&gt;</code>) and point your SDK's <code>baseURL</code> at it. No code change, any language. The CLI itself needs Python 3.11+; your app does not.
+      <strong>Node / TypeScript / other languages?</strong> Run <code>distil proxy</code> (or <code>distil wrap -- &lt;your-agent&gt;</code>) and point your SDK's <code>baseURL</code> at it. No code changes, any language. The CLI needs Python 3.11+; your app does not.
     </div>
 
     <h3>Billing-grade tokenizer (optional)</h3>
-    <p>The default tokenizer is an offline heuristic — compression <em>ratios</em> are robust, but absolute dollar figures are approximate. To get billing-grade token counts and certify against the live model, install the <code>live</code> extra and export your key:</p>
+    <p>The default tokenizer is an offline heuristic — compression <em>ratios</em> are robust, but absolute dollar figures are approximate. For billing-grade token counts and live-model certification, install the <code>live</code> extra:</p>
     <pre class="term"><span class="d"># with pipx (isolated):</span>
 pipx install 'distil-llm[live]'
 <span class="d"># or one-off with uvx:  uvx --from 'distil-llm[live]' distil certify --runner anthropic</span>
@@ -137,10 +137,10 @@ distil certify --runner anthropic</pre>
 
     <!-- 60-second quickstart -->
     <h2>60-second quickstart</h2>
-    <p>Three commands cover the core workflow. Run them against the bundled multi-domain corpus (no API key required).</p>
+    <p>Three commands cover the core workflow. All run against the bundled multi-domain corpus — no API key required. Run them in order the first time: <code>bench</code> to confirm savings and the gate pass, <code>certify</code> to inspect a single strategy, <code>prune</code> to see what's actually free to drop.</p>
 
     <h3>1. Benchmark savings across 7 domains</h3>
-    <p><code>distil bench</code> is the corpus-wide CI gate. It prices four strategies, certifies Distil is non-inferior on every trajectory, and confirms the gate rejects the aggressive lossy strategy. This is the command you run in CI.</p>
+    <p><code>distil bench</code> is the corpus-wide CI gate. It prices four strategies, certifies Distil is non-inferior on every trajectory, and confirms the gate rejects the aggressive lossy strategy. Run this in CI to catch any regression.</p>
     <pre class="term"><span class="d">$ distil bench</span>
 corpus gate — 7 trajectories | model claude-opus-4-8 | tokenizer=heuristic
 
@@ -159,7 +159,7 @@ aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) losslessly; 5761 tok
 GATE: <span class="g">PASS</span> — every trajectory certified non-inferior; aggressive rejected on all.</pre>
 
     <h3>2. Certify a strategy</h3>
-    <p>Run the TOST non-inferiority gate on a single trajectory and strategy. Exits 0 on pass, 1 on fail — plug it into any CI pipeline.</p>
+    <p>Run the TOST non-inferiority gate on a single trajectory and strategy. Exits 0 on pass, 1 on fail — plug it directly into any CI pipeline.</p>
     <pre class="term"><span class="d">$ distil certify --strategy distil</span>
 certifying strategy 'distil' on 'sre-disk-incident' (runner=deterministic)
 
@@ -174,7 +174,7 @@ TOST non-inferiority (margin=0.02, alpha=0.05): mean diff=+0.000, p=0.0000
 VERDICT: <span class="g">PASS</span>  (certified non-inferior)</pre>
 
     <h3>3. Discover causally inert blocks</h3>
-    <p><code>distil prune</code> ablates each context block, replays the trajectory, and identifies what never changed a decision — provably free to drop.</p>
+    <p><code>distil prune</code> ablates each context block, replays the trajectory, and identifies what never changed a decision. Those blocks are provably free to drop — not heuristically likely, provably safe.</p>
     <pre class="term"><span class="d">$ distil prune</span>
 causal ablation over 'sre-disk-incident' — what is free to drop?
 
@@ -220,10 +220,10 @@ response = client.messages.create(
 
     <h2>What to read next</h2>
     <ul>
-      <li><a href="concepts.html"><strong>Concepts</strong></a> — why decision-equivalence beats byte-equivalence, and why cache misses (not token size) dominate cost.</li>
-      <li><a href="techniques.html"><strong>Techniques</strong></a> — deep-dive into every compression technique: cache-aware, causal pruning, the learned keep-model, gist caching, and more.</li>
+      <li><a href="concepts.html"><strong>Concepts</strong></a> — why decision-equivalence beats byte-equivalence, how the certificate works, and why cache misses (not token size) dominate cost.</li>
+      <li><a href="techniques.html"><strong>Techniques</strong></a> — every compression technique in depth: cache stabilization, causal pruning, recoverable compression, cross-turn dedup, and more.</li>
+      <li><a href="benchmark.html"><strong>Benchmark</strong></a> — the live head-to-head against real installed packages (LLMLingua-2, Headroom), graded by <code>claude-opus-4-8</code>.</li>
       <li><a href="cli.html"><strong>CLI Reference</strong></a> — every flag and sample output for all commands.</li>
-      <li><a href="architecture.html"><strong>Architecture</strong></a> — tier model, the measure→discover→certify loop, byte-fidelity invariants.</li>
     </ul>
 
     <div class="site-footer">

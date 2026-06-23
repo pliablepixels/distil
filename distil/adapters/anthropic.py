@@ -151,8 +151,11 @@ def _compress_content_item(
         if role == "assistant":
             # Never rewrite the assistant's own words.
             return item
-        new_text = _compress_text_content(item["text"], store, lossless_only)
-        if new_text == item["text"]:
+        text = item.get("text")
+        if not isinstance(text, str):
+            return item  # malformed/absent text — pass through untouched
+        new_text = _compress_text_content(text, store, lossless_only)
+        if new_text == text:
             return item
         return {**item, "text": new_text}
 
@@ -171,7 +174,11 @@ def _compress_content_item(
             new_list: list[Any] = []
             changed = False
             for sub in content:
-                if isinstance(sub, dict) and sub.get("type") == "text":
+                if (
+                    isinstance(sub, dict)
+                    and sub.get("type") == "text"
+                    and isinstance(sub.get("text"), str)
+                ):
                     new_text = _compress_tool_result_text(sub["text"], store)
                     if new_text != sub["text"]:
                         new_list.append({**sub, "text": new_text})
@@ -262,6 +269,9 @@ def compress_messages(
         store = RestoreStore()
         new_messages: list[dict[str, Any]] = []
         for msg in messages:
+            if not isinstance(msg, dict):
+                new_messages.append(msg)  # malformed entry — pass through untouched
+                continue
             new_messages.append(_compress_message(msg, store, lossless_only))
         return new_messages, store
     finally:

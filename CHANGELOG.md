@@ -3,6 +3,37 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.12.1] — GA hardening
+
+Pre-GA security + correctness pass (no behavior change to the happy path):
+
+- **Request-path safety** (`httpguard.py`, applied across `proxy`, `aproxy`, `gateway`):
+  upstream-path validation (blocks `@`/`//`/`..` host-injection SSRF), defensive
+  `Content-Length` parsing, an 8 MiB body cap, and a bounded async connector.
+- **Crash-resistance**: `compress_messages` and `ingest` no longer raise on
+  malformed-but-valid JSON (missing/non-string `text`, non-dict messages, bad
+  JSONL lines) — they pass such input through untouched; the compress call in
+  every proxy is additionally guarded so compression can never break a request.
+- **Gateway**: tenant labels are sanitized to a safe charset (no injection into
+  accounting or the dashboard) and all HTML renderers (`gateway`, `telemetry`,
+  `ledger`) escape interpolated values (stored-XSS fix).
+- **Correctness**: `salience.protect()` now falls back to the byte-exact original
+  (never the stripped block) so a salient line is never silently dropped, and uses
+  exact line membership; `structured.fold` leaves null-bearing records byte-exact
+  (no null-vs-missing ambiguity); the Rust hot-path pins JSON key order to match
+  the Python backend.
+
+## [0.12.0]
+
+The Decision-Equivalence Risk Certificate (conformal risk control, `distil conformal`),
+salience protection (model-free frontier shifter), and the live head-to-head vs. the
+real LLMLingua-2 / Headroom packages. See `BENCHMARKS.md`.
+
+## [0.9.0 – 0.11.0]
+
+Recoverable compression (`distil_expand`), the self-improving learning flywheel
+(`distil learn`), and the conformal certificate foundations.
+
 ## [0.2.0]
 
 Both sides of the bill, the proof pack, and the leapfrog tracks.

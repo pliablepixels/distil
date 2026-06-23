@@ -60,7 +60,7 @@
   <main class="content">
 
     <h1>Core <span class="g">Concepts</span></h1>
-    <p class="lead">Three ideas underpin everything Distil does. Understanding them explains why the numbers are real and why the approach is different.</p>
+    <p class="lead">Three ideas explain why Distil's numbers are real and why the approach is different: decision-equivalence as the correct quality target, a statistical certificate that enforces it, and cache-aware cost modeling that makes aggressive compression financially correct.</p>
 
     <img src="assets/architecture.svg" alt="Distil architecture overview" class="svg-embed"/>
 
@@ -68,9 +68,9 @@
 
     <h2>1. Decision-equivalence, not byte-equivalence</h2>
 
-    <p>Most context compressors frame the problem as a string transformation: compress the context, compare the result byte-by-byte to the original, report the overlap as accuracy. That framing has a fatal flaw — byte-equivalence and high compression are <strong>information-theoretically in tension</strong>. You cannot meaningfully claim "87% compression, 100% accuracy" under byte-equivalence; the two numbers cannot describe the same operation.</p>
+    <p>Most context compressors frame the problem as a string transformation: shrink the context, compare the output byte-by-byte, report overlap as accuracy. That framing has a fatal flaw — byte-equivalence and high compression are <strong>information-theoretically in tension</strong>. A claim of "87% compression, 100% accuracy" under byte-equivalence is self-contradicting; the two numbers cannot describe the same operation.</p>
 
-    <p><strong>Decision-equivalence is the correct target.</strong> An agent only needs to take the same actions and produce the same outputs whether or not its context was compressed. "Same decision" is:</p>
+    <p><strong>Decision-equivalence is the correct target.</strong> An agent only needs to take the same actions and produce the same outputs on the compressed context as it would on the original. "Same decision" means:</p>
 
     <ul>
       <li>The same tool calls (name + arguments) in the same order.</li>
@@ -78,27 +78,32 @@
       <li>Measured across a real multi-turn trajectory, not a single prompt.</li>
     </ul>
 
-    <p>This is measurable. It is certifiable. And it is <strong>compatible with aggressive compression</strong> — because context blocks that are causally inert (never change a decision when removed) are provably free to drop, regardless of how many bytes they contain.</p>
+    <p>This is measurable, certifiable, and <strong>compatible with aggressive compression</strong>. Context blocks that are causally inert — they never change a decision when removed — are provably free to drop, regardless of how many bytes they contain. Distil's <strong>salience protection</strong> identifies the load-bearing frontier (model-free, using a causal ablation pass rather than a scorer model) and ensures those blocks are never touched, regardless of compression depth.</p>
 
     <div class="callout good">
-      <b>The reframe in one sentence:</b> "100% accuracy" becomes a statistical non-inferiority guarantee on <em>outcomes</em>, not a diff of strings — and that makes it real.
+      <b>The reframe in one sentence:</b> "100% accuracy" becomes a statistical non-inferiority guarantee on <em>outcomes</em>, not a diff of strings — and that makes it real. On a live <code>claude-opus-4-8</code> grading run, Distil certified <strong>83.2% token savings at a 0% decision-change rate</strong>.
     </div>
 
     <hr/>
 
     <h2>2. The quality contract</h2>
 
-    <p>A compression strategy in Distil does not ship unless a pre-registered <strong>TOST non-inferiority test</strong> certifies it. TOST (Two One-Sided Tests) is the standard statistical framework for equivalence testing — the same method used in pharmaceutical non-inferiority trials.</p>
+    <p>A compression strategy in Distil does not ship unless a pre-registered statistical gate certifies it. Distil uses two complementary certification methods, both grounded in conformal prediction:</p>
 
-    <h3>How the gate works</h3>
+    <ul>
+      <li><strong>TOST (Two One-Sided Tests)</strong> — the standard non-inferiority framework used in pharmaceutical trials. Pre-register a margin (default: 2 pp drop in task-success rate) and significance level (default: α = 0.05). If the lower one-sided test rejects H₀ that mean ≤ −margin, the strategy is certified non-inferior.</li>
+      <li><strong>DERC (Distribution-free Equivalence with Risk Control)</strong> — a Learn-Then-Test / CRC certificate that gives <code>P(R(λ̂) ≤ α) ≥ 1−δ</code> with Hoeffding–Bentkus p-values. No distributional assumptions; valid at finite sample sizes.</li>
+    </ul>
+
+    <p>The Student-t tail used in TOST is computed from a hand-rolled regularised incomplete beta function — zero dependencies on scipy or numpy. Both gates run across all 7 corpus domains.</p>
+
+    <h3>How the TOST gate works</h3>
     <ol>
-      <li><strong>Pre-register</strong> an indifference margin (default: 0.02 — tolerate at most a 2-point drop in task-success rate) and a significance level (default: α = 0.05).</li>
-      <li>For each turn in the trajectory, run the agent on the original context (baseline) and on the compressed context, and record whether the decision matched.</li>
+      <li><strong>Pre-register</strong> the indifference margin and significance level.</li>
+      <li>For each turn, run the agent on the original context and on the compressed context; record whether the decision matched.</li>
       <li>Compute paired differences (compressed score − baseline score) across all turns.</li>
-      <li>Run the lower one-sided test: reject H₀ that mean ≤ −margin. If you can reject that hypothesis at α, the strategy is certified <strong>non-inferior</strong>.</li>
+      <li>Run the lower one-sided test. Reject H₀ at α → the strategy is certified <strong>non-inferior</strong>.</li>
     </ol>
-
-    <p>The Student-t tail is computed from a hand-rolled regularised incomplete beta function — zero dependencies on scipy or numpy. The contract is the same gate, run across all 7 corpus domains.</p>
 
     <pre class="term"><span class="d">$ distil certify --strategy distil</span>
 decision-equivalence match rate: <span class="g">100.0%</span>
@@ -123,18 +128,18 @@ VERDICT: <span class="w">FAIL</span>  (NOT certified — would degrade quality)<
     <p>In a multi-turn agent loop, the growing context is re-sent to the model at <em>every turn</em>. With prompt caching enabled:</p>
 
     <ul>
-      <li>A <strong>cache read</strong> costs roughly <strong>0.1×</strong> (one tenth) of the normal input price.</li>
+      <li>A <strong>cache read</strong> costs roughly <strong>0.1×</strong> the normal input price.</li>
       <li>A <strong>cache write</strong> costs roughly <strong>1.25×</strong> of normal input.</li>
       <li>A <strong>cache miss</strong> (fresh token) costs the full input price.</li>
     </ul>
 
-    <p>The dominant cost lever is therefore not <em>how many tokens</em> you send — it is <em>how many of those tokens hit the cache</em>. A naive compressor that rewrites the context every turn causes the longest common prefix to drop to zero, losing the 10× discount on every cached block. The result:</p>
+    <p>The dominant cost lever is therefore not <em>how many tokens</em> you send — it is <em>how many of those tokens hit the cache</em>. A naive compressor that rewrites the context every turn drops the longest common prefix to zero, losing the 10× discount on every previously-cached block.</p>
 
     <div class="callout warn">
-      <b>Naive recompression sends fewer tokens yet costs more than not compressing at all</b>, because it rewrites the cached prefix every turn and pays the full input price on tokens that would otherwise cost 0.1×.
+      <b>Naive recompression sends fewer tokens yet costs more than no compression at all</b>, because it rewrites the cached prefix every turn and pays full input price on tokens that would otherwise cost 0.1×.
     </div>
 
-    <p>Distil's cache-aware engine models this explicitly. It keeps the prefix <strong>byte-stable</strong> across turns (via schema canonicalization and volatile-field extraction), compresses only the volatile tail, and proves via simulation that the naive approach is strictly dominated.</p>
+    <p>Distil's cache-aware engine models this explicitly. It keeps the prefix <strong>byte-stable</strong> across turns via schema canonicalization and volatile-field extraction, compresses only the volatile tail, and proves via simulation that the naive approach is strictly dominated.</p>
 
     <h3>The numbers, measured</h3>
 
@@ -155,7 +160,9 @@ VERDICT: <span class="w">FAIL</span>  (NOT certified — would degrade quality)<
 
     <img src="assets/cache-aware.svg" alt="Cache-aware savings vs naive compression" class="svg-embed"/>
 
-    <p>This 33% is the conservative <em>lossless, single-trajectory</em> figure. Across a varied 64-trajectory corpus, the byte-exact <em>certified ceiling</em> you can rely on is <strong>~58%</strong>; the aggressive <code>distil-causal</code> mode reaches <strong>~81%</strong> under the structural runner (but its lead does <em>not</em> hold under the live model — see the <a href="benchmark.html">Benchmark</a>'s live-model caveat). For the mechanics, see <a href="techniques.html">Techniques</a>; for pricing any trajectory yourself, <a href="cli.html">CLI Reference → <code>distil savings</code></a>.</p>
+    <p>The 33% figure is the conservative <em>lossless, single-trajectory</em> result. Across a varied 64-trajectory corpus, the certified lossless ceiling is <strong>~58%</strong>. The <code>distil-causal</code> mode reaches <strong>~81%</strong> on that offline corpus. And it holds up where it counts — under <em>live</em> model grading: in the <a href="benchmark.html#live-head-to-head">live head-to-head</a> against the real installed packages (a realistic, decision-determined corpus, graded by <code>claude-opus-4-8</code>), Distil certified <strong>83.2% savings at a 0% decision-change rate</strong>, while LLMLingua-2 reached only 53.1% savings and flipped 1-in-5 decisions, and Headroom achieved 35.3% at 0%.</p>
+
+    <p>For the compression mechanics, see <a href="techniques.html">Techniques</a>. To price any trajectory yourself, see <a href="cli.html">CLI Reference → <code>distil savings</code></a>.</p>
 
     <div class="site-footer">
       Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
