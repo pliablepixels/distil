@@ -305,8 +305,8 @@ td code { font-size: 11.5px; }
    SVG sanitizer never sees it; the standalone .svg stays static + safe. */
 .archfig .flow { stroke-dasharray: 5 9; animation: archdash 1.1s linear infinite; }
 @keyframes archdash { to { stroke-dashoffset: -28; } }
-.archfig .rflow { stroke-dasharray: 4 8; animation: archrdash 1.5s linear infinite; }
-@keyframes archrdash { to { stroke-dashoffset: 24; } }
+.archfig .rflow { stroke-dasharray: 0.1 9; stroke-linecap: round; animation: archrdash 2.2s linear infinite; }
+@keyframes archrdash { to { stroke-dashoffset: -18; } }
 .archfig .pulse { animation: archpulse 2.4s ease-in-out infinite; }
 @keyframes archpulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
