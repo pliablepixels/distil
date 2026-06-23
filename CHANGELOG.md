@@ -3,6 +3,26 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.17.0] — Decouple compression aggression from auth (`--verbatim`)
+
+Resolves an overload introduced in 0.16.0. `--lossless-only` had been redefined to
+mean "Tier-0 only," which **contradicted `policy.py`** (where the reversible digest
+*is* the lossless strategy that subscription sessions use) and silently de-tuned
+autonomous agents on subscription/OAuth from ~70%+ down to ~10%.
+
+- **`--lossless-only` restored** to its policy meaning: lossless *strategies* only
+  (no lossy output-shaping) + no tool injection. The reversible, certificate-backed
+  Tier-1 digest **still runs** — consistent with `policy.py` and the project's
+  definition of "lossless" (reversible + decision-equivalent).
+- **New `--verbatim` flag** (proxy / `wrap` / gateway): skips the Tier-1 digest
+  entirely (Tier-0 only) so the model sees content un-stubbed. The right mode for
+  interactive (human-in-the-loop) sessions or out-of-distribution traffic. Lower
+  savings, byte-in-context fidelity.
+- Adapter/integration kwargs renamed to match: `compress_messages(..., verbatim=)`,
+  `compress_generate_request(..., verbatim=)`; LiteLLM `distil_verbatim`; LangChain
+  `compress_messages(..., verbatim=)`. Docs reconciled across CLI / adapters /
+  integrations / faq / deploy-security.
+
 ## [0.16.0] — Ecosystem hooks: MCP server + LiteLLM/LangChain
 
 - **MCP server** (`mcp_server.py`, `distil mcp`): a zero-dependency, stdlib-only

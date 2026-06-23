@@ -196,7 +196,8 @@ distil bench   --tokenizer anthropic</pre>
       <li><strong>Request compression:</strong> <code>text</code> parts from non-model turns — Tier-0 lossless (minify + duplicate-run collapse). <code>functionResponse</code> payloads — Tier-1 reversible digest (original kept in the local <code>RestoreStore</code>, never sent, zero tokens). <code>functionCall</code>, <code>inlineData</code>, <code>fileData</code>, model-authored text, and <code>systemInstruction</code> pass through untouched.</li>
       <li><strong>Savings reporting:</strong> <code>x-distil-tokens-saved</code> response header + savings ledger, same as all other adapters.</li>
       <li><strong>Shadow-mode decision-equivalence:</strong> reads the chosen action from <code>candidates[0].content.parts[].functionCall</code>.</li>
-      <li><strong><code>--lossless-only</code> mode:</strong> Tier-0-only transforms — semantically identical content, no digest stubs. Safe for subscription or OAuth-gated sessions. Applies to Gemini as it does to all adapters.</li>
+      <li><strong><code>--verbatim</code> mode:</strong> Tier-0-only transforms — the Tier-1 digest is skipped entirely so the model sees message content essentially verbatim. No digest stubs. Applies to all adapters including Gemini. Use for interactive sessions or where recovery (<code>distil_expand</code>) is unavailable. Lower savings.</li>
+      <li><strong><code>--lossless-only</code> mode:</strong> Policy mode — restricts the proxy to lossless strategies (no lossy output-shaping, no tool injection). The reversible Tier-1 digest still runs. Use for subscription or OAuth-gated sessions.</li>
     </ul>
     <p><strong>Not yet wired for Gemini</strong> (messages-format-only today): expand-tool injection (<code>--expand</code>), output verbosity shaping (<code>--shape-output</code>), and Gemini context caching.</p>
 

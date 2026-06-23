@@ -105,27 +105,29 @@ def _apply_tier0(text: str) -> str:
     return collapse_runs(text)
 
 
-def _compress_text_content(text: str, store: RestoreStore, lossless_only: bool) -> str:
+def _compress_text_content(text: str, store: RestoreStore, verbatim: bool) -> str:
     """Apply only Tier-0 lossless transforms to a plain text block."""
     return _apply_tier0(text)
 
 
-def _compress_tool_result_text(text: str, store: RestoreStore, lossless_only: bool = False) -> str:
+def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = False) -> str:
     """Digest a large tool_result string and record the original in *store*.
 
-    In ``lossless_only`` mode (subscription/OAuth-safe) only *in-context-lossless*
-    Tier-0 transforms are applied: the model sees semantically identical content
-    (minified JSON, collapsed exact-duplicate runs), never a digest stub. This is
-    what makes the mode safe for interactive sessions, where the model must reason
-    over the real content rather than recover it via a tool it isn't allowed.
+    In ``verbatim`` mode only *in-context-lossless* Tier-0 transforms are applied:
+    the model sees semantically identical content (minified JSON, collapsed exact-
+    duplicate runs), never a Tier-1 digest stub. Use it for interactive sessions or
+    out-of-distribution traffic — anywhere the model must reason over the real
+    content rather than recover it via a tool. The default (digest) is reversible
+    and decision-equivalent by the certificate; ``verbatim`` trades that for
+    byte-in-context fidelity at lower savings.
     """
     lines = text.splitlines()
     if len(lines) < _MIN_LINES:
         # Too short to digest — apply lossless transforms only.
         return _apply_tier0(text)
 
-    # Subscription/OAuth-safe: never stub content the model can't recover.
-    if lossless_only:
+    # Verbatim: never replace content with a stub the model can't recover.
+    if verbatim:
         return _apply_tier0(text)
 
     # Learned policy: if your agents keep expanding this kind of content, keep it
@@ -142,7 +144,7 @@ def _compress_tool_result_text(text: str, store: RestoreStore, lossless_only: bo
 
 
 def _compress_content_item(
-    item: dict[str, Any], store: RestoreStore, role: str, lossless_only: bool
+    item: dict[str, Any], store: RestoreStore, role: str, verbatim: bool
 ) -> dict[str, Any]:
     """Return a (possibly new) content block after compression.
 
@@ -165,7 +167,7 @@ def _compress_content_item(
         text = item.get("text")
         if not isinstance(text, str):
             return item  # malformed/absent text — pass through untouched
-        new_text = _compress_text_content(text, store, lossless_only)
+        new_text = _compress_text_content(text, store, verbatim)
         if new_text == text:
             return item
         return {**item, "text": new_text}
@@ -176,7 +178,7 @@ def _compress_content_item(
             return item
 
         if isinstance(content, str):
-            new_content = _compress_tool_result_text(content, store, lossless_only)
+            new_content = _compress_tool_result_text(content, store, verbatim)
             if new_content == content:
                 return item
             return {**item, "content": new_content}
@@ -190,7 +192,7 @@ def _compress_content_item(
                     and sub.get("type") == "text"
                     and isinstance(sub.get("text"), str)
                 ):
-                    new_text = _compress_tool_result_text(sub["text"], store, lossless_only)
+                    new_text = _compress_tool_result_text(sub["text"], store, verbatim)
                     if new_text != sub["text"]:
                         new_list.append({**sub, "text": new_text})
                         changed = True
@@ -206,9 +208,7 @@ def _compress_content_item(
     return item
 
 
-def _compress_message(
-    msg: dict[str, Any], store: RestoreStore, lossless_only: bool
-) -> dict[str, Any]:
+def _compress_message(msg: dict[str, Any], store: RestoreStore, verbatim: bool) -> dict[str, Any]:
     """Return a (possibly new) message dict after compressing its content."""
     role = msg.get("role", "")
     content = msg.get("content")
@@ -220,9 +220,9 @@ def _compress_message(
         # decision-aware reversible digest as Anthropic tool_result blocks; other
         # string content gets Tier-0 lossless transforms.
         if role == "tool":
-            new_text = _compress_tool_result_text(content, store, lossless_only)
+            new_text = _compress_tool_result_text(content, store, verbatim)
         else:
-            new_text = _compress_text_content(content, store, lossless_only)
+            new_text = _compress_text_content(content, store, verbatim)
         if new_text == content:
             return msg
         return {**msg, "content": new_text}
@@ -232,7 +232,7 @@ def _compress_message(
         changed = False
         for item in content:
             if isinstance(item, dict):
-                new_item = _compress_content_item(item, store, role, lossless_only)
+                new_item = _compress_content_item(item, store, role, verbatim)
                 new_blocks.append(new_item)
                 if new_item is not item:
                     changed = True
@@ -253,7 +253,7 @@ def _compress_message(
 def compress_messages(
     messages: list[dict[str, Any]],
     *,
-    lossless_only: bool = False,
+    verbatim: bool = False,
     keep: Any = None,
 ) -> tuple[list[dict[str, Any]], RestoreStore]:
     """Compress an Anthropic Messages API messages list in place (non-mutating).
@@ -263,14 +263,14 @@ def compress_messages(
     messages:
         The ``messages`` kwarg value as passed to ``client.messages.create``.
         Each element is ``{"role": ..., "content": str | list[block]}``.
-    lossless_only:
-        When *True* (subscription/OAuth-safe mode), only *in-context-lossless*
-        Tier-0 transforms are applied — the model sees semantically identical
-        content, never a Tier-1 digest stub. This is the correct mode when tool
-        injection is disallowed (so the agent cannot recover a digest) and a human
-        is reading the model's output. When *False* (PAYG), large tool results are
-        replaced by reversible Tier-1 digests (recoverable via the RestoreStore /
-        the ``distil_expand`` tool) for far higher savings.
+    verbatim:
+        When *True*, only *in-context-lossless* Tier-0 transforms are applied — the
+        model sees semantically identical content, never a Tier-1 digest stub. The
+        right mode for interactive (human-in-the-loop) sessions, out-of-distribution
+        traffic, or anywhere recovery (the ``distil_expand`` tool) is unavailable.
+        When *False* (the default), large tool results are replaced by reversible
+        Tier-1 digests — decision-equivalent by the certificate, recoverable via the
+        RestoreStore / ``distil_expand`` — for far higher savings.
 
     Returns
     -------
@@ -287,7 +287,7 @@ def compress_messages(
             if not isinstance(msg, dict):
                 new_messages.append(msg)  # malformed entry — pass through untouched
                 continue
-            new_messages.append(_compress_message(msg, store, lossless_only))
+            new_messages.append(_compress_message(msg, store, verbatim))
         return new_messages, store
     finally:
         _keep_tls.fn = None

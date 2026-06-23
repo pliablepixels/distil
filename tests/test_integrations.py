@@ -20,13 +20,13 @@ def test_litellm_compress_compresses_messages():
 
 
 def test_litellm_compress_strips_distil_flag():
-    kwargs = {"messages": [{"role": "user", "content": "hi"}], "distil_lossless_only": True}
+    kwargs = {"messages": [{"role": "user", "content": "hi"}], "distil_verbatim": True}
     out = dll.compress(kwargs)
-    assert "distil_lossless_only" not in out
+    assert "distil_verbatim" not in out
 
 
-def test_litellm_lossless_only_does_not_digest():
-    kwargs = {"messages": [{"role": "tool", "content": BIG}], "distil_lossless_only": True}
+def test_litellm_verbatim_does_not_digest():
+    kwargs = {"messages": [{"role": "tool", "content": BIG}], "distil_verbatim": True}
     out = dll.compress(kwargs)
     assert "<< +" not in out["messages"][0]["content"]  # no digest stub
 
@@ -68,8 +68,8 @@ def test_langchain_object_messages_via_model_copy():
     assert out[0].content != BIG and len(out[0].content) < len(BIG)
 
 
-def test_langchain_lossless_only():
-    out = dlc.compress_messages([{"type": "tool", "content": BIG}], lossless_only=True)
+def test_langchain_verbatim():
+    out = dlc.compress_messages([{"type": "tool", "content": BIG}], verbatim=True)
     assert "<< +" not in out[0]["content"]
 
 

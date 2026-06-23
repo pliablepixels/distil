@@ -244,11 +244,11 @@ response = model.generate_content(<span class="g">"Hello!"</span>)</pre>
     <pre class="term"><span class="d"># LiteLLM — drop-in for litellm.completion</span>
 <span class="c">from</span> distil.integrations <span class="c">import</span> litellm <span class="c">as</span> distil_litellm
 resp = distil_litellm.completion(model=<span class="g">"claude-opus-4-8"</span>, messages=[...],
-                                 distil_lossless_only=<span class="g">True</span>)  <span class="d"># optional, subscription-safe</span>
+                                 distil_verbatim=<span class="g">True</span>)  <span class="d"># optional, Tier-0 only</span>
 
 <span class="d"># LangChain — compress a message list before the model call (duck-typed)</span>
 <span class="c">from</span> distil.integrations.langchain <span class="c">import</span> compress_messages
-msgs = compress_messages(state[<span class="g">"messages"</span>], lossless_only=<span class="g">True</span>)</pre>
+msgs = compress_messages(state[<span class="g">"messages"</span>], verbatim=<span class="g">True</span>)</pre>
     <p>Tool/function messages get the reversible Tier-1 digest; human/system messages get
     Tier-0 lossless; the model's own words are never rewritten. <code>compress()</code> (LiteLLM)
     and <code>compress_messages()</code> (LangChain) are framework-free and unit-tested.</p>

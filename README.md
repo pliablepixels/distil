@@ -335,7 +335,7 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 
 - **Localhost-only by default** — the proxy binds `127.0.0.1` and forwards only to the single configured upstream (no SSRF).
 - **No secret/body logging** — request bodies and credentials are never logged.
-- **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions lossless and never injects tools (provider-ToS-safe).
+- **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions to lossless strategies and never injects tools (provider-ToS-safe); the reversible, certified digest still runs. Add `--verbatim` to skip the digest entirely (Tier-0 only) for interactive sessions.
 - **Stateless** — nothing is persisted; ZDR-compatible.
 
 See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) for topologies (local sidecar, container sidecar, shared gateway) and the threat model.

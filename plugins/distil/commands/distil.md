@@ -11,7 +11,7 @@ only report what the commands actually output — do not invent numbers.
 2. If shadow-mode data exists, run `distil shadow-stats` and report the live
    decision-equivalence. If there are no samples, skip it.
 3. Briefly remind the user how to route more traffic through distil:
-   - Any agent/CLI: `distil wrap --lossless-only -- <command>` (subscription/OAuth-safe).
+   - Any agent/CLI: `distil wrap --lossless-only -- <command>` (subscription/OAuth-safe; add `--verbatim` for interactive sessions, where the model should see content un-digested).
    - Any SDK: point its `base_url` at a running `distil proxy`, or set
      `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` org-wide.
    - Google Gemini: `distil proxy --upstream https://generativelanguage.googleapis.com`.

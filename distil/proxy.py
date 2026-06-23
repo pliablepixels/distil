@@ -99,6 +99,7 @@ def build_handler(
     upstream: str,
     *,
     lossless_only: bool = False,
+    verbatim: bool = False,
     shape_output: str = "off",
     savings: Any = None,
     flush_every: int = 50,
@@ -281,7 +282,7 @@ def build_handler(
                 original: list[dict[str, Any]] = body["messages"]
                 try:
                     compressed, store = compress_messages(
-                        original, lossless_only=lossless_only, keep=_learn_keep
+                        original, verbatim=verbatim, keep=_learn_keep
                     )
                 except Exception:  # noqa: BLE001 — compression must never break a request
                     compressed, store = original, None
@@ -326,7 +327,7 @@ def build_handler(
                 before_tok = count_tokens(body)
                 try:
                     body, store = compress_generate_request(
-                        body, lossless_only=lossless_only, keep=_learn_keep
+                        body, verbatim=verbatim, keep=_learn_keep
                     )
                 except Exception:  # noqa: BLE001 — compression must never break a request
                     store = None
@@ -453,6 +454,7 @@ def serve(
     upstream: str = "https://api.anthropic.com",
     *,
     lossless_only: bool = False,
+    verbatim: bool = False,
     shape_output: str = "off",
     record: bool = True,
     pricing_model: str = "claude-opus-4-8",
@@ -467,7 +469,12 @@ def serve(
     port:       Port to listen on.
     upstream:   Real LLM API base URL (no trailing slash).
     lossless_only:
-        When *True* only Tier-0 lossless transforms are applied.
+        Policy mode: no lossy output-shaping and no tool injection. The reversible
+        Tier-1 digest still runs (it is the lossless, certified strategy).
+    verbatim:
+        When *True*, skip the Tier-1 digest entirely (Tier-0 only) so the model
+        sees content verbatim — for interactive sessions / out-of-distribution
+        traffic. Lower savings, byte-in-context fidelity.
     shape_output:
         Output-compression level: ``"off"``/``"light"``/``"aggressive"``.
     record:
@@ -485,6 +492,7 @@ def serve(
     handler = build_handler(
         upstream,
         lossless_only=lossless_only,
+        verbatim=verbatim,
         shape_output=shape_output,
         savings=savings,
         expand=expand,
@@ -522,6 +530,7 @@ def wrap_run(
     host: str = "127.0.0.1",
     upstream: str = "https://api.anthropic.com",
     lossless_only: bool = False,
+    verbatim: bool = False,
     shape_output: str = "off",
     record: bool = True,
     pricing_model: str = "claude-opus-4-8",
@@ -548,6 +557,7 @@ def wrap_run(
     handler = build_handler(
         upstream,
         lossless_only=lossless_only,
+        verbatim=verbatim,
         shape_output=shape_output,
         savings=savings,
         expand=expand,
@@ -561,7 +571,9 @@ def wrap_run(
     print(f"distil wrap → proxy {base} (upstream {upstream})")
     print(f"  → {env_var}={base}")
     if lossless_only:
-        print("  → lossless-only")
+        print("  → lossless-only (no shaping / no tool injection)")
+    if verbatim:
+        print("  → verbatim (Tier-0 only, no digest)")
     if savings is not None:
         print("  → recording genuine savings → distil leaderboard")
 

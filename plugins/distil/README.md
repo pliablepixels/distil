@@ -48,8 +48,8 @@ The status line reflects the local savings ledger. Populate it by routing an age
 through distil:
 
 ```
-# Subscription / OAuth-safe (lossless-in-context):
-distil wrap --lossless-only -- claude
+# Interactive + subscription/OAuth-safe (no tool injection, content un-digested):
+distil wrap --lossless-only --verbatim -- claude
 
 # Or a standalone proxy any SDK can point base_url at:
 distil proxy                                   # Anthropic / OpenAI-compatible

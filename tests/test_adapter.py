@@ -184,16 +184,16 @@ class TestInputNotMutated:
 
 
 # ---------------------------------------------------------------------------
-# compress_messages — lossless_only accepted without error
+# compress_messages — verbatim (Tier-0 only) vs default (digest)
 # ---------------------------------------------------------------------------
 
 
-class TestLosslessOnlyParam:
-    def test_lossless_only_does_not_digest(self) -> None:
-        """Subscription/OAuth-safe mode is lossless-IN-CONTEXT: a large tool_result
-        is never replaced by a Tier-1 digest stub the model can't recover."""
+class TestVerbatimParam:
+    def test_verbatim_does_not_digest(self) -> None:
+        """Verbatim mode is lossless-IN-CONTEXT: a large tool_result is never
+        replaced by a Tier-1 digest stub the model can't recover."""
         msg = _make_tool_result_message(LONG_TOOL_RESULT)
-        new_messages, store = compress_messages([msg], lossless_only=True)
+        new_messages, store = compress_messages([msg], verbatim=True)
         assert len(store.handles) == 0  # nothing digested
         seen = new_messages[0]["content"][0]["content"]
         assert "<< +" not in seen  # no digest stub marker
@@ -202,10 +202,10 @@ class TestLosslessOnlyParam:
             if line.strip():
                 assert line in seen
 
-    def test_payg_does_digest(self) -> None:
-        """Default (PAYG) mode keeps the aggressive reversible digest — the moat."""
+    def test_default_does_digest(self) -> None:
+        """Default mode keeps the aggressive reversible digest — the moat."""
         msg = _make_tool_result_message(LONG_TOOL_RESULT)
-        _new, store = compress_messages([msg], lossless_only=False)
+        _new, store = compress_messages([msg], verbatim=False)
         assert len(store.handles) == 1  # digested, recoverable via the store
 
 

@@ -103,6 +103,7 @@ def make_app(
     upstream: str,
     *,
     lossless_only: bool = False,
+    verbatim: bool = False,
     shape_output: str = "off",
 ) -> Any:
     """Build and return an ``aiohttp.web.Application``.
@@ -168,7 +169,7 @@ def make_app(
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
                 try:
-                    compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                    compressed, _store = compress_messages(original, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
                     compressed = original
                 saved = _tokens_saved(original, compressed)
@@ -187,7 +188,7 @@ def make_app(
                 # Gemini generateContent shape (reversible content compression).
                 before_tok = _gemini_count(body)
                 try:
-                    body, _store = compress_generate_request(body, lossless_only=lossless_only)
+                    body, _store = compress_generate_request(body, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
                     pass
                 saved = max(0, before_tok - _gemini_count(body))
@@ -310,6 +311,7 @@ def serve(
     upstream: str = "https://api.anthropic.com",
     *,
     lossless_only: bool = False,
+    verbatim: bool = False,
     shape_output: str = "off",
 ) -> None:
     """Run an async aiohttp proxy server.
@@ -320,7 +322,9 @@ def serve(
     port:       Port to listen on.
     upstream:   Real LLM API base URL (no trailing slash).
     lossless_only:
-        When *True* only Tier-0 lossless transforms are applied.
+        Policy mode: no lossy output-shaping, no tool injection (digest still runs).
+    verbatim:
+        When *True*, skip the Tier-1 digest (Tier-0 only) — interactive-safe.
     shape_output:
         Output-compression level: ``"off"``/``"light"``/``"aggressive"``.
     """
@@ -332,7 +336,9 @@ def serve(
             "Install it with: pip install 'distil-llm[async]'"
         ) from exc
 
-    app = make_app(upstream, lossless_only=lossless_only, shape_output=shape_output)
+    app = make_app(
+        upstream, lossless_only=lossless_only, verbatim=verbatim, shape_output=shape_output
+    )
     print(f"distil async proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
     if shape_output != "off":

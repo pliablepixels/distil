@@ -10,7 +10,7 @@ Two ways to use distil with LiteLLM:
        resp = distil_litellm.completion(
            model="claude-opus-4-8",
            messages=[...],
-           distil_lossless_only=True,   # optional; subscription/OAuth-safe
+           distil_verbatim=True,   # optional; Tier-0 only, no digest stubs
        )
 
 :func:`compress` is the pure, framework-free core (returns new completion kwargs
@@ -28,16 +28,16 @@ from ..adapters.anthropic import compress_messages
 def compress(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of ``litellm.completion`` kwargs with ``messages`` compressed.
 
-    A ``distil_lossless_only=True`` kwarg (consumed here, not forwarded) selects the
-    subscription/OAuth-safe lossless-in-context mode. Non-list ``messages`` are
-    returned untouched.
+    A ``distil_verbatim=True`` kwarg (consumed here, not forwarded) selects the
+    verbatim, in-context-lossless mode (Tier-0 only, no digest). Non-list
+    ``messages`` are returned untouched.
     """
     messages = kwargs.get("messages")
     if not isinstance(messages, list):
         return kwargs
-    lossless_only = bool(kwargs.get("distil_lossless_only", False))
-    compressed, _store = compress_messages(messages, lossless_only=lossless_only)
-    new = {k: v for k, v in kwargs.items() if k != "distil_lossless_only"}
+    verbatim = bool(kwargs.get("distil_verbatim", False))
+    compressed, _store = compress_messages(messages, verbatim=verbatim)
+    new = {k: v for k, v in kwargs.items() if k != "distil_verbatim"}
     new["messages"] = compressed
     return new
 

@@ -417,6 +417,7 @@ def build_gateway_handler(
     price: Pricing,
     *,
     lossless_only: bool = False,
+    verbatim: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a BaseHTTPRequestHandler subclass for the multi-tenant gateway.
 
@@ -429,7 +430,9 @@ def build_gateway_handler(
     price:
         ``Pricing`` used for dollar calculations in stats / dashboard.
     lossless_only:
-        When *True* only Tier-0 lossless transforms are applied.
+        Policy mode (no tool injection). The reversible digest still runs.
+    verbatim:
+        When *True*, skip the Tier-1 digest (Tier-0 only) — interactive-safe.
     """
 
     _upstream = upstream.rstrip("/")
@@ -527,7 +530,7 @@ def build_gateway_handler(
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
                 try:
-                    compressed, _store = compress_messages(original, lossless_only=lossless_only)
+                    compressed, _store = compress_messages(original, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
                     compressed = original
 
@@ -544,7 +547,7 @@ def build_gateway_handler(
                 # Gemini generateContent shape.
                 baseline_tokens = _gemini_count(body)
                 try:
-                    body, _store = compress_generate_request(body, lossless_only=lossless_only)
+                    body, _store = compress_generate_request(body, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
                     pass
                 compressed_tokens = _gemini_count(body)
@@ -676,6 +679,7 @@ def serve_gateway(
     *,
     pricing_model: str = "claude-opus-4-8",
     lossless_only: bool = False,
+    verbatim: bool = False,
 ) -> None:
     """Run a blocking ThreadingHTTPServer gateway.
 
@@ -685,11 +689,14 @@ def serve_gateway(
     port:           Port to listen on.
     upstream:       Real LLM API base URL (no trailing slash).
     pricing_model:  Model key from ``distil.pricing.CATALOG`` for dollar accounting.
-    lossless_only:  When *True* only Tier-0 lossless transforms are applied.
+    lossless_only:  Policy mode (no tool injection); the reversible digest still runs.
+    verbatim:       When *True*, skip the Tier-1 digest (Tier-0 only) — interactive-safe.
     """
     price = pricing_get(pricing_model)
     state = GatewayState(price)
-    handler = build_gateway_handler(upstream, state, price, lossless_only=lossless_only)
+    handler = build_gateway_handler(
+        upstream, state, price, lossless_only=lossless_only, verbatim=verbatim
+    )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil gateway listening on http://{host}:{port}")
     print(f"  dashboard: http://{host}:{port}/distil/dashboard")

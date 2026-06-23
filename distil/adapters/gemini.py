@@ -61,23 +61,23 @@ def is_gemini_path(path: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _compress_json_value(val: Any, store: RestoreStore, lossless_only: bool) -> Any:
+def _compress_json_value(val: Any, store: RestoreStore, verbatim: bool) -> Any:
     """Recursively compress string values inside a ``functionResponse.response``.
 
     Strings are digested (large) or Tier-0 transformed (small) via the shared
     tool-result path; structure (dicts/lists) is walked but preserved, so the
     object the Gemini API requires stays intact and the request remains valid.
     Returns the *same object* when nothing changed, so callers can use identity
-    to detect a no-op. ``lossless_only`` restricts to in-context-lossless Tier-0.
+    to detect a no-op. ``verbatim`` restricts to in-context-lossless Tier-0.
     """
     if isinstance(val, str):
-        new = _compress_tool_result_text(val, store, lossless_only)
+        new = _compress_tool_result_text(val, store, verbatim)
         return new if new != val else val
     if isinstance(val, dict):
         out: dict[str, Any] = {}
         changed = False
         for k, v in val.items():
-            nv = _compress_json_value(v, store, lossless_only)
+            nv = _compress_json_value(v, store, verbatim)
             out[k] = nv
             if nv is not v:
                 changed = True
@@ -86,7 +86,7 @@ def _compress_json_value(val: Any, store: RestoreStore, lossless_only: bool) -> 
         out_list: list[Any] = []
         changed = False
         for v in val:
-            nv = _compress_json_value(v, store, lossless_only)
+            nv = _compress_json_value(v, store, verbatim)
             out_list.append(nv)
             if nv is not v:
                 changed = True
@@ -94,7 +94,7 @@ def _compress_json_value(val: Any, store: RestoreStore, lossless_only: bool) -> 
     return val
 
 
-def _compress_part(part: Any, store: RestoreStore, role: str, lossless_only: bool) -> Any:
+def _compress_part(part: Any, store: RestoreStore, role: str, verbatim: bool) -> Any:
     """Compress a single Gemini ``part``; returns the same object when unchanged."""
     if not isinstance(part, dict):
         return part
@@ -103,13 +103,13 @@ def _compress_part(part: Any, store: RestoreStore, role: str, lossless_only: boo
     if isinstance(text, str):
         if role == "model":
             return part  # never rewrite the model's own words
-        new_text = _compress_text_content(text, store, lossless_only)
+        new_text = _compress_text_content(text, store, verbatim)
         return part if new_text == text else {**part, "text": new_text}
 
     fr = part.get("functionResponse")
     if isinstance(fr, dict) and "response" in fr:
         resp = fr.get("response")
-        new_resp = _compress_json_value(resp, store, lossless_only)
+        new_resp = _compress_json_value(resp, store, verbatim)
         if new_resp is resp:
             return part
         return {**part, "functionResponse": {**fr, "response": new_resp}}
@@ -121,7 +121,7 @@ def _compress_part(part: Any, store: RestoreStore, role: str, lossless_only: boo
 def compress_generate_request(
     body: dict[str, Any],
     *,
-    lossless_only: bool = False,
+    verbatim: bool = False,
     keep: Any = None,
 ) -> tuple[dict[str, Any], RestoreStore]:
     """Compress a Gemini ``generateContent`` request body (non-mutating).
@@ -149,7 +149,7 @@ def compress_generate_request(
                 new_contents.append(content)
                 continue
             role = content.get("role", "")
-            new_parts = [_compress_part(p, store, role, lossless_only) for p in parts]
+            new_parts = [_compress_part(p, store, role, verbatim) for p in parts]
             if any(np is not p for np, p in zip(new_parts, parts)):
                 new_contents.append({**content, "parts": new_parts})
                 changed = True

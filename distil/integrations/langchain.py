@@ -6,7 +6,7 @@ message list and want to compress it before the model call::
 
     from distil.integrations.langchain import compress_messages
 
-    msgs = compress_messages(state["messages"], lossless_only=True)
+    msgs = compress_messages(state["messages"], verbatim=True)
     resp = model.invoke(msgs)
 
 It is **duck-typed** — it works on LangChain ``BaseMessage`` objects (read via
@@ -55,7 +55,7 @@ def _with_content(m: Any, new_text: str) -> Any:
     return m  # unknown immutable shape — leave it rather than risk corruption
 
 
-def compress_messages(messages: list[Any], *, lossless_only: bool = False) -> list[Any]:
+def compress_messages(messages: list[Any], *, verbatim: bool = False) -> list[Any]:
     """Return a new list of messages with compressible text content compressed."""
     _keep_tls.fn = None
     try:
@@ -71,9 +71,9 @@ def compress_messages(messages: list[Any], *, lossless_only: bool = False) -> li
                 out.append(m)  # never rewrite the model's own words
                 continue
             if t in ("tool", "function"):
-                new_text = _compress_tool_result_text(content, store, lossless_only)
+                new_text = _compress_tool_result_text(content, store, verbatim)
             else:
-                new_text = _compress_text_content(content, store, lossless_only)
+                new_text = _compress_text_content(content, store, verbatim)
             out.append(m if new_text == content else _with_content(m, new_text))
         return out
     finally:

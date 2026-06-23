@@ -164,10 +164,15 @@ spec:
 def log_message(self, fmt: str, *args: object) -&gt; None:
     pass</pre>
 
-    <h3>Auth-mode gating — lossless subscriptions stay lossless</h3>
-    <p>Anthropic's cache-control and subscription/OAuth sessions require byte-for-byte stability in the system prefix. Pass <code>--lossless-only</code> to restrict the proxy to Tier-0 lossless transforms only (JSON minification, run-length collapse). No digests, no content changes that could break a cached prefix or OAuth flow.</p>
+    <h3>Auth-mode gating — prompt-cache stability and subscription policy</h3>
+    <p>The proxy compresses the <code>messages</code> array only — never the <code>system</code> prefix — so Anthropic prompt-cache prefix stability is preserved in <em>all</em> modes. Two flags give additional control:</p>
+    <ul>
+      <li><code>--lossless-only</code> — policy mode: restricts the proxy to lossless strategies (no lossy output-shaping, no tool injection via <code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription or OAuth-gated deployments.</li>
+      <li><code>--verbatim</code> — skips the Tier-1 digest entirely, so the model sees message content byte-for-byte (Tier-0 only: JSON minification, run-length collapse). Use for interactive sessions or anywhere <code>distil_expand</code> recovery is unavailable. Lower savings.</li>
+    </ul>
 
-    <pre class="term">distil proxy --lossless-only --upstream https://api.anthropic.com</pre>
+    <pre class="term">distil proxy --lossless-only --upstream https://api.anthropic.com
+distil proxy --verbatim     --upstream https://api.anthropic.com</pre>
 
     <h3>Hop-by-hop header stripping</h3>
     <p>The proxy strips connection-specific headers (<code>Connection</code>, <code>Transfer-Encoding</code>, <code>Keep-Alive</code>, etc.) before forwarding. This prevents header injection attacks and ensures clean HTTP/1.1 semantics at the upstream boundary.</p>
@@ -215,7 +220,8 @@ distil gateway listening on http://127.0.0.1:8789
         <tr><td><code>--port</code></td><td><code>8789</code></td><td>Port to listen on (distinct from the basic proxy default of 8788).</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL. Set once at startup — cannot be overridden per-request.</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key from the catalog; used for per-tenant dollar accounting in the dashboard.</td></tr>
-        <tr><td><code>--lossless-only</code></td><td>off</td><td>Apply only Tier-0 lossless transforms (safe for subscription / OAuth sessions).</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
+        <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Message content is byte-stable. Interactive-safe, lower savings.</td></tr>
       </tbody>
     </table>
 
@@ -304,7 +310,7 @@ distil gateway listening on http://127.0.0.1:8789
 distil async proxy listening on http://127.0.0.1:8788
   &#8594; upstream: https://api.anthropic.com</pre>
 
-    <p>All other <code>distil proxy</code> flags (<code>--host</code>, <code>--upstream</code>, <code>--lossless-only</code>, <code>--shape-output</code>) work identically with <code>--async</code>. Client configuration is unchanged — point your SDK at the same <code>base_url</code>.</p>
+    <p>All other <code>distil proxy</code> flags (<code>--host</code>, <code>--upstream</code>, <code>--lossless-only</code>, <code>--verbatim</code>, <code>--shape-output</code>) work identically with <code>--async</code>. Client configuration is unchanged — point your SDK at the same <code>base_url</code>.</p>
 
     <h3>Architecture</h3>
     <p><code>make_app()</code> in <code>distil/aproxy.py</code> builds an <code>aiohttp.web.Application</code> with a single shared <code>ClientSession</code> (created in <code>on_startup</code>, closed in <code>on_cleanup</code>) using <code>TCPConnector(limit=0)</code> — unlimited concurrent connections. Compressible paths (<code>/v1/messages</code>, <code>/v1/chat/completions</code>, <code>/v1/responses</code>) go through the compression handler; everything else is transparent passthrough. aiohttp is lazy-imported so the stdlib core of distil remains dependency-free when the async extra is not installed.</p>
@@ -389,7 +395,7 @@ rust</pre>
         </tr>
         <tr>
           <td>Cache prefix corruption</td>
-          <td><code>--lossless-only</code> mode restricts to byte-stable Tier-0 transforms only.</td>
+          <td>The proxy never compresses the <code>system</code> prefix, so prompt-cache stability holds in all modes. <code>--verbatim</code> additionally makes message content byte-stable (Tier-0 only). <code>--lossless-only</code> is the policy mode (no tool injection, digest still runs).</td>
         </tr>
         <tr>
           <td>Header injection</td>

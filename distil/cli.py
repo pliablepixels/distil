@@ -345,6 +345,7 @@ def cmd_proxy(args: argparse.Namespace) -> int:
             port=args.port,
             upstream=args.upstream,
             lossless_only=args.lossless_only,
+            verbatim=args.verbatim,
             shape_output=args.shape_output,
         )
     else:
@@ -355,6 +356,7 @@ def cmd_proxy(args: argparse.Namespace) -> int:
             port=args.port,
             upstream=args.upstream,
             lossless_only=args.lossless_only,
+            verbatim=args.verbatim,
             shape_output=args.shape_output,
             record=not args.no_record,
             pricing_model=args.pricing,
@@ -469,6 +471,7 @@ def cmd_wrap(args: argparse.Namespace) -> int:
         host=args.host,
         upstream=args.upstream,
         lossless_only=args.lossless_only,
+        verbatim=args.verbatim,
         shape_output=args.shape_output,
         record=not args.no_record,
         pricing_model=args.pricing,
@@ -487,6 +490,7 @@ def cmd_gateway(args: argparse.Namespace) -> int:
         upstream=args.upstream,
         pricing_model=args.pricing,
         lossless_only=args.lossless_only,
+        verbatim=args.verbatim,
     )
     return 0
 
@@ -931,7 +935,14 @@ def build_parser() -> argparse.ArgumentParser:
     px.add_argument(
         "--lossless-only",
         action="store_true",
-        help="lossless compression only (safe for subscription/OAuth sessions)",
+        help="lossless strategies only: no lossy output-shaping, no tool injection "
+        "(the reversible, certified digest still runs)",
+    )
+    px.add_argument(
+        "--verbatim",
+        action="store_true",
+        help="skip the Tier-1 digest (Tier-0 only) so the model sees content verbatim — "
+        "for interactive sessions / out-of-distribution traffic; lower savings",
     )
     px.add_argument(
         "--shape-output",
@@ -1003,7 +1014,14 @@ def build_parser() -> argparse.ArgumentParser:
     wr.add_argument(
         "--lossless-only",
         action="store_true",
-        help="lossless compression only (safe for subscription/OAuth sessions)",
+        help="lossless strategies only: no lossy output-shaping, no tool injection "
+        "(the reversible, certified digest still runs)",
+    )
+    wr.add_argument(
+        "--verbatim",
+        action="store_true",
+        help="skip the Tier-1 digest (Tier-0 only); model sees content verbatim — "
+        "for interactive sessions / OOD traffic; lower savings",
     )
     wr.add_argument(
         "--shape-output",
@@ -1054,6 +1072,11 @@ def build_parser() -> argparse.ArgumentParser:
     gw.add_argument("--upstream", default="https://api.anthropic.com")
     gw.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
     gw.add_argument("--lossless-only", action="store_true")
+    gw.add_argument(
+        "--verbatim",
+        action="store_true",
+        help="skip the Tier-1 digest (Tier-0 only) for all tenants — lower savings",
+    )
     gw.set_defaults(func=cmd_gateway)
 
     tt = sub.add_parser(
