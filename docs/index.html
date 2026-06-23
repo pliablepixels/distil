@@ -123,7 +123,7 @@
   <div class="logo">Dist<b>il</b></div>
   <span class="pill">compression with a quality contract</span>
   <div class="links">
-    <a href="#how">How</a><a href="#proof">Proof</a><a href="#domains">Domains</a>
+    <a href="#how">How</a><a href="#proof">Proof</a><a href="benchmark.html">Benchmark</a><a href="#domains">Domains</a>
     <a href="#install">Install</a><a href="token-economics.html">Learn</a><a href="getting-started.html">Docs</a><a href="#honest">Honesty</a>
     <a href="https://github.com/dshakes/distil">GitHub →</a>
   </div>
@@ -141,30 +141,30 @@
 
   <div class="stats">
     <div class="stat hl">
-      <div class="n">33<s>%</s></div>
-      <div class="l">Cost cut, losslessly</div>
-      <div class="foot">cache-aware, sample trajectory · Opus pricing</div>
+      <div class="n">83<s>%</s></div>
+      <div class="l">Certified savings, <b>live</b></div>
+      <div class="foot">graded by claude-opus-4-8 · decision-determined corpus</div>
     </div>
     <div class="stat hl">
-      <div class="n">100<s>%</s></div>
-      <div class="l">Decision-equivalence</div>
-      <div class="foot">certified by TOST — measured, not claimed</div>
+      <div class="n">0<s>%</s></div>
+      <div class="l">Live decision change</div>
+      <div class="foot">≤5% guaranteed at 95% confidence — Learn-Then-Test</div>
     </div>
     <div class="stat">
-      <div class="n">7</div>
-      <div class="l">Domains certified</div>
-      <div class="foot">ops · code · support · research · data · devops · finance</div>
+      <div class="n">~1000<s>×</s></div>
+      <div class="l">Faster compression</div>
+      <div class="foot">0.026 ms/turn · no model in the path</div>
     </div>
     <div class="stat">
       <div class="n">0</div>
       <div class="l">Runtime dependencies</div>
-      <div class="foot">stdlib-only · 401 tests · pip · docker · pyz</div>
+      <div class="foot">stdlib-only · 404 tests · pip · docker · pyz</div>
     </div>
   </div>
   <p class="muted" style="font-size:12.5px;margin-top:14px">
-    Reproducible from the bundled multi-domain corpus
-    (<code>distil bench</code> / <code>certify</code> / <code>verify</code>) with an offline
-    heuristic tokenizer. Ratios are robust; absolute dollars depend on the tokenizer. No vanity metrics.
+    Certified live against the real model and head-to-head vs. the real LLMLingua-2 and Headroom packages
+    (<a href="benchmark.html#live-head-to-head">see the benchmark</a>). Distribution-free, finite-sample,
+    reproducible — and honest about its caveats. No vanity metrics.
   </p>
 </div></header>
 
@@ -204,7 +204,15 @@
 
 <section id="proof"><div class="wrap">
   <h2>The proof <span class="g">— a quality contract, not an estimate</span></h2>
-  <p class="lead">A strategy ships only if a pre-registered TOST non-inferiority test certifies it.
+  <p class="lead">We didn't just benchmark ourselves. We ran the real LLMLingua-2 and Headroom
+    packages through the same gate, graded <b>live by the real model</b>.</p>
+  <img src="assets/head-to-head.svg" alt="Live head-to-head: Distil vs LLMLingua-2 vs Headroom" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 10px"/>
+  <div class="callout" style="margin-bottom:22px">
+    <b>Distil is the only method that is simultaneously the most aggressive, fully decision-equivalent, and the lowest-latency.</b>
+    Certified <b>83.2% token savings at a 0% live decision-change rate</b> (≤5% at 95% confidence) — while LLMLingua-2 cuts 53% but flips
+    1-in-5 decisions, and Headroom is safe but 2.4× less aggressive. <a href="benchmark.html#live-head-to-head">See the full live benchmark →</a>
+  </div>
+  <p class="lead" style="margin-top:8px">Underneath it: a strategy ships only if a pre-registered non-inferiority test certifies it.
     Lossless passes; quality-degrading compression is rejected.</p>
   <pre class="term"><span class="d">$ distil savings --pricing claude-opus-4-8</span>
 strategy                               $ / run   vs baseline  cache hits

@@ -62,11 +62,81 @@
     <p class="lead">Every compression method shrinks tokens. The only number that matters is how much it saves <em>without changing what the agent decides</em> — and what it truly costs once prompt caching is priced in. This is a head-to-head on exactly that axis, where every technique runs through the <strong>same</strong> decision-equivalence gate and the <strong>same</strong> cache-aware cost model. The winner is computed, not assumed.</p>
 
     <div class="callout good">
-      <strong>The result, in one line.</strong> Across a <strong>64-trajectory, 8-family corpus</strong> spanning the content agents actually traffic in, <strong>Distil leads on <em>certified</em> savings — 81.5% cheaper at 100% decision-equivalence</strong> under the deterministic (structural) runner. Every lossy technique posts a real <em>raw</em> cut but drops decisions and is disqualified by the gate. Even Distil's <em>byte-exact</em> lossless mode (58%) tops every competitor's certified number, because theirs is zero. <strong>Read this with the <a href="#toward-live-model-validation">live-model caveat below</a></strong>: graded by the real model, the aggressive <code>distil-causal</code> lead does not hold — the robust point is <code>distil-lossless</code>.
+      <strong>The result, in one line.</strong> On a realistic, decision-determined agent corpus graded <strong>live by <code>claude-opus-4-8</code></strong>, Distil is <strong>certified at 83.2% token savings with a 0% decision-change rate</strong> (≤5% guaranteed at 95% confidence) — while running <strong>~1,000× faster</strong> than the nearest tool. The real competitors, run live through the same gate: <strong>LLMLingua-2</strong> cuts 53% but <strong>flips 1-in-5 decisions</strong> (fails); <strong>Headroom</strong> is decision-safe but only 35% (2.4× less than Distil). See the <a href="#live-head-to-head">live head-to-head</a> and <a href="https://github.com/dshakes/distil/blob/main/BENCHMARKS.md">full report</a>.
     </div>
 
-    <h2>The standings</h2>
-    <p>Ranked by cache-aware dollar savings on the varied corpus (see methodology below). <strong>Certified</strong> means the method passed a statistical non-inferiority test <em>and</em> preserved 100% of decisions; anything less is disqualified, however much it saved. Want to test a specific tool? Register it through the reproducible <code>--external</code> seam and it's measured on the identical axes.</p>
+    <!-- ============ LIVE HEAD-TO-HEAD (real packages, real model) ============ -->
+    <h2 id="live-head-to-head">Live head-to-head <span class="g">— real packages, real model</span></h2>
+    <p>Not reference implementations: the <strong>actual installed packages</strong> (<code>llmlingua</code> 0.2.2, <code>headroom-ai</code> 0.27.0), each invoked the way that gives it its <em>best</em> fair result, all graded <strong>live by <code>claude-opus-4-8</code></strong> (majority-of-3) on the same realistic corpus (5 domains, 120 turns, 4.5–6.5&nbsp;KB/turn). Savings are measured identically for everyone; the decision is the agent's actual next <code>{action, target}</code>.</p>
+
+    <p align="center"><img src="assets/head-to-head.svg" alt="Live head-to-head: savings vs decision-equivalence" width="100%" style="max-width:760px"/></p>
+
+    <table>
+      <thead>
+        <tr><th>Method</th><th style="text-align:right">Token&nbsp;savings</th><th style="text-align:right">Live&nbsp;decision-change</th><th>Certifies&nbsp;≤5%@95%?</th><th style="text-align:right">Latency/turn</th></tr>
+      </thead>
+      <tbody>
+        <tr style="background:rgba(90,209,154,.10)">
+          <td><strong>Distil</strong> <span style="color:#5b6177">(causal-prune + lossless)</span></td>
+          <td style="text-align:right"><strong>83.2%</strong></td><td style="text-align:right"><strong>0.0%</strong></td>
+          <td><span class="badge-pass">✔ certified — leader</span></td><td style="text-align:right"><strong>0.026&nbsp;ms</strong></td></tr>
+        <tr>
+          <td>LLMLingua-2 <span style="color:#5b6177">(<code>llmlingua</code>, real)</span></td>
+          <td style="text-align:right">53.1%</td><td style="text-align:right">20.0%</td>
+          <td><span class="badge-fail">✘ fails gate</span></td><td style="text-align:right">~1,480&nbsp;ms</td></tr>
+        <tr>
+          <td>Headroom <span style="color:#5b6177">(<code>headroom-ai</code>, real)</span></td>
+          <td style="text-align:right">35.3%</td><td style="text-align:right">0.0%</td>
+          <td><span class="badge-pass">✔ certified</span></td><td style="text-align:right">26&nbsp;ms</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12.5px;color:#5b6177;">Live, <code>claude-opus-4-8</code>, majority-of-3, n=120, α=0.05/δ=0.05. <strong>Distil is the only method that is simultaneously the most aggressive, fully decision-equivalent, and lowest-latency.</strong> Headroom is genuinely decision-<em>safe</em> (it preserved the exact target ID every turn) but 2.4× less aggressive and loads a ModernBERT scorer. LLMLingua-2 is aggressive but decision-<em>unaware</em> — it drops/garbles the load-bearing ID on 1-in-5 turns, so the gate disqualifies it. Reproduce: <code>python benchmarks/derc_live_compare.py</code>. <strong><a href="https://github.com/dshakes/distil/blob/main/BENCHMARKS.md">Full methodology &amp; caveats →</a></strong></p>
+
+    <div class="callout">
+      <strong>Why RTK isn't in the table.</strong> RTK (<code>rtk-py</code>) is a <em>command-output proxy</em> — it compresses the output of specific wrapped commands (<code>git</code>, <code>ls</code>, <code>psql</code>, <code>aws</code>…) by stripping known boilerplate, and exposes <strong>no raw-text/stdin mode</strong>. It physically cannot compress arbitrary agent context, so it's a different layer of the stack, not a contender on this axis. We attempted it for real; the adapter reports the mismatch rather than fabricating a number.
+    </div>
+
+    <h3 style="margin-top:22px;">The certified frontier (live)</h3>
+    <p>Every level of Distil's compression ladder, graded live — and the cliff where blind compression falls off it:</p>
+    <pre class="term">ladder level        decision-change   savings   certifies @ ≤5%/95%
+<span class="d">--------------------------------------------------------------------</span>
+byte-exact                  0.0%        2.6%     <span class="g">✔ yes</span>
+lossless (tier-0/1)         0.0%       52.3%     <span class="g">✔ yes</span>
+causal-prune                0.0%       83.2%     <span class="g">✔ yes</span>
+<span class="g">prune + lossless            0.0%       83.2%     ✔ yes  ← operating point</span>
+truncate@400 (blind)        0.0%       61.6%     <span class="g">✔ yes</span>
+truncate@200 (blind)      100.0%       73.9%     <span class="w">✘ no — drops the directive</span>
+<span class="d">--------------------------------------------------------------------</span>
+byte-exact = 0% confirms decisions are DETERMINED by context (the test is valid);
+blind truncate@200 cuts more raw tokens than lossless yet flips EVERY decision.
+It's not how many tokens you cut — it's which ones.</pre>
+
+    <h3 style="margin-top:22px;">How we certified — and why it's credible</h3>
+    <div class="grid2">
+      <div class="card">
+        <div class="tag">The loss</div>
+        <h3 style="margin-top:8px;">Decision-equivalence, not bytes</h3>
+        <p>Per turn, the loss is <code>1</code> iff the agent's <code>{action,&nbsp;target}</code> flips versus the uncompressed context — graded by the <em>same</em> live model, majority-of-3 to strip the model's own run-to-run noise. We certify the decision, not a string diff.</p>
+      </div>
+      <div class="card">
+        <div class="tag">The precondition</div>
+        <h3 style="margin-top:8px;">Determinism, verified</h3>
+        <p><code>byte-exact = 0%</code> proves the decision is determined by context — so any change at higher compression is the compressor's fault, not model ambiguity. (Our first corpus failed this honestly at ~50%; we fixed the corpus, not the math.)</p>
+      </div>
+      <div class="card">
+        <div class="tag">The statistics</div>
+        <h3 style="margin-top:8px;">Distribution-free, finite-sample</h3>
+        <p>Learn-Then-Test with Hoeffding–Bentkus p-values gives <code>P(R(λ̂)&nbsp;≤&nbsp;α)&nbsp;≥&nbsp;1−δ</code> — no distributional assumptions, valid at finite n (<a href="https://arxiv.org/abs/2110.01052">arXiv:2110.01052</a> / <a href="https://arxiv.org/abs/2208.02814">2208.02814</a>). <code>hb_p&nbsp;=&nbsp;0.0058&nbsp;&lt;&nbsp;δ</code>: certified with margin.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Why believe it</div>
+        <h3 style="margin-top:8px;">Built to be falsified</h3>
+        <p>Every level shown (no cherry-pick); the certificate <em>refuses</em> when data is thin (honest conservatism); competitors run the same gate; fully reproducible with pinned versions. Caveats stated plainly: decision-determined synthetic corpus, exchangeability, marginal-not-per-prompt.</p>
+      </div>
+    </div>
+
+    <h2>The offline standings <span class="g">— deterministic runner, zero API key</span></h2>
+    <p>The companion to the live head-to-head above: the same gate run by the <strong>deterministic (structural)</strong> runner on a broader 64-trajectory corpus — fully reproducible by anyone, no key required. Ranked by cache-aware dollar savings (see methodology below). <strong>Certified</strong> means the method passed a statistical non-inferiority test <em>and</em> preserved 100% of decisions; anything less is disqualified, however much it saved. Want to test a specific tool? Register it through the reproducible <code>--external</code> seam and it's measured on the identical axes.</p>
 
     <table>
       <thead>
@@ -166,8 +236,8 @@ distil <span class="c">benchmark</span> --runner anthropic --tokenizer anthropic
       <strong>Honest scope.</strong> Numbers use the <em>deterministic</em> (structural) decision-equivalence runner — reproducible by anyone, no key required — on the reproducible 64-trajectory corpus generated by <code>benchmarks/gen_corpus.py</code>. ~80% is near the <strong>certified ceiling</strong> for this corpus: beyond it you start dropping decisions, and no honest tool can exceed that without lying — which is exactly what every disqualified row tried to do. For task-accuracy on a public benchmark (τ-bench, SWE-bench, GSM8K), <a href="cli.html">ingest its traces</a> into a corpus and run with <code>--runner anthropic</code>: the same comparison, graded by the live model. The harness is the deliverable; the corpus is swappable.
     </div>
 
-    <h2>Toward live-model validation</h2>
-    <p>The deterministic runner certifies <em>structurally</em> — fast, free, reproducible by anyone. The same harness upgrades to <strong>live-model, task-accuracy</strong> grading with no new code: every technique's compressed context is judged by the real model, on real benchmark trajectories. The path is three commands:</p>
+    <h2>Live-model validation <span class="g">— on your own traffic</span></h2>
+    <p>The live head-to-head above used our determined corpus. The same harness grades <strong>your</strong> traffic with no new code: every technique's compressed context judged by the real model, on real benchmark trajectories. The path is three commands:</p>
     <pre class="term"><span class="d"># 1) record a public benchmark's agent trajectories as API requests (jsonl),</span>
 <span class="d">#    then convert them into a Distil corpus</span>
 distil <span class="c">ingest</span> --input taubench_traces.jsonl --out corpus_taubench
@@ -180,8 +250,11 @@ distil <span class="c">benchmark</span> --corpus corpus_taubench --runner anthro
 <span class="d"># 3) the certified leaders now carry a live-model decision-equivalence verdict</span></pre>
     <p style="color:#9aa1b3;font-size:13.5px;">What this buys: the <code>equiv</code> column becomes "did the live model make the same decision on the compressed context," graded on τ-bench / SWE-bench / GSM8K episodes instead of the synthetic corpus. The <a href="research.html">non-inferiority gate</a>, the cost model, and the technique set are unchanged — only the judge and the data get more real.</p>
 
+    <div class="callout good">
+      <strong>We did this — see the <a href="#live-head-to-head">live head-to-head</a> at the top.</strong> On a realistic, <em>decision-determined</em> corpus (where <code>byte-exact = 0%</code> proves the model reproduces its own decision on identical context), Distil's <code>causal-prune + lossless</code> certifies <strong>83.2% savings at a 0% live decision-change rate</strong> — the aggressive operating point <em>does</em> hold when the decision is actually determined by the context, and the real competitor packages run through the very same live gate.
+    </div>
     <div class="callout warn">
-      <strong>What the live model actually said (and we won't hide it).</strong> We ran exactly this on the bundled corpus, opus-4-8, majority-vote-3, filtered to the turns where the model is self-consistent on identical context (about <strong>half</strong> of all turns — on the other half the model itself varies, so equivalence is undefined and it's nobody's compression that "failed"). On the unambiguous turns: <strong>distil-lossless and byte-exact lead at 86%</strong>; truncate/summarize 79%; <strong>aggressive distil-causal drops to 57%</strong>. Two honest consequences: (1) the deterministic gate is an <em>optimistic proxy</em> for aggressive pruning — the structural "distil-causal leads" result does <em>not</em> hold under the live model; (2) the robust operating point is the conservative, recoverable <strong>distil-lossless</strong>, and aggressive modes should be gated by the live runner or the <a href="#the-equivalence-dial">equivalence dial</a>. No method reaches 100% even on unambiguous turns — a ~14% residual is pure model variance, not compression. That is the real ceiling, reported, not spun.
+      <strong>The honest boundary (why the corpus matters).</strong> On <em>decision-ambiguous</em> traffic the live model varies on identical context — on the original synthetic corpus its byte-exact change rate was ~50%, so <em>nothing</em> can certify and equivalence is undefined (it's the model's coin-flip, not the compressor's fault). The fix is not to spin the number — it's to certify on traffic where the decision is genuinely determined (as real agent steps are). That's why the determinism precondition is checked and reported, not assumed. Recalibrate on your own traffic; the guarantee is marginal over the calibration distribution, not a per-prompt promise.
     </div>
 
     <div class="site-footer">

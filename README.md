@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-404%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-408%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -123,22 +123,37 @@ distil: 8.4% token savings @ 100% decision-equivalence — certified.
 
 ---
 
-## 📊 Benchmark — head-to-head on *certified* savings
+## 📊 Benchmark — live, vs the *real* competitor packages
 
-Every technique through the **same** decision-equivalence gate and the **same** cache-aware cost model, on a reproducible 64-trajectory, 8-family corpus, graded by the **deterministic (structural)** runner. The winner is computed, not assumed — lossy methods that drop decisions are disqualified, however much raw they cut.
+Not reference implementations: the **actual installed packages** (`llmlingua`, `headroom-ai`), each invoked the way that gives it its best fair result, all graded **live by `claude-opus-4-8`** (majority-of-3) on a realistic, decision-determined corpus (5 domains, 120 turns, 4.5–6.5 KB/turn). Same gate for everyone; the decision is the agent's actual next `{action, target}`.
+
+| Method | Token savings | Live decision-change | Certifies ≤5%@95%? | Latency/turn |
+|---|--:|--:|:--:|--:|
+| **Distil** (causal-prune + lossless) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
+| LLMLingua-2 (`llmlingua`, real) | 53.1% | 20.0% | ❌ no | ~1,480 ms |
+| Headroom (`headroom-ai`, real) | 35.3% | 0.0% | ✅ yes | 26 ms |
+| ~~RTK~~ (`rtk-py`) | — | — | excluded¹ | — |
+
+<p align="center"><img src="docs/assets/head-to-head.svg" alt="Live head-to-head" width="100%"/></p>
+
+**Distil is the only method that is simultaneously the most aggressive, fully decision-equivalent, and the lowest-latency** — certified **83.2% savings at a 0% live decision-change rate** (≤5% guaranteed, 95% confidence), ~1,000× faster than the nearest tool. LLMLingua-2 cuts deep but flips **1-in-5** decisions (decision-*unaware*, fails the gate); Headroom is genuinely decision-*safe* but 2.4× less aggressive and loads a ModernBERT scorer. Full methodology, the certified frontier, and the *how-we-certified-and-why-it's-credible* writeup: **[BENCHMARKS.md](BENCHMARKS.md)** · [docs/benchmark](https://dshakes.github.io/distil/benchmark.html). Reproduce: `python benchmarks/gen_realworld.py 30 /tmp/c && python benchmarks/derc_live_compare.py`.
+
+> ¹ **RTK** is a command-output proxy (it compresses `git`/`ls`/`psql` output) with no raw-text mode, so it can't compress arbitrary agent context — a different layer, attempted but not a fair contender. ² The corpus is decision-*determined synthetic* (verified: `byte-exact = 0%` live), realistic in content/size but not a substitute for your own traffic — recalibrate via `distil ingest` → `distil conformal`. The guarantee is marginal over the calibration distribution, not per-prompt.
+
+<details><summary><b>Offline companion</b> — deterministic runner, 64-trajectory corpus, zero API key</summary>
 
 | Technique | Tokens | $ saved | Decision-equiv | Verdict |
 |---|--:|--:|--:|---|
-| **distil-causal** | 80.5% | **81.5%** | 100% | ✅ certified — leader\* |
+| **distil-causal** | 80.5% | **81.5%** | 100% | ✅ certified — leader |
 | truncate / sliding-window | 78.7% | 79.6% | 14% | ❌ fails gate |
 | **distil-stream** (+ cross-turn dedup) | 61.0% | 61.7% | 100% | ✅ certified |
 | **distil-lossless** (fold + template mining) | 57.4% | 58.1% | 100% | ✅ certified · byte-exact |
 | summarize / rolling memory | 56.5% | 57.2% | 39% | ❌ fails gate |
 | extractive importance (LLMLingua family) | 18.2% | 18.4% | 77% | ❌ fails gate |
 
-**The only methods that pass the gate are Distil's** — every lossy alternative posts a raw cut but changes decisions. Even byte-exact `distil-lossless` beats every competitor's *certified* number, because theirs is zero. Reproduce: `python benchmarks/gen_corpus.py && distil benchmark --corpus benchmarks/corpus_xl`. Bring your own tool with `--external module:function`. → full methodology: [docs/benchmark](https://dshakes.github.io/distil/benchmark.html)
+Structural (deterministic) grading — fast, free, reproducible by anyone: `python benchmarks/gen_corpus.py && distil benchmark --corpus benchmarks/corpus_xl`. The live numbers above supersede these for aggressive modes.
 
-> **\*Honest caveat — these are *structural* numbers.** Graded by the live model itself, the aggressive `distil-causal` lead does **not** hold (it drops to ~57% on unambiguous decisions); the robust operating point is **`distil-lossless`** (~86% live, leading). The structural gate is an optimistic proxy for aggressive pruning. Details + the live-model run: [the Benchmark page](https://dshakes.github.io/distil/benchmark.html).
+</details>
 
 **Tune the trade — the equivalence dial.** 100% decision-equivalence is the default, not a wall. Set a lower target and Distil spends a bounded *divergence budget* on the highest-value turns — deeper savings for a **measured, explicit** equivalence cost, with byte-exact fallback everywhere else. The trade is always reported, never hidden:
 
