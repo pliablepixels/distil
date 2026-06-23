@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-448%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-465%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -307,6 +307,9 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **Managed gateway** — multi-tenant + live savings dashboard | `gateway.py`, `distil gateway` | — |
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |
 | **Gemini adapter** — compresses the `generateContent` shape (contents/parts/functionResponse) | `adapters/gemini.py` | reversible |
+| **MCP server** — zero-dep stdio JSON-RPC; `distil_compress` / `distil_expand` / `distil_savings` tools | `mcp_server.py`, `distil mcp` | reversible |
+| **Framework hooks** — in-process LiteLLM + LangChain message compression (no proxy) | `integrations/litellm.py`, `integrations/langchain.py` | reversible |
+| **Claude Code plugin** — `/distil` command + live savings status line | `plugins/distil/`, `distil statusline` | — |
 | **Learned keep-model** (logistic, 96.4% / 0.98 F1 on held-out lines; labels distilled from the salience heuristic + bundled corpus) | `codec/learned.py` | pluggable |
 | Transformer keep-model — ONNX adapter + training pipeline | `codec/transformer.py`, `codec/train_transformer.py` | pluggable |
 | Auth-mode gating (lossless-only on subscription/OAuth) | `policy.py` | safety |

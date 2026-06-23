@@ -446,6 +446,14 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    """Run the zero-dependency distil MCP server over stdio (compress/expand/savings)."""
+    from .mcp_server import serve
+
+    serve()
+    return 0
+
+
 def cmd_wrap(args: argparse.Namespace) -> int:
     """Transparently wrap a command: spawn the proxy, point its env at it, run it."""
     command = list(args.command)
@@ -973,6 +981,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sl.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     sl.set_defaults(func=cmd_statusline)
+
+    mc = sub.add_parser(
+        "mcp", help="run the zero-dep MCP server over stdio (distil_compress/expand/savings)"
+    )
+    mc.set_defaults(func=cmd_mcp)
 
     wr = sub.add_parser(
         "wrap",

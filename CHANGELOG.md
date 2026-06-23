@@ -3,6 +3,20 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.16.0] — Ecosystem hooks: MCP server + LiteLLM/LangChain
+
+- **MCP server** (`mcp_server.py`, `distil mcp`): a zero-dependency, stdlib-only
+  Model Context Protocol server over stdio JSON-RPC 2.0. Exposes `distil_compress`
+  (reversible digest + handle, original kept in a local on-disk store),
+  `distil_expand` (recover by handle), and `distil_savings`. Wire it into any MCP
+  client (Claude Desktop, IDEs, agents). The message handler is a pure function and
+  is unit-tested without real stdio; the loop is verified end-to-end.
+- **In-process framework hooks** (`integrations/`): LiteLLM (`compress`/`completion`/
+  `acompletion`) and LangChain (`compress_messages`, duck-typed over message objects
+  *and* dicts) compress requests before they leave the process — same reversible
+  compression as the proxy, no sidecar required. Both lazy-import their framework, so
+  distil stays zero-runtime-deps.
+
 ## [0.15.0] — Claude Code plugin + status line
 
 - **`distil statusline`** (new CLI command): renders a compact one-line savings

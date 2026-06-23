@@ -226,6 +226,35 @@ response = model.generate_content(<span class="g">"Hello!"</span>)</pre>
 
     <hr/>
 
+    <h2>MCP server</h2>
+    <p>A zero-dependency <a href="https://modelcontextprotocol.io">Model Context Protocol</a>
+    server (stdlib only — no SDK) exposes distil's reversible compression to any MCP client
+    (Claude Desktop, IDEs, agents) over stdio:</p>
+    <pre class="term">distil mcp        <span class="d"># newline-delimited JSON-RPC 2.0 over stdio</span></pre>
+    <p>Tools: <code>distil_compress(text)</code> → a compact digest + an 8-hex handle (the
+    original is kept in a local store, never returned until asked); <code>distil_expand(handle)</code>
+    → the original text; <code>distil_savings()</code> → cumulative ledger savings. Wire it into an
+    MCP client's server config as a stdio command (<code>command: "distil", args: ["mcp"]</code>).</p>
+
+    <hr/>
+
+    <h2>In-process hooks (LiteLLM &amp; LangChain)</h2>
+    <p>Prefer not to run a sidecar? Compress the request in-process — the same reversible
+    compression, no proxy. Both helpers lazy-import their framework, so distil stays zero-dep.</p>
+    <pre class="term"><span class="d"># LiteLLM — drop-in for litellm.completion</span>
+<span class="c">from</span> distil.integrations <span class="c">import</span> litellm <span class="c">as</span> distil_litellm
+resp = distil_litellm.completion(model=<span class="g">"claude-opus-4-8"</span>, messages=[...],
+                                 distil_lossless_only=<span class="g">True</span>)  <span class="d"># optional, subscription-safe</span>
+
+<span class="d"># LangChain — compress a message list before the model call (duck-typed)</span>
+<span class="c">from</span> distil.integrations.langchain <span class="c">import</span> compress_messages
+msgs = compress_messages(state[<span class="g">"messages"</span>], lossless_only=<span class="g">True</span>)</pre>
+    <p>Tool/function messages get the reversible Tier-1 digest; human/system messages get
+    Tier-0 lossless; the model's own words are never rewritten. <code>compress()</code> (LiteLLM)
+    and <code>compress_messages()</code> (LangChain) are framework-free and unit-tested.</p>
+
+    <hr/>
+
     <h2>Observability headers</h2>
     <p>The proxy adds two informational headers to every compressed response:</p>
     <table>
