@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-490%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-495%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -304,7 +304,8 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **TOST non-inferiority gate** + 7-domain corpus + `distil bench` | `certify/`, `corpus.py` | the contract |
 | **Decision-Equivalence Risk Certificate** — conformal risk control (LTT/CRC) | `conformal.py`, `distil conformal` | distribution-free guarantee |
 | **Salience protection** — model-free (pattern + entropy + cross-reference), keeps the decision-bearing lines while crushing the rest | `compress/salience.py` | frontier shifter |
-| **Shadow-mode live equivalence** — sample live traffic, run it compressed *and* uncompressed in the background, record the live decision-change rate | `shadow.py`, `distil proxy --shadow` / `distil shadow-stats` | live, content-free |
+| **Shadow-mode live equivalence** — sample live traffic, run it compressed *and* uncompressed in the background, record the live decision-change rate (streaming-aware) | `shadow.py`, `distil proxy --shadow` / `distil shadow-stats` | live, content-free |
+| **Edit-equivalence** — the agent's produced code is normalized by AST (`ast.dump`), so whitespace/comment-only differences count as equivalent while real logic changes don't — decision-equivalence made precise for coding | `shadow.py` (stdlib `ast`) | the motto, for code |
 | **Provider proxy** — drop-in across SDKs (Anthropic · OpenAI-compatible · Google Gemini) | `proxy.py`, `distil proxy` | reversible |
 | **Managed gateway** — multi-tenant + live savings dashboard | `gateway.py`, `distil gateway` | — |
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |

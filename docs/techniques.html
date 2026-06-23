@@ -355,6 +355,44 @@ score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span 
 
     <p>Agents re-read the same artifact — a file, a log, a design doc — every turn. Prompt caching only discounts the <em>contiguous prefix</em>, so a large block that recurs in the volatile tail is re-billed in full each time it reappears. The streaming compressor remembers what it has already sent and replaces a recurring inert block with a compact reference, recoverable on demand. It only references blocks that carry no decision marker. This is the lever that turns a multi-turn loop's quadratic re-read cost into near-linear, on exactly the content the prefix cache cannot reach. See the <a href="benchmark.html">Benchmark</a> for the measured contribution.</p>
 
+    <!-- Technique: cache-delta context coding -->
+    <h2 id="cache-delta">Cache-delta context coding <span class="g">(coding-agent hot path)</span></h2>
+    <p><strong>Module:</strong> <code>distil/cachedelta.py</code> &middot; <code>distil proxy --session-delta</code> &middot; opt-in &middot; Loss profile: lossless</p>
+
+    <p>Multi-turn coding agents (Claude Code, Codex, Gemini CLI) loop on read &rarr; edit &rarr; <strong>re-read</strong>. The re-read file is a near-duplicate of what the agent already has in context — one hunk changed. Exact-duplicate dedup (the state of the art elsewhere, e.g. Headroom's <code>dedup_identical_items</code>) misses it entirely and re-sends the whole file. Cache-delta coding handles both cases, confined to the volatile suffix so the stable, already-cached prefix is never touched:</p>
+
+    <ul>
+      <li><strong>Exact re-send</strong> &rarr; back-reference (a compact pointer to the earlier occurrence already in cache).</li>
+      <li><strong>Near-duplicate</strong> &rarr; reference + unified diff (only the changed hunk is transmitted).</li>
+    </ul>
+
+    <p>Both transforms preserve <strong>cache-monotonicity</strong>: the stable prefix is never mutated, so every prompt-cache hit that existed before the turn still exists after it. The prior version of the file remains present earlier in the cached conversation, so prior version + diff carries the same information the agent needs to take its next action — decision-equivalent by construction. The full file is recoverable byte-exact via <code>distil_expand</code>.</p>
+
+    <div class="callout good">
+      <b>Measured end-to-end.</b> A re-read-after-edit (1,063 tokens) was delta-encoded for a <strong>902-token saving (~85%)</strong> vs. re-sending the whole file.
+    </div>
+
+    <hr/>
+
+    <!-- Technique: AST-structural delta -->
+    <h2 id="ast-structural-delta">AST-structural delta <span class="g">(deepest layer of cache-delta)</span></h2>
+    <p><strong>Module:</strong> <code>distil/astdelta.py</code> &middot; stdlib <code>ast</code> &middot; model-free &middot; Loss profile: lossless</p>
+
+    <p>The deepest layer of cache-delta coding. For Python source, the cross-version diff operates on <strong>parsed structure</strong> rather than raw text: each top-level definition is fingerprinted with <code>ast.dump</code> (attributes off), which is invariant to whitespace, comments, and import order. Two consequences a textual diff cannot offer:</p>
+
+    <ul>
+      <li>A reformat-only re-read — whitespace changes, comment edits, import reordering — is recognised as "no definition changed" and referenced whole. Textual diff would produce a large spurious patch.</li>
+      <li>Only definitions whose AST actually changed are sent in full. Everything unchanged is a back-reference, regardless of how many lines moved around it.</li>
+    </ul>
+
+    <p>Non-Python files and unparseable source (mid-edit, syntax errors) fall back automatically to the standard unified diff — the technique never fails a request, it just does less when the AST is unavailable.</p>
+
+    <div class="callout">
+      <b>Model-free, zero dependencies.</b> Fingerprinting uses Python's stdlib <code>ast</code> module only. No external parser, no learned weights, no network calls.
+    </div>
+
+    <hr/>
+
     <h2>Certified-fallback &amp; the equivalence <span class="g">dial</span></h2>
     <p><strong>Module:</strong> <code>distil/compress/adaptive.py</code> &middot; <code>certified_fallback</code> &middot; <code>distil frontier</code></p>
 

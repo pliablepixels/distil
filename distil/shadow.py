@@ -55,6 +55,67 @@ def _canon(obj: Any) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()[:12]
 
 
+# ---------------------------------------------------------------------------
+# Edit-equivalence — AST-normalize code-bearing decision inputs
+# ---------------------------------------------------------------------------
+#
+# For coding agents the decision IS the edit. Two responses that make the agent
+# write the *same code* with trivially different whitespace/comments must count as
+# decision-equivalent, not as a spurious change — otherwise the live signal
+# over-reports drift and the certificate under-claims safe savings. We normalize
+# any code-shaped string value inside a tool input through Python's AST (stdlib,
+# model-free), so semantically identical edits hash equal while real logic changes
+# still differ. Non-code strings and non-Python pass through untouched.
+
+import ast as _ast  # noqa: E402
+
+_CODE_HINTS = ("def ", "class ", "import ", "return ", "self.", " = ", "):")
+
+
+def _looks_like_code(s: str) -> bool:
+    if len(s) < 8:
+        return False
+    return "\n" in s or any(h in s for h in _CODE_HINTS)
+
+
+def _normalize_code(s: str) -> str:
+    try:
+        return "py:" + _ast.dump(_ast.parse(s))
+    except (SyntaxError, ValueError):
+        return s
+
+
+def _normalize_decision(value: Any) -> Any:
+    """Recursively replace code-shaped strings with their AST-normalized form."""
+    if isinstance(value, str):
+        return _normalize_code(value) if _looks_like_code(value) else value
+    if isinstance(value, dict):
+        return {k: _normalize_decision(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize_decision(v) for v in value]
+    return value
+
+
+def _sig_anthropic(name: Any, input_obj: Any) -> str:
+    return "tool:" + _canon({"name": name, "input": _normalize_decision(input_obj)})
+
+
+def _sig_openai(name: Any, arguments: Any) -> str:
+    norm: Any = arguments
+    if isinstance(arguments, str):
+        try:
+            norm = _normalize_decision(json.loads(arguments))
+        except (ValueError, TypeError):
+            norm = _normalize_code(arguments) if _looks_like_code(arguments) else arguments
+    else:
+        norm = _normalize_decision(arguments)
+    return "tool:" + _canon({"name": name, "arguments": norm})
+
+
+def _sig_gemini(name: Any, args: Any) -> str:
+    return "tool:" + _canon({"name": name, "args": _normalize_decision(args)})
+
+
 def decision_signature(resp_json: Any) -> str:
     """A content-free signature of the agent's chosen next action.
 
@@ -70,7 +131,7 @@ def decision_signature(resp_json: Any) -> str:
     if isinstance(content, list):
         for b in content:
             if isinstance(b, dict) and b.get("type") == "tool_use":
-                return "tool:" + _canon({"name": b.get("name"), "input": b.get("input")})
+                return _sig_anthropic(b.get("name"), b.get("input"))
         return "text"  # answered without calling a tool
 
     # OpenAI Chat Completions
@@ -80,7 +141,7 @@ def decision_signature(resp_json: Any) -> str:
         tcs = msg.get("tool_calls")
         if isinstance(tcs, list) and tcs and isinstance(tcs[0], dict):
             fn = tcs[0].get("function") or {}
-            return "tool:" + _canon({"name": fn.get("name"), "arguments": fn.get("arguments")})
+            return _sig_openai(fn.get("name"), fn.get("arguments"))
         return "text"
 
     # Gemini generateContent
@@ -92,7 +153,7 @@ def decision_signature(resp_json: Any) -> str:
             for p in parts:
                 if isinstance(p, dict) and isinstance(p.get("functionCall"), dict):
                     fc = p["functionCall"]
-                    return "tool:" + _canon({"name": fc.get("name"), "args": fc.get("args")})
+                    return _sig_gemini(fc.get("name"), fc.get("args"))
         return "text"  # responded without calling a function
 
     return "none"
@@ -175,11 +236,11 @@ def _decision_from_chunks(chunks: list[Any]) -> str:
             inp = json.loads(a_buf) if a_buf.strip() else {}
         except (ValueError, TypeError):
             inp = {}
-        return "tool:" + _canon({"name": a_name, "input": inp})
+        return _sig_anthropic(a_name, inp)
     if o_tool:
-        return "tool:" + _canon({"name": o_name, "arguments": o_args})
+        return _sig_openai(o_name, o_args)
     if g_call is not None:
-        return "tool:" + _canon({"name": g_call.get("name"), "args": g_call.get("args")})
+        return _sig_gemini(g_call.get("name"), g_call.get("args"))
     if a_text or o_text or g_text:
         return "text"
     return "none"

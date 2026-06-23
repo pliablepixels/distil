@@ -10,7 +10,7 @@ authors:
     email: chandu1221@gmail.com
 repository-code: "https://github.com/dshakes/distil"
 license: Apache-2.0
-version: 0.20.0
+version: 0.21.0
 keywords:
   - llm
   - context-compression

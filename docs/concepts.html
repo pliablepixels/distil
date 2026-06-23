@@ -84,6 +84,8 @@
       <b>The reframe in one sentence:</b> "100% accuracy" becomes a statistical non-inferiority guarantee on <em>outcomes</em>, not a diff of strings — and that makes it real. On a live <code>claude-opus-4-8</code> grading run, Distil certified <strong>83.2% token savings at a 0% decision-change rate</strong>.
     </div>
 
+    <p>Two recently shipped techniques apply decision-equivalence directly to the coding-agent read &rarr; edit &rarr; re-read loop. <strong>Cache-delta context coding</strong> (<code>distil/cachedelta.py</code>) replaces an exact or near-duplicate re-read with a back-reference or reference&nbsp;+&nbsp;diff. It is decision-equivalent because the prior version of the file is already present earlier in the cached conversation — prior version + diff carries the same information. It also enforces <strong>cache-monotonicity</strong>: only the volatile suffix is mutated, so every prompt-cache hit that existed before the turn still exists after it. The deepest layer, <strong>AST-structural delta</strong> (<code>distil/astdelta.py</code>), fingerprints Python definitions with <code>ast.dump</code> (invariant to whitespace, comments, and import order), so a reformat-only re-read is a zero-change reference rather than a spurious diff. For a full treatment see <a href="techniques.html#cache-delta">Techniques &rarr; Cache-delta</a> and <a href="techniques.html#ast-structural-delta">AST-structural delta</a>.</p>
+
     <hr/>
 
     <h2>2. The quality contract</h2>

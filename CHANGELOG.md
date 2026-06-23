@@ -3,6 +3,19 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.21.0] — Edit-equivalence (decision-equivalence, made precise for code)
+
+- **Edit-equivalence**: the decision signature now AST-normalizes code-bearing tool
+  inputs (e.g. an `Edit`/`Write` `new_str`). For coding agents the decision *is* the
+  edit, so two responses that make the agent write the same code with trivially
+  different whitespace or comments now count as **equivalent**, while a real logic
+  change still differs. This stops shadow-mode over-reporting drift and lets the
+  certificate claim safe savings it previously, conservatively, could not.
+- Implemented model-free with the stdlib `ast` (`_normalize_decision` → `ast.dump`),
+  applied through shared signature builders so the JSON, streamed (SSE), and
+  chunk-array paths all stay consistent. Non-code strings and non-Python pass
+  through untouched. 5 tests (495 total). ruff clean, verify + bench PASS.
+
 ## [0.20.0] — AST-structural delta (the deepest cache-delta layer)
 
 - **AST-structural delta** (`astdelta.py`, stdlib `ast`, model-free): for Python,

@@ -188,3 +188,53 @@ def test_ledger_load_roundtrip(tmp_path):
     reloaded = ShadowLedger.load(p)
     assert reloaded.samples == 3
     assert reloaded.changes == 1
+
+
+# --- edit-equivalence: AST-normalized code in decision signatures ---------- #
+
+
+def _anthropic_edit(new_str: str) -> dict:
+    return {"content": [{"type": "tool_use", "name": "Edit",
+                         "input": {"path": "x.py", "new_str": new_str}}]}
+
+
+def test_edit_equivalence_ignores_formatting_and_comments():
+    a = decision_signature(_anthropic_edit("def f():\n    return 1"))
+    b = decision_signature(_anthropic_edit("def f():\n    # a comment\n    return 1"))
+    c = decision_signature(_anthropic_edit("def f():\n        return 1"))  # reindented body
+    assert a == b == c  # same code, different formatting/comments -> same decision
+
+
+def test_edit_equivalence_detects_real_logic_change():
+    a = decision_signature(_anthropic_edit("def f():\n    return 1"))
+    d = decision_signature(_anthropic_edit("def f():\n    return 2"))  # different value
+    assert a != d  # a genuine logic change is still a decision change
+
+
+def test_non_code_inputs_still_distinguished():
+    s1 = decision_signature({"content": [{"type": "tool_use", "name": "weather", "input": {"city": "SF"}}]})
+    s2 = decision_signature({"content": [{"type": "tool_use", "name": "weather", "input": {"city": "NYC"}}]})
+    assert s1 != s2 and s1.startswith("tool:")
+
+
+def test_edit_equivalence_openai_arguments():
+    import json as _j
+    a = decision_signature({"choices": [{"message": {"tool_calls": [
+        {"function": {"name": "Edit", "arguments": _j.dumps({"new_str": "def f():\n    return 1"})}}]}}]})
+    b = decision_signature({"choices": [{"message": {"tool_calls": [
+        {"function": {"name": "Edit", "arguments": _j.dumps({"new_str": "def f():\n\n    return 1  # x"})}}]}}]})
+    assert a == b
+
+
+def test_edit_equivalence_holds_across_streaming():
+    # Streamed and non-streamed forms of the same edit must still match (shared sig path).
+    nonstream = decision_signature(_anthropic_edit("def f():\n    return 1"))
+    sse = (
+        'event: content_block_start\n'
+        'data: {"type":"content_block_start","index":0,'
+        '"content_block":{"type":"tool_use","id":"t","name":"Edit","input":{}}}\n\n'
+        'event: content_block_delta\n'
+        'data: {"type":"content_block_delta","index":0,'
+        '"delta":{"type":"input_json_delta","partial_json":"{\\"path\\": \\"x.py\\", \\"new_str\\": \\"def f():\\\\n    return 1\\"}"}}\n\n'
+    )
+    assert decision_signature_from_body(sse) == nonstream
