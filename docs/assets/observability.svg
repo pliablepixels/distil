@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" font-family="Inter,ui-sans-serif,Segoe UI,Roboto,sans-serif" role="img" aria-label="Distil observability: per-request headers, per-session shadow stats, per-machine lifetime savings ledger, and the multi-tenant gateway dashboard">
+  <defs>
+    <linearGradient id="obg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0c13"/><stop offset="1" stop-color="#06070b"/></linearGradient>
+    <linearGradient id="og" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#5ad1c9"/></linearGradient>
+    <linearGradient id="ocard" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12151f"/><stop offset="1" stop-color="#0b0d15"/></linearGradient>
+    <pattern id="odots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#ffffff" opacity="0.02"/></pattern>
+    <marker id="oar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5ad19a"/></marker>
+  </defs>
+  <rect width="1200" height="430" fill="url(#obg)"/><rect width="1200" height="430" fill="url(#odots)"/>
+
+  <text x="48" y="48" font-size="22" font-weight="800" letter-spacing="-0.4" fill="#f2f3f7">Observability <tspan fill="#9aa0b2" font-weight="500" font-size="14">— savings you can see, at four widening scopes</tspan></text>
+
+  <!-- scope 1: per request -->
+  <g transform="translate(48,86)">
+    <rect width="262" height="300" rx="16" fill="url(#ocard)" stroke="#2c344a"/>
+    <text x="20" y="34" font-size="10" letter-spacing="2" font-weight="700" fill="#7d8cff">PER REQUEST</text>
+    <text x="20" y="58" font-size="14" font-weight="700" fill="#eef0f5">Response headers</text>
+    <text x="20" y="80" font-size="10.5" fill="#9aa0b2">on every compressed call</text>
+    <g font-size="10.5" fill="#cdd3e2" font-family="ui-monospace,Menlo,monospace">
+      <text x="20" y="116">x-distil-compressed: 1</text>
+      <text x="20" y="138" fill="#6fe0aa">x-distil-tokens-saved: 4120</text>
+      <text x="20" y="160">x-distil-cache-prefix-msgs: 7</text>
+      <text x="20" y="182">x-distil-cache-refs: 3</text>
+      <text x="20" y="204">x-distil-cache-tokens-saved: 980</text>
+    </g>
+    <text x="20" y="246" font-size="10.5" fill="#727a92">curl -i … | grep x-distil</text>
+    <text x="20" y="278" font-size="10.5" fill="#9aa0b2">content-free · no logging of bodies</text>
+  </g>
+
+  <!-- scope 2: per session -->
+  <g transform="translate(330,86)">
+    <rect width="262" height="300" rx="16" fill="url(#ocard)" stroke="#2c344a"/>
+    <text x="20" y="34" font-size="10" letter-spacing="2" font-weight="700" fill="#5ad1c9">PER SESSION</text>
+    <text x="20" y="58" font-size="14" font-weight="700" fill="#eef0f5">Live shadow stats</text>
+    <text x="20" y="80" font-size="10.5" fill="#9aa0b2">decision-equivalence, live</text>
+    <text x="20" y="116" font-size="11" fill="#cdd3e2" font-family="ui-monospace,Menlo,monospace">distil shadow-stats</text>
+    <g font-size="10.5">
+      <text x="20" y="150" fill="#9aa0b2">sampled</text><text x="242" y="150" text-anchor="end" fill="#eef0f5">214</text>
+      <text x="20" y="174" fill="#9aa0b2">decision-change rate</text><text x="242" y="174" text-anchor="end" fill="#6fe0aa">0.0%</text>
+      <text x="20" y="198" fill="#9aa0b2">savings</text><text x="242" y="198" text-anchor="end" fill="#eef0f5">31.4%</text>
+    </g>
+    <rect x="20" y="220" width="222" height="7" rx="3.5" fill="#172033"/>
+    <rect x="20" y="220" width="70" height="7" rx="3.5" fill="#5ad19a"/>
+    <text x="20" y="262" font-size="10.5" fill="#727a92">streaming-aware · both-ways replay</text>
+    <text x="20" y="284" font-size="10.5" fill="#9aa0b2">proves equivalence on real traffic</text>
+  </g>
+
+  <!-- scope 3: per machine (lifetime ledger) — the highlight -->
+  <g transform="translate(612,86)">
+    <rect width="262" height="300" rx="16" fill="url(#ocard)" stroke="url(#og)" stroke-width="1.8"/>
+    <text x="20" y="34" font-size="10" letter-spacing="2" font-weight="700" fill="#bcacff">PER MACHINE · LIFETIME</text>
+    <text x="20" y="58" font-size="14" font-weight="700" fill="#eef0f5">Savings ledger</text>
+    <text x="20" y="80" font-size="10.5" fill="#9aa0b2">distil leaderboard</text>
+    <text x="20" y="132" font-size="34" font-weight="800" fill="#6fe0aa" letter-spacing="-1">1,234,567</text>
+    <text x="20" y="150" font-size="10.5" fill="#9aa0b2">tokens saved, all-time</text>
+    <g font-size="11">
+      <text x="20" y="190" fill="#9aa0b2">≈ usd saved</text><text x="242" y="190" text-anchor="end" font-weight="700" fill="#eef0f5">$3.21</text>
+      <text x="20" y="216" fill="#9aa0b2">requests</text><text x="242" y="216" text-anchor="end" fill="#eef0f5">1,840</text>
+      <text x="20" y="242" fill="#9aa0b2">avg compression</text><text x="242" y="242" text-anchor="end" fill="#eef0f5">31.4%</text>
+    </g>
+    <text x="20" y="278" font-size="10.5" fill="#727a92">local JSON · no telemetry · opt-out env</text>
+  </g>
+
+  <!-- scope 4: community (federated, verifiable leaderboard) -->
+  <g transform="translate(894,86)">
+    <rect width="258" height="300" rx="16" fill="url(#ocard)" stroke="#2c344a"/>
+    <text x="20" y="34" font-size="10" letter-spacing="2" font-weight="700" fill="#5ad19a">COMMUNITY · VERIFIABLE</text>
+    <text x="20" y="58" font-size="14" font-weight="700" fill="#eef0f5">Federated leaderboard</text>
+    <text x="20" y="80" font-size="10.5" fill="#9aa0b2">distil federated-leaderboard</text>
+    <rect x="20" y="92" width="118" height="17" rx="4" fill="#15182a" stroke="#8b7bff"/><text x="29" y="104" font-size="9" fill="#bcacff" font-weight="700">HMAC-SHA256 signed</text>
+    <g font-size="10.5">
+      <text x="20" y="134" fill="#727a92">instance</text><text x="238" y="134" text-anchor="end" fill="#727a92">tokens</text>
+      <line x1="20" y1="142" x2="238" y2="142" stroke="#1d2640"/>
+      <text x="20" y="164" fill="#5ad1c9" font-family="ui-monospace,Menlo,monospace">acme</text><text x="238" y="164" text-anchor="end" fill="#6fe0aa">812k ✓</text>
+      <text x="20" y="186" fill="#5ad1c9" font-family="ui-monospace,Menlo,monospace">globex</text><text x="238" y="186" text-anchor="end" fill="#6fe0aa">540k ✓</text>
+      <line x1="20" y1="200" x2="238" y2="200" stroke="#1d2640"/>
+      <text x="20" y="222" fill="#9aa0b2" font-weight="700">certified total</text><text x="238" y="222" text-anchor="end" fill="#eef0f5" font-weight="700">1.35M</text>
+    </g>
+    <text x="20" y="258" font-size="10.5" fill="#727a92">tamper-evident · certified-only totals</text>
+    <text x="20" y="284" font-size="10.5" fill="#9aa0b2">content-free · opt-in · no telemetry by default</text>
+  </g>
+
+  <path d="M310,236 L330,236" fill="none" stroke="#5ad19a" stroke-width="1.6" marker-end="url(#oar)"/>
+  <path d="M592,236 L612,236" fill="none" stroke="#5ad19a" stroke-width="1.6" marker-end="url(#oar)"/>
+  <path d="M874,236 L894,236" fill="none" stroke="#5ad19a" stroke-width="1.6" marker-end="url(#oar)"/>
+</svg>

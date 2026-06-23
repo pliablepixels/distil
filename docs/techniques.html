@@ -69,7 +69,7 @@
     <hr/>
 
     <!-- Technique 1 -->
-    <h2>① Cache-aware compression</h2>
+    <h2 id="cache-aware">① Cache-aware compression</h2>
     <p><strong>Module:</strong> <code>distil/compress/cache_aware.py</code> &middot; Loss profile: lossless</p>
 
     <p>The dominant cost lever in a multi-turn agent loop is not token count — it is cache hit rate. A cache read costs roughly 0.1× fresh input; a cache miss costs full price. Distil models the full multi-turn loop, tracking the longest contiguous prefix that is identical between consecutive turns. Any compressor that rewrites that prefix — even to save tokens — destroys the prefix match and loses the 10× discount.</p>
@@ -124,7 +124,7 @@ distil (cache-aware lossless)          0.01019         <span class="g">33.1%</sp
     <hr/>
 
     <!-- Technique 3 -->
-    <h2>③ Causal / counterfactual pruning</h2>
+    <h2 id="causal">③ Causal / counterfactual pruning</h2>
     <p><strong>Module:</strong> <code>distil/replay/ablation.py</code> &middot; Loss profile: certified</p>
 
     <p>The eval engine in Distil is a <strong>discovery engine</strong>. The algorithm:</p>
@@ -156,7 +156,7 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
     <hr/>
 
     <!-- Tier model -->
-    <h2>Risk-graded tiers</h2>
+    <h2 id="tiers">Risk-graded tiers</h2>
     <p>Every technique is assigned to a tier based on its loss profile. Distil applies them in order — lossless ones unconditionally, certified-lossy ones only when the gate passes.</p>
 
     <div class="tiers">

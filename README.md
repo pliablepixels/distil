@@ -171,10 +171,19 @@ $ distil frontier --corpus benchmarks/corpus_xl
 
 ## 📡 See it working — real-time savings & live equivalence
 
-**Cost savings, live, three ways:**
-- **Per request** — every compressed response carries headers: `x-distil-tokens-saved`, `x-distil-compressed`, and `x-distil-expanded` when recovery fired. Read them in your own logging.
-- **Live dashboard** — run `distil gateway` (instead of `distil proxy`): `/distil/dashboard` (per-tenant tokens + dollars, live HTML) and `/distil/stats` (JSON to scrape into Grafana).
-- **Genuine cumulative savings** — the proxy records *real-traffic* savings to a local ledger; `distil leaderboard` renders it. Measured on your actual calls, not estimates.
+<p align="center"><img src="docs/assets/observability.svg" alt="observability at four widening scopes: per-request headers, per-session shadow stats, per-machine lifetime ledger, and the verifiable community leaderboard" width="100%"/></p>
+
+**Savings you can see, at four widening scopes:**
+- **Per request** — every compressed response carries headers: `x-distil-tokens-saved`, `x-distil-compressed`, `x-distil-cache-prefix-msgs`, and `x-distil-expanded` when recovery fired. Read them in your own logging.
+- **Per session** — `distil shadow-stats` shows the live, rolling decision-change rate (equivalence on real traffic). `distil gateway` adds `/distil/dashboard` (per-tenant tokens + dollars, live HTML) and `/distil/stats` (JSON for Grafana).
+- **Per machine, lifetime** — the proxy records *real-traffic* savings to a local ledger (`~/.distil/savings.jsonl`); `distil leaderboard` rolls it up (`--html` for a sleek page). Measured on your actual calls, not estimates. No content ever leaves your machine.
+- **Community, verifiable** — `distil federated-leaderboard` aggregates **signed, content-free** savings aggregates across instances. Every number is **HMAC-SHA256 tamper-evident**, only *certified* submissions count toward totals, and sharing is strictly **opt-in** (no telemetry by default). This is the "how much has the community saved" board — done privacy-first.
+
+```bash
+distil leaderboard                       # your cumulative, genuine savings
+distil leaderboard --html savings.html   # → a self-contained dark page
+distil federated-leaderboard --dir ./submissions --keys keys.json --html board.html
+```
 
 **Decision-equivalence, live — shadow mode.** Cost is free to measure live; equivalence needs the counterfactual. `distil proxy --shadow 0.05` samples 5% of requests, runs them **uncompressed too in the background** (never blocking your response), and records whether the agent chose the same action — a rolling, content-free **live decision-change rate** on your own traffic:
 
