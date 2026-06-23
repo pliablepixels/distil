@@ -506,6 +506,49 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_conformal(args: argparse.Namespace) -> int:
+    """Decision-Equivalence Risk Certificate — a distribution-free guarantee on the
+    agent's decision-change rate at a user-chosen risk level."""
+    from .conformal import calibrate
+
+    runner = None
+    if args.runner == "anthropic":
+        from .replay.anthropic_runner import AnthropicRunner
+
+        runner = AnthropicRunner(samples=args.samples)
+    else:
+        from .replay.runner import DeterministicRunner
+
+        runner = DeterministicRunner()
+    entries = load_corpus(args.corpus) if args.corpus else load_corpus()
+    cert = calibrate(entries, runner, alpha=args.alpha, delta=args.delta, method=args.method)
+
+    long = "Learn-Then-Test" if cert.method == "ltt" else "Conformal Risk Control"
+    print("Decision-Equivalence Risk Certificate (DERC)\n")
+    print(f"  method      : {cert.method.upper()}  ({long})")
+    print(f"  risk target : α = {args.alpha}  (max allowed decision-change rate)")
+    if cert.method == "ltt":
+        print(f"  confidence  : {(1 - args.delta) * 100:.0f}%  (1 − δ)")
+    print(f"  calibration : n = {cert.n} turns,  runner = {args.runner}")
+    print("-" * 64)
+    if cert.level:
+        print(f"  ✔ CERTIFIED  '{cert.level}'  →  {cert.savings * 100:.1f}% token savings")
+        print(f"\n  {cert.guarantee}")
+    else:
+        print(
+            f"  ✘ NOT CERTIFIED — no level holds a ≤{args.alpha * 100:.0f}% decision-change rate "
+            f"at n={cert.n}.\n    Calibrate on more traffic, or relax α. (This is the certificate "
+            "being honest:\n    small samples can't support tight guarantees.)"
+        )
+    print(
+        "\n  Distribution-free, finite-sample (Angelopoulos–Bates–Candès et al., arXiv:2110.01052 /"
+        "\n  2208.02814). Valid under EXCHANGEABILITY — recalibrate on recent traffic if your"
+        "\n  workload drifts. The guarantee is marginal over the calibration distribution, not a"
+        "\n  per-prompt promise."
+    )
+    return 0
+
+
 def cmd_learn(args: argparse.Namespace) -> int:
     """Show the keep policy Distil has learned from your real expand signals."""
     from .learn import ExpandStats
@@ -761,6 +804,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--min-samples", type=int, default=5, help="min digests before a policy applies"
     )
     ln.set_defaults(func=cmd_learn)
+
+    cf = sub.add_parser(
+        "conformal",
+        help="decision-equivalence risk certificate (distribution-free guarantee)",
+    )
+    cf.add_argument("--alpha", type=float, default=0.05, help="max decision-change rate to certify")
+    cf.add_argument(
+        "--delta", type=float, default=0.05, help="LTT failure probability (1−confidence)"
+    )
+    cf.add_argument("--method", default="ltt", choices=("ltt", "crc"))
+    cf.add_argument("--corpus", help="calibration corpus dir (e.g. your ingested traffic)")
+    cf.add_argument("--runner", default="deterministic", choices=("deterministic", "anthropic"))
+    cf.add_argument(
+        "--samples", type=int, default=3, help="majority-vote samples (anthropic runner)"
+    )
+    cf.set_defaults(func=cmd_conformal)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)

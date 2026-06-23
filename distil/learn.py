@@ -22,10 +22,23 @@ generalizes and the stored stats leak nothing about the actual content.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+
+def _state_dir() -> Path:
+    """The local state directory, resolved lazily so it honors ``DISTIL_HOME`` at
+    call time (configurable deployments; isolated tests). Defaults to ``~/.distil``."""
+    return Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil")))
+
+
+def _default_stats_path() -> Path:
+    return _state_dir() / "expand-stats.json"
+
+
+# Back-compat eager constant; runtime paths resolve via _default_stats_path().
 DEFAULT_STATS_PATH = Path.home() / ".distil" / "expand-stats.json"
 
 _JSON = re.compile(r"^\s*[\[{]")
@@ -91,16 +104,16 @@ class ExpandStats:
 
     # -- persistence (local, content-free, failure-tolerant) ------------------
     @classmethod
-    def load(cls, path: Path = DEFAULT_STATS_PATH) -> ExpandStats:
+    def load(cls, path: Path | None = None) -> ExpandStats:
         try:
-            raw = json.loads(Path(path).read_text())
+            raw = json.loads(Path(path or _default_stats_path()).read_text())
             return cls(dict(raw.get("digested", {})), dict(raw.get("expanded", {})))
         except (OSError, ValueError, TypeError):
             return cls()
 
-    def save(self, path: Path = DEFAULT_STATS_PATH) -> None:
+    def save(self, path: Path | None = None) -> None:
         try:
-            p = Path(path)
+            p = Path(path or _default_stats_path())
             p.parent.mkdir(parents=True, exist_ok=True)
             tmp = p.with_suffix(p.suffix + ".tmp")
             tmp.write_text(json.dumps({"digested": self.digested, "expanded": self.expanded}))
@@ -112,7 +125,7 @@ class ExpandStats:
 def keep_predicate(
     stats: ExpandStats | None = None,
     *,
-    path: Path = DEFAULT_STATS_PATH,
+    path: Path | None = None,
     min_digested: int = 5,
     threshold: float = 0.25,
 ):

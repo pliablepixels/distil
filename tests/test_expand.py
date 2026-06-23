@@ -123,7 +123,7 @@ def test_signal_log_is_content_free(tmp_path):
     assert "content" not in rec and "text" not in rec  # numbers only, never content
 
 
-def test_proxy_expand_loop_end_to_end():
+def test_proxy_expand_loop_end_to_end(tmp_path, monkeypatch):
     """Full path: proxy digests a tool_result → fake model asks to expand the handle
     → proxy resolves it from the local store and re-queries → agent gets the final
     answer, never seeing the recovery round-trip."""
@@ -133,6 +133,10 @@ def test_proxy_expand_loop_end_to_end():
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     from distil.proxy import build_handler
+
+    # Isolate the learning store so accumulated real signals (or this test's own
+    # writes) can't flip the keep-policy to byte-exact and starve the expand path.
+    monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
 
     class _Upstream(BaseHTTPRequestHandler):
         def do_POST(self):  # noqa: N802

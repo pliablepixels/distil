@@ -60,7 +60,7 @@
   <main class="content">
 
     <h1>Research <span class="g">&amp; Frontier</span></h1>
-    <p class="lead">The proof artifacts no competitor publishes: a savings-vs-quality curve where every point carries a certification verdict, a never-regressing self-distilling loop, and savings telemetry you can verify yourself.</p>
+    <p class="lead">The proof artifacts no competitor publishes: a savings-vs-quality curve where every point carries a certification verdict, a <strong>distribution-free risk certificate</strong> on the decision-change rate, a never-regressing self-distilling loop, and savings telemetry you can verify yourself.</p>
 
     <hr/>
 
@@ -121,6 +121,57 @@ certified ceiling: 8.4% savings (beyond this, lossy compression drops decisions 
         <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Custom corpus dir (e.g. from <code>distil ingest</code> on benchmark traces)</td></tr>
         <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline) or <code>anthropic</code> (live model, requires API key)</td></tr>
         <tr><td><code>--out</code></td><td>off</td><td>Write the raw curve as timestamped JSONL to this directory</td></tr>
+      </tbody>
+    </table>
+
+    <hr/>
+
+    <!-- Feature 1b: Decision-Equivalence Risk Certificate -->
+    <h2 id="conformal">Decision-Equivalence Risk Certificate (DERC)</h2>
+    <p><strong>Module:</strong> <code>distil/conformal.py</code> &middot; <strong>Command:</strong> <code>distil conformal [--alpha --delta --method --corpus --runner]</code></p>
+
+    <p>The frontier above tells you <em>where</em> the cliff is. The DERC turns that into an operational guarantee: you pick a risk budget &mdash; a maximum tolerable <strong>decision-change rate</strong> &alpha; &mdash; and Distil certifies the most aggressive compression level whose risk is provably below it, <em>distribution-free and finite-sample</em>, calibrated on your own traffic. This is conformal risk control, not a heuristic threshold.</p>
+
+    <div class="callout">
+      <b>The guarantee.</b> For the certified level &lambda;&#770;, Learn-Then-Test gives <code>P( R(&lambda;&#770;) &le; &alpha; ) &ge; 1 &minus; &delta;</code> &mdash; with no distributional assumptions and valid at finite <em>n</em>. The loss on each calibration turn is <code>1</code> iff the agent's decision flips versus the uncompressed context, graded by the same runner as the gate. <code>R</code> is the decision-change rate.
+    </div>
+
+    <h3>How it certifies</h3>
+    <p>Distil calibrates a ladder of compression levels (byte-exact &rarr; lossless &rarr; a truncation sweep), measures the decision-change rate at each, and selects the most aggressive controlled level via one of two procedures:</p>
+    <ul>
+      <li><strong>Learn-Then-Test (LTT)</strong> &mdash; Angelopoulos, Bates, Cand&egrave;s, Jordan &amp; Lei, <em>Ann. Appl. Stat.</em> 2025 (<a href="https://arxiv.org/abs/2110.01052" target="_blank" rel="noopener">arXiv:2110.01052</a>). Risk control as multiple hypothesis testing; Hoeffding&ndash;Bentkus p-values with fixed-sequence testing yield <code>P(R&le;&alpha;)&ge;1&minus;&delta;</code>. The default.</li>
+      <li><strong>Conformal Risk Control (CRC)</strong> &mdash; Angelopoulos, Bates, Fisch, Lei &amp; Schuster, <em>ICLR</em> 2024 (<a href="https://arxiv.org/abs/2208.02814" target="_blank" rel="noopener">arXiv:2208.02814</a>). For a monotone 0/1 loss, controls the <em>expected</em> rate <code>E[L]&le;&alpha;</code>, tight to O(1/n). Use <code>--method crc</code>.</li>
+    </ul>
+
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ distil conformal --corpus ./mycorpus --alpha 0.05 --delta 0.05</span>
+Decision-Equivalence Risk Certificate (DERC)
+
+  method      : LTT  (Learn-Then-Test)
+  risk target : &alpha; = 0.05  (max allowed decision-change rate)
+  confidence  : 95%  (1 &minus; &delta;)
+  calibration : n = 320 turns,  runner = deterministic
+----------------------------------------------------------------
+  <span class="g">&#10004; CERTIFIED  'lossless'  &rarr;  57.4% token savings</span>
+
+  the decision-change rate vs. uncompressed context is &le; 5.0%
+  with 95% confidence (Learn-Then-Test, n=320 calibration turns).</pre>
+
+    <h3>Why this is novel</h3>
+    <p>Conformal prediction is established theory, but applying it to <strong>context compression with the loss defined as agent decision-equivalence</strong> is, to our reading of the literature, open white space. The nearest neighbour (<a href="https://arxiv.org/abs/2511.17908" target="_blank" rel="noopener">arXiv:2511.17908</a>, ECIR 2026) applies conformal guarantees to <strong>RAG retrieval recall</strong> &mdash; a different task (which documents to fetch), not how far you can crush the context an agent already holds while it keeps acting identically.</p>
+
+    <div class="callout">
+      <b>The one honest caveat (load-bearing).</b> Conformal guarantees require <strong>exchangeability</strong>: your calibration traffic must resemble your live traffic. Under distribution shift (new agent, prompt change, workload drift) the bound can silently weaken &mdash; recalibrate on a rolling window. The guarantee is <strong>marginal</strong> over the calibration distribution (an average rate, not a per-prompt promise). And it is honestly <em>conservative</em>: on a small corpus it will refuse to certify a tight &alpha; rather than over-claim &mdash; more calibration turns certify the same &alpha; (double-validated: 320 turns certify <code>lossless</code> at &alpha;=2%, 640 turns at &alpha;=1%).
+    </div>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Risk target: max tolerable decision-change rate</td></tr>
+        <tr><td><code>--delta</code></td><td><code>0.05</code></td><td>LTT failure probability; confidence is 1&minus;&delta; (ignored by CRC)</td></tr>
+        <tr><td><code>--method</code></td><td><code>ltt</code></td><td><code>ltt</code> (high-probability bound) or <code>crc</code> (expected-rate bound)</td></tr>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Calibration corpus (use your own traffic via <code>distil ingest</code>)</td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline) or <code>anthropic</code> (live model)</td></tr>
       </tbody>
     </table>
 

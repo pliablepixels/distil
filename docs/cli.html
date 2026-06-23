@@ -619,6 +619,35 @@ savings-vs-equivalence dial  (runner=deterministic)
 
     <hr/>
 
+    <!-- conformal -->
+    <h2 id="conformal">distil conformal</h2>
+    <p>The <strong>Decision-Equivalence Risk Certificate (DERC)</strong>. You choose a risk budget &mdash; a maximum decision-change rate <code>&alpha;</code> &mdash; and Distil certifies the most aggressive compression level whose risk is provably below it, <em>distribution-free and finite-sample</em>, via conformal risk control (Learn-Then-Test / Conformal Risk Control). Unlike the dial, this is a statistical guarantee with a confidence level, calibrated on your own traffic. See <a href="research.html#conformal">Research &amp; Frontier &rarr; DERC</a>.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Risk target: max tolerable decision-change rate</td></tr>
+        <tr><td><code>--delta</code></td><td><code>0.05</code></td><td>LTT failure probability; confidence is 1&minus;&delta; (ignored by CRC)</td></tr>
+        <tr><td><code>--method</code></td><td><code>ltt</code></td><td><code>ltt</code> (high-probability bound) or <code>crc</code> (expected-rate bound)</td></tr>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Calibration corpus dir (use your own traffic via <code>distil ingest</code>)</td></tr>
+        <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> or <code>anthropic</code> (live model)</td></tr>
+        <tr><td><code>--samples</code></td><td><code>3</code></td><td>Majority-vote samples for the anthropic runner</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil conformal --corpus benchmarks/corpus_xl --alpha 0.05</span>
+Decision-Equivalence Risk Certificate (DERC)
+
+  method      : LTT  (Learn-Then-Test)
+  risk target : &alpha; = 0.05  (max allowed decision-change rate)
+  confidence  : 95%  (1 &minus; &delta;)
+  calibration : n = 320 turns,  runner = deterministic
+----------------------------------------------------------------
+  <span class="g">&#10004; CERTIFIED  'lossless'  &rarr;  57.4% token savings</span></pre>
+
+    <hr/>
+
     <!-- online -->
     <h2 id="online">distil online</h2>
     <p>One <strong>self-distilling round</strong>: collects causal labels from your corpus (certified-safe drops discovered by the ablation engine), retrains the logistic keep-model, and promotes the new weights only if they pass the non-inferiority gate on every trajectory. Never-regressing by construction — a cycle that would degrade quality is silently discarded.</p>

@@ -50,7 +50,16 @@ EXPAND_TOOL: dict[str, Any] = {
 
 # Where expand events are logged — the learning signal / moat data. Content-free by
 # default (handle + length only); the proxy can opt into storing the recovered text.
+# Resolved lazily so it honors DISTIL_HOME at call time (configurable / isolated tests).
 DEFAULT_SIGNAL_PATH = Path.home() / ".distil" / "expand-signals.jsonl"
+
+
+def _default_signal_path() -> Path:
+    import os
+
+    return (
+        Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil"))) / "expand-signals.jsonl"
+    )
 
 
 def inject_expand_tool(body: dict[str, Any]) -> dict[str, Any]:
@@ -71,10 +80,11 @@ def _expand_calls(resp: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def record_signal(handle: str, original: str, *, path: Path = DEFAULT_SIGNAL_PATH) -> None:
+def record_signal(handle: str, original: str, *, path: Path | None = None) -> None:
     """Append a content-free expand event — the label the keep-model learns from.
     Only the handle and recovered length are written; never the content itself."""
     try:
+        path = path or _default_signal_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a") as f:
             f.write(
