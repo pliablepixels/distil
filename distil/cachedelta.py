@@ -321,7 +321,7 @@ def _collect_texts(msg: Any) -> list[str]:
 def delta_encode(
     messages: list[Any],
     *,
-    session: DeltaSession,
+    session: DeltaSession | None = None,
     store: RestoreStore | None = None,
 ) -> tuple[list[Any], RestoreStore, CacheStats]:
     """Cross-turn delta-encode *messages* against *session* memory (non-mutating).
@@ -336,38 +336,35 @@ def delta_encode(
     if not isinstance(messages, list):
         return messages, store, stats
 
-    with session.lock:
-        cur_hashes = [_msg_hash(m) for m in messages]
-        # Longest common contiguous prefix with the previous turn = the cached prefix.
-        lcp = 0
-        prev = session.prev_msg_hashes
-        limit = min(len(cur_hashes), len(prev))
-        while lcp < limit and cur_hashes[lcp] == prev[lcp]:
-            lcp += 1
-        stats.prefix_msgs = lcp
+    cur_hashes = [_msg_hash(m) for m in messages]
+    # Prefix stat (informational): longest common prefix with the previous turn.
+    if session is not None:
+        with session.lock:
+            prev = session.prev_msg_hashes
+            lcp = 0
+            limit = min(len(cur_hashes), len(prev))
+            while lcp < limit and cur_hashes[lcp] == prev[lcp]:
+                lcp += 1
+            stats.prefix_msgs = lcp
+            session.prev_msg_hashes = cur_hashes
 
-        # Snapshot what was delivered BEFORE this turn (exact + near-dup bases).
-        prior = dict(session.delivered)
-        bases = list(session.delivered.items())[-_MAX_BASES:]
+    # Encoding is a PURE per-call walk over the cumulative messages: message i is
+    # deduped/delta'd only against blocks in messages[0..i-1]. Because the cached
+    # prefix is byte-identical across turns, each prefix message encodes to the SAME
+    # bytes every turn — so cache-delta is cache-monotonic BY CONSTRUCTION (no
+    # marker<->original flip), and the store is fully repopulated here so expand
+    # always resolves. The cumulative conversation is the memory; no cross-call
+    # state is needed for correctness.
+    delivered: dict[str, str] = {}
+    new_messages: list[Any] = []
+    for msg in messages:
+        bases = list(delivered.items())[-_MAX_BASES:]
 
-        def _transform(text: str) -> str:
-            return _encode_block(text, prior=prior, bases=bases, store=store, stats=stats)
+        def _transform(text: str, _prior: dict[str, str] = delivered, _bases: Any = bases) -> str:
+            return _encode_block(text, prior=_prior, bases=_bases, store=store, stats=stats)
 
-        new_messages: list[Any] = []
-        for i, msg in enumerate(messages):
-            if i < lcp:
-                # Cache-stable prefix: never mutate; just ensure its blocks are known.
-                for t in _collect_texts(msg):
-                    session.remember(t)
-                new_messages.append(msg)
-                continue
-
-            new_msg = _rewrite_tool_texts(msg, _transform)
-            # Register this turn's originals so future turns can reference them.
-            for t in _collect_texts(msg):
-                session.remember(t)
-            new_messages.append(new_msg)
-
-        session.prev_msg_hashes = cur_hashes
+        new_messages.append(_rewrite_tool_texts(msg, _transform))
+        for t in _collect_texts(msg):  # register AFTER, so a block can't dedup itself
+            delivered[_handle(t)] = t
 
     return new_messages, store, stats

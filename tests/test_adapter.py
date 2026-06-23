@@ -358,3 +358,14 @@ def test_openai_tool_message_is_digested_and_reversible():
     assert len(tool_msg["content"]) < len(long)  # digested
     assert "DECISION: keep this" in tool_msg["content"]  # decision preserved
     assert any(store.expand(h) == long for h in store.handles)  # reversible
+
+
+def test_tier0_never_inflates_tokens_on_blank_runs():
+    """collapse_runs must not turn near-free blank-line runs into a count marker
+    that costs MORE tokens — Tier-0 is reject-if-bigger by tokens."""
+    from distil.tokenizer import DEFAULT as _tok
+
+    text = "alpha\n\n\n\n\nbeta\n\n\n\n\ngamma\n\n\n\n\ndelta"
+    new_messages, _store = compress_messages([{"role": "user", "content": text}], verbatim=True)
+    seen = new_messages[0]["content"]
+    assert _tok.count(seen) <= _tok.count(text)  # never inflates

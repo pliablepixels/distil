@@ -1,0 +1,355 @@
+"""Coding-agent cache-delta benchmark — messages-level, read/edit/reread sessions.
+
+Part 2 of the head-to-head (part 1 = the trajectory-level core comparison via
+`distil benchmark`). This one targets the coding-agent hot path the cache-delta
+techniques are built for: an agent that reads a file, edits it, and RE-READS it.
+It measures, on realistic multi-turn sessions WITH prompt caching priced in:
+
+  * token savings vs full re-send (summed over turns)
+  * cache-aware real-dollar savings (the stable prefix billed at the cache-read rate)
+  * latency per turn
+  * reversibility (recoverable vs lossy)
+
+Fairness: every method is confined to the **volatile suffix** (the new messages
+since the previous turn), so the cache-stable prefix is billed at the cache-read
+rate for ALL methods — nobody is penalised for the others' cache-busting. The
+comparison is therefore purely "how well does each compress the new content", which
+is exactly where distil's cross-version delta on a re-read-after-edit shows up.
+
+Honest scope: this measures distil's cache-delta vs the competitors' per-message
+compressors. Headroom's router has its own (exact) cross-turn dedup that this
+per-block adapter does not drive — but note that even that router has no cross-
+VERSION delta (verified: no diff/patch/SequenceMatcher in the package), which is
+the case this benchmark stresses. Decision-equivalence for distil's reversible
+output is by construction (recoverable) and separately certified live (shadow mode);
+the lossy competitors drop content irrecoverably.
+
+Run:  PYTHONPATH=. uv run python benchmarks/codebench.py
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import time
+from dataclasses import dataclass
+from typing import Any, Callable
+
+from distil.adapters.anthropic import compress_messages
+from distil.cachedelta import DeltaSession, delta_encode
+from distil.pricing import get as get_pricing
+from distil.tokenizer import DEFAULT as _tok
+
+# --------------------------------------------------------------------------- #
+# Realistic coding-session corpus (deterministic / seeded)
+# --------------------------------------------------------------------------- #
+
+
+def _module(n_funcs: int, salt: int) -> str:
+    """A synthetic but realistic Python module with many sizeable functions."""
+    funcs = []
+    for i in range(n_funcs):
+        body = "\n".join(f"    v{j} = x * {i + j + salt} + {j}" for j in range(10))
+        funcs.append(f"def func_{i}(x):\n{body}\n    return v0 + v9\n")
+    return "import os\nimport sys\nimport json\n\n\n" + "\n\n".join(funcs) + "\n"
+
+
+def _edit(src: str, version: int) -> str:
+    """Bump func_0's return to a version-specific value: a clean, parseable change
+    isolated to one function, so each re-read is a near-duplicate of the prior
+    version (the read→edit→reread case AST-delta is built for)."""
+    return re.sub(r"    return v0 \+ v9[^\n]*\n", f"    return v0 + v9 + {version}\n", src, count=1)
+
+
+def _tool_result(text: str, tid: str) -> dict:
+    return {
+        "role": "user",
+        "content": [{"type": "tool_result", "tool_use_id": tid, "content": text}],
+    }
+
+
+def _tool_use(name: str, inp: dict, tid: str) -> dict:
+    return {
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}],
+    }
+
+
+def _session(seed: int, n_files: int = 3, n_edits: int = 4) -> list[list[dict]]:
+    """One coding session as a list of CUMULATIVE message lists (one per turn)."""
+    msgs: list[dict] = [{"role": "user", "content": f"Fix the failing tests in module {seed}."}]
+    files = {f"mod_{seed}_{k}.py": _module(6 + k, seed + k) for k in range(n_files)}
+    turns: list[list[dict]] = []
+    tid = 0
+
+    def emit() -> None:
+        turns.append([dict(m) for m in msgs])
+
+    # Read every file once.
+    for name, src in files.items():
+        tid += 1
+        msgs.append(_tool_use("Read", {"path": name}, f"t{tid}"))
+        msgs.append(_tool_result(src, f"t{tid}"))
+        emit()
+    # A grep with a medium output (some of it recurs later -> exact dedup case).
+    grep_out = "\n".join(f"{n}:{i}: return v0 + v9" for n in files for i in range(20))
+    tid += 1
+    msgs.append(_tool_use("Bash", {"cmd": "grep -n 'return' *.py"}, f"t{tid}"))
+    msgs.append(_tool_result(grep_out, f"t{tid}"))
+    emit()
+    # Edit → re-read cycles on the first file (the cross-version delta hot path).
+    target = list(files)[0]
+    for _e in range(n_edits):
+        files[target] = _edit(files[target], _e + 1)
+        tid += 1
+        msgs.append(_tool_use("Edit", {"path": target, "edit": "bump"}, f"t{tid}"))
+        msgs.append(_tool_result("Edit applied.", f"t{tid}"))
+        emit()
+        tid += 1
+        msgs.append(_tool_use("Read", {"path": target}, f"t{tid}"))  # RE-READ after edit
+        msgs.append(_tool_result(files[target], f"t{tid}"))
+        emit()
+        # Re-run the same grep (identical output -> exact cross-turn dedup).
+        tid += 1
+        msgs.append(_tool_use("Bash", {"cmd": "grep -n 'return' *.py"}, f"t{tid}"))
+        msgs.append(_tool_result(grep_out, f"t{tid}"))
+        emit()
+    return turns
+
+
+def make_corpus(n_sessions: int = 20) -> list[list[list[dict]]]:
+    return [_session(seed) for seed in range(n_sessions)]
+
+
+# --------------------------------------------------------------------------- #
+# Token + cache-aware cost model (messages level)
+# --------------------------------------------------------------------------- #
+
+
+def _msg_text(m: Any) -> str:
+    if not isinstance(m, dict):
+        return ""
+    c = m.get("content")
+    if isinstance(c, str):
+        return c
+    out = []
+    if isinstance(c, list):
+        for b in c:
+            if isinstance(b, dict):
+                if isinstance(b.get("text"), str):
+                    out.append(b["text"])
+                bc = b.get("content")
+                if isinstance(bc, str):
+                    out.append(bc)
+                elif isinstance(bc, list):
+                    out += [s.get("text", "") for s in bc if isinstance(s, dict)]
+                if isinstance(b.get("input"), dict):
+                    out.append(json.dumps(b["input"]))
+    return "\n".join(out)
+
+
+def _msg_tokens(m: Any) -> int:
+    return _tok.count(_msg_text(m))
+
+
+def _msg_hash(m: Any) -> str:
+    return hashlib.sha256(json.dumps(m, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _session_dollars(turns_sent: list[list[dict]], pricing: Any) -> float:
+    """Cache-aware bill: the contiguous prefix identical to the previous turn is
+    billed at cache-read; the rest is fresh input."""
+    total = 0.0
+    prev: list[str] | None = None
+    for msgs in turns_sent:
+        hashes = [_msg_hash(m) for m in msgs]
+        toks = [_msg_tokens(m) for m in msgs]
+        lcp = 0
+        if prev is not None:
+            lim = min(len(hashes), len(prev))
+            while lcp < lim and hashes[lcp] == prev[lcp]:
+                lcp += 1
+        read = sum(toks[:lcp])
+        fresh = sum(toks[lcp:])
+        total += read * pricing.cache_read + fresh * pricing.input
+        prev = hashes
+    return total
+
+
+def _session_tokens(turns_sent: list[list[dict]]) -> int:
+    return sum(_msg_tokens(m) for msgs in turns_sent for m in msgs)
+
+
+# --------------------------------------------------------------------------- #
+# Methods (each confined to the volatile suffix → cache-monotonic for all)
+# --------------------------------------------------------------------------- #
+
+
+def _apply_to_suffix_tool_results(m: dict, fn: Callable[[str], str]) -> dict:
+    """Apply a text transform to a message's tool_result text(s) (non-mutating)."""
+    c = m.get("content")
+    if isinstance(c, list):
+        new = []
+        changed = False
+        for b in c:
+            if (
+                isinstance(b, dict)
+                and b.get("type") == "tool_result"
+                and isinstance(b.get("content"), str)
+            ):
+                t = fn(b["content"])
+                if t != b["content"]:
+                    new.append({**b, "content": t})
+                    changed = True
+                    continue
+            new.append(b)
+        if changed:
+            return {**m, "content": new}
+    return m
+
+
+@dataclass
+class _State:
+    prev_len: int = 0
+    session: DeltaSession | None = None
+
+
+def _m_none(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+    return msgs
+
+
+def _m_distil(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+    out, _store = compress_messages(msgs)
+    return out
+
+
+def _m_distil_cachedelta(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+    if state.session is None:
+        state.session = DeltaSession()
+    pre, _ds, _stats = delta_encode(msgs, session=state.session)
+    out, _store = compress_messages(pre)
+    return out
+
+
+def _m_distil_verbatim(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+    # Interactive / subscription regime: Tier-0 only, NO aggressive digest.
+    out, _store = compress_messages(msgs, verbatim=True)
+    return out
+
+
+def _m_distil_verbatim_cachedelta(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+    # The cache-delta niche: in verbatim mode the digest is off, so cross-version
+    # delta on re-reads is the primary lever.
+    if state.session is None:
+        state.session = DeltaSession()
+    pre, _ds, _stats = delta_encode(msgs, session=state.session)
+    out, _store = compress_messages(pre, verbatim=True)
+    return out
+
+
+def _make_competitor(compress_fn: Callable[[list[str]], list[str]]) -> Callable:
+    def method(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+        out = list(msgs[: state.prev_len])  # cache-stable prefix untouched (fair)
+        for m in msgs[state.prev_len :]:
+            out.append(_apply_to_suffix_tool_results(m, lambda t: compress_fn([t])[0]))
+        state.prev_len = len(msgs)
+        return out
+
+    return method
+
+
+# --------------------------------------------------------------------------- #
+# Runner + report
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class Row:
+    name: str
+    reversible: bool
+    token_savings: float
+    dollar_savings: float
+    ms_per_turn: float
+
+
+def run(corpus: list[list[list[dict]]], methods: list[tuple[str, bool, Callable]]) -> list[Row]:
+    pricing = get_pricing("claude-opus-4-8")
+    base_tok = base_dol = 0.0
+    rows: list[Row] = []
+    # baseline first (none)
+    cache: dict[str, tuple[float, float]] = {}
+    for name, reversible, fn in methods:
+        tok_total = 0
+        dol_total = 0.0
+        dur = 0.0
+        nturns = 0
+        for session in corpus:
+            state = _State()
+            sent: list[list[dict]] = []
+            for ti, msgs in enumerate(session):
+                t0 = time.perf_counter()
+                s = fn(state, msgs, ti)
+                dur += time.perf_counter() - t0
+                nturns += 1
+                sent.append(s)
+            tok_total += _session_tokens(sent)
+            dol_total += _session_dollars(sent, pricing)
+        cache[name] = (tok_total, dol_total)
+        if name == "none":
+            base_tok, base_dol = tok_total, dol_total
+        rows.append(Row(name, reversible, 0.0, 0.0, 1000 * dur / max(1, nturns)))
+    # fill savings vs baseline
+    for r in rows:
+        tt, dd = cache[r.name]
+        r.token_savings = (1 - tt / base_tok) if base_tok else 0.0
+        r.dollar_savings = (1 - dd / base_dol) if base_dol else 0.0
+    return rows
+
+
+def format_table(rows: list[Row], n_sessions: int, n_turns: int) -> str:
+    rows = sorted(rows, key=lambda r: r.dollar_savings, reverse=True)
+    out = [
+        f"coding-agent cache-delta benchmark  ({n_sessions} sessions, {n_turns} turns, "
+        f"read→edit→reread; cache-aware $, model=claude-opus-4-8)",
+        "",
+        f"{'method':<26}{'tok save':>9}{'$ save (cache)':>16}{'ms/turn':>10}{'fidelity':>12}",
+        "-" * 73,
+    ]
+    for r in rows:
+        out.append(
+            f"{r.name:<26}{r.token_savings * 100:>8.1f}%{r.dollar_savings * 100:>15.1f}%"
+            f"{r.ms_per_turn:>10.2f}{'reversible' if r.reversible else 'lossy':>12}"
+        )
+    out.append("-" * 73)
+    return "\n".join(out)
+
+
+if __name__ == "__main__":
+    import sys
+
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else 20
+    methods: list[tuple[str, bool, Callable]] = [
+        ("none", True, _m_none),
+        ("distil (PAYG digest)", True, _m_distil),
+        ("distil+cache-delta", True, _m_distil_cachedelta),
+        ("distil-verbatim", True, _m_distil_verbatim),
+        ("distil-verbatim+cache-delta", True, _m_distil_verbatim_cachedelta),
+    ]
+    try:
+        from benchmarks.headroom_adapter import compress as _hr
+
+        methods.append(("headroom (real)", False, _make_competitor(_hr)))
+    except Exception as e:  # noqa: BLE001
+        print(f"(headroom unavailable: {e})", file=sys.stderr)
+    try:
+        from benchmarks.llmlingua_adapter import compress as _ll
+
+        methods.append(("llmlingua-2 (real)", False, _make_competitor(_ll)))
+    except Exception as e:  # noqa: BLE001
+        print(f"(llmlingua unavailable: {e})", file=sys.stderr)
+
+    corpus = make_corpus(n)
+    n_turns = sum(len(s) for s in corpus)
+    rows = run(corpus, methods)
+    print(format_table(rows, n, n_turns))

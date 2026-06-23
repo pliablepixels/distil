@@ -135,6 +135,25 @@ It's not how many tokens you cut — it's which ones.</pre>
       </div>
     </div>
 
+    <h2 id="coding-agent">Coding-agent benchmark <span class="g">— cache-delta on read→edit→reread</span></h2>
+    <p>A second, <strong>messages-level</strong> benchmark targets the coding-agent hot path (<code>benchmarks/codebench.py</code>: 16 sessions / 256 turns of read → edit → <strong>re-read</strong>), scoring <strong>cache-aware real dollars</strong> against the <em>real</em> installed packages. Every method is confined to the volatile suffix, so the cached prefix is billed at the cache-read rate for all — a fair test of how each compresses new content.</p>
+    <table>
+      <thead><tr><th>method</th><th style="text-align:right">token savings</th><th style="text-align:right">$ savings (cache-aware)</th><th style="text-align:right">latency / turn</th><th>fidelity</th></tr></thead>
+      <tbody>
+        <tr style="background:rgba(139,123,255,.07)"><td><b>distil</b> (PAYG digest)</td><td class="r">91.5%</td><td class="r">91.1%</td><td class="r">0.09 ms</td><td>reversible</td></tr>
+        <tr><td>distil + cache-delta</td><td class="r">89.6%</td><td class="r">89.0%</td><td class="r">13.6 ms</td><td>reversible</td></tr>
+        <tr><td>distil-verbatim + cache-delta</td><td class="r">34.9%</td><td class="r">43.8%</td><td class="r">13.1 ms</td><td>reversible</td></tr>
+        <tr><td>distil-verbatim (Tier-0 only)</td><td class="r">0.0%</td><td class="r">0.0%</td><td class="r">0.6 ms</td><td>reversible</td></tr>
+        <tr><td>Headroom (<code>headroom</code> 0.27.0)</td><td class="r">0.0%</td><td class="r">0.0%</td><td class="r">7.6 ms</td><td>lossy</td></tr>
+        <tr><td>LLMLingua-2 (<code>llmlingua</code> 0.2.2)</td><td class="r">6.5%</td><td class="r">&minus;11.9%</td><td class="r">762 ms</td><td>lossy</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <b>Honest reading.</b> The <strong>Tier-1 reversible digest is the dominant lever</strong> (~91% cache-aware, reversible, 0.09 ms) — it already captures the re-reads, so cache-delta adds little <em>on top of</em> it. <strong>Cache-delta's real niche is verbatim / interactive mode</strong> (where the aggressive digest is disallowed): there it turns a 0% floor into <strong>43.8% cache-aware savings, reversible</strong>. <strong>LLMLingua-2 <em>raises</em> cost by 11.9%</strong> here (it busts the prompt cache) at ~8,500× the latency and is lossy; <strong>Headroom left this corpus unchanged</strong>. This benchmark also caught two real distil bugs (a cache-monotonicity flip and a Tier-0 token inflation) — both fixed in v0.22.0; the numbers are post-fix. Reproduce: <code>PYTHONPATH=. python benchmarks/codebench.py 16</code>.
+    </div>
+
+    <hr/>
+
     <h2>The offline standings <span class="g">— deterministic runner, zero API key</span></h2>
     <p>The companion to the live head-to-head above: the same gate run by the <strong>deterministic (structural)</strong> runner on a broader 64-trajectory corpus — fully reproducible by anyone, no key required. Ranked by cache-aware dollar savings (see methodology below). <strong>Certified</strong> means the method passed a statistical non-inferiority test <em>and</em> preserved 100% of decisions; anything less is disqualified, however much it saved. Want to test a specific tool? Register it through the reproducible <code>--external</code> seam and it's measured on the identical axes.</p>
 

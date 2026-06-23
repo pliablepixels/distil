@@ -137,3 +137,24 @@ def test_dollars_saved_uses_input_rate():
     p = pricing_get("claude-opus-4-8")
     stats = CacheStats(tokens_saved=1000)
     assert stats.dollars_saved(p) == 1000 * p.input
+
+
+def test_cache_monotonic_emitted_bytes_are_stable():
+    """A re-read encoded as a delta in one turn must encode to the SAME bytes when
+    it later sits in the prefix — else the prompt cache busts (the bug the coding
+    benchmark caught)."""
+    s = DeltaSession()
+    turn_n = [_u("q"), _tr(V1), _u("edit"), _tr(V2)]  # V2 (delta) at index 3
+    out_n, _s1, _st1 = delta_encode(turn_n, session=s)
+    turn_n1 = turn_n + [_u("more"), _tr("small")]  # index 3 is now inside the prefix
+    out_n1, _s2, _st2 = delta_encode(turn_n1, session=s)
+    assert _block_text(out_n[3]) == _block_text(out_n1[3])  # byte-identical emission
+
+
+def test_delta_encode_is_pure_without_session():
+    # No session needed for correctness — the cumulative conversation is the memory.
+    msgs = [_u("q"), _tr(V1), _u("e"), _tr(V2)]
+    a, _sa, sta = delta_encode(msgs)
+    b, _sb, stb = delta_encode(msgs)
+    assert sta.delta_refs == stb.delta_refs == 1
+    assert _block_text(a[3]) == _block_text(b[3])  # deterministic

@@ -3,6 +3,28 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.22.0] — Coding-agent benchmark + two correctness fixes it found
+
+Building the messages-level coding-agent benchmark (`benchmarks/codebench.py`:
+read→edit→reread sessions, cache-aware dollars vs the real headroom + llmlingua
+packages) surfaced two real bugs, both now fixed:
+
+- **Cache-delta is now cache-monotonic by construction.** `cachedelta.delta_encode`
+  was rewritten as a *pure per-call walk* over the cumulative messages (message *i*
+  is deduped only against messages 0..i-1). Previously the stable prefix was passed
+  through as originals while the prior turn had emitted those messages as markers, so
+  a re-read flipped marker→original on entering the prefix and **busted the prompt
+  cache**. The pure-walk encoding emits identical bytes for the cached prefix every
+  turn. (`session` is now optional — the cumulative conversation is the memory.)
+- **Tier-0 never inflates tokens.** `collapse_runs` could turn a run of near-free
+  blank lines into a `<<x N>>` marker that costs *more* tokens; the adapter had only
+  a char-based guard. `_apply_tier0` now keeps the collapse only when it reduces the
+  **token** count. (Fixes verbatim mode showing negative savings on whitespace-heavy
+  content.)
+- Net effect on the coding benchmark: verbatim+cache-delta went from −1.4% to a real
+  **+43.8% cache-aware savings (reversible)**; plain verbatim from −3.5% to 0.0%.
+  The PAYG digest remains the dominant lever (~91%). 3 regression tests (498 total).
+
 ## [0.21.0] — Edit-equivalence (decision-equivalence, made precise for code)
 
 - **Edit-equivalence**: the decision signature now AST-normalizes code-bearing tool

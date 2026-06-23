@@ -32,6 +32,7 @@ from typing import Any
 
 from ..compress.tier0 import collapse_runs, minify_json
 from ..compress.tier1 import digest as _tier1_digest
+from ..tokenizer import DEFAULT as _tokenizer
 
 # Minimum line count for a tool_result to be digested (matches Tier1Reversible default).
 _MIN_LINES = 6
@@ -98,11 +99,19 @@ def _handle(text: str) -> str:
 
 
 def _apply_tier0(text: str) -> str:
-    """Apply lossless Tier-0 transforms: JSON minification then run collapse."""
+    """Apply lossless Tier-0 transforms: JSON minification then run collapse.
+
+    Run-collapse is reject-if-bigger **by tokens** (what we bill): collapsing a run
+    of near-free whitespace/blank lines into a ``<<x N>>`` count marker can cost
+    *more* tokens than it removes, so we only keep the collapse when it actually
+    reduces the token count — Tier-0 must never inflate.
+    """
     mj = minify_json(text)
-    if mj is not None:
-        text = mj
-    return collapse_runs(text)
+    base = mj if mj is not None else text
+    collapsed = collapse_runs(base)
+    if collapsed != base and _tokenizer.count(collapsed) <= _tokenizer.count(base):
+        return collapsed
+    return base
 
 
 def _compress_text_content(text: str, store: RestoreStore, verbatim: bool) -> str:

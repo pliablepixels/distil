@@ -23,6 +23,44 @@ RTK operates at a different layer (see below).
 
 ---
 
+## Coding-agent benchmark — cache-delta on read→edit→reread
+
+A second, **messages-level** benchmark targets the coding-agent hot path
+(`benchmarks/codebench.py`: 16 sessions / 256 turns of read → edit → **re-read**),
+scoring **cache-aware real dollars** (the stable prefix billed at the cache-read
+rate) against the *real* installed packages. Every method is confined to the
+volatile suffix, so the cached prefix is cache-read for all — a fair comparison of
+how each compresses *new* content.
+
+| method | token savings | $ savings (cache-aware) | latency / turn | fidelity |
+|---|---:|---:|---:|:--|
+| **distil** (PAYG digest) | **91.5%** | **91.1%** | **0.09 ms** | reversible |
+| distil + cache-delta | 89.6% | 89.0% | 13.6 ms | reversible |
+| distil-verbatim + cache-delta | 34.9% | **43.8%** | 13.1 ms | reversible |
+| distil-verbatim (Tier-0 only) | 0.0% | 0.0% | 0.6 ms | reversible |
+| Headroom (`headroom` 0.27.0) | 0.0% | 0.0% | 7.6 ms | lossy |
+| LLMLingua-2 (`llmlingua` 0.2.2) | 6.5% | **−11.9%** | 762 ms | lossy |
+
+**Honest reading of these numbers:**
+
+- The **Tier-1 reversible digest is the dominant lever** (~91% cache-aware savings,
+  reversible, 0.09 ms). On these sessions it already captures the re-reads, so
+  **cache-delta adds little *on top of* the digest** (89% vs 91%).
+- **cache-delta's real niche is verbatim/interactive mode** (where the aggressive
+  digest is disallowed — subscription/OAuth, human-in-the-loop): there it is the
+  primary lever, turning a 0% floor into **43.8% cache-aware savings, reversible**.
+- **LLMLingua-2 *raises* cost by 11.9%** here — it rewrites suffix content and busts
+  the prompt cache — at **~8,500× the latency**, and it is lossy. **Headroom's
+  per-block compressor left this corpus unchanged** (0%). distil leads on every axis
+  *and* is the only reversible method.
+
+This benchmark also caught two real distil bugs (a cache-monotonicity flip in
+cache-delta and a Tier-0 token-inflation on whitespace runs); both are fixed in
+v0.22.0 — the numbers above are post-fix. Reproduce:
+`PYTHONPATH=. python benchmarks/codebench.py 16`.
+
+---
+
 ## How we certified — and why it's credible
 
 The headline isn't "we cut N% tokens." It's a **statistical certificate** on the
