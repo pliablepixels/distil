@@ -206,7 +206,7 @@ Decision-Equivalence Risk Certificate (DERC)
       <b>How it stays production-safe.</b> The second (uncompressed) call runs in a <strong>background thread</strong> &mdash; the client gets the compressed response immediately, never blocked. Only <code>RATE</code> of requests are sampled, so the overhead is <code>RATE</code> (e.g. 5%), not 2&times;. And it is <strong>content-free</strong>: the ledger stores a decision <em>signature</em> and an <code>equivalent</code> bool &mdash; never prompt or response text.
     </div>
 
-    <p>The "decision" is the agent's next action &mdash; the first <code>tool_use</code> (Anthropic) or <code>tool_call</code> (OpenAI). Two responses are equivalent iff that action matches, exactly the <code>{action, target}</code> fingerprint the certificate uses. The result is a rolling, live decision-change rate on <em>your</em> traffic:</p>
+    <p>The "decision" is the agent's next action &mdash; the first <code>tool_use</code> (Anthropic), <code>tool_call</code> (OpenAI), or <code>functionCall</code> (Gemini). Two responses are equivalent iff that action matches, exactly the <code>{action, target}</code> fingerprint the certificate uses. It is <strong>streaming-aware</strong>: the decision is reconstructed from SSE, so shadow-mode works on real agent sessions (Claude Code, Codex, Gemini CLI) that stream &mdash; not just non-streaming SDK calls. The result is a rolling, live decision-change rate on <em>your</em> traffic:</p>
 
     <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ distil proxy --shadow 0.05 --upstream https://api.anthropic.com</span>
   → shadow-mode live decision-equivalence: sampling 5%

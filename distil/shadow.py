@@ -16,9 +16,16 @@ Design constraints (this is in the request path):
     ``equivalent`` bool — never prompt or response content (same privacy posture
     as the savings ledger / telemetry).
 
-The "decision" is the agent's next action: the first ``tool_use`` block (Anthropic)
-or ``tool_call`` (OpenAI). Two responses are decision-equivalent iff that action
-matches — exactly the ``{action, target}`` fingerprint the certificate uses.
+The "decision" is the agent's next action: the first ``tool_use`` block (Anthropic),
+``tool_call`` (OpenAI), or ``functionCall`` (Gemini). Two responses are decision-
+equivalent iff that action matches — exactly the ``{action, target}`` fingerprint
+the certificate uses.
+
+Streaming-aware: real agent sessions (Claude Code, Codex, the Gemini CLI) stream
+their responses (SSE), so the decision must be reconstructed from the stream.
+:func:`decision_signature_from_body` reads a non-streaming JSON body directly and
+reconstructs a streamed (SSE / chunk-array) one via :func:`_decision_from_chunks`,
+yielding the same signature either way.
 """
 
 from __future__ import annotations
@@ -88,6 +95,138 @@ def decision_signature(resp_json: Any) -> str:
                     return "tool:" + _canon({"name": fc.get("name"), "args": fc.get("args")})
         return "text"  # responded without calling a function
 
+    return "none"
+
+
+def _decision_from_chunks(chunks: list[Any]) -> str:
+    """Reconstruct the decision signature from a sequence of *streaming* chunks.
+
+    Handles all three providers' streaming shapes by accumulating the first tool
+    call across chunks, so the signature matches the non-streaming
+    :func:`decision_signature` form exactly:
+
+    * Anthropic SSE — ``content_block_start`` (tool_use name) + ``input_json_delta``
+      fragments accumulated into the input object.
+    * OpenAI SSE — ``choices[].delta.tool_calls[].function`` name + concatenated
+      ``arguments`` string.
+    * Gemini ``streamGenerateContent`` — ``candidates[].content.parts[].functionCall``.
+    """
+    a_name = None
+    a_buf = ""
+    a_tool = False
+    a_text = False
+    o_name = None
+    o_args = ""
+    o_tool = False
+    o_text = False
+    g_call = None
+    g_text = False
+
+    for ch in chunks:
+        if not isinstance(ch, dict):
+            continue
+
+        # Anthropic streaming events
+        ctype = ch.get("type")
+        if ctype == "content_block_start":
+            cb = ch.get("content_block") or {}
+            if cb.get("type") == "tool_use" and not a_tool:
+                a_tool = True
+                a_name = cb.get("name")
+                if isinstance(cb.get("input"), dict) and cb["input"]:
+                    a_buf = json.dumps(cb["input"])
+            elif cb.get("type") == "text":
+                a_text = True
+        elif ctype == "content_block_delta":
+            delta = ch.get("delta") or {}
+            if delta.get("type") == "input_json_delta" and a_tool:
+                a_buf += delta.get("partial_json") or ""
+            elif delta.get("type") == "text_delta":
+                a_text = True
+
+        # OpenAI streaming deltas
+        choices = ch.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            delta = choices[0].get("delta") or {}
+            tcs = delta.get("tool_calls")
+            if isinstance(tcs, list) and tcs and isinstance(tcs[0], dict):
+                o_tool = True
+                fn = tcs[0].get("function") or {}
+                if fn.get("name"):
+                    o_name = o_name or fn["name"]
+                if fn.get("arguments"):
+                    o_args += fn["arguments"]
+            elif delta.get("content"):
+                o_text = True
+
+        # Gemini streaming chunks
+        cands = ch.get("candidates")
+        if isinstance(cands, list) and cands and isinstance(cands[0], dict):
+            content = cands[0].get("content") or {}
+            for p in content.get("parts") or []:
+                if isinstance(p, dict):
+                    if isinstance(p.get("functionCall"), dict) and g_call is None:
+                        g_call = p["functionCall"]
+                    elif isinstance(p.get("text"), str):
+                        g_text = True
+
+    if a_tool:
+        try:
+            inp = json.loads(a_buf) if a_buf.strip() else {}
+        except (ValueError, TypeError):
+            inp = {}
+        return "tool:" + _canon({"name": a_name, "input": inp})
+    if o_tool:
+        return "tool:" + _canon({"name": o_name, "arguments": o_args})
+    if g_call is not None:
+        return "tool:" + _canon({"name": g_call.get("name"), "args": g_call.get("args")})
+    if a_text or o_text or g_text:
+        return "text"
+    return "none"
+
+
+def _sse_payloads(text: str) -> list[Any]:
+    """Extract the JSON ``data:`` payloads from an SSE stream (skipping ``[DONE]``)."""
+    out: list[Any] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            out.append(json.loads(payload))
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def decision_signature_from_body(raw: Any) -> str:
+    """Decision signature for a raw response body — JSON, SSE stream, or chunk array.
+
+    This is what makes shadow-mode work on **streaming** sessions (Claude Code,
+    Codex, Gemini CLI all stream): a non-streaming JSON body is read directly; an
+    SSE stream or a JSON array of chunks is reconstructed via
+    :func:`_decision_from_chunks`. Returns the same ``tool:``/``text``/``none``
+    signature as :func:`decision_signature`, so streamed and non-streamed responses
+    compare correctly.
+    """
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", "replace")
+    if not isinstance(raw, str):
+        return decision_signature(raw)
+    raw = raw.strip()
+    if not raw:
+        return "none"
+    try:
+        obj = json.loads(raw)
+    except (ValueError, TypeError):
+        return _decision_from_chunks(_sse_payloads(raw))
+    if isinstance(obj, dict):
+        return decision_signature(obj)
+    if isinstance(obj, list):
+        return _decision_from_chunks(obj)
     return "none"
 
 

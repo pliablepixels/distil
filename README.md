@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-465%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-472%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -182,6 +182,8 @@ distil shadow-stats
 #   decision-change rate (rolling): 0.49%      ← live, on real traffic
 #   decision-equivalence          : 99.51%
 ```
+
+Shadow mode is **streaming-aware**: it reconstructs the decision from SSE, so it works on real agent sessions (Claude Code, Codex, Gemini CLI) that stream their responses — not just non-streaming SDK calls.
 
 For periodic certification under drift: `distil ingest` your captured traffic → `distil conformal --runner anthropic` to re-certify. With `--expand`, the **expand rate** (`x-distil-expanded`) is also a free live canary — the model itself signalling it needed detail back.
 

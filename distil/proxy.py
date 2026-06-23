@@ -386,19 +386,21 @@ def build_handler(
             # signal on real traffic. Never blocks the client's response.
             if _shadow_sampler is not None and _shadow_sampler.should_sample():
                 extras["x-distil-shadow"] = "sampled"
-                try:
-                    _compressed_resp = json.loads(rbody)
-                except (ValueError, TypeError):
-                    _compressed_resp = None
+                # Capture the real (compressed) response body — JSON or SSE stream.
+                _compressed_body = rbody
                 _orig_raw, _hdrs = raw, headers
 
                 def _shadow_compare() -> None:
                     try:
-                        from .shadow import compare_decisions
+                        from .shadow import decision_signature_from_body
 
                         _s, _h, orig_rbody = self._post_upstream(self.path, _orig_raw, _hdrs)
-                        equiv = compare_decisions(_compressed_resp, json.loads(orig_rbody))
-                        _shadow_ledger.record(equiv)
+                        # decision_signature_from_body handles both JSON and streamed
+                        # (SSE / chunk-array) bodies, so this works for Claude Code /
+                        # Codex / Gemini sessions, which stream their responses.
+                        comp_sig = decision_signature_from_body(_compressed_body)
+                        orig_sig = decision_signature_from_body(orig_rbody)
+                        _shadow_ledger.record(comp_sig == orig_sig)
                     except Exception:  # noqa: BLE001 — shadow must never affect the request
                         pass
 

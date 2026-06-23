@@ -7,7 +7,117 @@ from distil.shadow import (
     ShadowSampler,
     compare_decisions,
     decision_signature,
+    decision_signature_from_body,
 )
+
+
+# --- streaming (SSE / chunk-array) decision extraction --------------------- #
+# The core property: a STREAMED response must yield the SAME signature as the
+# equivalent non-streamed JSON, so shadow-mode works on Claude Code / Codex /
+# Gemini sessions (which all stream).
+
+_ANTHROPIC_SSE = (
+    "event: content_block_start\n"
+    'data: {"type":"content_block_start","index":0,'
+    '"content_block":{"type":"tool_use","id":"t1","name":"get_weather","input":{}}}\n\n'
+    "event: content_block_delta\n"
+    'data: {"type":"content_block_delta","index":0,'
+    '"delta":{"type":"input_json_delta","partial_json":"{\\"city\\":"}}\n\n'
+    "event: content_block_delta\n"
+    'data: {"type":"content_block_delta","index":0,'
+    '"delta":{"type":"input_json_delta","partial_json":"\\"SF\\"}"}}\n\n'
+    'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+)
+_ANTHROPIC_JSON = {
+    "content": [{"type": "tool_use", "name": "get_weather", "input": {"city": "SF"}}]
+}
+
+_OPENAI_SSE = (
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1",'
+    '"function":{"name":"get_weather","arguments":""}}]}}]}\n\n'
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,'
+    '"function":{"arguments":"{\\"city\\":"}}]}}]}\n\n'
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,'
+    '"function":{"arguments":"\\"SF\\"}"}}]}}]}\n\n'
+    "data: [DONE]\n\n"
+)
+_OPENAI_JSON = {
+    "choices": [
+        {
+            "message": {
+                "tool_calls": [{"function": {"name": "get_weather", "arguments": '{"city":"SF"}'}}]
+            }
+        }
+    ]
+}
+
+_GEMINI_SSE = (
+    'data: {"candidates":[{"content":{"parts":['
+    '{"functionCall":{"name":"get_weather","args":{"city":"SF"}}}]}}]}\n\n'
+)
+_GEMINI_JSON = {
+    "candidates": [
+        {"content": {"parts": [{"functionCall": {"name": "get_weather", "args": {"city": "SF"}}}]}}
+    ]
+}
+
+
+def test_anthropic_stream_matches_json():
+    sig = decision_signature_from_body(_ANTHROPIC_SSE)
+    assert sig.startswith("tool:")
+    assert sig == decision_signature(_ANTHROPIC_JSON)
+
+
+def test_openai_stream_matches_json():
+    sig = decision_signature_from_body(_OPENAI_SSE)
+    assert sig.startswith("tool:")
+    assert sig == decision_signature(_OPENAI_JSON)
+
+
+def test_gemini_stream_matches_json():
+    sig = decision_signature_from_body(_GEMINI_SSE)
+    assert sig.startswith("tool:")
+    assert sig == decision_signature(_GEMINI_JSON)
+
+
+def test_gemini_chunk_array_form():
+    # Gemini streamGenerateContent without alt=sse returns a JSON array of chunks.
+    import json
+
+    body = json.dumps([_GEMINI_JSON])
+    assert decision_signature_from_body(body) == decision_signature(_GEMINI_JSON)
+
+
+def test_stream_text_responses_are_text():
+    anth = (
+        "event: content_block_start\n"
+        'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n'
+        "event: content_block_delta\n"
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}\n\n'
+    )
+    oai = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'
+    gem = 'data: {"candidates":[{"content":{"parts":[{"text":"hi"}]}}]}\n\n'
+    assert decision_signature_from_body(anth) == "text"
+    assert decision_signature_from_body(oai) == "text"
+    assert decision_signature_from_body(gem) == "text"
+
+
+def test_body_json_dict_and_bytes_and_empty():
+    import json
+
+    assert decision_signature_from_body(json.dumps(_ANTHROPIC_JSON)) == decision_signature(
+        _ANTHROPIC_JSON
+    )
+    assert decision_signature_from_body(_GEMINI_SSE.encode()).startswith("tool:")  # bytes ok
+    assert decision_signature_from_body("") == "none"
+    assert decision_signature_from_body("not json, not sse") == "none"
+
+
+def test_compressed_vs_uncompressed_stream_equivalence():
+    # Same decision, one streamed one not -> equivalent (shadow records no change).
+    assert decision_signature_from_body(_OPENAI_SSE) == decision_signature_from_body(
+        __import__("json").dumps(_OPENAI_JSON)
+    )
 
 
 def test_decision_signature_anthropic_tool_use():

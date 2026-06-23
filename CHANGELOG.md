@@ -3,6 +3,21 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.18.0] — Streaming-aware shadow mode (Claude Code / Codex / Gemini)
+
+- **Shadow-mode now works on streaming sessions.** Real agent sessions (Claude Code,
+  Codex, the Gemini CLI) stream their responses over SSE, which the previous shadow
+  comparison couldn't parse — so it silently recorded nothing. `shadow.py` now
+  reconstructs the decision from a streamed body: `decision_signature_from_body`
+  reads a non-streaming JSON body directly and rebuilds a streamed (SSE or
+  chunk-array) one via `_decision_from_chunks`, accumulating the first tool call
+  across chunks for all three providers (Anthropic `input_json_delta`, OpenAI
+  `tool_calls` argument deltas, Gemini `functionCall`). A streamed response yields
+  the same signature as its non-streamed equivalent, so comparisons are valid.
+- The proxy shadow path now compares raw bodies via `decision_signature_from_body`,
+  so `distil proxy --shadow` measures live decision-equivalence on streaming traffic.
+  Verified end-to-end on an SSE tool-call response.
+
 ## [0.17.0] — Decouple compression aggression from auth (`--verbatim`)
 
 Resolves an overload introduced in 0.16.0. `--lossless-only` had been redefined to
