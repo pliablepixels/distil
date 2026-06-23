@@ -7,16 +7,16 @@
 # Or clone this file into your own tap at:
 #   $(brew --repo)/Library/Taps/<yourname>/homebrew-tap/Formula/distil.rb
 #
-# sha256 is for the v0.21.0 source tarball. To recompute for a new version:
+# sha256 is for the v0.23.1 source tarball. To recompute for a new version:
 #   curl -sL https://github.com/dshakes/distil/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
 
 class Distil < Formula
   desc "Compression with a quality contract — context compression for LLM agentic runtimes"
   homepage "https://github.com/dshakes/distil"
-  url "https://github.com/dshakes/distil/archive/refs/tags/v0.21.0.tar.gz"
+  url "https://github.com/dshakes/distil/archive/refs/tags/v0.23.1.tar.gz"
   sha256 "15416fa9793b26a4d41959e4ad41e1d284b622e67595b7b5b6bf449de985f5ed"
   license "Apache-2.0"
-  version "0.21.0"
+  version "0.23.1"
 
   depends_on "python@3.12"
 
