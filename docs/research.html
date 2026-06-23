@@ -196,6 +196,31 @@ Decision-Equivalence Risk Certificate (DERC)
 
     <hr/>
 
+    <!-- Feature 1d: Shadow-mode live equivalence -->
+    <h2 id="shadow">Shadow-mode <span class="g">— live decision-equivalence on real traffic</span></h2>
+    <p><strong>Module:</strong> <code>distil/shadow.py</code> &middot; <strong>Command:</strong> <code>distil proxy --shadow RATE</code> &middot; <code>distil shadow-stats</code></p>
+
+    <p>The certificate proves decision-equivalence <em>offline</em>, on a calibration corpus. Shadow mode closes the loop <em>online</em>. Cost is free to measure live (token deltas); equivalence is not &mdash; it needs the <em>counterfactual</em>, the decision the agent would have made on the <em>uncompressed</em> context. So shadow mode samples a fraction of live requests and runs each one <strong>both ways</strong>, comparing the agent's chosen next action.</p>
+
+    <div class="callout">
+      <b>How it stays production-safe.</b> The second (uncompressed) call runs in a <strong>background thread</strong> &mdash; the client gets the compressed response immediately, never blocked. Only <code>RATE</code> of requests are sampled, so the overhead is <code>RATE</code> (e.g. 5%), not 2&times;. And it is <strong>content-free</strong>: the ledger stores a decision <em>signature</em> and an <code>equivalent</code> bool &mdash; never prompt or response text.
+    </div>
+
+    <p>The "decision" is the agent's next action &mdash; the first <code>tool_use</code> (Anthropic) or <code>tool_call</code> (OpenAI). Two responses are equivalent iff that action matches, exactly the <code>{action, target}</code> fingerprint the certificate uses. The result is a rolling, live decision-change rate on <em>your</em> traffic:</p>
+
+    <pre class="term"><button class="copy-btn" onclick="copyCode(this)">copy</button><span class="d">$ distil proxy --shadow 0.05 --upstream https://api.anthropic.com</span>
+  → shadow-mode live decision-equivalence: sampling 5%
+
+<span class="d">$ distil shadow-stats</span>
+  shadowed requests : 412
+  decision changes  : 2
+  decision-change rate (rolling): <span class="g">0.49%</span>
+  decision-equivalence          : <span class="g">99.51%</span></pre>
+
+    <p>This complements periodic re-certification (<code>distil ingest</code> &rarr; <code>distil conformal</code>) under the exchangeability caveat: shadow mode is the <em>continuous</em> monitor, the certificate is the <em>guarantee</em>. Together they make decision-equivalence observable in production, not just in eval.</p>
+
+    <hr/>
+
     <!-- Feature 2: Self-distilling keep-model -->
     <h2 id="online">Self-distilling keep-model</h2>
     <p><strong>Module:</strong> <code>distil/online.py</code> &middot; <strong>Command:</strong> <code>distil online [--corpus --promote-to]</code></p>

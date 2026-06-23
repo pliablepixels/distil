@@ -166,6 +166,29 @@ $ distil frontier --corpus benchmarks/corpus_xl
 
 ---
 
+## 📡 See it working — real-time savings & live equivalence
+
+**Cost savings, live, three ways:**
+- **Per request** — every compressed response carries headers: `x-distil-tokens-saved`, `x-distil-compressed`, and `x-distil-expanded` when recovery fired. Read them in your own logging.
+- **Live dashboard** — run `distil gateway` (instead of `distil proxy`): `/distil/dashboard` (per-tenant tokens + dollars, live HTML) and `/distil/stats` (JSON to scrape into Grafana).
+- **Genuine cumulative savings** — the proxy records *real-traffic* savings to a local ledger; `distil leaderboard` renders it. Measured on your actual calls, not estimates.
+
+**Decision-equivalence, live — shadow mode.** Cost is free to measure live; equivalence needs the counterfactual. `distil proxy --shadow 0.05` samples 5% of requests, runs them **uncompressed too in the background** (never blocking your response), and records whether the agent chose the same action — a rolling, content-free **live decision-change rate** on your own traffic:
+
+```bash
+distil proxy --shadow 0.05 --upstream https://api.anthropic.com
+distil shadow-stats
+#   shadowed requests : 412
+#   decision-change rate (rolling): 0.49%      ← live, on real traffic
+#   decision-equivalence          : 99.51%
+```
+
+For periodic certification under drift: `distil ingest` your captured traffic → `distil conformal --runner anthropic` to re-certify. With `--expand`, the **expand rate** (`x-distil-expanded`) is also a free live canary — the model itself signalling it needed detail back.
+
+**Enforce it once, org-wide.** Run `distil proxy` as a sidecar and set `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` in managed settings or container env — every client (Claude Code via `ANTHROPIC_BASE_URL`, Codex, any SDK) routes through it with **zero per-developer change**. (Gemini's API shape isn't supported yet — a Gemini adapter is on the roadmap.)
+
+---
+
 ## 🔌 Works with every SDK
 
 One proxy. Point any `base_url`-honoring client at it — **Python, TypeScript, any language** — and get cache-aware lossless compression with **no code change**.
@@ -269,6 +292,7 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **TOST non-inferiority gate** + 7-domain corpus + `distil bench` | `certify/`, `corpus.py` | the contract |
 | **Decision-Equivalence Risk Certificate** — conformal risk control (LTT/CRC) | `conformal.py`, `distil conformal` | distribution-free guarantee |
 | **Salience protection** — model-free (pattern + entropy + cross-reference), keeps the decision-bearing lines while crushing the rest | `compress/salience.py` | frontier shifter |
+| **Shadow-mode live equivalence** — sample live traffic, run it compressed *and* uncompressed in the background, record the live decision-change rate | `shadow.py`, `distil proxy --shadow` / `distil shadow-stats` | live, content-free |
 | **Provider proxy** — drop-in across SDKs | `proxy.py`, `distil proxy` | reversible |
 | **Managed gateway** — multi-tenant + live savings dashboard | `gateway.py`, `distil gateway` | — |
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |

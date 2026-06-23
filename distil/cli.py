@@ -358,7 +358,29 @@ def cmd_proxy(args: argparse.Namespace) -> int:
             record=not args.no_record,
             pricing_model=args.pricing,
             expand=args.expand,
+            shadow_rate=args.shadow,
         )
+    return 0
+
+
+def cmd_shadow_stats(args: argparse.Namespace) -> int:
+    """Show the live decision-equivalence measured by shadow mode on real traffic."""
+    from .shadow import ShadowLedger
+
+    led = ShadowLedger.load()
+    if led.samples == 0:
+        print("No shadow samples yet. Run `distil proxy --shadow 0.05` to sample live traffic.")
+        return 0
+    change = led.rate()
+    print("Shadow-mode live decision-equivalence (real traffic, content-free)\n")
+    print(f"  shadowed requests : {led.samples}")
+    print(f"  decision changes  : {led.changes}")
+    print(f"  decision-change rate (rolling): {change * 100:.2f}%")
+    print(f"  decision-equivalence          : {(1 - change) * 100:.2f}%")
+    print(
+        "\n  Each sampled request was run BOTH compressed and uncompressed; "
+        "equivalence\n  means the agent chose the same next action. Numbers only, never content."
+    )
     return 0
 
 
@@ -868,7 +890,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="recoverable compression: inject the distil_expand tool so the agent can "
         "pull back digested detail on demand (transparent server-side recovery loop)",
     )
+    px.add_argument(
+        "--shadow",
+        type=float,
+        default=0.0,
+        metavar="RATE",
+        help="shadow-mode live decision-equivalence: sample this fraction of requests "
+        "(e.g. 0.05) and run them uncompressed too, in the background, to measure the "
+        "live decision-change rate on real traffic (`distil shadow-stats`). Adds ~RATE cost.",
+    )
     px.set_defaults(func=cmd_proxy)
+
+    ss = sub.add_parser(
+        "shadow-stats", help="show live decision-equivalence measured by shadow mode"
+    )
+    ss.set_defaults(func=cmd_shadow_stats)
 
     wr = sub.add_parser(
         "wrap",

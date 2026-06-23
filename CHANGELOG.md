@@ -3,6 +3,19 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.13.0] — Shadow-mode live decision-equivalence
+
+- **Shadow mode** (`shadow.py`, `distil proxy --shadow RATE`, `distil shadow-stats`):
+  samples a fraction of live requests, runs each one **both compressed and
+  uncompressed** in a background thread (never blocking the client), and records a
+  **content-free live decision-change rate** on real traffic. The continuous online
+  counterpart to the offline certificate — decision-equivalence becomes observable
+  in production. Decision = the agent's next `tool_use`/`tool_call`; equivalence
+  iff that action matches.
+- README: a "See it working — real-time savings & live equivalence" section
+  (per-request headers, gateway dashboard, genuine-savings ledger, shadow mode,
+  and one-env-var org-wide enforcement).
+
 ## [0.12.1] — GA hardening
 
 Pre-GA security + correctness pass (no behavior change to the happy path):

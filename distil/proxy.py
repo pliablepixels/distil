@@ -21,6 +21,7 @@ Or as a module::
 from __future__ import annotations
 
 import json
+import threading
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -99,6 +100,7 @@ def build_handler(
     savings: Any = None,
     flush_every: int = 50,
     expand: bool = False,
+    shadow_rate: float = 0.0,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a ``BaseHTTPRequestHandler`` subclass configured for *upstream*.
 
@@ -126,6 +128,16 @@ def build_handler(
 
         _learn_stats = ExpandStats.load()
         _learn_keep = keep_predicate(_learn_stats)
+
+    # Shadow-mode live decision-equivalence: sample a fraction of requests, run the
+    # decision uncompressed too (in the background), and record whether it matched.
+    _shadow_sampler = None
+    _shadow_ledger = None
+    if shadow_rate and shadow_rate > 0:
+        from .shadow import ShadowLedger, ShadowSampler
+
+        _shadow_sampler = ShadowSampler(shadow_rate)
+        _shadow_ledger = ShadowLedger()
 
     class _DistilHandler(BaseHTTPRequestHandler):
         # ----------------------------------------------------------------
@@ -334,6 +346,29 @@ def build_handler(
                         extras["x-distil-expanded"] = "1"
             if _learn_stats is not None:  # persist the learned policy (atomic)
                 _learn_stats.save()
+
+            # Shadow-mode: on a sampled request, re-run the decision UNCOMPRESSED in
+            # the background and record whether it matched — a live decision-change
+            # signal on real traffic. Never blocks the client's response.
+            if _shadow_sampler is not None and _shadow_sampler.should_sample():
+                extras["x-distil-shadow"] = "sampled"
+                try:
+                    _compressed_resp = json.loads(rbody)
+                except (ValueError, TypeError):
+                    _compressed_resp = None
+                _orig_raw, _hdrs = raw, headers
+
+                def _shadow_compare() -> None:
+                    try:
+                        from .shadow import compare_decisions
+
+                        _s, _h, orig_rbody = self._post_upstream(self.path, _orig_raw, _hdrs)
+                        equiv = compare_decisions(_compressed_resp, json.loads(orig_rbody))
+                        _shadow_ledger.record(equiv)
+                    except Exception:  # noqa: BLE001 — shadow must never affect the request
+                        pass
+
+                threading.Thread(target=_shadow_compare, daemon=True).start()
             self._relay(status, rhdrs, rbody, extras=extras)
 
         # ----------------------------------------------------------------
@@ -389,6 +424,7 @@ def serve(
     record: bool = True,
     pricing_model: str = "claude-opus-4-8",
     expand: bool = False,
+    shadow_rate: float = 0.0,
 ) -> None:
     """Run a blocking :class:`ThreadingHTTPServer` proxy.
 
@@ -419,10 +455,16 @@ def serve(
         shape_output=shape_output,
         savings=savings,
         expand=expand,
+        shadow_rate=shadow_rate,
     )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
+    if shadow_rate and shadow_rate > 0:
+        print(
+            f"  → shadow-mode live decision-equivalence: sampling {shadow_rate * 100:.0f}% "
+            "(distil shadow-stats)"
+        )
     if expand:
         print(
             "  → recoverable compression: distil_expand tool active (agent recovers detail on demand)"
@@ -464,7 +506,6 @@ def wrap_run(
     import os
     import subprocess
     import sys
-    import threading
 
     savings = None
     if record:
