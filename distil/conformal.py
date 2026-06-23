@@ -143,15 +143,20 @@ def _truncate_level(limit: int):
 
 
 def default_ladder():
-    """Least → most aggressive compression levels (risk non-decreasing). Reuses
-    Distil's safe operating points, then a truncation sweep that traces the cliff."""
+    """Least → most aggressive compression levels, ordered by expected risk. Reuses
+    Distil's safe operating points, then salience-PROTECTED aggressive levels (which
+    keep the decision-bearing lines while crushing the rest), then the raw truncation
+    sweep that traces the cliff. The certificate picks the highest-savings level whose
+    risk is controlled — so a protected-aggressive level can legitimately win."""
     from .compress.adaptive import byte_exact
+    from .compress.salience import protect
     from .compress.strategies import distil
 
     return [
         ("byte-exact", byte_exact),
         ("lossless", distil),
-        ("truncate@2000", _truncate_level(2000)),
+        ("protect+truncate@500", protect(_truncate_level(500))),
+        ("protect+truncate@250", protect(_truncate_level(250))),
         ("truncate@1000", _truncate_level(1000)),
         ("truncate@500", _truncate_level(500)),
         ("truncate@250", _truncate_level(250)),
@@ -195,9 +200,17 @@ def calibrate(
 
     n = len(level_losses[0]) if level_losses else 0
     if method == "crc":
-        idx = crc_select(level_losses, alpha=alpha)
+        idx_end = crc_select(level_losses, alpha=alpha)
     else:
-        idx, _pvals = ltt_certify(level_losses, alpha=alpha, delta=delta)
+        idx_end, _pvals = ltt_certify(level_losses, alpha=alpha, delta=delta)
+
+    # Every level in the certified prefix [0..idx_end] carries the guarantee (fixed-
+    # sequence / monotone). The operating point is the HIGHEST-SAVINGS one of them —
+    # savings is not monotone in ladder position once protected levels are mixed in.
+    def _savings(i: int) -> float:
+        return (1.0 - comp_tok[i] / base_tok) if base_tok else 0.0
+
+    idx = max(range(idx_end + 1), key=_savings) if idx_end >= 0 else -1
 
     if idx < 0:
         return Certificate(

@@ -268,6 +268,7 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **Causal / counterfactual pruning** | `replay/ablation.py` | certified |
 | **TOST non-inferiority gate** + 7-domain corpus + `distil bench` | `certify/`, `corpus.py` | the contract |
 | **Decision-Equivalence Risk Certificate** — conformal risk control (LTT/CRC) | `conformal.py`, `distil conformal` | distribution-free guarantee |
+| **Salience protection** — model-free (pattern + entropy + cross-reference), keeps the decision-bearing lines while crushing the rest | `compress/salience.py` | frontier shifter |
 | **Provider proxy** — drop-in across SDKs | `proxy.py`, `distil proxy` | reversible |
 | **Managed gateway** — multi-tenant + live savings dashboard | `gateway.py`, `distil gateway` | — |
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |

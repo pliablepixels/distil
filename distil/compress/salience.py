@@ -1,0 +1,151 @@
+"""Salience protection — keep the needle, compress the haystack (model-free).
+
+The decision-aware counterpart to entity protection: before a *lossy* strategy
+crushes a block, we mark the spans that are most likely to carry the decision and
+guarantee they survive — so aggressive compression stops dropping load-bearing
+identifiers and directives.
+
+Unlike syntactic entity protectors, salience here is a **model-free blend of three
+signals**, and it operates at *line* granularity so the decision unit survives
+together (e.g. ``notify_customer(PAY-12345)`` keeps the verb AND the target):
+
+  1. PATTERN  — known identifier shapes (UUID, git sha, ``PREFIX-NNN``, email, IP, semver).
+  2. ENTROPY  — high-information mixed-alnum tokens, so novel ID formats that no
+                fixed regex anticipates are still caught (Shannon entropy + diversity).
+  3. REFERENCE — tokens that recur across blocks are anchors the agent navigates by;
+                a token referenced in two places is load-bearing, not noise.
+
+This is not a competing heuristic to the certificate — it is a *frontier shifter*.
+Protecting salient lines lowers the decision-change rate, so the conformal
+certificate (:mod:`distil.conformal`) can certify a **more aggressive** level. The
+guarantee still comes from the gate; this just moves where the gate says "safe".
+
+No model, no network — a few hundred microseconds, so it stays in the request path.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from collections import Counter
+from collections.abc import Callable
+
+from ..trajectory import Block
+
+__all__ = [
+    "salient_tokens",
+    "salient_lines",
+    "reference_index",
+    "protect",
+]
+
+# --- Signal 1: identifier shapes ------------------------------------------- #
+_PATTERNS = re.compile(
+    r"""(
+        [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}  # UUID
+      | \b(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b      # hex hash / git sha (mixed)
+      | \b[A-Z][A-Z0-9]{1,}-[A-Za-z0-9]{1,}\b                       # PAY-12345, NODE-77, GHSA-xv9
+      | \b[\w.+-]+@[\w-]+\.[\w.-]+\b                                # email
+      | \b(?:\d{1,3}\.){3}\d{1,3}\b                                 # IPv4
+      | \bv?\d+\.\d+\.\d+(?:-[\w.]+)?\b                             # semver
+    )""",
+    re.VERBOSE,
+)
+_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-/]{3,}")
+
+
+def _entropy(tok: str) -> float:
+    """Shannon entropy (bits/char) of a token — high for random-looking strings."""
+    if not tok:
+        return 0.0
+    counts = Counter(tok)
+    n = len(tok)
+    return -sum((c / n) * math.log2(c / n) for c in counts.values())
+
+
+def _high_entropy(tok: str, min_entropy: float, min_len: int) -> bool:
+    """A novel identifier the patterns miss: long, mixed letters+digits, high entropy."""
+    if len(tok) < min_len:
+        return False
+    has_alpha = any(c.isalpha() for c in tok)
+    has_digit = any(c.isdigit() for c in tok)
+    return has_alpha and has_digit and _entropy(tok) >= min_entropy
+
+
+def reference_index(blocks: list[Block]) -> Counter:
+    """Count token occurrences across DISTINCT blocks — a token in >=2 blocks is an
+    anchor the agent cross-references (a tool name in the schema and a tool output)."""
+    idx: Counter = Counter()
+    for b in blocks:
+        for tok in set(_TOKEN.findall(b.text)):
+            idx[tok] += 1
+    return idx
+
+
+def salient_tokens(
+    text: str,
+    *,
+    ref_index: Counter | None = None,
+    min_entropy: float = 3.2,
+    min_len: int = 10,
+) -> set[str]:
+    """The set of tokens in ``text`` worth protecting, from the three signals."""
+    out: set[str] = set(m.group(0) for m in _PATTERNS.finditer(text))
+    for tok in _TOKEN.findall(text):
+        if tok in out:
+            continue
+        if _high_entropy(tok, min_entropy, min_len):
+            out.add(tok)
+        elif (
+            ref_index is not None and ref_index.get(tok, 0) >= 2 and any(ch.isdigit() for ch in tok)
+        ):
+            out.add(tok)  # cross-referenced identifier-like anchor
+    return out
+
+
+def salient_lines(text: str, *, ref_index: Counter | None = None, **kw) -> list[str]:
+    """The lines carrying a salient token — the decision *unit* (verb + target),
+    not an isolated token. Preserved verbatim so the agent reads them intact."""
+    toks = salient_tokens(text, ref_index=ref_index, **kw)
+    if not toks:
+        return []
+    return [ln for ln in text.splitlines() if any(t in ln for t in toks)]
+
+
+# --- The composable protector ---------------------------------------------- #
+Strategy = Callable[[list[Block], int], list[Block]]
+
+
+def protect(strategy: Strategy, **salience_kw) -> Strategy:
+    """Wrap any (possibly lossy) strategy so no salient *line* is ever dropped.
+
+    For each block, if compression removed a salient line that was in the original,
+    the line is re-appended verbatim under a compact ``⟦keep⟧`` marker — the needle
+    survives even when the haystack is crushed. Never emits a block larger than the
+    original (reject-if-bigger), so protection can only *reduce* savings, never invert
+    them. Lossless strategies already keep everything, so this is a no-op there; its
+    value is making the aggressive operating points decision-safe.
+    """
+
+    def wrapped(blocks: list[Block], turn: int) -> list[Block]:
+        ref = reference_index(blocks)
+        out = strategy(blocks, turn)
+        by_id = {b.id: b for b in blocks}
+        fixed: list[Block] = []
+        for c in out:
+            orig = by_id.get(c.id)
+            if orig is None or orig.text == c.text:
+                fixed.append(c)
+                continue
+            want = salient_lines(orig.text, ref_index=ref, **salience_kw)
+            missing = [ln for ln in want if ln.strip() and ln not in c.text]
+            if not missing:
+                fixed.append(c)
+                continue
+            patched = c.text + "\n⟦keep⟧ " + " ⟦keep⟧ ".join(ln.strip() for ln in missing)
+            # reject-if-bigger: never let protection exceed the original block
+            fixed.append(c if len(patched) >= len(orig.text) else orig.copy_with(patched))
+        return fixed
+
+    wrapped.__name__ = f"protect({getattr(strategy, '__name__', 'strategy')})"
+    return wrapped

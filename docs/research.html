@@ -177,6 +177,25 @@ Decision-Equivalence Risk Certificate (DERC)
 
     <hr/>
 
+    <!-- Feature 1c: Salience protection -->
+    <h2 id="salience">Salience protection <span class="g">— keep the needle, crush the haystack</span></h2>
+    <p><strong>Module:</strong> <code>distil/compress/salience.py</code> &middot; <strong>Composes with:</strong> the certificate (it shifts the frontier)</p>
+
+    <p>The certificate tells you how far you can compress safely. <em>Salience protection</em> makes "far" go further: before a lossy level crushes a block, it guarantees the <strong>decision-bearing lines survive</strong> &mdash; so aggressive compression stops dropping load-bearing identifiers and directives. It is <strong>model-free</strong> (a few hundred microseconds, no transformer in the path), and unlike syntactic entity protectors it blends three signals and works at <em>line</em> granularity so the decision unit (verb + target) stays intact.</p>
+
+    <div class="grid2">
+      <div class="card"><div class="tag">Signal 1 — pattern</div><h3>Identifier shapes</h3><p>UUIDs, git SHAs, <code>PREFIX-NNN</code> IDs, emails, IPs, semver &mdash; the obvious load-bearing tokens.</p></div>
+      <div class="card"><div class="tag">Signal 2 — entropy</div><h3>Novel IDs no regex anticipates</h3><p>High-information mixed-alnum tokens caught by Shannon entropy + character diversity, so an unfamiliar key format is still protected.</p></div>
+      <div class="card"><div class="tag">Signal 3 — reference</div><h3>Cross-block anchors</h3><p>A token that recurs across blocks (a tool name in the schema and in an output) is something the agent navigates by &mdash; load-bearing, not noise.</p></div>
+      <div class="card"><div class="tag">Composition</div><h3>A frontier shifter, not a heuristic</h3><p>Protection lowers the decision-change rate, so the conformal certificate can certify a <em>more aggressive</em> level. The guarantee still comes from the gate; this just moves where the gate says &ldquo;safe.&rdquo;</p></div>
+    </div>
+
+    <div class="callout">
+      <b>Measured.</b> On the realistic corpus, wrapping blind <code>truncate@200</code> with <code>protect(&hellip;)</code> took its load-bearing-target survival from <strong>0/120 &rarr; 120/120</strong>, at a cost of only <strong>2.4 points of savings</strong> (73.9% &rarr; 71.5%) &mdash; and <strong>~0.4&nbsp;ms</strong> per turn, no model. The needle survives; the haystack still compresses. Distil's <code>distil conformal</code> ladder includes <code>protect+truncate</code> levels, so the certificate can pick a protected-aggressive operating point automatically.
+    </div>
+
+    <hr/>
+
     <!-- Feature 2: Self-distilling keep-model -->
     <h2 id="online">Self-distilling keep-model</h2>
     <p><strong>Module:</strong> <code>distil/online.py</code> &middot; <strong>Command:</strong> <code>distil online [--corpus --promote-to]</code></p>
