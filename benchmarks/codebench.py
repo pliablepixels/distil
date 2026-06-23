@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from distil.adapters.anthropic import compress_messages
-from distil.cachedelta import DeltaSession, delta_encode
+from distil.cachedelta import delta_encode
 from distil.pricing import get as get_pricing
 from distil.tokenizer import DEFAULT as _tok
 
@@ -186,7 +186,7 @@ def _session_tokens(turns_sent: list[list[dict]]) -> int:
 # --------------------------------------------------------------------------- #
 
 
-def _apply_to_suffix_tool_results(m: dict, fn: Callable[[str], str]) -> dict:
+def _apply_to_tool_results(m: dict, fn: Callable[[str], str]) -> dict:
     """Apply a text transform to a message's tool_result text(s) (non-mutating)."""
     c = m.get("content")
     if isinstance(c, list):
@@ -209,52 +209,63 @@ def _apply_to_suffix_tool_results(m: dict, fn: Callable[[str], str]) -> dict:
     return m
 
 
-@dataclass
-class _State:
-    prev_len: int = 0
-    session: DeltaSession | None = None
+# Every method is a PURE function of the cumulative message list -> sent messages.
+# Deterministic methods are therefore cache-monotonic by construction (a given
+# prefix message always encodes to the same bytes). Headroom is a whole-conversation
+# transformer with its own staleness logic, so its cross-turn cache behavior is
+# measured exactly as it actually behaves — no harness shortcut.
 
 
-def _m_none(state: _State, msgs: list[dict], ti: int) -> list[dict]:
+def _m_none(msgs: list[dict]) -> list[dict]:
     return msgs
 
 
-def _m_distil(state: _State, msgs: list[dict], ti: int) -> list[dict]:
-    out, _store = compress_messages(msgs)
-    return out
+def _m_distil(msgs: list[dict]) -> list[dict]:
+    return compress_messages(msgs)[0]
 
 
-def _m_distil_cachedelta(state: _State, msgs: list[dict], ti: int) -> list[dict]:
-    if state.session is None:
-        state.session = DeltaSession()
-    pre, _ds, _stats = delta_encode(msgs, session=state.session)
-    out, _store = compress_messages(pre)
-    return out
+def _m_distil_cachedelta(msgs: list[dict]) -> list[dict]:
+    pre, _ds, _stats = delta_encode(msgs)  # pure per-call walk (cache-monotonic)
+    return compress_messages(pre)[0]
 
 
-def _m_distil_verbatim(state: _State, msgs: list[dict], ti: int) -> list[dict]:
-    # Interactive / subscription regime: Tier-0 only, NO aggressive digest.
-    out, _store = compress_messages(msgs, verbatim=True)
-    return out
+def _m_distil_verbatim(msgs: list[dict]) -> list[dict]:
+    return compress_messages(msgs, verbatim=True)[0]
 
 
-def _m_distil_verbatim_cachedelta(state: _State, msgs: list[dict], ti: int) -> list[dict]:
-    # The cache-delta niche: in verbatim mode the digest is off, so cross-version
-    # delta on re-reads is the primary lever.
-    if state.session is None:
-        state.session = DeltaSession()
-    pre, _ds, _stats = delta_encode(msgs, session=state.session)
-    out, _store = compress_messages(pre, verbatim=True)
-    return out
+def _m_distil_verbatim_cachedelta(msgs: list[dict]) -> list[dict]:
+    pre, _ds, _stats = delta_encode(msgs)
+    return compress_messages(pre, verbatim=True)[0]
 
 
-def _make_competitor(compress_fn: Callable[[list[str]], list[str]]) -> Callable:
-    def method(state: _State, msgs: list[dict], ti: int) -> list[dict]:
-        out = list(msgs[: state.prev_len])  # cache-stable prefix untouched (fair)
-        for m in msgs[state.prev_len :]:
-            out.append(_apply_to_suffix_tool_results(m, lambda t: compress_fn([t])[0]))
-        state.prev_len = len(msgs)
-        return out
+def make_llmlingua(compress_fn: Callable[[list[str]], list[str]]) -> Callable:
+    """LLMLingua applied to EVERY tool_result, memoised per text — so it is a pure,
+    deterministic, cache-monotonic function of the conversation (apples-to-apples
+    with distil), and we compress each distinct block once."""
+    memo: dict[str, str] = {}
+
+    def one(t: str) -> str:
+        if t not in memo:
+            memo[t] = compress_fn([t])[0]
+        return memo[t]
+
+    def method(msgs: list[dict]) -> list[dict]:
+        return [_apply_to_tool_results(m, one) for m in msgs]
+
+    return method
+
+
+def make_headroom() -> Callable:
+    """Headroom driven its real way: the whole conversation through its router with
+    optimize=True (the invocation that engages its pipeline, incl. its own stale-read
+    compression). We measure exactly what it emits, cross-turn cache behavior and all."""
+    from headroom import compress as hr
+
+    def method(msgs: list[dict]) -> list[dict]:
+        try:
+            return hr(msgs, model="claude-sonnet-4-5", model_limit=2000, optimize=True).messages
+        except Exception:  # noqa: BLE001 — never let a competitor error abort the bench
+            return msgs
 
     return method
 
@@ -285,11 +296,10 @@ def run(corpus: list[list[list[dict]]], methods: list[tuple[str, bool, Callable]
         dur = 0.0
         nturns = 0
         for session in corpus:
-            state = _State()
             sent: list[list[dict]] = []
-            for ti, msgs in enumerate(session):
+            for msgs in session:
                 t0 = time.perf_counter()
-                s = fn(state, msgs, ti)
+                s = fn(msgs)
                 dur += time.perf_counter() - t0
                 nturns += 1
                 sent.append(s)
@@ -337,15 +347,13 @@ if __name__ == "__main__":
         ("distil-verbatim+cache-delta", True, _m_distil_verbatim_cachedelta),
     ]
     try:
-        from benchmarks.headroom_adapter import compress as _hr
-
-        methods.append(("headroom (real)", False, _make_competitor(_hr)))
+        methods.append(("headroom (real)", False, make_headroom()))
     except Exception as e:  # noqa: BLE001
         print(f"(headroom unavailable: {e})", file=sys.stderr)
     try:
         from benchmarks.llmlingua_adapter import compress as _ll
 
-        methods.append(("llmlingua-2 (real)", False, _make_competitor(_ll)))
+        methods.append(("llmlingua-2 (real)", False, make_llmlingua(_ll)))
     except Exception as e:  # noqa: BLE001
         print(f"(llmlingua unavailable: {e})", file=sys.stderr)
 

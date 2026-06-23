@@ -1,8 +1,10 @@
 # Distil — Live Benchmark Report
 
-> Dev reference. Every number here is **measured live** against `claude-opus-4-8`
-> (no offline stand-in), reproducible from the scripts in `benchmarks/`. Where a
-> result is a limitation or a caveat, it's stated plainly — see [Honest caveats](#honest-caveats).
+> Dev reference. The **live-graded** head-to-head (graded by `claude-opus-4-8`)
+> **requires an `ANTHROPIC_API_KEY` + a generated corpus — it is not offline-reproducible.**
+> The **offline** numbers (`distil bench` / `eval` / `benchmark`, and the coding-agent
+> `benchmarks/codebench.py`) reproduce exactly with **no key**. Every caveat is stated
+> plainly — see [Honest caveats](#honest-caveats).
 
 ## TL;DR
 
@@ -13,7 +15,7 @@ graded live by `claude-opus-4-8`:
 |---|---:|---:|:--:|---:|
 | **Distil** (causal-prune + lossless) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
 | LLMLingua-2 (`llmlingua` 0.2.2) | 53.1% | 20.0% | ❌ no | ~1,480 ms |
-| Headroom (`headroom` 0.27.0) | 35.3% | 0.0% | ✅ yes | 26 ms |
+| Headroom (`headroom-ai` 0.27.0) | 35.3% | 0.0% | ✅ yes | 26 ms |
 | RTK (`rtk-py` 0.42.4.1) | — | — | excluded | — |
 
 **Distil is the only method that is simultaneously the most aggressive, fully
@@ -32,27 +34,37 @@ rate) against the *real* installed packages. Every method is confined to the
 volatile suffix, so the cached prefix is cache-read for all — a fair comparison of
 how each compresses *new* content.
 
+Each method is a **pure, deterministic, cache-monotonic** function of the
+cumulative conversation (the same standard distil holds itself to). The real
+packages are driven the way they actually deploy: LLMLingua-2 applied to every
+tool result (memoised); Headroom via its whole-conversation router with
+`optimize=True`.
+
 | method | token savings | $ savings (cache-aware) | latency / turn | fidelity |
 |---|---:|---:|---:|:--|
-| **distil** (PAYG digest) | **91.5%** | **91.1%** | **0.09 ms** | reversible |
-| distil + cache-delta | 89.6% | 89.0% | 13.6 ms | reversible |
-| distil-verbatim + cache-delta | 34.9% | **43.8%** | 13.1 ms | reversible |
+| **distil** (PAYG digest) | **91.5%** | **91.1%** | **0.08 ms** | reversible |
+| distil + cache-delta | 89.6% | 89.0% | 12.9 ms | reversible |
+| LLMLingua-2 (`headroom-ai`/`llmlingua` 0.2.2, real) | 56.8% | 57.2% | 274 ms | lossy |
+| distil-verbatim + cache-delta | 34.9% | 43.8% | 13.8 ms | reversible |
 | distil-verbatim (Tier-0 only) | 0.0% | 0.0% | 0.6 ms | reversible |
-| Headroom (`headroom` 0.27.0) | 0.0% | 0.0% | 7.6 ms | lossy |
-| LLMLingua-2 (`llmlingua` 0.2.2) | 6.5% | **−11.9%** | 762 ms | lossy |
+| Headroom (`headroom-ai` 0.27.0, real, default) | 22.4% | **−16.8%** | 5.3 ms | lossy |
 
 **Honest reading of these numbers:**
 
 - The **Tier-1 reversible digest is the dominant lever** (~91% cache-aware savings,
-  reversible, 0.09 ms). On these sessions it already captures the re-reads, so
+  reversible, 0.08 ms). On these sessions it already captures the re-reads, so
   **cache-delta adds little *on top of* the digest** (89% vs 91%).
 - **cache-delta's real niche is verbatim/interactive mode** (where the aggressive
   digest is disallowed — subscription/OAuth, human-in-the-loop): there it is the
   primary lever, turning a 0% floor into **43.8% cache-aware savings, reversible**.
-- **LLMLingua-2 *raises* cost by 11.9%** here — it rewrites suffix content and busts
-  the prompt cache — at **~8,500× the latency**, and it is lossy. **Headroom's
-  per-block compressor left this corpus unchanged** (0%). distil leads on every axis
-  *and* is the only reversible method.
+- **LLMLingua-2 is genuinely strong on savings (57.2%)** — we do not hide that — but
+  it is **lossy** (irrecoverable) and **~3,400× slower** (274 ms vs 0.08 ms).
+- **Headroom reduces tokens 22.4% but costs 16.8% *more***: its default
+  `read_lifecycle` compression rewrites earlier turns and **busts the prompt cache**,
+  and its prefix-freeze ships **off** ("prefix stability gains are marginal in
+  practice", per Headroom's own `config.py`). A live demonstration of distil's thesis
+  on a real competitor: token-ratio is not savings once caching is priced in. distil
+  leads on cache-aware dollars **and** is the only reversible method.
 
 This benchmark also caught two real distil bugs (a cache-monotonicity flip in
 cache-delta and a Tier-0 token-inflation on whitespace runs); both are fixed in

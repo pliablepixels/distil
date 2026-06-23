@@ -136,7 +136,7 @@ Not reference implementations: the **actual installed packages** (`llmlingua`, `
 
 <p align="center"><img src="docs/assets/head-to-head.svg" alt="Live head-to-head" width="100%"/></p>
 
-**Distil is the only method that is simultaneously the most aggressive, fully decision-equivalent, and the lowest-latency** — certified **83.2% savings at a 0% live decision-change rate** (≤5% guaranteed, 95% confidence), ~1,000× faster than the nearest tool. LLMLingua-2 cuts deep but flips **1-in-5** decisions (decision-*unaware*, fails the gate); Headroom is genuinely decision-*safe* but 2.4× less aggressive and loads a ModernBERT scorer. Full methodology, the certified frontier, and the *how-we-certified-and-why-it's-credible* writeup: **[BENCHMARKS.md](BENCHMARKS.md)** · [docs/benchmark](https://dshakes.github.io/distil/benchmark.html). Reproduce: `python benchmarks/gen_realworld.py 30 /tmp/c && python benchmarks/derc_live_compare.py`.
+**Distil is the only method that is simultaneously the most aggressive, fully decision-equivalent, and the lowest-latency** — certified **83.2% savings at a 0% live decision-change rate** (≤5% guaranteed, 95% confidence), ~1,000× faster than the nearest tool. LLMLingua-2 cuts deep but flips **1-in-5** decisions (decision-*unaware*, fails the gate); Headroom is genuinely decision-*safe* but 2.4× less aggressive and loads a ModernBERT scorer. Full methodology, the certified frontier, and the *how-we-certified-and-why-it's-credible* writeup: **[BENCHMARKS.md](BENCHMARKS.md)** · [docs/benchmark](https://dshakes.github.io/distil/benchmark.html). Reproduce (live — **requires `ANTHROPIC_API_KEY`** + a generated corpus, so it is *not* offline-reproducible): `python benchmarks/gen_realworld.py 30 /tmp/c && python benchmarks/derc_live_compare.py`. With no key, the offline `distil bench` / `eval` / `benchmark` numbers reproduce exactly.
 
 > ¹ **RTK** is a command-output proxy (it compresses `git`/`ls`/`psql` output) with no raw-text mode, so it can't compress arbitrary agent context — a different layer, attempted but not a fair contender. ² The corpus is decision-*determined synthetic* (verified: `byte-exact = 0%` live), realistic in content/size but not a substitute for your own traffic — recalibrate via `distil ingest` → `distil conformal`. The guarantee is marginal over the calibration distribution, not per-prompt.
 
@@ -145,13 +145,14 @@ Not reference implementations: the **actual installed packages** (`llmlingua`, `
 | Technique | Tokens | $ saved | Decision-equiv | Verdict |
 |---|--:|--:|--:|---|
 | **distil-causal** | 80.5% | **81.5%** | 100% | ✅ certified — leader |
-| truncate / sliding-window | 78.7% | 79.6% | 14% | ❌ fails gate |
 | **distil-stream** (+ cross-turn dedup) | 61.0% | 61.7% | 100% | ✅ certified |
 | **distil-lossless** (fold + template mining) | 57.4% | 58.1% | 100% | ✅ certified · byte-exact |
-| summarize / rolling memory | 56.5% | 57.2% | 39% | ❌ fails gate |
-| extractive importance (LLMLingua family) | 18.2% | 18.4% | 77% | ❌ fails gate |
+| **LLMLingua-2** (`llmlingua` 0.2.2, real pkg) | 54.9% | 54.8% | 0% | ❌ fails gate |
+| **Headroom** (`headroom-ai` 0.27.0, real pkg) | 43.5% | 44.0% | 61% | ❌ fails gate |
+| truncate / sliding-window *(structural baseline)* | 78.7% | 79.6% | 14% | ❌ fails gate |
+| extractive-prune *(structural baseline)* | 18.2% | 18.4% | 77% | ❌ fails gate |
 
-Structural (deterministic) grading — fast, free, reproducible by anyone: `python benchmarks/gen_corpus.py && distil benchmark --corpus benchmarks/corpus_xl`. The live numbers above supersede these for aggressive modes.
+Deterministic-runner grading — **fast, free, reproducible by anyone, zero key**: `python benchmarks/gen_corpus.py && PYTHONPATH=. distil benchmark --corpus benchmarks/corpus_xl --external benchmarks.headroom_adapter:compress:Headroom --external benchmarks.llmlingua_adapter:compress:LLMLingua-2`. The real packages are driven the way they deploy (Headroom whole-conversation `optimize=True`; LLMLingua-2 per tool-result); the *structural baselines* are faithful in-repo reference implementations of those technique families, not the packages. Same gate + cache-aware cost model for all; the **live** API-graded run above supersedes these for the aggressive modes.
 
 </details>
 
@@ -242,6 +243,44 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 | **In a venv** | `pip install distil-llm` (inside an active virtualenv) | Python 3.11+ |
 
 > The import package and CLI are `distil`; the PyPI distribution is `distil-llm` (the bare name was taken — so `uvx`/`pip` must reference `distil-llm`, not `distil`). Distil is a CLI: install it **isolated** (pipx/uv/brew/Docker), because modern macOS/Linux block system-wide `pip install` ([PEP 668](https://peps.python.org/pep-0668/)). **Node / any language:** point your SDK's `base_url` at `distil proxy`, or use `distil wrap -- <agent>` — no Distil-specific package needed.
+
+---
+
+## 🚀 Use it on your workflow — recipes
+
+Pick the row that matches you. Every command is real; see them work with `distil leaderboard` (genuine savings) and the `x-distil-*` response headers.
+
+**Coding agents (Claude Code · Codex · Gemini CLI)** — wrap the agent; its traffic routes through compression with zero code change:
+```bash
+distil wrap --lossless-only -- claude         # subscription/OAuth-safe (ToS-safe, no tool injection)
+distil wrap --lossless-only --verbatim -- claude   # interactive: model sees content un-digested
+distil wrap --expand -- claude                # PAYG: aggressive digest, model recovers detail on demand
+distil wrap --session-delta -- claude         # cache-delta: re-reads after edits sent as a diff
+```
+
+**Any SDK app (non-coding: chatbots, RAG, agents, batch)** — point `base_url` at the proxy, or compress in-process:
+```bash
+distil proxy                                                   # Anthropic / OpenAI-compatible
+distil proxy --upstream https://generativelanguage.googleapis.com   # Google Gemini
+```
+```python
+client = anthropic.Anthropic(base_url="http://127.0.0.1:8788")   # any base_url SDK, any language
+# or in-process, no sidecar:
+from distil.integrations import litellm as distil_litellm
+distil_litellm.completion(model="claude-opus-4-8", messages=[...])
+```
+
+**See it, prove it, and get more out of it:**
+| Goal | Command |
+|---|---|
+| Watch genuine savings accumulate | `distil leaderboard` (or the live `distil gateway` dashboard) |
+| Live decision-equivalence on real traffic | `distil proxy --shadow 0.05` → `distil shadow-stats` |
+| Certify on *your* domain | `distil ingest --input prod.jsonl --out ./mycorpus` → `distil conformal --corpus ./mycorpus` |
+| Let agents recover digested detail (MCP) | `distil mcp` (exposes `distil_compress`/`distil_expand`/`distil_savings`) |
+| Live savings in your Claude Code status line | install the [`plugins/distil`](plugins/distil) plugin → `distil statusline` |
+| Self-improving keep policy | `distil learn` / `distil online` (flywheel; only ever gets more conservative) |
+
+Rule of thumb: **subscription/interactive → `--lossless-only` (+`--verbatim`)**; **PAYG/autonomous → default digest (+`--expand`)**; **coding sessions with re-reads → add `--session-delta`**.
 
 ---
 
@@ -377,7 +416,7 @@ $ distil ingest --input prod-requests.jsonl --out ./mycorpus   # Anthropic/OpenA
 $ distil bench --corpus ./mycorpus --savings-only
 ```
 
-**Performance** (`distil perf`, stdlib, single core): ~27,000 distil-compressions/sec; the in-process adapter compresses a request in **~0.006 ms** (p50).
+**Performance** (`distil perf`, stdlib, single core): ~25,000 distil-compressions/sec; the in-process adapter compresses a request in **~0.006 ms** (p50).
 
 ### Honest limits
 - **Production keep-model weights.** A logistic model (96.4%/0.98) ships built-in; the transformer is a real adapter + pipeline with a *demo* checkpoint on the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — retrain on your traces (`distil train-transformer`).

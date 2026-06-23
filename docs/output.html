@@ -102,14 +102,14 @@
     </ul>
 
     <div class="callout warn">
-      <b>Lossy and PAYG-only.</b> Generation shaping is not lossless — it shortens real model output. It is also gated to pay-as-you-go API keys. The proxy detects subscription keys and skips injection rather than injecting into a context where the directive would be disallowed or ineffective.
+      <b>Lossy and opt-in.</b> Generation shaping is not lossless — it shortens real model output. It is gated solely by <code>--lossless-only</code>: shaping runs when <code>--shape-output</code> is set and <code>--lossless-only</code> is not. There is no subscription key detection or key-tier verification in the proxy.
     </div>
 
     <pre class="term"><span class="d"># Start the proxy with aggressive output shaping</span>
-<span class="d">$ python -m distil.proxy --port 8788 --shape-output aggressive</span>
+<span class="d">$ distil proxy --port 8788 --shape-output aggressive</span>
 distil proxy listening on http://127.0.0.1:8788
   → upstream: https://api.anthropic.com
-  → output shaping: <span class="g">aggressive</span> (PAYG-only; will verify key tier on first request)</pre>
+  → output shaping: <span class="g">aggressive</span></pre>
 
     <h3>Lossless re-entry digest</h3>
     <p>When a long model response is about to be re-injected as history on the next turn, Distil compresses it using the same Tier-1 digest mechanism used for input blocks: the full output is stored in the local RestoreStore under an 8-hex handle, and only the handle travels as history. The model never re-reads the full prior output.</p>
@@ -117,20 +117,17 @@ distil proxy listening on http://127.0.0.1:8788
     <p>This is fully lossless and transparent to the application. The digest expands back to the original on any path that reads history — certify, replay, or export.</p>
 
     <h3>Measuring output savings</h3>
-    <pre class="term"><span class="d">$ distil output-savings --mode aggressive</span>
-output-token A/B — mode=aggressive | runner=anthropic | n=8 turns
+    <pre class="term"><span class="d">$ distil output-savings --input shaped_pairs.jsonl</span>
+output-token A/B — n=8 turns
 
   baseline mean output tokens:   487
   shaped   mean output tokens:   134
 
-  reduction: <span class="g">72.5%</span>  [95% CI: 67.5%–77.1%]
-  answer preserved: <span class="g">100%</span>  (semantic match gate, n=8)
-
-<span class="d">note: realized savings require --runner anthropic (live model).</span>
-<span class="d">      offline --runner deterministic gives a lower-bound proxy only.</span></pre>
+  reduction: <span class="g">72.5%</span>  [95% CI: 67.5%–77.1%]  (illustrative)
+  answer preserved: <span class="g">100%</span>  (semantic match gate, n=8)</pre>
 
     <div class="callout">
-      <b>Honest scope:</b> the 72.5% figure is a live A/B result from <code>--runner anthropic</code>. The offline deterministic runner cannot measure output length — generation is not simulated there. Always verify output savings with a live run against your own workload, since verbosity shaping interacts with prompt design.
+      <b>Honest scope:</b> the 72.5% figure above is illustrative. <code>distil output-savings</code> reads a JSONL file of <code>{"baseline": ..., "shaped": ...}</code> pairs (default: bundled fixture); pass <code>--input &lt;file&gt;</code> to measure your own traffic. Always verify output savings with a live run against your own workload, since verbosity shaping interacts with prompt design.
     </div>
 
     <hr/>
@@ -141,22 +138,14 @@ output-token A/B — mode=aggressive | runner=anthropic | n=8 turns
     <p>Distil ships a bundled synthetic corpus, but your production traffic may differ. <code>distil ingest</code> converts recorded API request logs into a Distil corpus so you can measure savings on real traffic.</p>
 
     <h3>Supported formats</h3>
+    <p>Pass <code>--provider anthropic</code> (default) or <code>--provider openai</code> to select the input format. One input file produces one trajectory — there is no session grouping.</p>
     <ul>
-      <li><strong>Anthropic</strong> — JSONL where each record is an Anthropic <code>messages.create</code> request body.</li>
-      <li><strong>OpenAI-compatible</strong> — JSONL where each record is an OpenAI <code>chat.completions.create</code> request body.</li>
+      <li><strong>anthropic</strong> (default) — JSONL where each record is an Anthropic <code>messages.create</code> request body.</li>
+      <li><strong>openai</strong> — JSONL where each record is an OpenAI <code>chat.completions.create</code> request body.</li>
     </ul>
-    <p>Format is auto-detected from the first record. Pass <code>--format anthropic</code> or <code>--format openai</code> to override.</p>
-
-    <h3>Grouping into trajectories</h3>
-    <p>Ingest groups records into trajectories by <code>session_id</code> (or <code>x-session-id</code> header if present in metadata). Records without a session ID are treated as single-turn trajectories.</p>
 
     <pre class="term"><span class="d">$ distil ingest --input prod.jsonl --out ./mycorpus</span>
 ingesting prod.jsonl → ./mycorpus
-
-  format detected: anthropic
-  records read:    1,204
-  trajectories:       42  (grouped by session_id)
-  skipped:             3  (malformed or missing messages field)
 
 corpus written to ./mycorpus/</pre>
 

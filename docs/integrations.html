@@ -256,22 +256,55 @@ msgs = compress_messages(state[<span class="g">"messages"</span>], verbatim=<spa
     <hr/>
 
     <h2>Observability headers</h2>
-    <p>The proxy adds two informational headers to every compressed response:</p>
+    <p>The proxy adds up to 8 response headers per compressed response. The first two appear on every compressed request; the rest are conditional:</p>
     <table>
       <thead>
-        <tr><th>Header</th><th>Meaning</th></tr>
+        <tr><th>Header</th><th>Meaning</th><th>Condition</th></tr>
       </thead>
       <tbody>
         <tr>
           <td><code>x-distil-compressed: 1</code></td>
           <td>Compression was applied this turn.</td>
+          <td>Always (on compressed requests)</td>
         </tr>
         <tr>
           <td><code>x-distil-tokens-saved: &lt;n&gt;</code></td>
           <td>Estimated input tokens saved (heuristic tokenizer).</td>
+          <td>Always (on compressed requests)</td>
+        </tr>
+        <tr>
+          <td><code>x-distil-expanded: 1</code></td>
+          <td>A digest was resolved via the transparent expand loop.</td>
+          <td>When <code>--expand</code> fired</td>
+        </tr>
+        <tr>
+          <td><code>x-distil-cache-refs: &lt;n&gt;</code></td>
+          <td>Total cache-delta references this turn.</td>
+          <td>With <code>--session-delta</code></td>
+        </tr>
+        <tr>
+          <td><code>x-distil-cache-delta: &lt;n&gt;</code></td>
+          <td>Delta-encoded references this turn.</td>
+          <td>With <code>--session-delta</code></td>
+        </tr>
+        <tr>
+          <td><code>x-distil-cache-tokens-saved: &lt;n&gt;</code></td>
+          <td>Tokens saved by cache-delta encoding.</td>
+          <td>With <code>--session-delta</code></td>
+        </tr>
+        <tr>
+          <td><code>x-distil-output-shaping: light|aggressive</code></td>
+          <td>Output shaping was injected at this level.</td>
+          <td>When <code>--shape-output</code> fired</td>
+        </tr>
+        <tr>
+          <td><code>x-distil-shadow: sampled</code></td>
+          <td>This request was sampled for shadow-mode decision-equivalence.</td>
+          <td>When <code>--shadow</code> rate triggered</td>
         </tr>
       </tbody>
     </table>
+    <p>The managed gateway (<code>distil gateway</code>) additionally adds <code>x-distil-tenant: &lt;id&gt;</code> for per-tenant accounting.</p>
 
     <hr/>
 

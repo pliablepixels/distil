@@ -162,7 +162,7 @@
 
     <h2>Trajectory structure</h2>
 
-    <p>Each trajectory is a 4-turn headless agent loop with three structural components:</p>
+    <p>The bundled trajectories are 4-turn headless agent loops; the structural minimum enforced by <code>corpus.validate()</code> is ≥3 turns. Three structural components:</p>
 
     <ul>
       <li><strong>Cacheable stable prefix</strong> — system instructions, tool definitions, and other content that does not change between turns. This is what the cache-aware engine keeps byte-stable to maximize cache hits.</li>
@@ -206,11 +206,12 @@ GATE: <span class="w">FAIL</span> (1 issue(s))
     <p>The <code>validate()</code> function checks structural correctness of each trajectory before it enters the gate:</p>
 
     <ul>
-      <li>Every trajectory must have at least one turn.</li>
-      <li>Every turn must have at least one block.</li>
-      <li>Every block must have a non-empty ID and non-empty text.</li>
-      <li>Block stability labels must be from the defined <code>Stability</code> enum (<code>STABLE</code> / <code>VOLATILE</code>).</li>
-      <li>Turn indices must be monotonically increasing.</li>
+      <li><strong>Invariant 1:</strong> ≥3 turns, and the trajectory's model must be in the pricing catalog.</li>
+      <li><strong>Invariant 2:</strong> Cacheable-prefix ordering — no volatile block may precede a non-volatile block within any turn.</li>
+      <li><strong>Invariant 3:</strong> STABLE blocks are byte-identical across every turn they appear in (breaks the cache if violated).</li>
+      <li><strong>Invariant 4:</strong> At least one STABLE block carries a <code>DECISION:</code> marker (so ablation keeps the prefix).</li>
+      <li><strong>Invariant 5:</strong> At least one VOLATILE, decision-relevant tool output carries a decision; non-decision-relevant volatile blocks must NOT contain a decision marker.</li>
+      <li><strong>Invariant 6:</strong> At least one causally-inert "noise" block — a VOLATILE, non-decision-relevant block with no decision marker — for ablation to prune.</li>
     </ul>
 
     <p>A trajectory that fails validation is reported as a failure in <code>bench</code> before any cost or quality measurement runs — there is no silent skip.</p>

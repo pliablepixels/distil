@@ -83,6 +83,8 @@
         <tr><td><code>--margin</code></td><td><code>0.02</code></td><td>TOST indifference margin (max tolerable mean score drop)</td></tr>
         <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Significance level for the non-inferiority test</td></tr>
         <tr><td><code>--record</code></td><td>off</td><td>Append corpus-aggregate savings to the local savings ledger</td></tr>
+        <tr><td><code>--corpus</code></td><td>bundled corpus</td><td>Run on a custom corpus dir (e.g. from <code>distil ingest</code>)</td></tr>
+        <tr><td><code>--savings-only</code></td><td>off</td><td>Report token savings only; skip the decision-equivalence gate (for real-trace corpora without DECISION labels)</td></tr>
       </tbody>
     </table>
 
@@ -284,7 +286,13 @@ holdout A/B savings measurement (deterministic partition + bootstrap CI)
     <h2 id="leaderboard">distil leaderboard</h2>
     <p>Shows cumulative savings from all runs recorded via <code>--record</code> flags on <code>savings</code> and <code>bench</code>. Local-first; no data leaves the machine unless you opt in to community sharing (not currently enabled).</p>
 
-    <p>No flags.</p>
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--html</code></td><td>off</td><td>Render your savings ledger as a self-contained HTML page at this path</td></tr>
+      </tbody>
+    </table>
 
     <pre class="term"><span class="d">$ distil leaderboard</span>
 distil savings ledger — ~/.local/share/distil/ledger.jsonl
@@ -309,11 +317,15 @@ by trajectory:
     <table>
       <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
+        <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Interface to bind on</td></tr>
         <tr><td><code>--port</code></td><td><code>8788</code></td><td>Port to listen on</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only (JSON minify + collapse exact-duplicate runs). Interactive-safe, lower savings. Use where <code>distil_expand</code> recovery is unavailable.</td></tr>
-        <tr><td><code>--shape-output</code></td><td>off</td><td>Enable generation-side verbosity shaping: <code>light</code> (conservative) or <code>aggressive</code>. Injects a gated <code>role:"system"</code> directive before the request. PAYG-only — blocked on subscription keys.</td></tr>
+        <tr><td><code>--shape-output</code></td><td>off</td><td>Enable generation-side verbosity shaping: <code>light</code> (conservative) or <code>aggressive</code>. Injects a <code>role:"system"</code> directive before the request. Gated by <code>--lossless-only</code>: shaping is skipped when <code>--lossless-only</code> is set. No subscription key detection.</td></tr>
+        <tr><td><code>--expand</code></td><td>off</td><td>Inject the <code>distil_expand</code> tool so the model can pull digested blocks back on demand</td></tr>
+        <tr><td><code>--shadow</code></td><td>off</td><td>Shadow-mode sampling rate (0–1): re-run a fraction of requests uncompressed to measure live decision-change rate</td></tr>
+        <tr><td><code>--session-delta</code></td><td>off</td><td>Enable cross-turn cache-delta encoding (deduplicates repeated stable blocks across the session)</td></tr>
         <tr><td><code>--async</code></td><td>off</td><td>Use the async aiohttp backend (<code>distil/aproxy.py</code>) for high-concurrency streaming. Requires <code>pip install 'distil-llm[async]'</code>. Same compression behavior; async event loop handles thousands of concurrent sessions.</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model used to price the genuine dollar savings recorded to the ledger</td></tr>
         <tr><td><code>--no-record</code></td><td>off</td><td>Do not record genuine savings to the local ledger</td></tr>
@@ -335,7 +347,18 @@ client = openai.OpenAI(base_url=<span class="g">"http://localhost:8788/v1"</span
 <span class="d"># LiteLLM</span>
 response = litellm.completion(api_base=<span class="g">"http://localhost:8788"</span>, ...)</pre>
 
-    <p>The proxy adds two response headers: <code>x-distil-compressed: 1</code> and <code>x-distil-tokens-saved: &lt;n&gt;</code>. All other paths and HTTP methods are forwarded unchanged.</p>
+    <p>The proxy adds up to 8 response headers (not all appear on every request):</p>
+    <ul>
+      <li><code>x-distil-compressed: 1</code> — compression was applied</li>
+      <li><code>x-distil-tokens-saved: &lt;n&gt;</code> — heuristic estimate of tokens saved</li>
+      <li><code>x-distil-expanded: 1</code> — present when <code>--expand</code> fired and a digest was resolved</li>
+      <li><code>x-distil-cache-refs: &lt;n&gt;</code> — total cache-delta references (with <code>--session-delta</code>)</li>
+      <li><code>x-distil-cache-delta: &lt;n&gt;</code> — delta-encoded references (with <code>--session-delta</code>)</li>
+      <li><code>x-distil-cache-tokens-saved: &lt;n&gt;</code> — tokens saved by cache-delta (with <code>--session-delta</code>)</li>
+      <li><code>x-distil-output-shaping: light|aggressive</code> — present when output shaping fired</li>
+      <li><code>x-distil-shadow: sampled</code> — present when this request was sampled for shadow-mode comparison</li>
+    </ul>
+    <p>All other paths and HTTP methods are forwarded unchanged.</p>
 
     <p>See <a href="adapters.html">Adapters</a> for the full story on in-process vs. proxy adoption.</p>
 
@@ -359,69 +382,64 @@ $ distil <span class="c">wrap</span> --lossless-only -- my-agent --task build</p
     <table>
       <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>--env-var</code></td><td><code>ANTHROPIC_BASE_URL</code></td><td>Environment variable to point at the proxy in the child process</td></tr>
+        <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Bind address for the ephemeral proxy</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
+        <tr><td><code>--env-var</code></td><td><code>ANTHROPIC_BASE_URL</code></td><td>Environment variable to point at the proxy in the child process</td></tr>
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Interactive-safe, lower savings.</td></tr>
-        <tr><td><code>--shape-output</code></td><td>off</td><td>Generation-side verbosity shaping (PAYG-only)</td></tr>
+        <tr><td><code>--shape-output</code></td><td>off</td><td>Generation-side verbosity shaping (gated by <code>--lossless-only</code>)</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model used to price genuine dollar savings recorded to the ledger</td></tr>
         <tr><td><code>--no-record</code></td><td>off</td><td>Do not record genuine savings to the local ledger</td></tr>
+        <tr><td><code>--expand</code></td><td>off</td><td>Inject the <code>distil_expand</code> tool so the model can pull digested blocks back on demand</td></tr>
+        <tr><td><code>--session-delta</code></td><td>off</td><td>Enable cross-turn cache-delta encoding</td></tr>
       </tbody>
     </table>
 
     <!-- output-savings -->
     <h2 id="output-savings">distil output-savings</h2>
-    <p>Measure the realized output-token reduction from <code>--shape-output</code>. Compares baseline generation length against shaped generation across the trajectory set and reports the A/B result with a bootstrap 95% confidence interval. Requires a live API key (<code>--runner anthropic</code>).</p>
+    <p>Measure the realized output-token reduction from <code>--shape-output</code>. Reads a JSONL file of <code>{"baseline": ..., "shaped": ...}</code> pairs and reports the A/B result with a bootstrap 95% confidence interval.</p>
 
     <h3>Flags</h3>
     <table>
       <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>--trajectory, -t</code></td><td>bundled sample</td><td>Path to a trajectory JSON file</td></tr>
-        <tr><td><code>--mode</code></td><td><code>light</code></td><td><code>light</code> or <code>aggressive</code> — which shaping directive to test</td></tr>
-        <tr><td><code>--runner</code></td><td><code>anthropic</code></td><td>Must be <code>anthropic</code> (live model); output shaping requires a real generation to measure</td></tr>
+        <tr><td><code>--input</code></td><td>bundled fixture</td><td>Path to a JSONL file of <code>{"baseline": ..., "shaped": ...}</code> pairs</td></tr>
       </tbody>
     </table>
 
-    <pre class="term"><span class="d">$ distil output-savings --mode aggressive</span>
-output-token A/B — mode=aggressive | runner=anthropic | n=8 turns
+    <pre class="term"><span class="d">$ distil output-savings --input shaped_pairs.jsonl</span>
+output-token A/B — n=8 turns
 
   baseline mean output tokens:   487
   shaped   mean output tokens:   134
 
-  reduction: <span class="g">72.5%</span>  [95% CI: 67.5%–77.1%]
-  answer preserved: <span class="g">100%</span>  (semantic match gate, n=8)
-
-<span class="d">note: realized savings require --runner anthropic (live model).</span></pre>
+  reduction: <span class="g">72.5%</span>  [95% CI: 67.5%–77.1%]  (illustrative)
+  answer preserved: <span class="g">100%</span>  (semantic match gate, n=8)</pre>
 
     <hr/>
 
     <!-- ingest -->
     <h2 id="ingest">distil ingest</h2>
-    <p>Convert recorded Anthropic or OpenAI request logs (JSONL) into a Distil corpus. Real-trace corpora have no <code>DECISION</code> labels, so the offline gate is savings-only; certify quality live with <code>distil certify --runner anthropic</code>.</p>
+    <p>Convert a recorded Anthropic or OpenAI request log (JSONL) into a Distil trajectory. One input file produces one trajectory — there is no session grouping. Real-trace corpora have no <code>DECISION</code> labels, so the offline gate is savings-only; certify quality live with <code>distil certify --runner anthropic</code>.</p>
 
     <h3>Flags</h3>
     <table>
       <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>--input</code></td><td>required</td><td>Path to the JSONL log file (Anthropic or OpenAI request format)</td></tr>
-        <tr><td><code>--out</code></td><td>required</td><td>Output directory where the corpus will be written</td></tr>
-        <tr><td><code>--format</code></td><td>auto-detect</td><td><code>anthropic</code> or <code>openai</code> — inferred from the first record if omitted</td></tr>
+        <tr><td><code>--out</code></td><td><code>./ingested-corpus</code></td><td>Output directory where the trajectory will be written</td></tr>
+        <tr><td><code>--provider</code></td><td><code>anthropic</code></td><td><code>anthropic</code> or <code>openai</code> — selects the input format</td></tr>
+        <tr><td><code>--model</code></td><td><code>claude-opus-4-8</code></td><td>Model name to tag the trajectory with (must be in the pricing catalog)</td></tr>
       </tbody>
     </table>
 
     <pre class="term"><span class="d">$ distil ingest --input prod.jsonl --out ./mycorpus</span>
 ingesting prod.jsonl → ./mycorpus
 
-  format detected: anthropic
-  records read:    1,204
-  trajectories:       42  (grouped by session_id)
-  skipped:             3  (malformed or missing messages field)
-
 corpus written to ./mycorpus/
 
 <span class="d">$ distil bench --corpus ./mycorpus --savings-only</span>
-corpus gate — 42 trajectories | savings-only (no DECISION labels)
+corpus gate — savings-only (no DECISION labels)
 
   aggregate savings: <span class="g">28.3%</span>  [95% CI: 25.1%–31.6%]
   <span class="d">note: certify with --runner anthropic for a live quality gate.</span></pre>
@@ -430,7 +448,15 @@ corpus gate — 42 trajectories | savings-only (no DECISION labels)
 
     <!-- perf -->
     <h2 id="perf">distil perf</h2>
-    <p>Throughput benchmark: measures raw distil-compression rate and in-process adapter latency. Runs a tight loop of <code>compress()</code> calls with the bundled trajectory and reports throughput (ops/sec) and p50/p95/p99 latency. No flags.</p>
+    <p>Throughput benchmark: measures raw distil-compression rate and in-process adapter latency. Runs a tight loop of <code>compress()</code> calls with the bundled trajectory and reports throughput (ops/sec) and p50/p95/p99 latency.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--iterations</code></td><td><code>200</code></td><td>Number of compression iterations to run</td></tr>
+      </tbody>
+    </table>
 
     <pre class="term"><span class="d">$ distil perf</span>
 distil performance benchmark
@@ -575,6 +601,8 @@ certified ceiling: 8.4% savings (beyond this, lossy compression drops decisions 
         <tr><td><code>--runner</code></td><td><code>deterministic</code></td><td><code>deterministic</code> (offline) or <code>anthropic</code> (live model)</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing for the cache-aware cost model</td></tr>
         <tr><td><code>--tokenizer</code></td><td><code>heuristic</code></td><td><code>heuristic</code> or <code>anthropic</code> (billing-grade)</td></tr>
+        <tr><td><code>--margin</code></td><td><code>0.02</code></td><td>TOST non-inferiority margin</td></tr>
+        <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Significance level for the non-inferiority test</td></tr>
         <tr><td><code>--html</code> / <code>--out</code></td><td>off</td><td>Render the standings as HTML / write raw results JSONL</td></tr>
       </tbody>
     </table>

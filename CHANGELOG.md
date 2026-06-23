@@ -3,6 +3,30 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.23.0] — GA polish: grounded docs, genuine head-to-head, recipes
+
+A go-live pass: every customer-facing claim audited against code, every benchmark
+number re-measured genuinely, and the docs made white-glove.
+
+- **Genuine, apples-to-apples benchmarks.** Fixed the local competitor adapters so
+  they actually engage: Headroom is now driven its real whole-conversation way
+  (`optimize=True`) instead of no-op'ing on a per-block user message; LLMLingua-2 is
+  applied to every tool result and memoised (pure function). Corrected the v0.22.0
+  coding-agent competitor numbers (which were harness artifacts) to the real ones —
+  **LLMLingua-2 56.8% tok / 57.2% $ / 274 ms / lossy**, **Headroom 22.4% tok /
+  −16.8% $ (busts the prompt cache by default) / 5.3 ms / lossy**. distil leads on
+  cache-aware dollars (91.1%) and is the only reversible method.
+- **Docs claims audit (no fake, all real grounded).** Removed fabricated claims (a
+  non-existent "proxy detects subscription keys" path; `ingest --format` auto-detect;
+  `output-savings --mode/--runner` flags; invented `corpus.validate()` invariants),
+  corrected CLI flag tables, fixed `compress_messages(verbatim=)` signature, the
+  salience module path, and the 8 proxy response headers; clarified that the live
+  83.2%/53.1%/35.3% run needs an API key and is not offline-reproducible.
+- **Diagrams** (YC-style, on-brand): `cache-delta.svg` and `ast-delta.svg`, embedded
+  in the techniques and benchmark pages.
+- **White-glove "Use it on your workflow" recipes** in the README — coding and
+  non-coding use cases, a see-it/prove-it table, and a config rule-of-thumb.
+
 ## [0.22.0] — Coding-agent benchmark + two correctness fixes it found
 
 Building the messages-level coding-agent benchmark (`benchmarks/codebench.py`:

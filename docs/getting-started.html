@@ -218,6 +218,46 @@ response = client.messages.create(
 
     <hr/>
 
+    <h2>Use it on your workflow <span class="g">— recipes</span></h2>
+    <p>Pick the row that matches you. Every command is real; watch it work with <code>distil leaderboard</code> (genuine cumulative savings) and the <code>x-distil-*</code> response headers.</p>
+
+    <h3>Coding agents — Claude Code · Codex · Gemini CLI</h3>
+    <p>Wrap the agent; its traffic routes through compression with zero code change.</p>
+    <pre class="term"><span class="d"># subscription/OAuth-safe (ToS-safe, no tool injection)</span>
+distil wrap --lossless-only -- claude
+<span class="d"># interactive: model sees content un-digested (Tier-0 only)</span>
+distil wrap --lossless-only --verbatim -- claude
+<span class="d"># PAYG: aggressive reversible digest; the model recovers detail on demand</span>
+distil wrap --expand -- claude
+<span class="d"># coding sessions with re-reads: send the diff, not the whole file</span>
+distil wrap --session-delta -- claude</pre>
+
+    <h3>Any SDK app — chatbots, RAG, agents, batch (non-coding)</h3>
+    <pre class="term"><span class="d"># standalone proxy — point any base_url SDK at it, any language</span>
+distil proxy
+distil proxy --upstream https://generativelanguage.googleapis.com   <span class="d"># Google Gemini</span></pre>
+    <pre class="term"><span class="d"># or in-process, no sidecar (LiteLLM / LangChain)</span>
+<span class="c">from</span> distil.integrations <span class="c">import</span> litellm <span class="c">as</span> distil_litellm
+distil_litellm.completion(model=<span class="g">"claude-opus-4-8"</span>, messages=[...])</pre>
+
+    <h3>See it, prove it, get more out of it</h3>
+    <table>
+      <thead><tr><th>Goal</th><th>Command</th></tr></thead>
+      <tbody>
+        <tr><td>Watch genuine savings accumulate</td><td><code>distil leaderboard</code> · live <code>distil gateway</code> dashboard</td></tr>
+        <tr><td>Live decision-equivalence on real traffic</td><td><code>distil proxy --shadow 0.05</code> → <code>distil shadow-stats</code></td></tr>
+        <tr><td>Certify on <em>your</em> domain</td><td><code>distil ingest --input prod.jsonl --out ./mycorpus</code> → <code>distil conformal --corpus ./mycorpus</code></td></tr>
+        <tr><td>Let agents recover digested detail (MCP)</td><td><code>distil mcp</code> — exposes <code>distil_compress</code>/<code>_expand</code>/<code>_savings</code></td></tr>
+        <tr><td>Live savings in your Claude Code status line</td><td>install the <code>plugins/distil</code> plugin → <code>distil statusline</code></td></tr>
+        <tr><td>Self-improving keep policy</td><td><code>distil learn</code> / <code>distil online</code> (flywheel; only ever gets more conservative)</td></tr>
+      </tbody>
+    </table>
+    <div class="callout good">
+      <b>Rule of thumb.</b> Subscription / interactive → <code>--lossless-only</code> (add <code>--verbatim</code>). PAYG / autonomous → default digest (add <code>--expand</code>). Coding sessions with re-reads → add <code>--session-delta</code>.
+    </div>
+
+    <hr/>
+
     <h2>What to read next</h2>
     <ul>
       <li><a href="concepts.html"><strong>Concepts</strong></a> — why decision-equivalence beats byte-equivalence, how the certificate works, and why cache misses (not token size) dominate cost.</li>

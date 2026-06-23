@@ -136,20 +136,21 @@ It's not how many tokens you cut — it's which ones.</pre>
     </div>
 
     <h2 id="coding-agent">Coding-agent benchmark <span class="g">— cache-delta on read→edit→reread</span></h2>
-    <p>A second, <strong>messages-level</strong> benchmark targets the coding-agent hot path (<code>benchmarks/codebench.py</code>: 16 sessions / 256 turns of read → edit → <strong>re-read</strong>), scoring <strong>cache-aware real dollars</strong> against the <em>real</em> installed packages. Every method is confined to the volatile suffix, so the cached prefix is billed at the cache-read rate for all — a fair test of how each compresses new content.</p>
+    <p>A second, <strong>messages-level</strong> benchmark targets the coding-agent hot path (<code>benchmarks/codebench.py</code>: 16 sessions / 256 turns of read → edit → <strong>re-read</strong>), scoring <strong>cache-aware real dollars</strong> against the <em>real</em> installed packages. Each method is a pure, deterministic, <strong>cache-monotonic</strong> function of the cumulative conversation — the same standard distil holds itself to. The competitors are driven the way they actually deploy: LLMLingua-2 over every tool result (memoised); Headroom via its whole-conversation router with <code>optimize=True</code>.</p>
+    <img src="assets/cache-delta.svg" alt="Cache-delta: read, edit, re-read — distil sends a reference + diff" class="svg-embed"/>
     <table>
       <thead><tr><th>method</th><th style="text-align:right">token savings</th><th style="text-align:right">$ savings (cache-aware)</th><th style="text-align:right">latency / turn</th><th>fidelity</th></tr></thead>
       <tbody>
-        <tr style="background:rgba(139,123,255,.07)"><td><b>distil</b> (PAYG digest)</td><td class="r">91.5%</td><td class="r">91.1%</td><td class="r">0.09 ms</td><td>reversible</td></tr>
-        <tr><td>distil + cache-delta</td><td class="r">89.6%</td><td class="r">89.0%</td><td class="r">13.6 ms</td><td>reversible</td></tr>
-        <tr><td>distil-verbatim + cache-delta</td><td class="r">34.9%</td><td class="r">43.8%</td><td class="r">13.1 ms</td><td>reversible</td></tr>
+        <tr style="background:rgba(139,123,255,.07)"><td><b>distil</b> (PAYG digest)</td><td class="r">91.5%</td><td class="r">91.1%</td><td class="r">0.08 ms</td><td>reversible</td></tr>
+        <tr><td>distil + cache-delta</td><td class="r">89.6%</td><td class="r">89.0%</td><td class="r">12.9 ms</td><td>reversible</td></tr>
+        <tr><td>LLMLingua-2 (<code>llmlingua</code> 0.2.2, real)</td><td class="r">56.8%</td><td class="r">57.2%</td><td class="r">274 ms</td><td>lossy</td></tr>
+        <tr><td>distil-verbatim + cache-delta</td><td class="r">34.9%</td><td class="r">43.8%</td><td class="r">13.8 ms</td><td>reversible</td></tr>
         <tr><td>distil-verbatim (Tier-0 only)</td><td class="r">0.0%</td><td class="r">0.0%</td><td class="r">0.6 ms</td><td>reversible</td></tr>
-        <tr><td>Headroom (<code>headroom</code> 0.27.0)</td><td class="r">0.0%</td><td class="r">0.0%</td><td class="r">7.6 ms</td><td>lossy</td></tr>
-        <tr><td>LLMLingua-2 (<code>llmlingua</code> 0.2.2)</td><td class="r">6.5%</td><td class="r">&minus;11.9%</td><td class="r">762 ms</td><td>lossy</td></tr>
+        <tr><td>Headroom (<code>headroom-ai</code> 0.27.0, real, default)</td><td class="r">22.4%</td><td class="r">&minus;16.8%</td><td class="r">5.3 ms</td><td>lossy</td></tr>
       </tbody>
     </table>
     <div class="callout">
-      <b>Honest reading.</b> The <strong>Tier-1 reversible digest is the dominant lever</strong> (~91% cache-aware, reversible, 0.09 ms) — it already captures the re-reads, so cache-delta adds little <em>on top of</em> it. <strong>Cache-delta's real niche is verbatim / interactive mode</strong> (where the aggressive digest is disallowed): there it turns a 0% floor into <strong>43.8% cache-aware savings, reversible</strong>. <strong>LLMLingua-2 <em>raises</em> cost by 11.9%</strong> here (it busts the prompt cache) at ~8,500× the latency and is lossy; <strong>Headroom left this corpus unchanged</strong>. This benchmark also caught two real distil bugs (a cache-monotonicity flip and a Tier-0 token inflation) — both fixed in v0.22.0; the numbers are post-fix. Reproduce: <code>PYTHONPATH=. python benchmarks/codebench.py 16</code>.
+      <b>Honest reading.</b> The <strong>Tier-1 reversible digest is the dominant lever</strong> (~91% cache-aware, reversible, 0.08 ms) — it already captures the re-reads, so cache-delta adds little <em>on top of</em> it. <strong>Cache-delta's real niche is verbatim / interactive mode</strong> (digest disallowed): there it turns a 0% floor into <strong>43.8%, reversible</strong>. <strong>LLMLingua-2 is genuinely strong on savings (57.2%)</strong> — we don't hide it — but it's lossy and <strong>~3,400× slower</strong>. <strong>Headroom reduces tokens 22.4% yet costs 16.8% <em>more</em></strong>: its default read-lifecycle compression rewrites earlier turns and busts the prompt cache (its prefix-freeze ships off — "marginal in practice", per Headroom's own config). A live proof of distil's thesis on a real competitor. This benchmark also caught two real distil bugs (a cache-monotonicity flip and a Tier-0 token inflation) — both fixed in v0.22.0; numbers are post-fix. Reproduce: <code>PYTHONPATH=. python benchmarks/codebench.py 16</code>.
     </div>
 
     <hr/>
@@ -167,7 +168,7 @@ It's not how many tokens you cut — it's which ones.</pre>
           <td style="text-align:right">80.5%</td><td style="text-align:right"><strong>81.5%</strong></td>
           <td style="text-align:right">100%</td><td><span class="badge-pass">✔ certified · leader</span></td><td>lossy*</td></tr>
         <tr>
-          <td>truncate-tail</td><td>sliding-window / truncation</td>
+          <td>truncate-tail <span style="color:#5b6177">(structural baseline)</span></td><td>sliding-window / truncation</td>
           <td style="text-align:right">78.7%</td><td style="text-align:right">79.6%</td>
           <td style="text-align:right">14%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
         <tr>
@@ -179,11 +180,19 @@ It's not how many tokens you cut — it's which ones.</pre>
           <td style="text-align:right">57.4%</td><td style="text-align:right">58.1%</td>
           <td style="text-align:right">100%</td><td><span class="badge-pass">✔ certified</span></td><td>byte-exact</td></tr>
         <tr>
-          <td>summarize</td><td>abstractive / rolling summary</td>
+          <td>summarize <span style="color:#5b6177">(structural baseline)</span></td><td>abstractive / rolling summary</td>
           <td style="text-align:right">56.5%</td><td style="text-align:right">57.2%</td>
           <td style="text-align:right">39%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
         <tr>
-          <td>extractive-prune</td><td>extractive importance (LLMLingua family)</td>
+          <td><strong>LLMLingua-2</strong> <span style="color:#5b6177">(real pkg)</span></td><td><code>llmlingua</code> 0.2.2, per tool-result</td>
+          <td style="text-align:right">54.9%</td><td style="text-align:right">54.8%</td>
+          <td style="text-align:right">0%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
+        <tr>
+          <td><strong>Headroom</strong> <span style="color:#5b6177">(real pkg)</span></td><td><code>headroom-ai</code> 0.27.0, whole-conversation <code>optimize=True</code></td>
+          <td style="text-align:right">43.5%</td><td style="text-align:right">44.0%</td>
+          <td style="text-align:right">61%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
+        <tr>
+          <td>extractive-prune <span style="color:#5b6177">(structural baseline)</span></td><td>extractive importance (LLMLingua technique family)</td>
           <td style="text-align:right">18.2%</td><td style="text-align:right">18.4%</td>
           <td style="text-align:right">77%</td><td><span class="badge-fail">✘ fails gate</span></td><td>lossy</td></tr>
         <tr>
