@@ -74,7 +74,16 @@
   .tier p{color:var(--mut);font-size:13px;margin:0}
   footer{padding:48px 0 70px;color:var(--dim);font-size:13px;border-top:1px solid var(--line)}
   .muted{color:var(--dim)}
-  @media(max-width:840px){.stats{grid-template-columns:1fr 1fr}.grid2,.tiers{grid-template-columns:1fr}}
+  @media(max-width:840px){
+    .stats{grid-template-columns:1fr 1fr}.grid2,.tiers{grid-template-columns:1fr}
+    table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;font-size:13px}
+    header{padding:56px 0 28px}section{padding:40px 0}
+    .cta{flex-direction:column}.cta .btn{text-align:center}
+  }
+  @media(max-width:480px){
+    .stats{grid-template-columns:1fr}.wrap{padding:0 16px}
+    .stat .n{font-size:32px}
+  }
 
   /* ── world-class cohesion pass (matches the docs design system) ── */
   @font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;

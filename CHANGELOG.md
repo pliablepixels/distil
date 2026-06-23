@@ -3,6 +3,23 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.23.2] — Mobile docs, animated architecture diagram, distribution fix
+
+- **Fixed a broken Homebrew distribution.** Both formulas (repo + tap) had frozen
+  their `url`/`version` at v0.21.0 while the `sha256` advanced — so `brew install`
+  failed on a sha mismatch. Root cause (a version-specific regex in the update step)
+  fixed with a version-agnostic pattern; both formulas now consistent at the current
+  release and verified against the published tarball.
+- **Mobile-responsive docs.** Wide benchmark tables now scroll horizontally instead
+  of overflowing; landing stats collapse to one column, CTAs stack, padding/typography
+  scale down — across the docs site and the landing page.
+- **New animated architecture diagram** (`docs/assets/architecture.svg`) — a realistic
+  depiction of the pipeline (agent → compress/cache-pin/forward → provider), the
+  transparent recovery loop, and the quality-contract band (certificate · shadow ·
+  flywheel), with flowing-data animation. Shown on README, Concepts, Architecture.
+- **Vocabulary consistency:** `distil bench` now reports savings as "reversibly"
+  (the strategy uses the Tier-1 reversible digest), matching the v0.23.1 terminology.
+
 ## [0.23.1] — Honest vocabulary: "reversible" vs "lossless"
 
 A precision pass on terminology so no claim can be read as an overclaim:

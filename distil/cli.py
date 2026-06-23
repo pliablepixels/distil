@@ -88,7 +88,7 @@ def cmd_savings(args: argparse.Namespace) -> int:
     print("-" * 72)
     print(
         f"\ndistil cuts ${baseline:.5f} -> ${best:.5f} per run "
-        f"({(1 - best / baseline) * 100:.1f}% cheaper), losslessly."
+        f"({(1 - best / baseline) * 100:.1f}% cheaper), reversibly."
     )
     naive = results["naive compress + cache"].total_dollars
     if naive > best:
@@ -250,7 +250,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
     tail = "" if savings_only else f"; {int(pruned_total)} tokens causally prunable"
     print(
         f"\naggregate: distil cuts ${base_total:.5f} -> ${distil_total:.5f} "
-        f"({overall:.1f}% cheaper) losslessly{tail}."
+        f"({overall:.1f}% cheaper) reversibly{tail}."
     )
     if savings_only:
         print(

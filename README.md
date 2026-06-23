@@ -94,7 +94,7 @@ data-analysis     data-analysis-sql           18.1%     PASS   FAIL     965
 devops            devops-rollback             25.0%     PASS   FAIL     857
 finance           finance-reconcile           29.1%     PASS   FAIL    1014
 ---------------------------------------------------------------------------
-aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) losslessly; 5761 tokens prunable.
+aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) reversibly; 5761 tokens prunable.
 GATE: PASS — every trajectory certified non-inferior; aggressive rejected on all.
 ```
 
