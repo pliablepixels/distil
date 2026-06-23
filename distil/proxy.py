@@ -28,6 +28,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .adapters.anthropic import compress_messages
+from .adapters.gemini import compress_generate_request
+from .adapters.gemini import count_tokens
+from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path, strip_query
 from .tokenizer import DEFAULT as _tokenizer
 
@@ -152,7 +155,8 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def do_POST(self) -> None:  # noqa: N802
-            if strip_query(self.path) in _COMPRESSIBLE_PATHS:
+            p = strip_query(self.path)
+            if p in _COMPRESSIBLE_PATHS or is_gemini_path(p):
                 self._handle_compressible()
             else:
                 self._passthrough()
@@ -315,6 +319,35 @@ def build_handler(
 
                     body = shape_request(body, level=shape_output, allow=True)
                     extras["x-distil-output-shaping"] = shape_output
+
+            elif "contents" in body and isinstance(body["contents"], list):
+                # Gemini generateContent shape. Reversible content compression only;
+                # expand-tool / output-shaping are messages-format-only today.
+                before_tok = count_tokens(body)
+                try:
+                    body, store = compress_generate_request(
+                        body, lossless_only=lossless_only, keep=_learn_keep
+                    )
+                except Exception:  # noqa: BLE001 — compression must never break a request
+                    store = None
+                if _learn_stats is not None and getattr(store, "handles", None):
+                    from .learn import signature
+
+                    for h in store.handles:
+                        try:
+                            _learn_stats.record_digest(signature(store.expand(h)))
+                        except Exception:  # noqa: BLE001 — learning never breaks a request
+                            pass
+                after_tok = count_tokens(body)
+                saved = max(0, before_tok - after_tok)
+                extras = {
+                    "x-distil-compressed": "1",
+                    "x-distil-tokens-saved": str(saved),
+                }
+                if savings is not None:
+                    savings.record(before_tok, after_tok)
+                    if savings.requests >= flush_every:
+                        savings.flush()
 
             new_raw = json.dumps(body).encode()
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)

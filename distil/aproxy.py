@@ -23,6 +23,9 @@ import json
 from typing import Any
 
 from .adapters.anthropic import compress_messages
+from .adapters.gemini import compress_generate_request
+from .adapters.gemini import count_tokens as _gemini_count
+from .adapters.gemini import is_gemini_path
 from .httpguard import MAX_BODY_BYTES, safe_forward_path
 from .tokenizer import DEFAULT as _tokenizer
 
@@ -180,6 +183,19 @@ def make_app(
                     body = shape_request(body, level=shape_output, allow=True)
                     extras["x-distil-output-shaping"] = shape_output
 
+            elif "contents" in body and isinstance(body["contents"], list):
+                # Gemini generateContent shape (reversible content compression).
+                before_tok = _gemini_count(body)
+                try:
+                    body, _store = compress_generate_request(body, lossless_only=lossless_only)
+                except Exception:  # noqa: BLE001 — compression must never break a request
+                    pass
+                saved = max(0, before_tok - _gemini_count(body))
+                extras = {
+                    "x-distil-compressed": "1",
+                    "x-distil-tokens-saved": str(saved),
+                }
+
             body_bytes = json.dumps(body).encode()
 
         url = _upstream + request.path
@@ -257,6 +273,15 @@ def make_app(
             return await _handle_compressible(request)
         return await _passthrough(request)
 
+    async def _route_any(request: web.Request) -> web.Response:
+        # Wildcard dispatcher: Gemini's path is dynamic (model name in the URL), so
+        # it can't be a fixed route — match it here and compress; else passthrough.
+        if request.method == "POST" and (
+            request.path in _COMPRESSIBLE_PATHS or is_gemini_path(request.path)
+        ):
+            return await _handle_compressible(request)
+        return await _passthrough(request)
+
     # Cap inbound body size so a giant POST can't exhaust memory (aiohttp returns
     # 413 automatically past this); matches the sync servers' guard.
     app = web.Application(client_max_size=MAX_BODY_BYTES)
@@ -269,7 +294,7 @@ def make_app(
 
     # Wildcard for all other paths/methods (aiohttp doesn't have a true catch-all,
     # so we register explicit wildcards for the common verbs plus a fallback).
-    app.router.add_route("*", "/{path_info:.*}", _passthrough)
+    app.router.add_route("*", "/{path_info:.*}", _route_any)
 
     return app
 

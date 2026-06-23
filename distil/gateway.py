@@ -30,6 +30,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .adapters.anthropic import compress_messages
+from .adapters.gemini import compress_generate_request
+from .adapters.gemini import count_tokens as _gemini_count
+from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
 from .tokenizer import DEFAULT as _tokenizer
@@ -454,7 +457,7 @@ def build_gateway_handler(
         def do_POST(self) -> None:  # noqa: N802
             # Strip query string for path matching
             path = self.path.split("?", 1)[0]
-            if path in _COMPRESSIBLE_PATHS:
+            if path in _COMPRESSIBLE_PATHS or is_gemini_path(path):
                 self._handle_compressible()
             else:
                 self._passthrough()
@@ -535,6 +538,18 @@ def build_gateway_handler(
                 state.record(tenant, baseline_tokens, compressed_tokens)
 
                 body = {**body, "messages": compressed}
+                extras["x-distil-tokens-saved"] = str(tokens_saved)
+
+            elif "contents" in body and isinstance(body["contents"], list):
+                # Gemini generateContent shape.
+                baseline_tokens = _gemini_count(body)
+                try:
+                    body, _store = compress_generate_request(body, lossless_only=lossless_only)
+                except Exception:  # noqa: BLE001 — compression must never break a request
+                    pass
+                compressed_tokens = _gemini_count(body)
+                tokens_saved = max(0, baseline_tokens - compressed_tokens)
+                state.record(tenant, baseline_tokens, compressed_tokens)
                 extras["x-distil-tokens-saved"] = str(tokens_saved)
 
             new_raw = json.dumps(body).encode()

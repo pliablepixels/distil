@@ -123,7 +123,7 @@ original = store.expand(<span class="g">"a3f92b1c"</span>)  <span class="d"># re
     <h2>Path 2 — Provider proxy: <code>distil proxy</code></h2>
     <p><strong>Module:</strong> <code>distil/proxy.py</code></p>
 
-    <p>A lightweight HTTP proxy that sits between your client and the real LLM API. It intercepts <code>POST /v1/messages</code>, <code>POST /v1/chat/completions</code>, and <code>POST /v1/responses</code> requests, compresses the <code>messages</code> array, and forwards the modified request to the upstream. All other paths and methods pass through unchanged.</p>
+    <p>A lightweight HTTP proxy that sits between your client and the real LLM API. It intercepts <code>POST /v1/messages</code>, <code>POST /v1/chat/completions</code>, <code>POST /v1/responses</code>, and <code>POST /v1beta/models/{model}:generateContent</code> (and <code>:streamGenerateContent</code>) requests, compresses the payload, and forwards the modified request to the upstream. All other paths and methods pass through unchanged.</p>
 
     <p>This approach works with <strong>any SDK, framework, or language</strong> — you do not need to touch your application code at all.</p>
 
@@ -168,6 +168,21 @@ llm = ChatAnthropic(
     base_url=<span class="g">"http://localhost:8788"</span>
 )</pre>
       </div>
+      <div class="card">
+        <span class="tag">Google Gemini REST</span>
+        <h3>Python / curl</h3>
+        <pre class="term" style="margin-top:8px"><span class="d">$ distil proxy --upstream \</span>
+<span class="d">    https://generativelanguage.googleapis.com</span>
+
+<span class="d"># then in your code — no other changes</span>
+<span class="c">import</span> google.generativeai <span class="c">as</span> genai
+genai.configure(
+    transport=<span class="g">"rest"</span>,
+    client_options={
+        <span class="g">"api_endpoint"</span>: <span class="g">"http://localhost:8788"</span>
+    },
+)</pre>
+      </div>
     </div>
 
     <h3>Proxy flags</h3>
@@ -200,6 +215,92 @@ distil wrap → proxy http://127.0.0.1:54xxx (upstream https://api.anthropic.com
   → ANTHROPIC_BASE_URL=http://127.0.0.1:54xxx
   → recording genuine savings → distil leaderboard</pre>
     <p>Everything after <code>--</code> runs verbatim and its exit code is propagated. Use <code>--env-var</code> to point a different variable (e.g. an OpenAI-compatible client) at the proxy. See the <a href="cli.html#wrap">CLI reference</a> for all flags.</p>
+
+    <hr/>
+
+    <h2>Google Gemini adapter</h2>
+    <p><strong>Module:</strong> <code>distil/adapters/gemini.py</code></p>
+
+    <p>The Gemini adapter compresses Google's <code>generateContent</code> REST request shape. It is wired into the proxy, the async proxy, and the gateway — no extra configuration beyond pointing the proxy at the Gemini API.</p>
+
+    <pre class="term"><span class="d">$ distil proxy --upstream https://generativelanguage.googleapis.com</span>
+distil proxy listening on http://127.0.0.1:8788
+  → upstream: https://generativelanguage.googleapis.com</pre>
+
+    <p>See <a href="https://github.com/dshakes/distil/blob/main/examples/python_gemini.py"><code>examples/python_gemini.py</code></a> for a runnable end-to-end example.</p>
+
+    <h3>Request shape handled</h3>
+    <pre class="term">{
+  <span class="g">"contents"</span>: [
+    {
+      <span class="g">"role"</span>: <span class="g">"user"</span> | <span class="g">"model"</span>,
+      <span class="g">"parts"</span>: [
+        { <span class="g">"text"</span>: <span class="g">"…"</span> },
+        { <span class="g">"functionCall"</span>: {<span class="g">"name"</span>: <span class="g">"…"</span>, <span class="g">"args"</span>: {…}} },
+        { <span class="g">"functionResponse"</span>: {<span class="g">"name"</span>: <span class="g">"…"</span>, <span class="g">"response"</span>: {…}} }
+      ]
+    }
+  ]
+}</pre>
+
+    <h3>What is compressed</h3>
+    <table>
+      <thead><tr><th>Part type</th><th>What happens</th><th>Reversible?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>text</code> parts (non-model role)</td>
+          <td>Tier-0 lossless: JSON minify + collapse exact-duplicate runs</td>
+          <td>Provably lossless — no side state</td>
+        </tr>
+        <tr>
+          <td><code>functionResponse</code> parts</td>
+          <td>Large string values inside <code>response</code> get the Tier-1 reversible digest; object structure is preserved so the request stays valid</td>
+          <td>Reversible via local <code>RestoreStore</code> (never sent to model, zero tokens)</td>
+        </tr>
+        <tr>
+          <td><code>functionCall</code> parts</td>
+          <td>Passed through untouched</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><code>text</code> parts (model role)</td>
+          <td>Passed through untouched — the model's own words are never rewritten</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><code>inlineData</code>, <code>fileData</code></td>
+          <td>Passed through untouched</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><code>systemInstruction</code></td>
+          <td>Left byte-exact (same treatment as the Anthropic <code>system</code> field)</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Path detection</h3>
+    <p>The adapter activates on:</p>
+    <ul>
+      <li><code>/v1beta/models/{model}:generateContent</code></li>
+      <li><code>/v1beta/models/{model}:streamGenerateContent</code></li>
+      <li><code>/v1/…</code> equivalents on the Gemini host</li>
+    </ul>
+
+    <h3>Savings reporting</h3>
+    <p>Token savings are reported via the <code>x-distil-tokens-saved</code> response header and recorded to the savings ledger, exactly as for other adapters.</p>
+
+    <h3>Shadow-mode decision-equivalence</h3>
+    <p>Shadow-mode live decision-equivalence works for Gemini. It reads the chosen action from <code>candidates[0].content.parts[].functionCall</code> in the response.</p>
+
+    <h3>Not yet wired for Gemini</h3>
+    <div class="callout warn">
+      <b>The following features are messages-format-only today and are not yet wired for Gemini:</b> expand-tool injection (<code>--expand</code>), output verbosity shaping (<code>--shape-output</code>), and Gemini context caching. These gaps are documented honestly here rather than papered over.
+    </div>
+
+    <h3>Lossless-only mode</h3>
+    <p><code>--lossless-only</code> applies to Gemini as it does to all adapters: only Tier-0 transforms are used, so the model sees semantically identical content — no digest stubs. This is the safe mode for subscription or OAuth-gated sessions. The aggressive Tier-1 digest is the default PAYG behavior.</p>
 
     <hr/>
 

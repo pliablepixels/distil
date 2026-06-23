@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-422%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-441%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -185,7 +185,7 @@ distil shadow-stats
 
 For periodic certification under drift: `distil ingest` your captured traffic → `distil conformal --runner anthropic` to re-certify. With `--expand`, the **expand rate** (`x-distil-expanded`) is also a free live canary — the model itself signalling it needed detail back.
 
-**Enforce it once, org-wide.** Run `distil proxy` as a sidecar and set `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` in managed settings or container env — every client (Claude Code via `ANTHROPIC_BASE_URL`, Codex, any SDK) routes through it with **zero per-developer change**. (Gemini's API shape isn't supported yet — a Gemini adapter is on the roadmap.)
+**Enforce it once, org-wide.** Run `distil proxy` as a sidecar and set `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` in managed settings or container env — every client (Claude Code via `ANTHROPIC_BASE_URL`, Codex, any SDK) routes through it with **zero per-developer change**. **Google Gemini** is supported too (point `--upstream` at `generativelanguage.googleapis.com`): the proxy compresses the `generateContent` shape (`contents` / `parts` / `functionResponse`) reversibly, and shadow-mode works for it.
 
 ---
 
@@ -206,6 +206,7 @@ distil proxy --upstream https://api.anthropic.com   # localhost:8788
 | Vercel AI SDK | `createAnthropic({ baseURL: '…:8788' })` | [`examples/js_vercel_ai_sdk.ts`](examples/js_vercel_ai_sdk.ts) |
 | LangChain (py/js) | `anthropicApiUrl` / base URL | [`examples/js_langchain.ts`](examples/js_langchain.ts) |
 | LiteLLM | `api_base="http://127.0.0.1:8788"` | [`examples/python_litellm.py`](examples/python_litellm.py) |
+| Google Gemini | `--upstream https://generativelanguage.googleapis.com` | [`examples/python_gemini.py`](examples/python_gemini.py) |
 
 Prefer in-process? Wrap the client directly — still no call-site change:
 
@@ -293,9 +294,10 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **Decision-Equivalence Risk Certificate** — conformal risk control (LTT/CRC) | `conformal.py`, `distil conformal` | distribution-free guarantee |
 | **Salience protection** — model-free (pattern + entropy + cross-reference), keeps the decision-bearing lines while crushing the rest | `compress/salience.py` | frontier shifter |
 | **Shadow-mode live equivalence** — sample live traffic, run it compressed *and* uncompressed in the background, record the live decision-change rate | `shadow.py`, `distil proxy --shadow` / `distil shadow-stats` | live, content-free |
-| **Provider proxy** — drop-in across SDKs | `proxy.py`, `distil proxy` | reversible |
+| **Provider proxy** — drop-in across SDKs (Anthropic · OpenAI-compatible · Google Gemini) | `proxy.py`, `distil proxy` | reversible |
 | **Managed gateway** — multi-tenant + live savings dashboard | `gateway.py`, `distil gateway` | — |
 | In-process adapter (`wrap`) | `adapters/anthropic.py` | reversible |
+| **Gemini adapter** — compresses the `generateContent` shape (contents/parts/functionResponse) | `adapters/gemini.py` | reversible |
 | **Learned keep-model** (logistic, 96.4% / 0.98 F1 on held-out lines; labels distilled from the salience heuristic + bundled corpus) | `codec/learned.py` | pluggable |
 | Transformer keep-model — ONNX adapter + training pipeline | `codec/transformer.py`, `codec/train_transformer.py` | pluggable |
 | Auth-mode gating (lossless-only on subscription/OAuth) | `policy.py` | safety |

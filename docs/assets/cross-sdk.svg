@@ -31,8 +31,9 @@
     <path d="M345,406 C420,406 410,278 463,278" marker-end="url(#ar)"/>
   </g>
   <g fill="none" stroke="#7d8cff" stroke-width="1.7" stroke-linecap="round">
-    <path d="M765,278 C828,278 820,231 873,231" marker-end="url(#arg)"/>
-    <path d="M765,278 C828,278 820,333 873,333" marker-end="url(#arg)"/>
+    <path d="M765,278 C828,278 820,208 873,208" marker-end="url(#arg)"/>
+    <path d="M765,278 C828,278 824,294 873,294" marker-end="url(#arg)"/>
+    <path d="M765,278 C828,278 820,380 873,380" marker-end="url(#arg)"/>
   </g>
 
   <!-- client cards: x=44 w=300 h=56, tops 122/186/250/314/378 -->
@@ -61,8 +62,9 @@
   <text x="615" y="425" text-anchor="middle" font-size="13.5" font-weight="700" fill="#eef0f5">wrap(client)</text>
 
   <!-- provider cards: x=874 w=282 h=84, tops 189/291 (centers 231/333) -->
-  <g transform="translate(874,189)"><rect width="282" height="84" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="42" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="46" text-anchor="middle" font-size="12" font-weight="800" fill="#8b7bff">A</text><text x="60" y="36" font-size="14" font-weight="700" fill="#eef0f5">Anthropic API</text><text x="60" y="56" font-size="11" fill="#8b91a3">api.anthropic.com</text><text x="60" y="72" font-size="10" fill="#5b6177">Claude — all models</text></g>
-  <g transform="translate(874,291)"><rect width="282" height="84" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="42" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="46" text-anchor="middle" font-size="12" font-weight="800" fill="#5ad1c9">O</text><text x="60" y="36" font-size="14" font-weight="700" fill="#eef0f5">OpenAI-compatible</text><text x="60" y="56" font-size="11" fill="#8b91a3">OpenAI · Azure · Together</text><text x="60" y="72" font-size="10" fill="#5b6177">Fireworks · Groq · …</text></g>
+  <g transform="translate(874,168)"><rect width="282" height="80" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="40" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="#8b7bff">A</text><text x="60" y="34" font-size="14" font-weight="700" fill="#eef0f5">Anthropic API</text><text x="60" y="54" font-size="11" fill="#8b91a3">api.anthropic.com</text><text x="60" y="70" font-size="10" fill="#5b6177">Claude — all models</text></g>
+  <g transform="translate(874,254)"><rect width="282" height="80" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="40" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="#5ad1c9">O</text><text x="60" y="34" font-size="14" font-weight="700" fill="#eef0f5">OpenAI-compatible</text><text x="60" y="54" font-size="11" fill="#8b91a3">OpenAI · Azure · Together</text><text x="60" y="70" font-size="10" fill="#5b6177">Fireworks · Groq · …</text></g>
+  <g transform="translate(874,340)"><rect width="282" height="80" rx="15" fill="url(#card)" stroke="#252c3e" filter="url(#sh)"/><circle cx="34" cy="40" r="14" fill="#171d30" stroke="#2c3658"/><text x="34" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="#f0a36b">G</text><text x="60" y="34" font-size="14" font-weight="700" fill="#eef0f5">Google Gemini</text><text x="60" y="54" font-size="11" fill="#8b91a3">generativelanguage.googleapis.com</text><text x="60" y="70" font-size="10" fill="#5b6177">generateContent — Gemini models</text></g>
 
   <text x="600" y="466" text-anchor="middle" font-size="12.5" fill="#8b91a3">no code change — point <tspan fill="#eef0f5" font-weight="600">base_url</tspan> at the proxy; works in any language</text>
 </svg>

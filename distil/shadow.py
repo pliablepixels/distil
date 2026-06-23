@@ -76,6 +76,18 @@ def decision_signature(resp_json: Any) -> str:
             return "tool:" + _canon({"name": fn.get("name"), "arguments": fn.get("arguments")})
         return "text"
 
+    # Gemini generateContent
+    candidates = resp_json.get("candidates")
+    if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+        content = candidates[0].get("content")
+        parts = content.get("parts") if isinstance(content, dict) else None
+        if isinstance(parts, list):
+            for p in parts:
+                if isinstance(p, dict) and isinstance(p.get("functionCall"), dict):
+                    fc = p["functionCall"]
+                    return "tool:" + _canon({"name": fc.get("name"), "args": fc.get("args")})
+        return "text"  # responded without calling a function
+
     return "none"
 
 

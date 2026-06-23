@@ -3,6 +3,25 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.14.0] — Google Gemini adapter + true lossless-only
+
+- **Gemini adapter** (`adapters/gemini.py`): the proxy, async proxy, and gateway now
+  compress Google's `generateContent` request shape (`contents` / `parts` /
+  `functionResponse`) — a third first-class provider alongside Anthropic and the
+  OpenAI-compatible family. `text` parts get Tier-0 lossless transforms; large
+  `functionResponse` string values get the Tier-1 *reversible* digest (recoverable
+  via the local store); `functionCall`, `inlineData`, `fileData`, and model-authored
+  text pass through untouched. Path-detected (`:generateContent` /
+  `:streamGenerateContent`), so just `--upstream https://generativelanguage.googleapis.com`.
+  Shadow-mode live decision-equivalence works for Gemini too. (Expand-tool injection,
+  output shaping, and Gemini context caching remain messages-format-only for now.)
+- **`--lossless-only` is now genuinely lossless-in-context** (GA correctness fix). It
+  previously still applied the Tier-1 digest, replacing tool output the model could not
+  recover (tool injection is disallowed on subscription/OAuth) with a stub — despite
+  the "safe for subscription" label. It now applies only Tier-0 transforms in this
+  mode, so the model sees semantically identical content. The aggressive,
+  certificate-backed reversible digest remains the default (PAYG) behavior.
+
 ## [0.13.0] — Shadow-mode live decision-equivalence
 
 - **Shadow mode** (`shadow.py`, `distil proxy --shadow RATE`, `distil shadow-stats`):

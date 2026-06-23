@@ -76,6 +76,7 @@
       <li><code>/v1/messages</code> — Anthropic Messages API</li>
       <li><code>/v1/chat/completions</code> — OpenAI Chat Completions (also used by LiteLLM, LangChain, etc.)</li>
       <li><code>/v1/responses</code> — OpenAI Responses API</li>
+      <li><code>/v1beta/models/{model}:generateContent</code> and <code>:streamGenerateContent</code> — Google Gemini REST API (also the <code>/v1/…</code> host variants)</li>
     </ul>
     <p>All other paths and HTTP verbs pass through unchanged. Your API key travels in the request headers exactly as normal — the proxy never logs or stores it.</p>
 
@@ -132,6 +133,13 @@
           <td><code>anthropicApiUrl</code> in <code>ChatAnthropic({…})</code></td>
           <td><code>http://127.0.0.1:8788</code></td>
           <td><a href="https://github.com/dshakes/distil/blob/main/examples/js_langchain.ts">js_langchain.ts</a></td>
+        </tr>
+        <tr>
+          <td><strong>Google Gemini REST</strong> (<code>google-generativeai</code>)</td>
+          <td>Python / curl</td>
+          <td><code>api_endpoint</code> in <code>client_options</code></td>
+          <td><code>http://127.0.0.1:8788</code> (upstream: <code>https://generativelanguage.googleapis.com</code>)</td>
+          <td><a href="https://github.com/dshakes/distil/blob/main/examples/python_gemini.py">python_gemini.py</a></td>
         </tr>
       </tbody>
     </table>
@@ -202,6 +210,19 @@ response = litellm.completion(
 <span class="c">const</span> response = <span class="c">await</span> model.invoke([
   [<span class="g">"human"</span>, <span class="g">"Hello!"</span>],
 ]);</pre>
+
+    <h3>Google Gemini REST</h3>
+    <pre class="term"><span class="d"># Start proxy pointing at the Gemini API</span>
+distil proxy --port 8788 --upstream https://generativelanguage.googleapis.com</pre>
+    <pre class="term"><span class="c">import</span> google.generativeai <span class="c">as</span> genai
+
+genai.configure(
+    transport=<span class="g">"rest"</span>,
+    client_options={<span class="g">"api_endpoint"</span>: <span class="g">"http://127.0.0.1:8788"</span>},
+)
+model = genai.GenerativeModel(<span class="g">"gemini-1.5-pro"</span>)
+response = model.generate_content(<span class="g">"Hello!"</span>)</pre>
+    <p>See <a href="https://github.com/dshakes/distil/blob/main/examples/python_gemini.py"><code>examples/python_gemini.py</code></a> for a full runnable example including tool-use turns. The proxy transparently compresses <code>text</code> parts (Tier-0 lossless) and <code>functionResponse</code> payloads (Tier-1 reversible digest). <code>functionCall</code>, <code>inlineData</code>, <code>fileData</code>, model-authored text, and <code>systemInstruction</code> are always passed through unchanged.</p>
 
     <hr/>
 

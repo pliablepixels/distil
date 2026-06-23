@@ -189,11 +189,24 @@ class TestInputNotMutated:
 
 
 class TestLosslessOnlyParam:
-    def test_accepted_without_error(self) -> None:
+    def test_lossless_only_does_not_digest(self) -> None:
+        """Subscription/OAuth-safe mode is lossless-IN-CONTEXT: a large tool_result
+        is never replaced by a Tier-1 digest stub the model can't recover."""
         msg = _make_tool_result_message(LONG_TOOL_RESULT)
         new_messages, store = compress_messages([msg], lossless_only=True)
-        # Should still compress (today lossless_only is a no-op flag).
-        assert len(store.handles) == 1
+        assert len(store.handles) == 0  # nothing digested
+        seen = new_messages[0]["content"][0]["content"]
+        assert "<< +" not in seen  # no digest stub marker
+        # Every non-empty original line still present (Tier-0 is semantically lossless).
+        for line in LONG_TOOL_RESULT.splitlines():
+            if line.strip():
+                assert line in seen
+
+    def test_payg_does_digest(self) -> None:
+        """Default (PAYG) mode keeps the aggressive reversible digest — the moat."""
+        msg = _make_tool_result_message(LONG_TOOL_RESULT)
+        _new, store = compress_messages([msg], lossless_only=False)
+        assert len(store.handles) == 1  # digested, recoverable via the store
 
 
 # ---------------------------------------------------------------------------
