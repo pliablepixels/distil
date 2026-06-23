@@ -42,7 +42,7 @@ Agents re-send their whole context every turn — you pay for it every turn. Dis
 
 **🛠️ For developers**
 
-`pipx install distil-llm` (or `uvx --from distil-llm distil …`), point your client's `base_url` at the proxy, done — **no code change, any language or SDK**. Or `wrap(client)` in-process. Lossless by default, reversible on demand.
+`pipx install distil-llm` (or `uvx --from distil-llm distil …`), point your client's `base_url` at the proxy, done — **no code change, any language or SDK**. Or `wrap(client)` in-process. **Reversible by default** — every digest is byte-recoverable on demand; **lossless byte-in-context** with `--verbatim`.
 
 </td>
 <td width="33%" valign="top">
@@ -72,6 +72,8 @@ Every other compressor — summarizers, extractive pruners, structural crushers 
 - **Every expansion is a label.** A `distil_expand` call is ground truth that the digested content *mattered*. Logged (numbers only, never content), these feed a learned policy (`distil learn` shows it) that stops digesting the content *signatures* your agents keep expanding — keeping them byte-exact instead. It only ever makes Distil **more** conservative, so it's never-regressing by construction.
 
 This is the structural advantage: **compress more, lose nothing, and get better the more you use it.** Recoverable compression is uncommon among the lossy tools in this space — and the learning loop compounds on top of it.
+
+> **The three fidelity tiers, precisely:** **lossless** = the model sees content *byte-identical in-context* (Tier-0 / `--verbatim`); **reversible** = content is *digested but byte-recoverable on demand* via the local store / `distil_expand` (the default — like a zip you unpack only when needed); **lossy** = dropped irrecoverably (every other tool). **All three distil modes are certified decision-equivalent**; only distil offers the reversible tier, and only distil certifies it.
 
 ---
 
@@ -129,7 +131,7 @@ Not reference implementations: the **actual installed packages** (`llmlingua`, `
 
 | Method | Token savings | Live decision-change | Certifies ≤5%@95%? | Latency/turn |
 |---|--:|--:|:--:|--:|
-| **Distil** (causal-prune + lossless) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
+| **Distil** (causal-prune + reversible) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
 | LLMLingua-2 (`llmlingua`, real) | 53.1% | 20.0% | ❌ no | ~1,480 ms |
 | Headroom (`headroom-ai`, real) | 35.3% | 0.0% | ✅ yes | 26 ms |
 | ~~RTK~~ (`rtk-py`) | — | — | excluded¹ | — |
@@ -203,7 +205,7 @@ Then wire the status line in `~/.claude/settings.json` (`"statusLine": {"type":"
 
 ## 🔌 Works with every SDK
 
-One proxy. Point any `base_url`-honoring client at it — **Python, TypeScript, any language** — and get cache-aware lossless compression with **no code change**.
+One proxy. Point any `base_url`-honoring client at it — **Python, TypeScript, any language** — and get cache-aware **reversible** compression with **no code change**.
 
 <p align="center"><img src="docs/assets/cross-sdk.svg" alt="one proxy, every SDK" width="100%"/></p>
 
@@ -403,7 +405,7 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 
 **Output** — two real mechanisms (`distil/output.py`):
 - **Generation-side shaping** — a gated `role:"system"` verbosity directive (`distil proxy --shape-output light|aggressive`) so the model *emits* fewer tokens. Lossy by nature, so it's **PAYG-only** and **measured**: `distil output-savings` reports the token cut **and** the rate the answer survived, with a bootstrap CI.
-- **Lossless output-on-re-entry digest** — long answers that become history are digested reversibly, so verbose past output stops costing full price as context.
+- **Reversible output-on-re-entry digest** — long answers that become history are digested reversibly, so verbose past output stops costing full price as context.
 
 ```
 $ distil output-savings   # live A/B (needs an API key); small sample — verify on your own workload

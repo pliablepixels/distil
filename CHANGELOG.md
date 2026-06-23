@@ -3,6 +3,20 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.23.1] — Honest vocabulary: "reversible" vs "lossless"
+
+A precision pass on terminology so no claim can be read as an overclaim:
+- **The default Tier-1 digest is now described as "reversible"** (byte-recoverable on
+  demand), not "lossless". "Lossless" is reserved for the **byte-in-context** tier
+  (Tier-0 / `--verbatim`), where the model sees content unchanged. "Lossy" stays for
+  the irrecoverable competitors. All three Distil tiers remain certified
+  decision-equivalent. Updated the README headline + prose, the benchmark method
+  label, and added an explicit three-tier definition to the README and Concepts page.
+- **`--safe`** added as a clearer alias for **`--lossless-only`** (the
+  policy/subscription-safe mode: no lossy shaping, no tool injection — the reversible
+  digest still runs); `--verbatim` remains the byte-in-context switch. Internal
+  strategy/ladder identifiers are unchanged (no behavior change).
+
 ## [0.23.0] — GA polish: grounded docs, genuine head-to-head, recipes
 
 A go-live pass: every customer-facing claim audited against code, every benchmark

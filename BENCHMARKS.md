@@ -13,7 +13,7 @@ graded live by `claude-opus-4-8`:
 
 | method | token savings | live decision-change | certifies ≤5% @ 95%? | compression latency / turn |
 |---|---:|---:|:--:|---:|
-| **Distil** (causal-prune + lossless) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
+| **Distil** (causal-prune + reversible) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
 | LLMLingua-2 (`llmlingua` 0.2.2) | 53.1% | 20.0% | ❌ no | ~1,480 ms |
 | Headroom (`headroom-ai` 0.27.0) | 35.3% | 0.0% | ✅ yes | 26 ms |
 | RTK (`rtk-py` 0.42.4.1) | — | — | excluded | — |

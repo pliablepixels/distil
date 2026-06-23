@@ -936,9 +936,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     px.add_argument(
         "--lossless-only",
+        "--safe",
         action="store_true",
-        help="lossless strategies only: no lossy output-shaping, no tool injection "
-        "(the reversible, certified digest still runs)",
+        help="policy/subscription-safe mode: no lossy output-shaping, no tool injection "
+        "(the reversible, certified digest still runs). Alias: --safe. For byte-in-context "
+        "content use --verbatim.",
     )
     px.add_argument(
         "--verbatim",
@@ -1021,9 +1023,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     wr.add_argument(
         "--lossless-only",
+        "--safe",
         action="store_true",
-        help="lossless strategies only: no lossy output-shaping, no tool injection "
-        "(the reversible, certified digest still runs)",
+        help="policy/subscription-safe mode: no lossy output-shaping, no tool injection "
+        "(the reversible, certified digest still runs). Alias: --safe. For byte-in-context "
+        "content use --verbatim.",
     )
     wr.add_argument(
         "--verbatim",
@@ -1085,7 +1089,7 @@ def build_parser() -> argparse.ArgumentParser:
     gw.add_argument("--port", type=int, default=8789)
     gw.add_argument("--upstream", default="https://api.anthropic.com")
     gw.add_argument("--pricing", default="claude-opus-4-8", choices=sorted(pricing.CATALOG))
-    gw.add_argument("--lossless-only", action="store_true")
+    gw.add_argument("--lossless-only", "--safe", action="store_true")
     gw.add_argument(
         "--verbatim",
         action="store_true",
