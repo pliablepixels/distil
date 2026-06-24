@@ -139,12 +139,13 @@ def llmlingua2(rate: float = 0.5):
     the way it deploys. Returns None if the package isn't importable (skipped)."""
     try:
         from llmlingua import PromptCompressor
-    except ImportError:
+
+        comp = PromptCompressor(
+            model_name="microsoft/llmlingua-2-xlm-roberta-large-meetingbank",
+            use_llmlingua2=True,
+        )
+    except Exception:  # noqa: BLE001 — not importable OR model won't load (e.g. no GPU); skip
         return None
-    comp = PromptCompressor(
-        model_name="microsoft/llmlingua-2-xlm-roberta-large-meetingbank",
-        use_llmlingua2=True,
-    )
 
     def strat(blocks, turn):
         def fn(text):
@@ -163,9 +164,10 @@ def longllmlingua(rate: float = 0.5):
     ``llmlingua`` package. Returns None if the package isn't importable (skipped)."""
     try:
         from llmlingua import PromptCompressor
-    except ImportError:
+
+        comp = PromptCompressor(use_llmlingua2=False)  # original LLMLingua/LongLLMLingua LM
+    except Exception:  # noqa: BLE001 — not importable OR backbone won't load (e.g. no GPU); skip
         return None
-    comp = PromptCompressor(use_llmlingua2=False)  # original LLMLingua/LongLLMLingua LM
 
     def strat(blocks, turn):
         def fn(text):

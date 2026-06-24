@@ -593,3 +593,42 @@ def test_report_to_latex_fragments():
     for fn in (r2l.frontier, r2l.coverage, r2l.task_success, r2l.shift):
         out = fn(rep)
         assert out and "\\" in out  # produced LaTeX, didn't crash
+
+# --- honest-denominator + guards (added with the real-run hardening) ---------- #
+
+
+def test_frontier_reports_effective_and_trivial_fields():
+    prove, matrix, ladder = _matrix()
+    rows = {r["level"]: r for r in prove.e1_frontier(matrix, ladder)}
+    for r in rows.values():
+        # every row carries the honest denominator so no-op turns can't inflate equivalence
+        assert "effective_n" in r and "trivial_frac" in r and "decision_change_effective" in r
+        assert 0.0 <= r["trivial_frac"] <= 1.0
+        assert r["effective_n"] <= r["n"]
+    # byte-exact changes no text on any turn → 100% trivial, 0 effective turns
+    assert rows["byte-exact"]["trivial_frac"] == 1.0
+    assert rows["byte-exact"]["effective_n"] == 0
+
+
+def test_e4_flags_nonevidential_degenerate_outcomes():
+    prove, matrix, ladder = _matrix()
+    # force a degenerate outcome label set (all True) — mirrors swe-hf resolved=True
+    for rec in matrix.values():
+        rec["success"] = True
+    e4 = prove.e4_task_success(matrix, ladder, seed=0, boot=50)
+    assert e4 is not None and e4["outcome_evidential"] is False
+
+
+def test_report_to_latex_refuses_smoke_run(tmp_path):
+    import json
+    import subprocess
+    import sys
+
+    rep = tmp_path / "smoke.json"
+    rep.write_text(json.dumps({"args": {"runner": "smoke", "samples": 1}, "frontier": []}))
+    script = Path(__file__).resolve().parent.parent / "benchmarks" / "report_to_latex.py"
+    out = subprocess.run(
+        [sys.executable, str(script), str(rep)], capture_output=True, text=True
+    )
+    assert out.returncode != 0
+    assert "smoke" in (out.stderr + out.stdout).lower()

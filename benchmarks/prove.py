@@ -160,7 +160,9 @@ def build_matrix(
         for turn in e.trajectory.turns:
             restore = build_restore(turn.blocks) if expand else None
             comps = {("level", n): strat(turn.blocks, turn.index) for n, strat in ladder}
-            comps.update({("baseline", n): strat(turn.blocks, turn.index) for n, strat in baselines})
+            comps.update(
+                {("baseline", n): strat(turn.blocks, turn.index) for n, strat in baselines}
+            )
             requests.append((turn.blocks, restore))
             for c in comps.values():
                 requests.append((c, restore))
@@ -177,6 +179,7 @@ def build_matrix(
         rec = {"domain": domain, "success": success, "turns": []}
         for _idx, base_blocks, restore, gold_fp, comps in turns:
             base = cache.decide(base_blocks, restore)
+            base_text = "\n".join(b.text for b in base_blocks)
             tr = {
                 "base": base,
                 "base_tok": sum(tok.count(b.text) for b in base_blocks),
@@ -190,6 +193,9 @@ def build_matrix(
                 tr[bucket][name] = {
                     "loss": 0.0 if dec == base else 1.0,
                     "comp_tok": sum(tok.count(b.text) for b in comp),
+                    # did this level actually alter the text on this turn? a turn it
+                    # leaves byte-identical is trivially loss=0 and dilutes the rate.
+                    "changed": "\n".join(b.text for b in comp) != base_text,
                 }
             rec["turns"].append(tr)
         matrix[tid] = rec
@@ -205,17 +211,26 @@ def e1_frontier(matrix, ladder) -> list[dict]:
     rows = []
     for name, _ in ladder:
         losses, base_t, comp_t = [], 0, 0
+        eff_losses = []  # losses only on turns this level actually changed
         for rec in matrix.values():
             for tr in rec["turns"]:
-                losses.append(tr["levels"][name]["loss"])
+                lv = tr["levels"][name]
+                losses.append(lv["loss"])
+                if lv.get("changed"):
+                    eff_losses.append(lv["loss"])
                 base_t += tr["base_tok"]
                 comp_t += tr["levels"][name]["comp_tok"]
-        n = len(losses)
+        n, m = len(losses), len(eff_losses)
         rows.append(
             {
                 "level": name,
                 "n": n,
                 "decision_change": (sum(losses) / n) if n else 0.0,
+                # honest denominator: rate over turns the level actually compressed,
+                # and the fraction of turns it left byte-identical (trivially safe).
+                "effective_n": m,
+                "decision_change_effective": (sum(eff_losses) / m) if m else 0.0,
+                "trivial_frac": ((n - m) / n) if n else 0.0,
                 "savings": (1.0 - comp_t / base_t) if base_t else 0.0,
             }
         )
@@ -411,6 +426,10 @@ def e4_task_success(matrix, ladder, *, seed=0, boot=1000) -> dict | None:
         return None
     n = len(labeled)
     base_success = sum(1 for _, r in labeled if r["success"]) / n
+    # If every trajectory shares the same outcome label there is no real outcome
+    # variance to measure — e.g. the swe-hf localization builder marks every instance
+    # resolved=True by construction. Flag it so E4 is not read as a measured success rate.
+    outcome_evidential = len({bool(r["success"]) for _, r in labeled}) > 1
 
     rng = random.Random(seed)
     rows = []
@@ -438,7 +457,12 @@ def e4_task_success(matrix, ladder, *, seed=0, boot=1000) -> dict | None:
                 "preserved_frac": sum(1 for _, r in labeled if preserved(r)) / n,
             }
         )
-    return {"n": n, "baseline_success": base_success, "levels": rows}
+    return {
+        "n": n,
+        "baseline_success": base_success,
+        "outcome_evidential": outcome_evidential,
+        "levels": rows,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -648,13 +672,18 @@ def main() -> int:
 
     # ---- E1 ----------------------------------------------------------------
     print("\n=== E1 · FRONTIER (savings vs. decision-change, real grader) ===")
-    print(f"{'level':<24}{'savings':>9}{'dec-change':>12}{'n':>7}")
-    print("-" * 52)
+    print(f"{'level':<24}{'savings':>9}{'dec-change':>12}{'n':>7}{'on-changed':>12}{'trivial':>9}")
+    print("-" * 73)
     f_rows = e1_frontier(matrix, ladder)
     for r in f_rows:
         print(
             f"{r['level']:<24}{r['savings'] * 100:>8.1f}%{r['decision_change'] * 100:>11.1f}%{r['n']:>7}"
+            f"{r['decision_change_effective'] * 100:>11.1f}%{r['trivial_frac'] * 100:>8.0f}%"
         )
+    print(
+        "  on-changed = decision-change over only the turns this level actually compressed\n"
+        "  (effective n); trivial = % of turns left byte-identical (trivially safe, dilutes the rate)."
+    )
 
     # ---- head-to-head vs baselines ----------------------------------------
     h2h = []
@@ -727,6 +756,12 @@ def main() -> int:
     e4 = e4_task_success(matrix, ladder, seed=args.seed)
     if e4:
         print("\n=== E4 · DOWNSTREAM TASK SUCCESS (outcome preserved under compression?) ===")
+        if not e4.get("outcome_evidential", True):
+            print(
+                "  ⚠ NON-EVIDENTIAL OUTCOME: every trajectory shares the same label (no variance —\n"
+                "    e.g. swe-hf marks all instances resolved=True by construction). Read the\n"
+                "    retained-decision-equivalence below, NOT the success rate, as the signal."
+            )
         print(
             f"labeled trajectories: {e4['n']}  ·  baseline success-rate: {e4['baseline_success'] * 100:.1f}%"
         )

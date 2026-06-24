@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -106,8 +107,23 @@ class OpenAIRunner:
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions", data=data, headers=headers, method="POST"
         )
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 (configured URL)
-            return json.loads(resp.read().decode())
+        # Retry on rate-limit / transient server errors with exponential backoff,
+        # honoring Retry-After when the provider sends it. Rate limits are routine on
+        # paid-but-low-tier keys; without this a 429 would crash the whole sweep.
+        delay = 2.0
+        for attempt in range(6):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 (configured URL)
+                    return json.loads(resp.read().decode())
+            except urllib.error.HTTPError as e:
+                if e.code in (429, 500, 502, 503, 529) and attempt < 5:
+                    ra = e.headers.get("Retry-After") if e.headers else None
+                    wait = float(ra) if (ra and ra.replace(".", "", 1).isdigit()) else delay
+                    time.sleep(min(wait, 60.0))
+                    delay = min(delay * 2, 60.0)
+                    continue
+                raise
+        raise RuntimeError("unreachable")  # loop either returns or re-raises
 
     def _raw(self, system: str, user: str) -> str:
         payload: dict = {

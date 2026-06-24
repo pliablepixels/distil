@@ -132,6 +132,13 @@ def task_success(rep: dict) -> str:
     t = rep.get("task_success") or {}
     if not t:
         return "% no task-success in report (need outcome-labeled trajectories)\n"
+    note = ""
+    if t.get("outcome_evidential") is False:
+        note = (
+            "% NOTE: outcome is non-evidential (all trajectories share one label, e.g.\n"
+            "% swe-hf resolved=True by construction) — read 'retained' as retained\n"
+            "% decision-equivalence, NOT a measured task-success rate.\n"
+        )
     body = "\n".join(
         _tex(r["level"])
         + " & "
@@ -145,6 +152,7 @@ def task_success(rep: dict) -> str:
     header = "level & savings & retained success (95\\% CI)" + EOL
     return (
         f"% auto-generated task-success (E4); baseline={_pct(t.get('baseline_success', 0))}, n={t.get('n')}\n"
+        f"{note}"
         "\\begin{tabular}{@{}lrr@{}}\n\\toprule\n"
         f"{header}\n\\midrule\n{body}\n\\bottomrule\n\\end{{tabular}}\n"
     )
@@ -182,6 +190,18 @@ def main() -> int:
     args = ap.parse_args()
 
     rep = json.loads(Path(args.report).read_text())
+    runner = (rep.get("args") or {}).get("runner")
+    if runner == "smoke":
+        raise SystemExit(
+            "ERROR: this report came from the NON-EVIDENTIAL smoke runner — refusing to\n"
+            "       emit paper LaTeX from it. Re-run prove.py with --runner "
+            "anthropic/openai/claude-cli on real traces."
+        )
+    if (rep.get("args") or {}).get("samples", 1) < 3:
+        print(
+            "WARNING: report used --samples < 3; decision-change rate conflates true loss "
+            "with grader variance. Use majority-of-3+ for a publishable number.",
+        )
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     files = {
