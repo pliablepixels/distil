@@ -83,9 +83,10 @@ few trajectories and `--ladder quick`, scale up for the headline run.
 
 **`--baselines` (head-to-head).** Add `--baselines` to grade competitor/structural
 baselines under the **same grader** and print a comparison table (token savings,
-decision-change rate, and whether each *certifies* ≤ α at 1−δ): LLMLingua-2 (if
-`pip install llmlingua`), RECOMP-style extractive, selective-context, truncation, and
-recency-window. The honest contrast: aggressive baselines save more but flip decisions
+decision-change rate, and whether each *certifies* ≤ α at 1−δ): LLMLingua-2 and
+LongLLMLingua (if `pip install llmlingua`), RECOMP-style extractive,
+selective-context, truncation, recency-window, and **keep-last-k-turns** (the classic
+agent-memory sliding window). The honest contrast: aggressive baselines save more but flip decisions
 (don't certify); distil's certified level is the most aggressive one that does.
 
 **`--expand` (with-expand frontier).** The reversible digest is only decision-equivalent

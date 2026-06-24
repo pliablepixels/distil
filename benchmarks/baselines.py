@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 
 from distil.compress.salience import reference_index, salient_tokens
-from distil.trajectory import Stability
+from distil.trajectory import Kind, Stability
 
 _WORD = re.compile(r"\S+")
 
@@ -33,6 +33,18 @@ def _map_volatile(blocks, fn):
     out = []
     for b in blocks:
         if b.stability is Stability.VOLATILE:
+            new = fn(b.text)
+            out.append(b.copy_with(new) if len(new) < len(b.text) else b)
+        else:
+            out.append(b)
+    return out
+
+
+def _map_kind(blocks, kinds, fn):
+    """Apply ``fn(text) -> text`` to blocks of the given kinds (e.g. HISTORY)."""
+    out = []
+    for b in blocks:
+        if b.kind in kinds:
             new = fn(b.text)
             out.append(b.copy_with(new) if len(new) < len(b.text) else b)
         else:
@@ -79,6 +91,21 @@ def recomp_extractive(keep_frac: float = 0.35):
         return _map_volatile(blocks, fn)
 
     return strat
+
+
+def keep_last_k_turns(k: int = 3):
+    """Agent-memory sliding window: keep only the most recent ``k`` history
+    entries, dropping older context entirely (lossy, irrecoverable, and
+    cache-breaking since it rewrites the prefix). The classic ``messages[-k:]``
+    memory policy, here applied to the HISTORY block the adapters accumulate."""
+
+    def fn(text):
+        entries = text.split("\n\n")
+        if len(entries) <= k:
+            return text
+        return f"[…{len(entries) - k} earlier turns dropped…]\n\n" + "\n\n".join(entries[-k:])
+
+    return lambda blocks, turn: _map_kind(blocks, {Kind.HISTORY}, fn)
 
 
 def selective_context(keep_frac: float = 0.5):
@@ -131,6 +158,34 @@ def llmlingua2(rate: float = 0.5):
     return strat
 
 
+def longllmlingua(rate: float = 0.5):
+    """LongLLMLingua (the question-aware, perplexity-based variant) via the real
+    ``llmlingua`` package. Returns None if the package isn't importable (skipped)."""
+    try:
+        from llmlingua import PromptCompressor
+    except ImportError:
+        return None
+    comp = PromptCompressor(use_llmlingua2=False)  # original LLMLingua/LongLLMLingua LM
+
+    def strat(blocks, turn):
+        def fn(text):
+            try:
+                return comp.compress_prompt(
+                    [text],
+                    rate=rate,
+                    condition_compare=True,
+                    condition_in_question="after",
+                    rank_method="longllmlingua",
+                    dynamic_context_compression_ratio=0.3,
+                ).get("compressed_prompt", text)
+            except Exception:  # noqa: BLE001 — never break the sweep on one block
+                return text
+
+        return _map_volatile(blocks, fn)
+
+    return strat
+
+
 # --------------------------------------------------------------------------- #
 
 
@@ -140,13 +195,15 @@ def load_baselines(*, include_real: bool = True) -> list[tuple[str, object]]:
     rungs: list[tuple[str, object]] = [
         ("truncate@500", truncate_head(500)),
         ("recency-window@500", recency_window(500)),
+        ("keep-last-3-turns", keep_last_k_turns(3)),
         ("recomp-extractive", recomp_extractive()),
         ("selective-context", selective_context()),
     ]
     if include_real:
-        ll = llmlingua2()
-        if ll is not None:
-            rungs.append(("llmlingua-2", ll))
-        else:
-            print("  [baselines] llmlingua-2 skipped — `pip install llmlingua` to include it")
+        for label, factory in (("llmlingua-2", llmlingua2), ("longllmlingua", longllmlingua)):
+            strat = factory()
+            if strat is not None:
+                rungs.append((label, strat))
+            else:
+                print(f"  [baselines] {label} skipped — `pip install llmlingua` to include it")
     return rungs

@@ -444,20 +444,42 @@ def _load_baselines_mod():
 
 def test_baselines_load_and_compress():
     bl = _load_baselines_mod()
-    rungs = bl.load_baselines(include_real=False)
-    names = {n for n, _ in rungs}
-    assert {"truncate@500", "recency-window@500", "recomp-extractive", "selective-context"} <= names
+    rungs = dict(bl.load_baselines(include_real=False))
+    assert {
+        "truncate@500",
+        "recency-window@500",
+        "keep-last-3-turns",
+        "recomp-extractive",
+        "selective-context",
+    } <= set(rungs)
     entries = realtrace.load_tau_bench(FIX / "tau_bench_sample.json")
-    blocks = entries[1].trajectory.turns[-1].blocks  # a turn with a verbose volatile obs
-    vol0 = sum(len(b.text) for b in blocks if b.stability is Stability.VOLATILE)
-    for _name, strat in rungs:
-        out = strat(blocks, 0)
-        vol1 = sum(len(b.text) for b in out if b.stability is Stability.VOLATILE)
-        assert vol1 <= vol0  # baselines only shrink the volatile tail
-        # the cacheable prefix must be left byte-identical
+    blocks = entries[1].trajectory.turns[-1].blocks  # verbose volatile obs + history
+    tot0 = sum(len(b.text) for b in blocks)
+
+    # volatile-only baselines: shrink the tail, leave the cacheable prefix byte-identical
+    for name in ("truncate@500", "recency-window@500", "recomp-extractive", "selective-context"):
+        out = rungs[name](blocks, 0)
         pre_in = [b.text for b in blocks if b.stability is not Stability.VOLATILE]
         pre_out = [b.text for b in out if b.stability is not Stability.VOLATILE]
         assert pre_in == pre_out
+        assert sum(len(b.text) for b in out) <= tot0
+
+    # keep-last-k-turns is the cache-breaking memory baseline: it rewrites HISTORY,
+    # keeping only the most recent k entries (test on a synthetic long history)
+    from distil.trajectory import Block, Kind  # Stability already imported at module level
+
+    hist = Block(
+        "h", Kind.HISTORY, "\n\n".join(f"[msg{i}] turn {i}" for i in range(10)), Stability.SETTLING
+    )
+    synth = [
+        Block("s", Kind.SYSTEM, "policy", Stability.STABLE),
+        hist,
+        Block("o", Kind.TOOL_OUTPUT, "obs", Stability.VOLATILE),
+    ]
+    out = rungs["keep-last-3-turns"](synth, 0)
+    hist_out = next(b.text for b in out if b.kind is Kind.HISTORY)
+    assert hist_out.count("[msg") == 3  # only the last 3 entries survive
+    assert "earlier turns dropped" in hist_out
 
 
 def test_head_to_head_distil_certifies_aggressive_baseline_does_not():
