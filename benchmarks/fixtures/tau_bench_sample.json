@@ -2,6 +2,7 @@
   {
     "id": "tau-refund-ok",
     "title": "tau-refund-ok",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -72,6 +73,7 @@
   {
     "id": "tau-credit-opened",
     "title": "tau-credit-opened",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -142,6 +144,7 @@
   {
     "id": "tau-credit-late",
     "title": "tau-credit-late",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -212,6 +215,7 @@
   {
     "id": "tau-cancel-ok",
     "title": "tau-cancel-ok",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -282,6 +286,7 @@
   {
     "id": "tau-cancel-shipped",
     "title": "tau-cancel-shipped",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -352,6 +357,7 @@
   {
     "id": "tau-fraud",
     "title": "tau-fraud",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -422,6 +428,7 @@
   {
     "id": "tau-refund-ok2",
     "title": "tau-refund-ok2",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -492,6 +499,7 @@
   {
     "id": "tau-credit-opened2",
     "title": "tau-credit-opened2",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -562,6 +570,7 @@
   {
     "id": "tau-cancel-ok2",
     "title": "tau-cancel-ok2",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -632,6 +641,7 @@
   {
     "id": "tau-fraud2",
     "title": "tau-fraud2",
+    "reward": 0,
     "tools": [
       {
         "name": "issue_refund",
@@ -702,6 +712,7 @@
   {
     "id": "tau-credit-late2",
     "title": "tau-credit-late2",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",
@@ -772,6 +783,7 @@
   {
     "id": "tau-refund-ok3",
     "title": "tau-refund-ok3",
+    "reward": 1,
     "tools": [
       {
         "name": "issue_refund",

@@ -90,7 +90,7 @@ def build_matrix(entries, cache: DecisionCache, ladder, gold) -> dict:
     matrix: dict[str, dict] = {}
     for e in entries:
         tid = e.trajectory.id
-        rec = {"domain": e.domain, "turns": []}
+        rec = {"domain": e.domain, "success": realtrace.success_label(e), "turns": []}
         for turn in e.trajectory.turns:
             base = cache.decide(turn.blocks)
             base_tok = sum(tok.count(b.text) for b in turn.blocks)
@@ -260,6 +260,60 @@ def e3_shift(matrix, ladder, *, alpha, delta, method) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- #
+# E4 — downstream task success (does compression preserve the OUTCOME?)
+# --------------------------------------------------------------------------- #
+
+
+def e4_task_success(matrix, ladder, *, seed=0, boot=1000) -> dict | None:
+    """Convert per-turn decision-equivalence into a downstream task metric.
+
+    A trajectory keeps its outcome under a compression level iff EVERY decision is
+    unchanged (one flip ⇒ the agent diverges and the resolution is no longer
+    guaranteed — a conservative, lower-bound reading). So:
+
+      retained success-rate(level) = (# trajectories that originally succeeded AND
+                                      stay fully decision-equivalent) / N
+
+    Reported against the uncompressed baseline success-rate, per level, with a
+    bootstrap CI over trajectories. Needs trajectories that carry an outcome label
+    (τ-bench reward / SWE-bench resolved); returns None if none do.
+    """
+    labeled = [(tid, rec) for tid, rec in matrix.items() if rec.get("success") is not None]
+    if not labeled:
+        return None
+    n = len(labeled)
+    base_success = sum(1 for _, r in labeled if r["success"]) / n
+
+    rng = random.Random(seed)
+    rows = []
+    for name, _ in ladder:
+
+        def preserved(rec, lvl=name):  # all turns unchanged at this level
+            return all(tr["levels"][lvl]["loss"] == 0.0 for tr in rec["turns"])
+
+        retained = [1.0 if (r["success"] and preserved(r)) else 0.0 for _, r in labeled]
+        base_t = sum(tr["base_tok"] for _, r in labeled for tr in r["turns"])
+        comp_t = sum(tr["levels"][name]["comp_tok"] for _, r in labeled for tr in r["turns"])
+        # bootstrap CI over trajectories
+        means = []
+        for _ in range(boot):
+            sample = [retained[rng.randrange(n)] for _ in range(n)]
+            means.append(sum(sample) / n)
+        means.sort()
+        rows.append(
+            {
+                "level": name,
+                "savings": (1.0 - comp_t / base_t) if base_t else 0.0,
+                "retained_success": sum(retained) / n,
+                "ci_low": means[int(0.025 * boot)],
+                "ci_high": means[int(0.975 * boot)],
+                "preserved_frac": sum(1 for _, r in labeled if preserved(r)) / n,
+            }
+        )
+    return {"n": n, "baseline_success": base_success, "levels": rows}
+
+
+# --------------------------------------------------------------------------- #
 # Reporting
 # --------------------------------------------------------------------------- #
 
@@ -280,9 +334,31 @@ def main() -> int:
     )
     ap.add_argument("--dataset", choices=["tau", "swe", "fixtures"], default="fixtures")
     ap.add_argument("--path", help="trace file/dir (required for tau/swe)")
-    ap.add_argument("--runner", choices=["smoke", "anthropic"], default="smoke")
-    ap.add_argument("--samples", type=int, default=1, help="majority-of-k for the anthropic runner")
-    ap.add_argument("--model", default="claude-opus-4-8")
+    ap.add_argument(
+        "--runner",
+        choices=["smoke", "anthropic", "openai", "claude-cli"],
+        default="smoke",
+        help="grader: smoke (offline plumbing), anthropic (API key), openai "
+        "(local/vLLM/Ollama via --base-url), claude-cli (your Claude Code subscription)",
+    )
+    ap.add_argument("--samples", type=int, default=1, help="majority-of-k votes per decision")
+    ap.add_argument("--model", default="claude-opus-4-8", help="grader model id")
+    ap.add_argument(
+        "--base-url",
+        default="http://localhost:8000/v1",
+        help="openai runner: OpenAI-compatible endpoint (vLLM/Ollama/LM Studio/OpenAI)",
+    )
+    ap.add_argument(
+        "--api-key-env", default="OPENAI_API_KEY", help="openai runner: env var holding the key"
+    )
+    ap.add_argument(
+        "--json-mode",
+        action="store_true",
+        help="openai runner: request response_format=json_object",
+    )
+    ap.add_argument(
+        "--cli-bin", default="claude", help="claude-cli runner: path to the claude binary"
+    )
     ap.add_argument("--alpha", type=float, default=0.05, help="risk budget (decision-change rate)")
     ap.add_argument("--delta", type=float, default=0.05, help="LTT confidence 1-δ")
     ap.add_argument("--method", choices=["ltt", "crc"], default="ltt")
@@ -324,25 +400,43 @@ def main() -> int:
         print(
             "\n" + "!" * 78 + "\n"
             "! SMOKE RUNNER — NON-EVIDENTIAL. This verifies the harness mechanics only.\n"
-            "! It does NOT grade real agent behavior. For a publishable result run\n"
-            "!   --runner anthropic  on real τ-/SWE-bench traces (needs ANTHROPIC_API_KEY).\n"
+            "! It does NOT grade real agent behavior. For a publishable result run with a\n"
+            "! real model: --runner claude-cli (your subscription) / openai (local) / anthropic.\n"
             + "!"
             * 78
         )
-    else:
+    elif args.runner == "anthropic":
         from distil.replay.anthropic_runner import AnthropicRunner
 
         runner = AnthropicRunner(model=args.model, samples=args.samples)
         ns = f"anthropic_{args.model}_s{args.samples}"
+    elif args.runner == "openai":
+        from distil.replay.openai_runner import OpenAIRunner
 
+        runner = OpenAIRunner(
+            args.model,
+            base_url=args.base_url,
+            api_key_env=args.api_key_env,
+            samples=args.samples,
+            json_mode=args.json_mode,
+        )
+        ns = f"openai_{args.model.replace('/', '_')}_s{args.samples}"
+    else:  # claude-cli
+        from distil.replay.claude_cli_runner import ClaudeCliRunner
+
+        cli_model = None if args.model == "claude-opus-4-8" else args.model
+        runner = ClaudeCliRunner(bin=args.cli_bin, model=cli_model, samples=args.samples)
+        ns = f"claudecli_{(cli_model or 'default').replace('/', '_')}_s{args.samples}"
+
+    evidential = args.runner != "smoke"
     ladder = default_ladder()
     cache = DecisionCache(runner, ns)
     matrix = build_matrix(entries, cache, ladder, gold)
     cache.flush()
     print(f"decisions: {cache.hits} cached / {cache.misses} computed")
 
-    # ---- gold sanity (anthropic only: does the model reproduce real actions?) ----
-    if args.runner == "anthropic":
+    # ---- gold sanity (real runners: does the model reproduce real actions?) ----
+    if evidential:
         m, t = gold_agreement(matrix)
         print(
             f"model↔gold next-action agreement (uncompressed): {m}/{t} = {(m / t if t else 0):.1%}"
@@ -408,6 +502,23 @@ def main() -> int:
             "  (✘ under shift is EXPECTED and is itself a finding — recalibrate per the paper plan)"
         )
 
+    # ---- E4 ----------------------------------------------------------------
+    e4 = e4_task_success(matrix, ladder, seed=args.seed)
+    if e4:
+        print("\n=== E4 · DOWNSTREAM TASK SUCCESS (outcome preserved under compression?) ===")
+        print(
+            f"labeled trajectories: {e4['n']}  ·  baseline success-rate: {e4['baseline_success'] * 100:.1f}%"
+        )
+        print(f"{'level':<24}{'savings':>9}{'retained-success (95% CI)':>30}")
+        print("-" * 63)
+        for r in e4["levels"]:
+            ci = f"{r['retained_success'] * 100:.1f}% [{r['ci_low'] * 100:.0f}–{r['ci_high'] * 100:.0f}]"
+            print(f"{r['level']:<24}{r['savings'] * 100:>8.1f}%{ci:>30}")
+        print(
+            "  retained-success = originally-successful AND fully decision-equivalent (a flip\n"
+            "  puts the outcome at risk). The safe levels hold the baseline; aggressive ones erode it."
+        )
+
     if args.report:
         Path(args.report).write_text(
             json.dumps(
@@ -418,6 +529,7 @@ def main() -> int:
                     "frontier": f_rows,
                     "coverage": cov,
                     "shift": e3,
+                    "task_success": e4,
                 },
                 indent=2,
             )

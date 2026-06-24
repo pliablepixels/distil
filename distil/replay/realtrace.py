@@ -64,6 +64,15 @@ class GoldDecision:
 
 # in-memory side table: (trajectory_id, turn_index) -> GoldDecision
 _GOLD: dict[tuple[str, int], GoldDecision] = {}
+# in-memory side table: trajectory_id -> task succeeded? (τ-bench reward / SWE resolved)
+_SUCCESS: dict[str, bool] = {}
+
+
+def success_label(entry: CorpusEntry) -> bool | None:
+    """Did this trajectory's task succeed (τ-bench reward>0 / SWE-bench resolved)?
+    ``None`` if the trace carried no outcome. Used for the downstream task-success
+    metric — never injected into model context."""
+    return _SUCCESS.get(entry.trajectory.id)
 
 
 def gold_actions(entries: list[CorpusEntry]) -> dict[tuple[str, int], GoldDecision]:
@@ -154,6 +163,12 @@ def load_tau_bench(path: str | Path, *, model: str = "claude-opus-4-8") -> list[
         msgs = _tau_messages(ep)
         if not msgs:
             continue
+
+        reward = ep.get("reward", ep.get("success"))
+        if reward is not None:
+            _SUCCESS[ep_id] = (
+                float(reward) > 0 if isinstance(reward, (int, float)) else bool(reward)
+            )
 
         system_text = ""
         tools_text = ""
@@ -322,6 +337,7 @@ def load_swe_bench(path: str | Path, *, model: str = "claude-opus-4-8") -> list[
             _GOLD[(inst, -1)] = GoldDecision(
                 inst, -1, "RESOLVED" if resolved else "UNRESOLVED", inst
             )
+            _SUCCESS[inst] = resolved
     return entries
 
 

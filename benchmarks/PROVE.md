@@ -11,9 +11,30 @@ oracle removed (see `docs/PAPER_PLAN.md` for why that matters).
 | **E1** | Frontier | token savings vs. decision-change rate, per ladder level |
 | **E2** | Certification coverage — *the proof* | certify at α on a calibration split, then measure the **realized** decision-change rate on a **disjoint held-out** split, over many random trajectory-level splits. The certificate is sound iff empirical `P(realized ≤ α) ≥ 1−δ`. |
 | **E3** | Distribution shift | leave-one-domain-out: calibrate on all domains but one, test on the held-out one (the exchangeability stress test) |
+| **E4** | Downstream task success | converts per-turn equivalence into the **outcome**: a trajectory keeps its result iff *every* decision is unchanged, so `retained-success(level)` = originally-successful ∧ fully-equivalent, vs. the uncompressed baseline, with a bootstrap CI. Needs outcome labels (τ-bench reward / SWE-bench resolved). |
 
 Decisions are cached on disk per rendered-context hash, so the live-model pass is
 paid **once** and the statistics are reproducible.
+
+## Grading backends (`--runner`)
+
+| `--runner` | What it uses | When |
+|---|---|---|
+| `smoke` | offline heuristic, **non-evidential** | plumbing / CI, no key |
+| `claude-cli` | the **`claude -p` CLI** — your Claude Code subscription, **no API key** | easiest real-model run if you already use Claude Code |
+| `openai` | any **OpenAI-compatible endpoint** (vLLM/Ollama/LM Studio/OpenAI) via `--base-url` | **free at scale** with a local open model |
+| `anthropic` | the Anthropic API (needs `ANTHROPIC_API_KEY`) | billing-grade reference |
+
+```bash
+# your Claude subscription, no API key (Haiku = cheap large sweeps; Opus = headline):
+python benchmarks/prove.py --dataset tau --path runs.json \
+    --runner claude-cli --model claude-haiku-4-5-20251001 --samples 3
+
+# a local open model via vLLM (zero per-call cost):
+#   vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
+python benchmarks/prove.py --dataset swe --path swe_trajs/ \
+    --runner openai --base-url http://localhost:8000/v1 --model meta-llama/Llama-3.1-8B-Instruct
+```
 
 ## Offline plumbing check (no key, no download)
 

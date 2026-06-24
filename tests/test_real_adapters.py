@@ -157,3 +157,75 @@ def test_tiny_sample_refuses_tight_alpha():
     prove, matrix, ladder = _matrix()
     cov = prove.e2_coverage(matrix, ladder, alpha=0.01, delta=0.05, method="ltt", reps=50, seed=0)
     assert cov["certified_frac"] == 0.0
+
+
+def test_task_success_metric_safe_levels_hold_baseline():
+    prove, matrix, ladder = _matrix()
+    e4 = prove.e4_task_success(matrix, ladder, seed=0, boot=200)
+    assert e4 is not None and e4["n"] >= 6
+    rows = {r["level"]: r for r in e4["levels"]}
+    # safe levels keep the full baseline success-rate; aggressive truncation erodes it
+    assert rows["lossless"]["retained_success"] == e4["baseline_success"]
+    assert rows["byte-exact"]["retained_success"] == e4["baseline_success"]
+    assert rows["truncate@120"]["retained_success"] < e4["baseline_success"]
+    assert rows["lossless"]["savings"] > 0.05
+
+
+# --------------------------------------------------------------------------- #
+# runners — fingerprint rendering / parsing (no network)
+# --------------------------------------------------------------------------- #
+
+
+def test_parse_fingerprint_handles_fences_and_prose():
+    from distil.replay.prompts import parse_fingerprint
+
+    canon = '{"action":"refund","target":"A1"}'
+    assert parse_fingerprint('{"action": "refund", "target": "A1"}') == canon
+    assert parse_fingerprint('```json\n{"action":"refund","target":"A1"}\n```') == canon
+    assert parse_fingerprint('Sure! {"target":"A1","action":"refund"} done.') == canon
+    assert parse_fingerprint("no json here") == "<no-decision>"
+
+
+def test_render_keeps_system_prefix_separate():
+    from distil.replay.prompts import render
+
+    entries = realtrace.load_tau_bench(FIX / "tau_bench_sample.json")
+    blocks = entries[0].trajectory.turns[-1].blocks
+    system, user = render(blocks)
+    assert "customer-support agent" in system  # stable system prompt
+    assert "[tool_output]" in user or "[user]" in user  # observations go to the user turn
+
+
+def test_claude_cli_result_extraction():
+    from distil.replay.claude_cli_runner import ClaudeCliRunner
+
+    envelope = (
+        '{"type":"result","result":"```json\\n{\\"action\\":\\"x\\",\\"target\\":\\"y\\"}\\n```"}'
+    )
+    assert ClaudeCliRunner._result_text(envelope) == '```json\n{"action":"x","target":"y"}\n```'
+    # non-envelope stdout falls through unchanged
+    assert ClaudeCliRunner._result_text("plain text") == "plain text"
+
+
+def test_openai_runner_parses_mocked_response(monkeypatch):
+    from distil.replay.openai_runner import OpenAIRunner
+
+    class _Resp:
+        def __init__(self, payload):
+            self._b = payload.encode()
+
+        def read(self):
+            return self._b
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    payload = '{"choices":[{"message":{"content":"{\\"action\\":\\"edit\\",\\"target\\":\\"src/x.py\\"}"}}]}'
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: _Resp(payload))
+    runner = OpenAIRunner("local-model", base_url="http://x/v1")
+    entries = realtrace.load_swe_bench(FIX / "swe_bench_sample.json")
+    blocks = entries[0].trajectory.turns[0].blocks
+    assert runner.decide(blocks) == '{"action":"edit","target":"src/x.py"}'

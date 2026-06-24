@@ -57,7 +57,7 @@ def _tau_noise_post():
     )
 
 
-def tau_episode(eid, order_id, record, gold_call, user_ask):
+def tau_episode(eid, order_id, record, gold_call, user_ask, reward=1):
     """record = a dense key=value line (the needle), placed in the TAIL after ~8
     noise lines. The reversible digest keeps head+tail (record survives, recoverable);
     aggressive head-truncation (@250/@120) discards the tail and loses it. That is the
@@ -66,6 +66,7 @@ def tau_episode(eid, order_id, record, gold_call, user_ask):
     return {
         "id": eid,
         "title": eid,
+        "reward": reward,
         "tools": TAU_TOOLS,
         "messages": [
             {"role": "system", "content": TAU_SYSTEM},
@@ -144,7 +145,12 @@ def build_tau():
     ]
     eps = [
         tau_episode(
-            f"tau-{name}", f"A{1000 + i}", rec, call, f"Please help with order A{1000 + i}."
+            f"tau-{name}",
+            f"A{1000 + i}",
+            rec,
+            call,
+            f"Please help with order A{1000 + i}.",
+            reward=0 if name == "fraud2" else 1,  # one unresolved case for the success metric
         )
         for i, (name, rec, call) in enumerate(specs)
     ]
