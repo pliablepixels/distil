@@ -25,6 +25,9 @@
 \newcommand{\HLsavings}{\textit{[pending]}}
 \newcommand{\HLcoverage}{\textit{[pending]}}
 \newcommand{\HLrisk}{\textit{[pending]}}
+% Real numbers are injected by `python benchmarks/report_to_latex.py results.json`,
+% which writes docs/paper/generated/*.tex. Until then, placeholders/illustrative.
+\IfFileExists{generated/macros.tex}{\input{generated/macros.tex}}{}
 
 \definecolor{distilblue}{HTML}{2b6cb0}
 \definecolor{distilgreen}{HTML}{2f855a}
@@ -322,8 +325,25 @@ the decision is preserved---this is the honest measure of a reversible compresso
 \subsection{Headline results}
 On the full headline run, the reversible engine operating inside the certified
 frontier saves \HLsavings{} tokens at a \HLrisk{} decision-change rate, with
-out-of-sample coverage \HLcoverage{} ($\ge 1-\delta$). \emph{(Fill from
-\texttt{results\_tau\_expand.json}.)}
+out-of-sample coverage \HLcoverage{} ($\ge 1-\delta$). The tables and figure below
+are auto-generated from \texttt{results.json} by \texttt{benchmarks/report\_to\_latex.py}
+(they appear once you run it; until then this subsection is a stub).
+
+\IfFileExists{generated/frontier.tex}{%
+  \begin{figure}[t]\centering\input{generated/frontier.tex}
+  \caption{E1 certified frontier on the headline run (real grader).}\end{figure}}{}
+\IfFileExists{generated/coverage.tex}{%
+  \begin{table}[t]\centering\caption{E2 certification coverage (out-of-sample).}
+  \input{generated/coverage.tex}\end{table}}{}
+\IfFileExists{generated/headtohead.tex}{%
+  \begin{table}[t]\centering\caption{E5 head-to-head: every method under the same
+  grader, with a certifies-$\le\alpha$ verdict.}\input{generated/headtohead.tex}\end{table}}{}
+\IfFileExists{generated/tasksuccess.tex}{%
+  \begin{table}[t]\centering\caption{E4 downstream task success retained under
+  compression, vs.\ the uncompressed baseline.}\input{generated/tasksuccess.tex}\end{table}}{}
+\IfFileExists{generated/shift.tex}{%
+  \begin{table}[t]\centering\caption{E3 distribution shift (leave-one-domain-out).}
+  \input{generated/shift.tex}\end{table}}{}
 
 \begin{table}[t]
 \centering

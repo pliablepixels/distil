@@ -66,24 +66,64 @@ class DecisionCache:
             h.update(f"{b.kind.value}|{b.stability.value}|{b.text}\x00".encode())
         return h.hexdigest()
 
-    def decide(self, blocks, restore=None) -> str:
+    def _compose_key(self, blocks, restore) -> str:
         k = self._key(blocks)
         if restore:  # expand-aware decisions depend on what's recoverable
             rk = hashlib.sha1("".join(sorted(restore)).encode()).hexdigest()[:8]
             k = f"{k}:{rk}"
-        if k in self.store:
-            self.hits += 1
-            return self.store[k]
-        self.misses += 1
-        d = (
+        return k
+
+    def _call(self, blocks, restore) -> str:
+        return (
             self.runner.decide(blocks, restore)
             if restore is not None
             else self.runner.decide(blocks)
         )
-        self.store[k] = d
+
+    def decide(self, blocks, restore=None) -> str:
+        k = self._compose_key(blocks, restore)
+        if k in self.store:
+            self.hits += 1
+            return self.store[k]
+        self.misses += 1
+        self.store[k] = d = self._call(blocks, restore)
         if self.misses % 20 == 0:  # checkpoint long live runs so nothing is lost
             self.flush()
         return d
+
+    def prefetch(self, requests, workers: int = 1) -> None:
+        """Compute all uncached decisions up front, optionally concurrently. Each
+        unique (blocks, restore) is graded once; results fill the cache so the matrix
+        assembly is pure cache hits. Concurrency is the difference between a real
+        full-corpus API run taking minutes vs. hours (runner calls run in threads;
+        results are consumed serially, so the cache/flush stay single-threaded)."""
+        todo: dict[str, tuple] = {}
+        for blocks, restore in requests:
+            k = self._compose_key(blocks, restore)
+            if k not in self.store and k not in todo:
+                todo[k] = (blocks, restore)
+        if not todo:
+            return
+        items = list(todo.items())
+        if workers <= 1:
+            results = ((k, self._call(b, r)) for k, (b, r) in items)
+        else:
+            from concurrent.futures import ThreadPoolExecutor
+
+            def work(item):
+                k, (b, r) = item
+                return k, self._call(b, r)
+
+            ex = ThreadPoolExecutor(max_workers=workers)
+            results = ex.map(work, items)
+        done = 0
+        for k, d in results:
+            self.store[k] = d
+            self.misses += 1
+            done += 1
+            if done % 20 == 0:
+                self.flush()
+        self.flush()
 
     def flush(self) -> None:
         CACHE_DIR.mkdir(exist_ok=True)
@@ -96,42 +136,58 @@ class DecisionCache:
 
 
 def build_matrix(
-    entries, cache: DecisionCache, ladder, gold, *, expand: bool = False, baselines=None
+    entries,
+    cache: DecisionCache,
+    ladder,
+    gold,
+    *,
+    expand: bool = False,
+    baselines=None,
+    workers: int = 1,
 ) -> dict:
     from distil.replay.expand_runner import build_restore
 
     # baselines are graded under the SAME runner but never with --expand (they are
     # lossy/irrecoverable — recovery would not apply), for a fair head-to-head.
     baselines = baselines or []
-    matrix: dict[str, dict] = {}
+
+    # Phase 1 — plan: compute every compressed context once, gather decision requests.
+    plan = []  # (tid, domain, success, [(turn_index, base_blocks, restore, gold_fp, comps)])
+    requests = []
     for e in entries:
         tid = e.trajectory.id
-        rec = {"domain": e.domain, "success": realtrace.success_label(e), "turns": []}
+        turns = []
         for turn in e.trajectory.turns:
-            # with --expand, the grader may recover digested content (the distil_expand
-            # loop); restore maps each handle to its byte-exact original for this turn.
             restore = build_restore(turn.blocks) if expand else None
-            base = cache.decide(turn.blocks, restore)
-            base_tok = sum(tok.count(b.text) for b in turn.blocks)
+            comps = {("level", n): strat(turn.blocks, turn.index) for n, strat in ladder}
+            comps.update({("baseline", n): strat(turn.blocks, turn.index) for n, strat in baselines})
+            requests.append((turn.blocks, restore))
+            for c in comps.values():
+                requests.append((c, restore))
             g = gold.get((tid, turn.index))
+            turns.append((turn.index, turn.blocks, restore, g.fingerprint if g else None, comps))
+        plan.append((tid, e.domain, realtrace.success_label(e), turns))
+
+    # Phase 2 — grade all unique decisions (optionally concurrently).
+    cache.prefetch(requests, workers=workers)
+
+    # Phase 3 — assemble from the (now warm) cache; no new model calls.
+    matrix: dict[str, dict] = {}
+    for tid, domain, success, turns in plan:
+        rec = {"domain": domain, "success": success, "turns": []}
+        for _idx, base_blocks, restore, gold_fp, comps in turns:
+            base = cache.decide(base_blocks, restore)
             tr = {
                 "base": base,
-                "base_tok": base_tok,
-                "gold": g.fingerprint if g else None,
+                "base_tok": sum(tok.count(b.text) for b in base_blocks),
+                "gold": gold_fp,
                 "levels": {},
                 "baselines": {},
             }
-            for name, strat in ladder:
-                comp = strat(turn.blocks, turn.index)
+            for (kind, name), comp in comps.items():
                 dec = cache.decide(comp, restore)
-                tr["levels"][name] = {
-                    "loss": 0.0 if dec == base else 1.0,
-                    "comp_tok": sum(tok.count(b.text) for b in comp),
-                }
-            for name, strat in baselines:
-                comp = strat(turn.blocks, turn.index)
-                dec = cache.decide(comp, restore)
-                tr["baselines"][name] = {
+                bucket = "levels" if kind == "level" else "baselines"
+                tr[bucket][name] = {
                     "loss": 0.0 if dec == base else 1.0,
                     "comp_tok": sum(tok.count(b.text) for b in comp),
                 }
@@ -448,6 +504,13 @@ def main() -> int:
     ap.add_argument("--delta", type=float, default=0.05, help="LTT confidence 1-δ")
     ap.add_argument("--method", choices=["ltt", "crc"], default="ltt")
     ap.add_argument("--reps", type=int, default=200, help="random calib/test splits for E2")
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="concurrent grader calls (use 8–16 for the API runner to finish a full "
+        "real corpus in minutes; keep at 1 for smoke/local)",
+    )
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0, help="cap #trajectories (live cost control)")
     ap.add_argument(
@@ -569,9 +632,11 @@ def main() -> int:
         print(f"baselines: {', '.join(n for n, _ in baselines)}")
 
     cache = DecisionCache(runner, ns)
-    matrix = build_matrix(entries, cache, ladder, gold, expand=args.expand, baselines=baselines)
+    matrix = build_matrix(
+        entries, cache, ladder, gold, expand=args.expand, baselines=baselines, workers=args.workers
+    )
     cache.flush()
-    print(f"decisions: {cache.hits} cached / {cache.misses} computed")
+    print(f"decisions: {cache.hits} cached / {cache.misses} computed (workers={args.workers})")
 
     # ---- gold sanity (real runners: does the model reproduce real actions?) ----
     if evidential:

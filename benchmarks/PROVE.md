@@ -78,8 +78,18 @@ trajectories from instances with `swe-hf` (needs `datasets` + HF reachable).
 
 Use `--runner claude-cli` (subscription, no key) or `--runner anthropic` (key).
 **Cost/latency note:** real τ-bench contexts are 3–11 KB, so each graded decision is
-~5–20 s of model time; majority-of-3 triples it. Budget accordingly — start with a
-few trajectories and `--ladder quick`, scale up for the headline run.
+~5–20 s of model time; majority-of-3 triples it. **Use `--workers 8` (or 16) with the
+API runner** — decisions are graded concurrently, turning a full-corpus run from hours
+into minutes. (`claude -p` spawns a process per call; the API runner is the right tool
+at scale.) Start with a few trajectories and `--ladder quick` to smoke-test, then scale.
+
+**From results to the paper (no hand-copying).** After a run with `--report`:
+```bash
+python benchmarks/report_to_latex.py results.json   # writes docs/paper/generated/*.tex
+```
+The paper (`docs/paper/main.tex`) `\IfFileExists`-includes those fragments, so the
+headline macros, the E1 frontier figure, and the E2/E3/E4/E5 tables fill in with your
+real numbers on the next compile. Commit them with `git add -f docs/paper/generated/`.
 
 **`--baselines` (head-to-head).** Add `--baselines` to grade competitor/structural
 baselines under the **same grader** and print a comparison table (token savings,

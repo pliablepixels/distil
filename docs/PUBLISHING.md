@@ -14,17 +14,18 @@ real and validated; the **headline numbers are not yet run at scale**. Before
 submitting anywhere, complete the headline run:
 
 ```bash
+pip install llmlingua                                  # to include the LLMLingua baselines
 python benchmarks/fetch_real.py tau --src tau:sonnet-35-airline --out tau.json
 python benchmarks/prove.py --dataset tau --path tau.json \
-   --runner anthropic --model claude-opus-4-8 --samples 3 \
-   --alpha 0.05 --delta 0.05 --ladder full --reps 500 --report no_expand.json
-python benchmarks/prove.py --dataset tau --path tau.json \
-   --runner anthropic --model claude-opus-4-8 --samples 3 --expand \
-   --alpha 0.05 --delta 0.05 --ladder full --reps 500 --report with_expand.json
+   --runner anthropic --model claude-opus-4-8 --samples 3 --baselines --expand \
+   --workers 12 --alpha 0.05 --delta 0.05 --ladder full --reps 500 --report results.json
+python benchmarks/report_to_latex.py results.json     # fills the paper's tables/figures
 ```
-Run a second domain (`tau:sonnet-35-retail`) for E3, then paste E1/E2/E4 into the
-paper. Budget: this is the main cost (API tokens + a few hours). Everything else is
-writing.
+`--workers 12` grades concurrently (minutes, not hours). `--baselines` adds the
+head-to-head (E5); `--expand` adds the with-expand frontier. Run a second domain
+(`tau:sonnet-35-retail`) for E3. After `report_to_latex.py`, the paper auto-includes
+your real numbers on the next compile — `git add -f docs/paper/generated/` to keep
+them. Budget: API tokens + ~minutes is the main cost; everything else is writing.
 
 ---
 

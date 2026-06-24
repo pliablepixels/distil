@@ -127,6 +127,9 @@ def _matrix():
         def decide(self, blocks, restore=None):
             return self.r.decide(blocks)
 
+        def prefetch(self, requests, workers=1):
+            pass
+
     return prove, prove.build_matrix(entries, _Cache(), ladder, gold), ladder
 
 
@@ -498,6 +501,9 @@ def test_head_to_head_distil_certifies_aggressive_baseline_does_not():
         def decide(self, blocks, restore=None):
             return self.r.decide(blocks)
 
+        def prefetch(self, requests, workers=1):
+            pass
+
     matrix = prove.build_matrix(entries, _Cache(), ladder, gold, baselines=baselines)
     rows = {r["method"]: r for r in prove.head_to_head(matrix, ladder, alpha=0.2, delta=0.05)}
     assert "recomp-extractive" in rows and "lossless" in rows  # both graded together
@@ -505,3 +511,85 @@ def test_head_to_head_distil_certifies_aggressive_baseline_does_not():
     # an aggressive lossy baseline saves more but flips decisions → cannot certify
     assert rows["recomp-extractive"]["savings"] > rows["lossless"]["savings"]
     assert rows["recomp-extractive"]["certifies"] is False
+
+
+# --------------------------------------------------------------------------- #
+# report → LaTeX filler
+# --------------------------------------------------------------------------- #
+
+
+def _load_r2l():
+    path = Path(__file__).resolve().parent.parent / "benchmarks" / "report_to_latex.py"
+    spec = importlib.util.spec_from_file_location("report_to_latex", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_report_to_latex_fragments():
+    r2l = _load_r2l()
+    rep = {
+        "frontier": [
+            {"level": "lossless", "n": 10, "decision_change": 0.0, "savings": 0.16},
+            {"level": "truncate@120", "n": 10, "decision_change": 0.5, "savings": 0.30},
+        ],
+        "head_to_head": [
+            {
+                "method": "lossless",
+                "kind": "distil",
+                "savings": 0.16,
+                "decision_change": 0.0,
+                "certifies": True,
+            },
+            {
+                "method": "llmlingua-2",
+                "kind": "baseline",
+                "savings": 0.40,
+                "decision_change": 0.2,
+                "certifies": False,
+            },
+        ],
+        "coverage": {
+            "alpha": 0.05,
+            "delta": 0.05,
+            "method": "ltt",
+            "reps": 500,
+            "certified_frac": 1.0,
+            "empirical_coverage": 0.99,
+            "target_coverage": 0.95,
+            "mean_realized_risk": 0.01,
+            "mean_test_savings": 0.16,
+        },
+        "task_success": {
+            "n": 50,
+            "baseline_success": 0.8,
+            "levels": [
+                {
+                    "level": "lossless",
+                    "savings": 0.16,
+                    "retained_success": 0.8,
+                    "ci_low": 0.7,
+                    "ci_high": 0.9,
+                }
+            ],
+        },
+        "shift": [
+            {
+                "held_out_domain": "retail",
+                "certified": "lossless",
+                "realized_risk": 0.02,
+                "savings": 0.15,
+                "held_within_alpha": True,
+            }
+        ],
+    }
+    macros = r2l.macros(rep)
+    assert "\\renewcommand{\\HLsavings}{16.0\\%}" in macros
+    h2h = r2l.head_to_head(rep)
+    assert "llmlingua-2" in h2h and "\\checkmark" in h2h and "$\\times$" in h2h
+    assert "\\begin{tabular}" in h2h and "\\bottomrule" in h2h
+    # underscores in method names must be LaTeX-escaped (\_)
+    assert r2l._tex("truncate@500_x") == "truncate@500\\_x"
+    for fn in (r2l.frontier, r2l.coverage, r2l.task_success, r2l.shift):
+        out = fn(rep)
+        assert out and "\\" in out  # produced LaTeX, didn't crash
