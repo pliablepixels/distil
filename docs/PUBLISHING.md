@@ -34,9 +34,10 @@ writing.
    no-expand vs with-expand. This is the result.
 2. **A second domain** for E3 (distribution shift) — calibrate on one, test on the
    other.
-3. **Baselines on the same corpus**: LLMLingua-2, RECOMP, raw truncation — graded
-   identically (the harness already supports external strategies; wire them as ladder
-   levels). Reviewers want a comparison, not just your method.
+3. **Baselines on the same corpus** (already wired): add `--baselines` to
+   `prove.py` — LLMLingua-2 (`pip install llmlingua`), RECOMP-style extractive,
+   selective-context, truncation, recency-window, all graded by the same model with a
+   "certifies ≤ α?" verdict (E5 head-to-head). Reviewers want this table.
 4. **Report variance**: seeds + the bootstrap CIs the harness emits; publish the
    grader's model↔gold agreement.
 

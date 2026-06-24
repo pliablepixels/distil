@@ -103,7 +103,10 @@ rate and preserves ⟨Z⟩% downstream task success.
   measure realized risk on a disjoint held-out split, over many trajectory-level
   splits → empirical `P(realized ≤ α)`); E3 leave-one-domain-out shift; **E4
   downstream task success** (trajectory keeps its outcome iff every decision is
-  unchanged), vs. the uncompressed baseline with a bootstrap CI.
+  unchanged), vs. the uncompressed baseline with a bootstrap CI; **E5 head-to-head**
+  vs. competitor/structural baselines (LLMLingua-2, RECOMP-style extractive,
+  selective-context, truncation, recency-window) under the same grader, each marked
+  with whether its decision-change rate certifies ≤ α.
 
 ## 6. Results
 

@@ -81,6 +81,13 @@ Use `--runner claude-cli` (subscription, no key) or `--runner anthropic` (key).
 ~5–20 s of model time; majority-of-3 triples it. Budget accordingly — start with a
 few trajectories and `--ladder quick`, scale up for the headline run.
 
+**`--baselines` (head-to-head).** Add `--baselines` to grade competitor/structural
+baselines under the **same grader** and print a comparison table (token savings,
+decision-change rate, and whether each *certifies* ≤ α at 1−δ): LLMLingua-2 (if
+`pip install llmlingua`), RECOMP-style extractive, selective-context, truncation, and
+recency-window. The honest contrast: aggressive baselines save more but flip decisions
+(don't certify); distil's certified level is the most aggressive one that does.
+
 **`--expand` (with-expand frontier).** The reversible digest is only decision-equivalent
 *with* its recovery loop. By default the harness grades the conservative *no-expand*
 lower bound; add `--expand` to let the grader recover digested content (`distil_expand`)

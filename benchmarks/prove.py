@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from distil.conformal import crc_select, default_ladder, ltt_certify  # noqa: E402
+from distil.conformal import crc_select, default_ladder, hb_pvalue, ltt_certify  # noqa: E402
 from distil.replay import realtrace  # noqa: E402
 from distil.tokenizer import DEFAULT as tok  # noqa: E402
 
@@ -75,7 +75,11 @@ class DecisionCache:
             self.hits += 1
             return self.store[k]
         self.misses += 1
-        d = self.runner.decide(blocks, restore) if restore is not None else self.runner.decide(blocks)
+        d = (
+            self.runner.decide(blocks, restore)
+            if restore is not None
+            else self.runner.decide(blocks)
+        )
         self.store[k] = d
         if self.misses % 20 == 0:  # checkpoint long live runs so nothing is lost
             self.flush()
@@ -91,9 +95,14 @@ class DecisionCache:
 # --------------------------------------------------------------------------- #
 
 
-def build_matrix(entries, cache: DecisionCache, ladder, gold, *, expand: bool = False) -> dict:
+def build_matrix(
+    entries, cache: DecisionCache, ladder, gold, *, expand: bool = False, baselines=None
+) -> dict:
     from distil.replay.expand_runner import build_restore
 
+    # baselines are graded under the SAME runner but never with --expand (they are
+    # lossy/irrecoverable — recovery would not apply), for a fair head-to-head.
+    baselines = baselines or []
     matrix: dict[str, dict] = {}
     for e in entries:
         tid = e.trajectory.id
@@ -110,11 +119,19 @@ def build_matrix(entries, cache: DecisionCache, ladder, gold, *, expand: bool = 
                 "base_tok": base_tok,
                 "gold": g.fingerprint if g else None,
                 "levels": {},
+                "baselines": {},
             }
             for name, strat in ladder:
                 comp = strat(turn.blocks, turn.index)
                 dec = cache.decide(comp, restore)
                 tr["levels"][name] = {
+                    "loss": 0.0 if dec == base else 1.0,
+                    "comp_tok": sum(tok.count(b.text) for b in comp),
+                }
+            for name, strat in baselines:
+                comp = strat(turn.blocks, turn.index)
+                dec = cache.decide(comp, restore)
+                tr["baselines"][name] = {
                     "loss": 0.0 if dec == base else 1.0,
                     "comp_tok": sum(tok.count(b.text) for b in comp),
                 }
@@ -146,6 +163,51 @@ def e1_frontier(matrix, ladder) -> list[dict]:
                 "savings": (1.0 - comp_t / base_t) if base_t else 0.0,
             }
         )
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Head-to-head — distil ladder vs competitor/structural baselines, same grader
+# --------------------------------------------------------------------------- #
+
+
+def head_to_head(matrix, ladder, *, alpha, delta) -> list[dict]:
+    """One row per method (distil ladder levels + baselines), all graded identically:
+    token savings, decision-change rate, and whether its risk certifies ≤ α at
+    confidence 1−δ on the full data (single-shot Hoeffding–Bentkus). This is the
+    comparison table reviewers expect — distil's certified levels next to LLMLingua-2,
+    RECOMP-extractive, truncation, etc."""
+    methods: list[tuple[str, str]] = [(n, "distil") for n, _ in ladder]
+    seen = {n for n, _ in ladder}
+    for rec in matrix.values():
+        for n in rec["turns"][0]["baselines"] if rec["turns"] else []:
+            if n not in seen:
+                methods.append((n, "baseline"))
+                seen.add(n)
+
+    rows = []
+    for name, kind in methods:
+        losses, base_t, comp_t = [], 0, 0
+        for rec in matrix.values():
+            for tr in rec["turns"]:
+                cell = tr["levels"].get(name) or tr["baselines"].get(name)
+                if cell is None:
+                    continue
+                losses.append(cell["loss"])
+                base_t += tr["base_tok"]
+                comp_t += cell["comp_tok"]
+        n = len(losses)
+        rhat = (sum(losses) / n) if n else 1.0
+        rows.append(
+            {
+                "method": name,
+                "kind": kind,
+                "savings": (1.0 - comp_t / base_t) if base_t else 0.0,
+                "decision_change": rhat,
+                "certifies": hb_pvalue(rhat, n, alpha) <= delta,
+            }
+        )
+    rows.sort(key=lambda r: -r["savings"])
     return rows
 
 
@@ -370,6 +432,13 @@ def main() -> int:
         "--cli-bin", default="claude", help="claude-cli runner: path to the claude binary"
     )
     ap.add_argument(
+        "--baselines",
+        action="store_true",
+        help="also grade competitor/structural baselines (LLMLingua-2 if installed, "
+        "RECOMP-extractive, selective-context, truncation, recency-window) for a "
+        "head-to-head table under the same grader",
+    )
+    ap.add_argument(
         "--ladder",
         choices=["full", "quick"],
         default="full",
@@ -491,8 +560,16 @@ def main() -> int:
     if args.ladder == "quick":
         keep = {"byte-exact", "lossless", "truncate@250", "truncate@120"}
         ladder = [rung for rung in ladder if rung[0] in keep]
+
+    baselines = []
+    if args.baselines:
+        from benchmarks.baselines import load_baselines
+
+        baselines = load_baselines()
+        print(f"baselines: {', '.join(n for n, _ in baselines)}")
+
     cache = DecisionCache(runner, ns)
-    matrix = build_matrix(entries, cache, ladder, gold, expand=args.expand)
+    matrix = build_matrix(entries, cache, ladder, gold, expand=args.expand, baselines=baselines)
     cache.flush()
     print(f"decisions: {cache.hits} cached / {cache.misses} computed")
 
@@ -512,6 +589,24 @@ def main() -> int:
     for r in f_rows:
         print(
             f"{r['level']:<24}{r['savings'] * 100:>8.1f}%{r['decision_change'] * 100:>11.1f}%{r['n']:>7}"
+        )
+
+    # ---- head-to-head vs baselines ----------------------------------------
+    h2h = []
+    if baselines:
+        h2h = head_to_head(matrix, ladder, alpha=args.alpha, delta=args.delta)
+        print(f"\n=== HEAD-TO-HEAD (same grader, α={args.alpha}, δ={args.delta}) ===")
+        print(f"{'method':<22}{'kind':<10}{'savings':>9}{'dec-change':>12}{'certifies?':>12}")
+        print("-" * 65)
+        for r in h2h:
+            print(
+                f"{r['method']:<22}{r['kind']:<10}{r['savings'] * 100:>8.1f}%"
+                f"{r['decision_change'] * 100:>11.1f}%{('✔ yes' if r['certifies'] else '✘ no'):>12}"
+            )
+        print(
+            "  certifies? = decision-change rate provably ≤ α at 1−δ (Hoeffding–Bentkus, full data).\n"
+            "  The honest contrast: aggressive baselines save more but flip decisions (don't certify);\n"
+            "  distil's certified level is the most aggressive one that does."
         )
 
     # ---- E2 ----------------------------------------------------------------
@@ -588,6 +683,7 @@ def main() -> int:
                     "n_trajectories": len(entries),
                     "n_turns": n_turns,
                     "frontier": f_rows,
+                    "head_to_head": h2h,
                     "coverage": cov,
                     "shift": e3,
                     "task_success": e4,

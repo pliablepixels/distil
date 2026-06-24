@@ -427,3 +427,59 @@ def test_anthropic_runner_returns_canonical():
     entries = realtrace.load_tau_bench(FIX / "tau_bench_sample.json")
     blocks = entries[0].trajectory.turns[-1].blocks
     assert runner.decide(blocks) == canonical("searchflights", "x")  # normalized, not raw
+
+
+# --------------------------------------------------------------------------- #
+# competitor / structural baselines (head-to-head)
+# --------------------------------------------------------------------------- #
+
+
+def _load_baselines_mod():
+    path = Path(__file__).resolve().parent.parent / "benchmarks" / "baselines.py"
+    spec = importlib.util.spec_from_file_location("baselines", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_baselines_load_and_compress():
+    bl = _load_baselines_mod()
+    rungs = bl.load_baselines(include_real=False)
+    names = {n for n, _ in rungs}
+    assert {"truncate@500", "recency-window@500", "recomp-extractive", "selective-context"} <= names
+    entries = realtrace.load_tau_bench(FIX / "tau_bench_sample.json")
+    blocks = entries[1].trajectory.turns[-1].blocks  # a turn with a verbose volatile obs
+    vol0 = sum(len(b.text) for b in blocks if b.stability is Stability.VOLATILE)
+    for _name, strat in rungs:
+        out = strat(blocks, 0)
+        vol1 = sum(len(b.text) for b in out if b.stability is Stability.VOLATILE)
+        assert vol1 <= vol0  # baselines only shrink the volatile tail
+        # the cacheable prefix must be left byte-identical
+        pre_in = [b.text for b in blocks if b.stability is not Stability.VOLATILE]
+        pre_out = [b.text for b in out if b.stability is not Stability.VOLATILE]
+        assert pre_in == pre_out
+
+
+def test_head_to_head_distil_certifies_aggressive_baseline_does_not():
+    prove = _load_prove()
+    bl = _load_baselines_mod()
+    entries = realtrace.load_tau_bench(FIX / "tau_bench_sample.json")
+    entries += realtrace.load_swe_bench(FIX / "swe_bench_sample.json")
+    gold = realtrace.gold_actions(entries)
+    ladder = default_ladder()
+    baselines = bl.load_baselines(include_real=False)
+
+    class _Cache:
+        def __init__(self):
+            self.r = SmokeRunner()
+
+        def decide(self, blocks, restore=None):
+            return self.r.decide(blocks)
+
+    matrix = prove.build_matrix(entries, _Cache(), ladder, gold, baselines=baselines)
+    rows = {r["method"]: r for r in prove.head_to_head(matrix, ladder, alpha=0.2, delta=0.05)}
+    assert "recomp-extractive" in rows and "lossless" in rows  # both graded together
+    assert rows["lossless"]["certifies"] is True  # reversible digest holds the decision
+    # an aggressive lossy baseline saves more but flips decisions → cannot certify
+    assert rows["recomp-extractive"]["savings"] > rows["lossless"]["savings"]
+    assert rows["recomp-extractive"]["certifies"] is False
