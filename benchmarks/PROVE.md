@@ -58,9 +58,28 @@ At a tight α (e.g. 0.05) on this tiny fixture it **correctly refuses to certify
 too few calibration turns — which is the honest, conservative behavior (more turns
 certify tighter α, exactly as the README's 320→α2%, 640→α1% result shows).
 
+## Real τ-bench data — no HuggingFace required
+
+The tau-bench repo ships **200 real trajectories per domain** (gpt-4o & Sonnet-3.5,
+airline + retail) under `historical_trajectories/`, reachable from GitHub even where
+HuggingFace is blocked. The adapter loads them **directly** (182 trajectories /
+1164 real decision points for airline-gpt-4o; tool calls, reward labels, no markers).
+
+```bash
+python benchmarks/fetch_real.py tau --src tau:gpt-4o-airline --out /data/tau.json
+#   choices: tau:gpt-4o-airline | tau:gpt-4o-retail | tau:sonnet-35-airline | tau:sonnet-35-retail
+python benchmarks/prove.py --dataset tau --path /data/tau.json --runner claude-cli ...
+```
+
+SWE-bench: point `swe-traj` at a SWE-agent `.traj` dir, or build edit-localization
+trajectories from instances with `swe-hf` (needs `datasets` + HF reachable).
+
 ## The real run (the publishable result)
 
-Needs `ANTHROPIC_API_KEY` and downloaded traces.
+Use `--runner claude-cli` (subscription, no key) or `--runner anthropic` (key).
+**Cost/latency note:** real τ-bench contexts are 3–11 KB, so each graded decision is
+~5–20 s of model time; majority-of-3 triples it. Budget accordingly — start with a
+few trajectories and `--ladder quick`, scale up for the headline run.
 
 ```bash
 # τ-bench (decisions = real tool calls; nothing tells the model what to pick)
