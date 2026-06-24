@@ -54,6 +54,9 @@ class OpenAIRunner:
 
     def _sample(self, blocks: list[Block]) -> str:
         system, user = prompts.decision_prompt(blocks)
+        return prompts.parse_fingerprint(self._raw(system, user))
+
+    def _raw(self, system: str, user: str) -> str:
         payload: dict = {
             "model": self.model,
             "messages": [
@@ -74,5 +77,4 @@ class OpenAIRunner:
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 (configured URL)
             body = json.loads(resp.read().decode())
-        content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return prompts.parse_fingerprint(content)
+        return body.get("choices", [{}])[0].get("message", {}).get("content", "")

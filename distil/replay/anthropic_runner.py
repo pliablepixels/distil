@@ -99,3 +99,17 @@ class AnthropicRunner:
             if getattr(block, "type", None) == "tool_use":
                 return json.dumps(block.input, sort_keys=True, separators=(",", ":"))
         return "<no-decision>"
+
+    def _raw(self, system: str, user: str) -> str:
+        """Free-form text completion (no forced tool) — used by the expand loop, which
+        needs the model to choose between requesting an expansion and committing."""
+        client = self._ensure_client()
+        resp = client.messages.create(  # type: ignore[attr-defined]
+            model=self.model,
+            max_tokens=self.max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        return "".join(
+            getattr(b, "text", "") for b in resp.content if getattr(b, "type", None) == "text"
+        )

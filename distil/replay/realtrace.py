@@ -57,9 +57,11 @@ class GoldDecision:
 
     @property
     def fingerprint(self) -> str:
-        return json.dumps(
-            {"action": self.action, "target": self.target}, sort_keys=True, separators=(",", ":")
-        )
+        # same canonical form the grader's parse_fingerprint emits, so model↔gold
+        # agreement compares like with like (paraphrase of the same tool ≠ mismatch)
+        from .prompts import canonical
+
+        return canonical(self.action, self.target)
 
 
 # in-memory side table: (trajectory_id, turn_index) -> GoldDecision

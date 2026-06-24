@@ -55,6 +55,9 @@ class ClaudeCliRunner:
 
     def _sample(self, blocks: list[Block]) -> str:
         system, user = prompts.decision_prompt(blocks)
+        return prompts.parse_fingerprint(self._raw(system, user))
+
+    def _raw(self, system: str, user: str) -> str:
         prompt = f"{system}\n\n{user}"
         cmd = [self.bin, "-p", prompt, "--output-format", "json"]
         if self.model:
@@ -65,9 +68,8 @@ class ClaudeCliRunner:
                 cmd, capture_output=True, text=True, timeout=self.timeout, check=False
             )
         except (OSError, subprocess.TimeoutExpired):
-            return "<no-decision>"
-        out = proc.stdout.strip()
-        return prompts.parse_fingerprint(self._result_text(out))
+            return ""
+        return self._result_text(proc.stdout.strip())
 
     @staticmethod
     def _result_text(stdout: str) -> str:

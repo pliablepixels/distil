@@ -81,6 +81,13 @@ Use `--runner claude-cli` (subscription, no key) or `--runner anthropic` (key).
 ~5–20 s of model time; majority-of-3 triples it. Budget accordingly — start with a
 few trajectories and `--ladder quick`, scale up for the headline run.
 
+**`--expand` (with-expand frontier).** The reversible digest is only decision-equivalent
+*with* its recovery loop. By default the harness grades the conservative *no-expand*
+lower bound; add `--expand` to let the grader recover digested content (`distil_expand`)
+before deciding — `distil.replay.expand_runner` drives any runner through a text
+protocol and splices byte-exact originals from a content-addressed restore map. Report
+both: no-expand (floor) and with-expand (the deployed behavior).
+
 ```bash
 # τ-bench (decisions = real tool calls; nothing tells the model what to pick)
 python benchmarks/prove.py --dataset tau --path /data/taubench_runs.json \

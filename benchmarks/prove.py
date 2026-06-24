@@ -66,13 +66,16 @@ class DecisionCache:
             h.update(f"{b.kind.value}|{b.stability.value}|{b.text}\x00".encode())
         return h.hexdigest()
 
-    def decide(self, blocks) -> str:
+    def decide(self, blocks, restore=None) -> str:
         k = self._key(blocks)
+        if restore:  # expand-aware decisions depend on what's recoverable
+            rk = hashlib.sha1("".join(sorted(restore)).encode()).hexdigest()[:8]
+            k = f"{k}:{rk}"
         if k in self.store:
             self.hits += 1
             return self.store[k]
         self.misses += 1
-        d = self.runner.decide(blocks)
+        d = self.runner.decide(blocks, restore) if restore is not None else self.runner.decide(blocks)
         self.store[k] = d
         if self.misses % 20 == 0:  # checkpoint long live runs so nothing is lost
             self.flush()
@@ -88,13 +91,18 @@ class DecisionCache:
 # --------------------------------------------------------------------------- #
 
 
-def build_matrix(entries, cache: DecisionCache, ladder, gold) -> dict:
+def build_matrix(entries, cache: DecisionCache, ladder, gold, *, expand: bool = False) -> dict:
+    from distil.replay.expand_runner import build_restore
+
     matrix: dict[str, dict] = {}
     for e in entries:
         tid = e.trajectory.id
         rec = {"domain": e.domain, "success": realtrace.success_label(e), "turns": []}
         for turn in e.trajectory.turns:
-            base = cache.decide(turn.blocks)
+            # with --expand, the grader may recover digested content (the distil_expand
+            # loop); restore maps each handle to its byte-exact original for this turn.
+            restore = build_restore(turn.blocks) if expand else None
+            base = cache.decide(turn.blocks, restore)
             base_tok = sum(tok.count(b.text) for b in turn.blocks)
             g = gold.get((tid, turn.index))
             tr = {
@@ -105,7 +113,7 @@ def build_matrix(entries, cache: DecisionCache, ladder, gold) -> dict:
             }
             for name, strat in ladder:
                 comp = strat(turn.blocks, turn.index)
-                dec = cache.decide(comp)
+                dec = cache.decide(comp, restore)
                 tr["levels"][name] = {
                     "loss": 0.0 if dec == base else 1.0,
                     "comp_tok": sum(tok.count(b.text) for b in comp),
@@ -373,6 +381,13 @@ def main() -> int:
     ap.add_argument("--reps", type=int, default=200, help="random calib/test splits for E2")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0, help="cap #trajectories (live cost control)")
+    ap.add_argument(
+        "--expand",
+        action="store_true",
+        help="grade the reversible tier WITH the distil_expand recovery loop (the model "
+        "may recover digested content before deciding) — the with-expand frontier, vs. the "
+        "default conservative no-expand lower bound",
+    )
     ap.add_argument("--report", help="write full JSON report here")
     args = ap.parse_args()
 
@@ -460,12 +475,24 @@ def main() -> int:
             "  measurement. Also grade traces with a model of the SAME family that produced them\n"
             "  (e.g. the sonnet-35 τ-bench logs with a Claude grader) for faithful gold-agreement.\n"
         )
+    if args.expand:
+        from distil.replay.expand_runner import ExpandAwareRunner
+
+        if not hasattr(runner, "_raw"):
+            raise SystemExit(f"--expand needs a runner with _raw(); '{args.runner}' has none")
+        runner = ExpandAwareRunner(runner, samples=args.samples)
+        ns += "+expand"
+        print(
+            "EXPAND-AWARE grading ON: the reversible tier is graded WITH the recovery loop\n"
+            "  (with-expand frontier). Without --expand you get the conservative no-expand bound."
+        )
+
     ladder = default_ladder()
     if args.ladder == "quick":
         keep = {"byte-exact", "lossless", "truncate@250", "truncate@120"}
         ladder = [rung for rung in ladder if rung[0] in keep]
     cache = DecisionCache(runner, ns)
-    matrix = build_matrix(entries, cache, ladder, gold)
+    matrix = build_matrix(entries, cache, ladder, gold, expand=args.expand)
     cache.flush()
     print(f"decisions: {cache.hits} cached / {cache.misses} computed")
 

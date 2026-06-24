@@ -142,11 +142,34 @@ instructive confounds:
 The **reversible digest graded *without the recovery loop* is not decision-equivalent
 on real τ-bench**: folding decision-relevant tool output behind a handle changes the
 decision unless the model expands it. So distil's aggressive savings **depend on the
-`distil_expand` loop being active**; the offline harness measures the *conservative,
-no-expand* frontier. Quantifying the **with-expand** frontier (simulating recovery)
-is the key next experiment — and the honest version of the repo's headline savings.
+`distil_expand` loop being active**; without it the harness measures a *conservative,
+no-expand* lower bound.
 
-**E2 / E3 / E4** on the valid (majority-vote) run: pending.
+**This is now measured both ways.** `prove.py --expand` runs the recovery loop inside
+the grader (`distil.replay.expand_runner`): the model sees the digested context, may
+emit `{"expand": [handle,…]}`, and the harness splices the byte-exact original back (a
+content-addressed restore map) before it commits. Live single-turn check on real
+τ-bench (`claude -p`, Haiku):
+
+| context | action | matches base? |
+|---|---|---|
+| base (uncompressed) | `search_flights` | — |
+| no-expand (digest hidden) | `confirm_booking_details` (flipped) | ✗ |
+| with-expand (recovery loop) | `search_flights` | ✓ (action) |
+
+Recovery restores the *action*; the residual target-string difference is a
+measurement-granularity artifact, not a decision change (§6.3).
+
+### 6.3 A third measurement finding: fingerprint granularity
+
+A free-text `{action,target}` grader counts **paraphrase as decision change**
+(`search_flights` vs `SearchFlights`; "NYC-SEA-2024-05-20" vs "New York to Seattle on
+May 20th"). We now normalize the action (case/punctuation-folded) and case-fold the
+target; the robust fix is a **structured / forced-tool grader** (the `anthropic`
+runner emits a tool call, not prose) — recommended for the headline run.
+
+**E2 / E3 / E4** on the valid run (majority vote + structured grader, with and without
+`--expand`): pending — compute-bound, specified in §Reproducing.
 
 ## 7. Analysis & limitations
 
@@ -189,4 +212,8 @@ python benchmarks/fetch_real.py tau --src tau:gpt-4o-airline --out /data/tau.jso
 python benchmarks/prove.py --dataset tau --path /data/tau.json \
     --runner claude-cli --model claude-opus-4-8 --samples 3 \
     --alpha 0.05 --delta 0.05 --ladder full --reps 500 --report results_tau.json
+# the with-expand frontier (reversible tier graded WITH the distil_expand recovery loop):
+python benchmarks/prove.py --dataset tau --path /data/tau.json \
+    --runner anthropic --model claude-opus-4-8 --samples 3 --expand \
+    --alpha 0.05 --delta 0.05 --ladder full --reps 500 --report results_tau_expand.json
 ```

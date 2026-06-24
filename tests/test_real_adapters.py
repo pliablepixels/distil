@@ -124,7 +124,7 @@ def _matrix():
         def __init__(self):
             self.r = SmokeRunner()
 
-        def decide(self, blocks):
+        def decide(self, blocks, restore=None):
             return self.r.decide(blocks)
 
     return prove, prove.build_matrix(entries, _Cache(), ladder, gold), ladder
@@ -179,11 +179,15 @@ def test_task_success_metric_safe_levels_hold_baseline():
 def test_parse_fingerprint_handles_fences_and_prose():
     from distil.replay.prompts import parse_fingerprint
 
-    canon = '{"action":"refund","target":"A1"}'
+    canon = '{"action":"refund","target":"a1"}'  # action normalized, target case-folded
     assert parse_fingerprint('{"action": "refund", "target": "A1"}') == canon
-    assert parse_fingerprint('```json\n{"action":"refund","target":"A1"}\n```') == canon
+    assert parse_fingerprint('```json\n{"action":"Refund","target":"A1"}\n```') == canon
     assert parse_fingerprint('Sure! {"target":"A1","action":"refund"} done.') == canon
     assert parse_fingerprint("no json here") == "<no-decision>"
+    # paraphrase of the same tool is NOT a decision change
+    assert parse_fingerprint('{"action":"search_flights","target":"x"}') == parse_fingerprint(
+        '{"action":"SearchFlights","target":"x"}'
+    )
 
 
 def test_render_keeps_system_prefix_separate():
@@ -287,3 +291,56 @@ def test_swe_localization_episode_round_trips(tmp_path):
     edit = [g for g in gold.values() if g.action == "edit"][0]
     assert edit.target == "src/foo.py"  # ground truth = the file the gold patch edits
     assert realtrace.validate_real(entries) == []
+
+
+# --------------------------------------------------------------------------- #
+# expand-aware grading (the with-expand frontier)
+# --------------------------------------------------------------------------- #
+
+
+def test_build_restore_matches_digest_handles():
+    from distil.compress.strategies import distil
+    from distil.compress.tier1 import _handle
+    from distil.replay.expand_runner import build_restore
+    from distil.trajectory import Block, Kind, Stability
+
+    # a verbose tool output whose load-bearing record sits in the MIDDLE → folded
+    lines = [f"log line {i} status=ok lat={i}" for i in range(6)]
+    lines.insert(3, "RECORD status=delivered condition=opened amount=88.50 days_since=11")
+    obs = Block("obs", Kind.TOOL_OUTPUT, "\n".join(lines), Stability.VOLATILE)
+    blocks = [Block("sys", Kind.SYSTEM, "policy", Stability.STABLE), obs]
+    restore = build_restore(blocks)
+    assert _handle(obs.text) in restore  # handle is content-addressed → reproducible
+    compressed = distil(blocks, 0)
+    folded = [b for b in compressed if "handle=" in b.text]
+    assert folded, "the digest should have folded the verbose middle behind a handle"
+
+
+def test_expand_loop_recovers_a_folded_decision():
+    from distil.compress.strategies import distil
+    from distil.replay import prompts
+    from distil.replay.expand_runner import ExpandAwareRunner, build_restore
+    from distil.replay.smoke_runner import SmokeRunner
+    from distil.trajectory import Block, Kind, Stability
+
+    # record buried in the middle so the reversible digest folds it out of view
+    noise = [f"log {i} kind=heartbeat status=ok shard={i}" for i in range(8)]
+    noise.insert(4, "RECORD status=delivered condition=opened amount=42.00 days_since=20")
+    obs = Block("obs", Kind.TOOL_OUTPUT, "\n".join(noise), Stability.VOLATILE)
+    blocks = [Block("sys", Kind.SYSTEM, "support policy", Stability.STABLE), obs]
+
+    smoke = SmokeRunner()
+    er = ExpandAwareRunner(smoke)
+    restore = build_restore(blocks)
+    compressed = distil(blocks, 0)
+    assert any("handle=" in b.text for b in compressed)  # record is folded
+
+    base = er.decide(blocks, restore)  # uncompressed (no handles → direct decide)
+    # no-expand: decide on the folded text without recovery
+    s, u = prompts.decision_prompt(compressed)
+    no_expand = prompts.parse_fingerprint(smoke._raw(s, u))
+    # with-expand: the loop recovers the folded record, then decides
+    with_expand = er.decide(compressed, restore)
+
+    assert no_expand != base  # folding hid the load-bearing record → decision flips
+    assert with_expand == base  # recovery restores byte-exact content → decision preserved

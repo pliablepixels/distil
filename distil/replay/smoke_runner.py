@@ -54,3 +54,24 @@ class SmokeRunner:
         if not facts:
             return "<no-record>"
         return "act:" + hashlib.sha1("|".join(sorted(facts)).encode()).hexdigest()[:12]
+
+    def _raw(self, system: str, user: str) -> str:
+        """Participate in the expand-or-decide protocol (for offline --expand plumbing):
+        if digested handles are present, request them all (model that recovers freely);
+        otherwise decide from the dense records visible in the prompt text."""
+        import json
+
+        handles = sorted(set(re.findall(r"handle=([0-9a-f]{8})", user)))
+        if handles and '"expand"' in user:
+            return json.dumps({"expand": handles})
+        facts: set[str] = set()
+        for line in _FOLD.sub("", user).splitlines():
+            fields = _FIELD.findall(line)
+            if len(fields) >= 3:
+                facts.update(f"{k.lower()}={v.lower()}" for k, v in fields)
+        act = (
+            "no-record"
+            if not facts
+            else hashlib.sha1("|".join(sorted(facts)).encode()).hexdigest()[:12]
+        )
+        return json.dumps({"action": act, "target": ""})
