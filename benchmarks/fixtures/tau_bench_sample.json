@@ -1,0 +1,842 @@
+[
+  {
+    "id": "tau-refund-ok",
+    "title": "tau-refund-ok",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1000."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1000"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1000) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=6 condition=unopened amount=42.00"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "issue_refund",
+              "arguments": {
+                "order_id": "A1000"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-credit-opened",
+    "title": "tau-credit-opened",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1001."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1001"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1001) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=11 condition=opened amount=88.50"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "offer_store_credit",
+              "arguments": {
+                "order_id": "A1001"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-credit-late",
+    "title": "tau-credit-late",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1002."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1002"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1002) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=51 condition=unopened amount=19.99"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "offer_store_credit",
+              "arguments": {
+                "order_id": "A1002"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-cancel-ok",
+    "title": "tau-cancel-ok",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1003."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1003"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1003) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=processing shipped=false days_since=0 amount=131.00"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "cancel_order",
+              "arguments": {
+                "order_id": "A1003"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-cancel-shipped",
+    "title": "tau-cancel-shipped",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1004."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1004"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1004) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=in_transit shipped=true days_since=2 amount=67.25"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "offer_store_credit",
+              "arguments": {
+                "order_id": "A1004"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-fraud",
+    "title": "tau-fraud",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1005."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1005"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1005) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered ship_country=ru card_mismatch=true velocity=9"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "escalate_fraud",
+              "arguments": {
+                "order_id": "A1005"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-refund-ok2",
+    "title": "tau-refund-ok2",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1006."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1006"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1006) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=3 condition=unopened amount=215.00"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "issue_refund",
+              "arguments": {
+                "order_id": "A1006"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-credit-opened2",
+    "title": "tau-credit-opened2",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1007."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1007"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1007) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=20 condition=opened amount=12.00"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "offer_store_credit",
+              "arguments": {
+                "order_id": "A1007"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-cancel-ok2",
+    "title": "tau-cancel-ok2",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1008."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1008"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1008) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=processing shipped=false days_since=1 amount=9.99"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "cancel_order",
+              "arguments": {
+                "order_id": "A1008"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-fraud2",
+    "title": "tau-fraud2",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1009."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1009"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1009) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered ship_country=ng card_mismatch=true velocity=14"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "escalate_fraud",
+              "arguments": {
+                "order_id": "A1009"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-credit-late2",
+    "title": "tau-credit-late2",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1010."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1010"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1010) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=44 condition=unopened amount=55.50"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "offer_store_credit",
+              "arguments": {
+                "order_id": "A1010"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tau-refund-ok3",
+    "title": "tau-refund-ok3",
+    "tools": [
+      {
+        "name": "issue_refund",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "offer_store_credit",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "cancel_order",
+        "args": [
+          "order_id"
+        ]
+      },
+      {
+        "name": "escalate_fraud",
+        "args": [
+          "order_id"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a retail customer-support agent. Resolve each case with exactly one tool call.\nPolicy: refunds only for items returned within 30 days of delivery AND unopened;\notherwise offer store credit. Cancel an order only if it has not yet shipped. Escalate fraud."
+      },
+      {
+        "role": "user",
+        "content": "Please help with order A1011."
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_order",
+              "arguments": {
+                "order_id": "A1011"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": "get_order(A1011) ->\nmeta: tenant acme; region us-east-1\nlog 2026-06-21T08:14:02Z INFO loaded customer profile\nlog 2026-06-21T08:14:02Z INFO prior_tickets 3; csat 4.6\nlog 2026-06-21T08:14:03Z INFO loyalty gold; newsletter on\nlog 2026-06-21T08:14:03Z DEBUG inventory sync ok; carrier UPS\nlog 2026-06-21T08:14:03Z DEBUG cache warm; shard 7; node b12\nnote: promotional banner eligible; gift_wrap no\nlog 2026-06-21T08:14:04Z INFO rendered response template v3\nRECORD status=delivered days_since=10 condition=unopened amount=33.10"
+      },
+      {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "issue_refund",
+              "arguments": {
+                "order_id": "A1011"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

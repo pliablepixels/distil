@@ -3,3 +3,5 @@
 *.out
 results_xl.html
 results_xl/
+.cache/
+*_proof.json
