@@ -385,8 +385,23 @@ def main() -> int:
         entries = realtrace.load_tau_bench(args.path, model=args.model)
     else:
         entries = realtrace.load_swe_bench(args.path, model=args.model)
-    if args.limit:
-        entries = entries[: args.limit]
+    if args.limit and args.limit < len(entries):
+        # stratify by outcome so a small sample isn't all-failures (E4 needs both),
+        # then deterministically subsample the rest — avoids the first-N bias.
+        labeled_ok = [e for e in entries if realtrace.success_label(e) is True]
+        labeled_no = [e for e in entries if realtrace.success_label(e) is False]
+        other = [e for e in entries if realtrace.success_label(e) is None]
+        rng0 = random.Random(args.seed)
+        for grp in (labeled_ok, labeled_no, other):
+            rng0.shuffle(grp)
+        picked, i = [], 0
+        pools = [labeled_ok, labeled_no, other]
+        while len(picked) < args.limit and any(pools):
+            pool = pools[i % len(pools)]
+            if pool:
+                picked.append(pool.pop())
+            i += 1
+        entries = picked
 
     problems = realtrace.validate_real(entries)
     if problems:
@@ -437,6 +452,14 @@ def main() -> int:
         ns = f"claudecli_{(cli_model or 'default').replace('/', '_')}_s{args.samples}"
 
     evidential = args.runner != "smoke"
+    if evidential and args.samples == 1:
+        print(
+            "\nWARNING: --samples 1 with a stochastic grader inflates the decision-change rate:\n"
+            "  any text change (e.g. the reversible digest) triggers a fresh sample, so grader\n"
+            "  variance is counted as a 'flip'. Use --samples 3+ (majority vote) for a valid\n"
+            "  measurement. Also grade traces with a model of the SAME family that produced them\n"
+            "  (e.g. the sonnet-35 τ-bench logs with a Claude grader) for faithful gold-agreement.\n"
+        )
     ladder = default_ladder()
     if args.ladder == "quick":
         keep = {"byte-exact", "lossless", "truncate@250", "truncate@120"}

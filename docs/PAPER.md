@@ -107,26 +107,69 @@ rate and preserves ⟨Z⟩% downstream task success.
 
 ## 6. Results
 
-> Auto-populated from `benchmarks/prove.py --report` on real τ-bench. The pipeline is
-> validated end-to-end live; the cells below are filled from the latest real run.
+> Produced by `benchmarks/prove.py` on **real τ-bench** trajectories (gpt-4o-airline,
+> from the tau-bench repo; no HuggingFace, no markers). The pipeline runs end-to-end
+> live via `claude -p`. The run below, deliberately cheap, **surfaced the methodology
+> requirements** that follow — which is exactly what evaluating on real data is for.
+> The valid (majority-vote, faithful-grader) headline run is in §Reproducing.
 
-**E1 — frontier (real grader).** ⟨table: level, savings, decision-change⟩
+### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
-**E2 — certification holds out-of-sample.** At α=⟨α⟩, δ=⟨δ⟩ over ⟨R⟩ splits:
-empirical coverage `P(realized ≤ α)` = ⟨cov⟩ (target ≥ 1−δ); mean realized held-out
-risk = ⟨r⟩; certified savings = ⟨s⟩. **The certificate holds on traffic it never saw.**
+| level | savings | decision-change |
+|---|--:|--:|
+| byte-exact | 0.0% | 0.0% |
+| lossless (reversible digest) | 1.1% | 67.2% |
+| truncate@250 | 9.5% | 64.2% |
+| truncate@120 | 10.6% | 67.2% |
 
-**E3 — distribution shift.** Leave-one-domain-out: ⟨per-domain realized risk / ok?⟩.
+model↔gold next-action agreement (uncompressed) = **19.4%**.
 
-**E4 — downstream task success.** Baseline success ⟨b⟩%; safe levels retain ⟨…⟩%,
-aggressive truncation erodes to ⟨…⟩% (95% CI).
+**This run is NOT a valid measurement, and the harness flags it.** Three real,
+instructive confounds:
 
-**Grader faithfulness.** model↔gold agreement on uncompressed context = ⟨g⟩%.
+1. **`byte-exact` is byte-identical to the original on 100% of these turns** (Tier-0
+   minify is a no-op on already-compact τ-bench JSON), so its 0% is a *cache artifact*
+   (same text → same decision), not robustness.
+2. **`samples=1` turns grader variance into apparent decision change** — any level
+   that alters text triggers a fresh stochastic grader call. Majority-of-k is
+   mandatory; the harness now warns on `--samples 1`.
+3. **A cross-family, weaker grader is unfaithful** — Haiku reproduces *gpt-4o's*
+   action 19% of the time. Grade traces with a same-family/strength model (e.g. the
+   `sonnet-35` τ-bench logs with a Claude grader).
+
+### 6.2 The substantive finding that survives the confounds
+
+The **reversible digest graded *without the recovery loop* is not decision-equivalent
+on real τ-bench**: folding decision-relevant tool output behind a handle changes the
+decision unless the model expands it. So distil's aggressive savings **depend on the
+`distil_expand` loop being active**; the offline harness measures the *conservative,
+no-expand* frontier. Quantifying the **with-expand** frontier (simulating recovery)
+is the key next experiment — and the honest version of the repo's headline savings.
+
+**E2 / E3 / E4** on the valid (majority-vote) run: pending.
 
 ## 7. Analysis & limitations
 
-- Where it works / breaks; cost of the guarantee; sample-size vs. tightest certifiable
-  α (more calibration turns → tighter α, per the conformal bounds).
+Lessons the real-data run makes concrete (each is now enforced or flagged by the
+harness, and each is a methodological contribution in its own right):
+
+- **Majority voting is not optional.** With a single sample, the decision-change rate
+  is a sum of true information loss and grader sampling variance; only majority-of-k
+  isolates the former. Report k and the residual grader self-disagreement.
+- **Grade with a faithful agent.** The grader must reproduce the trace-generating
+  agent's actions at a high rate on the *uncompressed* context; otherwise E1/E2
+  measure a strawman. Use a same-family/strength model (ideally the one that produced
+  the traces) and publish the agreement number as a gate.
+- **The reversible tier must be evaluated *with* its recovery loop.** distil's whole
+  premise is digest-behind-handle + recover-on-demand. Grading the digest with the
+  `distil_expand` loop disabled measures a conservative lower bound that understates
+  it; grading with perfect recovery overstates it. The honest number requires
+  simulating the model's expand decisions — i.e. running the recovery loop in the
+  grader. **This is the single most important remaining experiment**, and it is the
+  rigorous form of the repo's headline "high savings at ~0% decision change".
+- **Cost of the guarantee / sample size.** Tightest certifiable α scales with the
+  number of zero-loss calibration turns (Hoeffding–Bentkus): ~⌈ln(1/δ)/α⌉-ish; budget
+  calibration turns accordingly.
 - **Threats to validity** (see `docs/PAPER_PLAN.md §8`): grader stochasticity (majority
   vote; report agreement), decision-proxy vs. outcome (E4), non-exchangeability (E3),
   domain coverage, cost-model fidelity.
