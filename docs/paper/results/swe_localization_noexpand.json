@@ -1,0 +1,1005 @@
+{
+  "args": {
+    "dataset": "swe",
+    "path": "/private/tmp/claude-501/-Users-shakes-workspace/f8d99b81-8e92-45ac-b540-0cda915b11c1/scratchpad/paper/swe_loc.json",
+    "runner": "anthropic",
+    "samples": 3,
+    "model": "claude-sonnet-4-6",
+    "base_url": "http://localhost:8000/v1",
+    "api_key_env": "OPENAI_API_KEY",
+    "json_mode": false,
+    "cli_bin": "claude",
+    "baselines": false,
+    "ladder": "quick",
+    "alpha": 0.05,
+    "delta": 0.05,
+    "method": "ltt",
+    "reps": 300,
+    "workers": 4,
+    "seed": 0,
+    "limit": 40,
+    "expand": false,
+    "report": "/private/tmp/claude-501/-Users-shakes-workspace/f8d99b81-8e92-45ac-b540-0cda915b11c1/scratchpad/paper/results_swe.json"
+  },
+  "n_trajectories": 40,
+  "n_turns": 80,
+  "frontier": [
+    {
+      "level": "byte-exact",
+      "n": 80,
+      "decision_change": 0.0,
+      "savings": -0.0009366381628015397
+    },
+    {
+      "level": "lossless",
+      "n": 80,
+      "decision_change": 0.1125,
+      "savings": 0.23898149272370905
+    },
+    {
+      "level": "truncate@250",
+      "n": 80,
+      "decision_change": 0.1375,
+      "savings": 0.22316271486306005
+    },
+    {
+      "level": "truncate@120",
+      "n": 80,
+      "decision_change": 0.1125,
+      "savings": 0.25270150729363605
+    }
+  ],
+  "head_to_head": [],
+  "coverage": {
+    "alpha": 0.05,
+    "delta": 0.05,
+    "method": "ltt",
+    "reps": 300,
+    "certified_frac": 0.0,
+    "empirical_coverage": 0.0,
+    "target_coverage": 0.95,
+    "mean_realized_risk": 0.0,
+    "mean_test_savings": 0.0,
+    "detail": [
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      },
+      {
+        "certified": null
+      }
+    ]
+  },
+  "shift": [],
+  "task_success": {
+    "n": 40,
+    "baseline_success": 1.0,
+    "levels": [
+      {
+        "level": "byte-exact",
+        "savings": -0.0009366381628015397,
+        "retained_success": 1.0,
+        "ci_low": 1.0,
+        "ci_high": 1.0,
+        "preserved_frac": 1.0
+      },
+      {
+        "level": "lossless",
+        "savings": 0.23898149272370905,
+        "retained_success": 0.775,
+        "ci_low": 0.65,
+        "ci_high": 0.9,
+        "preserved_frac": 0.775
+      },
+      {
+        "level": "truncate@250",
+        "savings": 0.22316271486306005,
+        "retained_success": 0.725,
+        "ci_low": 0.575,
+        "ci_high": 0.85,
+        "preserved_frac": 0.725
+      },
+      {
+        "level": "truncate@120",
+        "savings": 0.25270150729363605,
+        "retained_success": 0.775,
+        "ci_low": 0.65,
+        "ci_high": 0.9,
+        "preserved_frac": 0.775
+      }
+    ]
+  }
+}

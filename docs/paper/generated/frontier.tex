@@ -1,0 +1,11 @@
+% auto-generated frontier (E1)
+\begin{tikzpicture}
+\begin{axis}[width=0.7\textwidth,height=6cm,xlabel={token savings (\%)},ylabel={decision-change (\%)},xmin=0,xmax=28,ymin=-3,ymax=25,legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west}]
+\addplot[only marks,mark=*,distilgreen] coordinates {(-0.06,0.00) (21.65,10.17) (20.41,11.50) (22.82,11.67)};
+\addlegendentry{certified ($\le\alpha$)}
+\addplot[only marks,mark=triangle*,distilred] coordinates {(0,0)};
+\addlegendentry{lossy (flips)}
+\addplot[dashed,distilgray] coordinates {(0,15.0) (28,15.0)};
+\addlegendentry{$\alpha=15\%$}
+\end{axis}
+\end{tikzpicture}

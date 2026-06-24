@@ -1,0 +1,140 @@
+[
+  {
+    "instance_id": "proj__off-by-one-1",
+    "problem_statement": "test_paginate fails: last page omitted when total % size == 0",
+    "system": "You are a software engineer. Inspect the repo and fix the failing test with minimal edits.",
+    "trajectory": [
+      {
+        "action": "ls src/",
+        "observation": "$ ls src/\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      },
+      {
+        "action": "python -m pytest -q",
+        "observation": "$ python -m pytest -q\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s\nFAILREC file=src/paginate.py func=pages defect=floor_div expected=4 got=3 line=2"
+      },
+      {
+        "action": "edit src/paginate.py",
+        "observation": "$ edit src/paginate.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      }
+    ],
+    "info": {
+      "resolved": true,
+      "exit_status": "submitted"
+    }
+  },
+  {
+    "instance_id": "proj__none-guard-2",
+    "problem_statement": "AttributeError on empty config",
+    "system": "You are a software engineer. Inspect the repo and fix the failing test with minimal edits.",
+    "trajectory": [
+      {
+        "action": "grep -rn config.get src/",
+        "observation": "$ grep -rn config.get src/\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      },
+      {
+        "action": "python -m pytest -q",
+        "observation": "$ python -m pytest -q\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s\nFAILREC file=src/loader.py func=mode defect=none_attr expected=ok got=error line=22"
+      },
+      {
+        "action": "edit src/loader.py",
+        "observation": "$ edit src/loader.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      }
+    ],
+    "info": {
+      "resolved": true,
+      "exit_status": "submitted"
+    }
+  },
+  {
+    "instance_id": "proj__regex-3",
+    "problem_statement": "URL validator rejects valid https URLs with ports",
+    "system": "You are a software engineer. Inspect the repo and fix the failing test with minimal edits.",
+    "trajectory": [
+      {
+        "action": "open src/validate.py",
+        "observation": "$ open src/validate.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      },
+      {
+        "action": "python -m pytest -q",
+        "observation": "$ python -m pytest -q\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s\nFAILREC file=src/validate.py func=valid defect=strict_pattern expected=true got=false line=1"
+      },
+      {
+        "action": "edit src/validate.py",
+        "observation": "$ edit src/validate.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      }
+    ],
+    "info": {
+      "resolved": true,
+      "exit_status": "submitted"
+    }
+  },
+  {
+    "instance_id": "proj__timezone-4",
+    "problem_statement": "Naive timestamps break DST comparison",
+    "system": "You are a software engineer. Inspect the repo and fix the failing test with minimal edits.",
+    "trajectory": [
+      {
+        "action": "grep -rn datetime.now src/",
+        "observation": "$ grep -rn datetime.now src/\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      },
+      {
+        "action": "python -m pytest -q",
+        "observation": "$ python -m pytest -q\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s\nFAILREC file=src/clock.py func=stamp defect=naive_dt expected=aware got=naive line=8"
+      },
+      {
+        "action": "edit src/clock.py",
+        "observation": "$ edit src/clock.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      }
+    ],
+    "info": {
+      "resolved": false,
+      "exit_status": "submitted"
+    }
+  },
+  {
+    "instance_id": "proj__keyerror-5",
+    "problem_statement": "KeyError when optional header absent",
+    "system": "You are a software engineer. Inspect the repo and fix the failing test with minimal edits.",
+    "trajectory": [
+      {
+        "action": "open src/headers.py",
+        "observation": "$ open src/headers.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      },
+      {
+        "action": "python -m pytest -q",
+        "observation": "$ python -m pytest -q\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s\nFAILREC file=src/headers.py func=read defect=missing_key expected=none got=keyerror line=14"
+      },
+      {
+        "action": "edit src/headers.py",
+        "observation": "$ edit src/headers.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      }
+    ],
+    "info": {
+      "resolved": true,
+      "exit_status": "submitted"
+    }
+  },
+  {
+    "instance_id": "proj__float-6",
+    "problem_statement": "Rounding error in currency sum",
+    "system": "You are a software engineer. Inspect the repo and fix the failing test with minimal edits.",
+    "trajectory": [
+      {
+        "action": "open src/money.py",
+        "observation": "$ open src/money.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      },
+      {
+        "action": "python -m pytest -q",
+        "observation": "$ python -m pytest -q\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s\nFAILREC file=src/money.py func=total defect=float_round expected=10.00 got=9.99 line=7"
+      },
+      {
+        "action": "edit src/money.py",
+        "observation": "$ edit src/money.py\nlog collecting ... ; rootdir /repo; plugins none\nlog cachedir .pytest_cache; testpaths tests\nlog 412 items discovered across 9 modules\nlog warnings 0; deprecations 0; session start\nlog loading conftest; fixtures resolved; seed 1337\nlog teardown ok; coverage skipped\nlog session finished in 0.21s"
+      }
+    ],
+    "info": {
+      "resolved": true,
+      "exit_status": "submitted"
+    }
+  }
+]

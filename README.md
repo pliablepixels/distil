@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-498%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-532%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -408,7 +408,8 @@ See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) f
 ## ✅ What we won't pretend
 
 - **Default tokenizer is an offline heuristic** (zero deps); ratios are robust, dollars are approximate. Use `--tokenizer anthropic` for billing-grade counts (the correct Claude tokenizer — tiktoken undercounts Claude).
-- **The default runner is a deterministic stand-in** so the gate runs offline with ground truth. `--runner anthropic` certifies against the live model — implemented, **UNVERIFIED** until you run it with a key.
+- **The default runner is a deterministic stand-in** so the gate runs offline with ground truth. For a *non-circular* evaluation, the **proof harness** (`benchmarks/prove.py`) grades **real agent traces** (τ-bench / SWE-bench) with a **real model** — see [Reproducible evaluation & the paper](#-reproducible-evaluation--the-paper).
+- **What the real-trace runs taught us (and we now enforce):** measuring decision-equivalence credibly requires (1) **majority-vote grading** (a single sample lets grader noise masquerade as a decision change), (2) a **faithful grader** (same model family as the trace), and (3) grading the **reversible tier *with* its `distil_expand` recovery loop** — without recovery the digest is only a conservative lower bound. The aggressive headline savings are realized *with* recovery active; the harness measures both bounds.
 - The learned keep-model is a real trained **logistic** classifier (96.4%/0.98 on held-out lines). The **transformer** path ships a real ONNX adapter + training pipeline; a **demo checkpoint** (96.3%/0.98, trained on the bundled corpus) is on the v0.1.0 release, and you retrain on your own traces for production (`distil train-transformer`). We don't fabricate weights to claim "done."
 - Numbers here are reproducible from the bundled corpus with the heuristic tokenizer. No vanity metrics.
 
@@ -457,6 +458,18 @@ $ distil bench --corpus ./mycorpus --savings-only
 No vanity metrics — every number here is reproducible from the bundled corpus.
 
 ---
+
+## 🔬 Reproducible evaluation & the paper
+
+Beyond the offline corpus gate, Distil ships a **decision-equivalence proof harness**
+that removes any circularity by grading **real agent traces with a real model** — no
+planted markers, no synthetic oracle.
+
+- **Real data, no HuggingFace needed** — `python benchmarks/fetch_real.py tau --src tau:gpt-4o-airline --out tau.json` pulls real τ-bench trajectories (the tau-bench repo ships them); SWE-bench adapters included.
+- **Four experiments** (`benchmarks/prove.py`): **E1** savings-vs-decision-change frontier · **E2** *certification coverage* (certify on calibration, verify the realized decision-change rate stays ≤ α on a disjoint held-out split, over many splits — the out-of-sample proof) · **E3** leave-one-domain-out shift · **E4** downstream task-success.
+- **Real-model graders, three ways** — `--runner claude-cli` (your Claude subscription, no API key), `--runner openai` (vLLM/Ollama/any OpenAI-compatible, free at scale), `--runner anthropic` (forced-tool, structured). Majority-vote; `--expand` measures the reversible tier **with** the recovery loop.
+
+> **Docs:** [`benchmarks/PROVE.md`](benchmarks/PROVE.md) (harness) · [`docs/PAPER_PLAN.md`](docs/PAPER_PLAN.md) (protocol) · [`docs/PAPER.md`](docs/PAPER.md) (findings) · [`docs/paper/`](docs/paper/) (**arXiv-ready LaTeX paper, TikZ figures**) · [`docs/PUBLISHING.md`](docs/PUBLISHING.md) (how to publish — first-timer guide).
 
 ## 🤝 Contributing
 

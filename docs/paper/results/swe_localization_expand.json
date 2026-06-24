@@ -1,0 +1,1918 @@
+{
+  "args": {
+    "dataset": "swe",
+    "path": "/private/tmp/claude-501/-Users-shakes-workspace/f8d99b81-8e92-45ac-b540-0cda915b11c1/scratchpad/paper/swe_loc.json",
+    "runner": "anthropic",
+    "samples": 3,
+    "model": "claude-sonnet-4-6",
+    "base_url": "http://localhost:8000/v1",
+    "api_key_env": "OPENAI_API_KEY",
+    "json_mode": false,
+    "cli_bin": "claude",
+    "baselines": false,
+    "ladder": "quick",
+    "alpha": 0.1,
+    "delta": 0.05,
+    "method": "ltt",
+    "reps": 300,
+    "workers": 4,
+    "seed": 0,
+    "limit": 40,
+    "expand": true,
+    "report": "docs/paper/results/swe_localization_expand.json"
+  },
+  "n_trajectories": 40,
+  "n_turns": 80,
+  "frontier": [
+    {
+      "level": "byte-exact",
+      "n": 80,
+      "decision_change": 0.0,
+      "effective_n": 8,
+      "decision_change_effective": 0.0,
+      "trivial_frac": 0.9,
+      "savings": -0.0009366381628015397
+    },
+    {
+      "level": "lossless",
+      "n": 80,
+      "decision_change": 0.075,
+      "effective_n": 40,
+      "decision_change_effective": 0.15,
+      "trivial_frac": 0.5,
+      "savings": 0.23898149272370905
+    },
+    {
+      "level": "truncate@250",
+      "n": 80,
+      "decision_change": 0.1,
+      "effective_n": 40,
+      "decision_change_effective": 0.2,
+      "trivial_frac": 0.5,
+      "savings": 0.22316271486306005
+    },
+    {
+      "level": "truncate@120",
+      "n": 80,
+      "decision_change": 0.125,
+      "effective_n": 40,
+      "decision_change_effective": 0.25,
+      "trivial_frac": 0.5,
+      "savings": 0.25270150729363605
+    }
+  ],
+  "head_to_head": [],
+  "coverage": {
+    "alpha": 0.1,
+    "delta": 0.05,
+    "method": "ltt",
+    "reps": 300,
+    "certified_frac": 1.0,
+    "empirical_coverage": 0.9933333333333333,
+    "target_coverage": 0.95,
+    "mean_realized_risk": 0.001,
+    "mean_test_savings": 0.000652277474539057,
+    "detail": [
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007090438543624344,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009904622157006493,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006258568277999199,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007935878104912142,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009756450097564429,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006912760956725439,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004845128915036412,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00046466740536876827,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006945891505174551,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008777154321180092,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006327016359857218,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007426530395728825,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007055918151348539,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007599939200486627,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009030704394943356,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013024225058608785,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011097866743392526,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012229775907341978,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007303534910896303,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006145903755148119,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0002431484247455984,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012972642985233929,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009073800241967689,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00041491127282022866,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011648840410887207,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013759312705550197,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006614631565022844,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007300031285848441,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008015879074738663,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0014131279587366041,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0005064023728569289,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007171151482037175,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004570383912247955,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007035213092900783,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009877807858345022,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008264121317300699,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012230215827337965,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009481668773703156,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007271669575334982,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007352168889822597,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013889371158721797,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006611674327812178,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008458860656537226,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008300344783551683,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008153756552125024,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0002638124670233388,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0014253135689852314,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009758137589739313,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006780098795724498,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008597357108741654,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004417561506049328,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013676588897828523,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008862920168066779,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008083763184232318,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00048152988924821116,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008467676274221958,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012245469176404011,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009836987071387693,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008973208563005652,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010729613733906351,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006573592938083905,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001497881046324645,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001336477987421425,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004483222402318354,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0015149793584061655,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001169839412953344,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009682625067239936,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001140566135554577,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011741682974559797,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006936255809113501,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011052437676533078,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007158440141805666,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00045018526855278296,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013646197370611457,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009324940886534794,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001136474331915549,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011899181480545806,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006692373880621272,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006565988181221893,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001154290111581302,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012489439077250086,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000945245763898539,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012646457132230449,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0005926452721722875,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006160101025656228,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011993022241605367,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": 0.0,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006159032707704348,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011173184357542443,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006706908115359234,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001287976361845633,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010567514677104484,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009666171850726268,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012064490183891774,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012402716194845897,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013482967839155702,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007406584453579779,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009768451519536203,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008060904612627873,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0016060166869051873,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012567324955117254,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00159904057565452,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004774897680763779,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006018943833749901,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008237232289951546,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0002557451317086734,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011419249592170555,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0005251464350635171,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011404803434857946,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00021554378618060532,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009990614876933535,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009693401306813954,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00023849272597176174,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008880431335236416,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004201137538779598,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007834359261331691,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007038535984515981,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00048441230407259006,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000571405248765311,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009254181519056104,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013927576601671099,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009248475714187521,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0015317429279102512,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007933601855243388,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011886865014159032,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001096844957739318,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007413722800904132,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006710958996041239,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008131550415613198,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010372646945830954,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008299775598659132,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006500048750366361,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000707013574660742,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013111719563456692,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011210381492678945,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006944203326273435,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006568452660222768,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000979837949877549,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013059820347838258,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001592546880598844,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012646457132230449,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007119718059165336,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009472802127736824,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0017583239805460948,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008922375334590171,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010979075174373243,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00084939562234565,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004598676996001583,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0014055054677590828,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009730080363257176,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00048096488956295147,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001038715769593912,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001098368599580013,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007656516873786323,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011045800623299407,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006595063124175127,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008906775747179463,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007469853804289439,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006894174422613641,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0015982951518380695,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010775179058122308,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0014065279444008816,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012086583891879332,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007636919048659152,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012401947105695754,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009098261221189841,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009626420822688164,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00047123645195190633,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007001820473322429,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012689435138859562,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000913025835249659,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010553245922608756,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00046832140228803,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007676409802184203,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012155446712667217,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001108759197661513,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010373045449305618,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011654188444696345,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012327416173569805,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009043105469404011,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00041071654239854816,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007396449704142327,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004546249344290487,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007846360783141382,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010365949426731635,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008145533532446514,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008218952905398869,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008238015272012955,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0014621702339472353,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012035398230088035,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007729523918582615,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0005247376311843244,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011804735782237064,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000933190474544654,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013728444667671091,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012174336498660399,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010197459905441075,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006563617866168769,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008880431335236416,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009025897382490822,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006236941403936491,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00046014441455466404,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007399186089529497,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013757171291417514,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00044681326397100207,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006456194718833519,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008137922719875235,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009350973193877898,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008752309637265476,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009924978836441944,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010030835531449345,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013264731891631243,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009881061299177318,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004287033372905036,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008228629300250923,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001028336380255901,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00023779597105688666,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007512019230768718,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008504778875748631,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00041160081053703834,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009999999999998899,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0004601479046837387,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011356597150526948,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0013707213910862937,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000259778816892986,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010031251205679936,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009947919714436981,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011800404585300406,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011973875181421345,
+        "hit": true
+      },
+      {
+        "certified": "lossless",
+        "realized_risk": 0.15,
+        "savings": 0.22823997348359293,
+        "hit": false
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008875156137007068,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009744829826396906,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008674101610903762,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0015011166843628132,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011945332536977826,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012781474380663127,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011564745049938985,
+        "hit": true
+      },
+      {
+        "certified": "lossless",
+        "realized_risk": 0.15,
+        "savings": 0.24192593108734284,
+        "hit": false
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007404795486600779,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008027664567122894,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012997438740012246,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001017732023329554,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011783189316574294,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00166292508522492,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008970316407523882,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006363347120585949,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009676378883991532,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008766901574670527,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007251631617113397,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0015825393162112178,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009758364312266732,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009168604080029841,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010453818718485497,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007308071765264046,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009655377302435486,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001128593241718212,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012127448458343348,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006680472977487195,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012567492087134369,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009676193109167119,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006622735852179762,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001228199459592183,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007190623427051346,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012972091471776803,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008001219233406687,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0011377706388246978,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.000488605032631817,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009368356574064318,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009333840356759993,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012573476251847016,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007250880464055864,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008627576290141103,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007069885821344712,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008098415024488936,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012418730367447228,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009425609094284582,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001176193836744277,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008846368074439948,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009908984145625688,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008098137428391716,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007379814450378941,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008754296089747982,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0015382306595632667,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001127320954907196,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006912522033664104,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0006803415314486916,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0012860495772111236,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0005156347832493413,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010653829459812414,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007159416337105817,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009118848998614926,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0007577965607694637,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0010636202481779655,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0014104857575341079,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.00047017732401943846,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001030613023894844,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.001243144424131648,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009817248149825986,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0009400786880680023,
+        "hit": true
+      },
+      {
+        "certified": "byte-exact",
+        "realized_risk": 0.0,
+        "savings": -0.0008500303582270607,
+        "hit": true
+      }
+    ]
+  },
+  "shift": [],
+  "task_success": {
+    "n": 40,
+    "baseline_success": 1.0,
+    "outcome_evidential": false,
+    "levels": [
+      {
+        "level": "byte-exact",
+        "savings": -0.0009366381628015397,
+        "retained_success": 1.0,
+        "ci_low": 1.0,
+        "ci_high": 1.0,
+        "preserved_frac": 1.0
+      },
+      {
+        "level": "lossless",
+        "savings": 0.23898149272370905,
+        "retained_success": 0.85,
+        "ci_low": 0.725,
+        "ci_high": 0.95,
+        "preserved_frac": 0.85
+      },
+      {
+        "level": "truncate@250",
+        "savings": 0.22316271486306005,
+        "retained_success": 0.8,
+        "ci_low": 0.675,
+        "ci_high": 0.925,
+        "preserved_frac": 0.8
+      },
+      {
+        "level": "truncate@120",
+        "savings": 0.25270150729363605,
+        "retained_success": 0.75,
+        "ci_low": 0.625,
+        "ci_high": 0.875,
+        "preserved_frac": 0.75
+      }
+    ]
+  }
+}
