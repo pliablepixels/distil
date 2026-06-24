@@ -229,3 +229,61 @@ def test_openai_runner_parses_mocked_response(monkeypatch):
     entries = realtrace.load_swe_bench(FIX / "swe_bench_sample.json")
     blocks = entries[0].trajectory.turns[0].blocks
     assert runner.decide(blocks) == '{"action":"edit","target":"src/x.py"}'
+
+
+# --------------------------------------------------------------------------- #
+# fetch_real converters
+# --------------------------------------------------------------------------- #
+
+
+def _load_fetch():
+    path = Path(__file__).resolve().parent.parent / "benchmarks" / "fetch_real.py"
+    spec = importlib.util.spec_from_file_location("fetch_real", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_tau_result_normalization():
+    fr = _load_fetch()
+    rec = {
+        "task_id": "retail_7",
+        "success": True,
+        "traj": [
+            {"role": "system", "content": "support agent"},
+            {"role": "user", "content": "refund A1"},
+            {
+                "role": "assistant",
+                "tool_calls": [{"function": {"name": "credit", "arguments": {"id": "A1"}}}],
+            },
+        ],
+    }
+    ep = fr.normalize_tau_episode(rec, 0)
+    assert ep["id"] == "retail_7" and ep["reward"] == 1 and len(ep["messages"]) == 3
+    assert fr.normalize_tau_episode({"id": "x"}, 1) is None  # no messages → dropped
+
+
+def test_swe_patch_target_parsing():
+    fr = _load_fetch()
+    patch = (
+        "--- a/src/foo.py\n+++ b/src/foo.py\n@@\n-x\n+y\n--- a/t/bar.py\n+++ b/t/bar.py\n@@\n-a\n+b"
+    )
+    assert fr.parse_patch_targets(patch) == ["src/foo.py", "t/bar.py"]
+    assert fr.parse_patch_targets("") == []
+
+
+def test_swe_localization_episode_round_trips(tmp_path):
+    import json
+
+    fr = _load_fetch()
+    patch = "--- a/src/foo.py\n+++ b/src/foo.py\n@@ -1,2 +1,2 @@\n-bad\n+good"
+    inst = {"instance_id": "p__b1", "problem_statement": "foo is wrong", "patch": patch}
+    ep = fr.build_swe_localization_episode(inst, ["src/zzz.py", "src/qqq.py"])
+    p = tmp_path / "swe.json"
+    p.write_text(json.dumps([ep]))
+    entries = realtrace.load_swe_bench(p)
+    assert len(entries) == 1
+    gold = realtrace.gold_actions(entries)
+    edit = [g for g in gold.values() if g.action == "edit"][0]
+    assert edit.target == "src/foo.py"  # ground truth = the file the gold patch edits
+    assert realtrace.validate_real(entries) == []

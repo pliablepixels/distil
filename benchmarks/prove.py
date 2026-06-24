@@ -74,6 +74,8 @@ class DecisionCache:
         self.misses += 1
         d = self.runner.decide(blocks)
         self.store[k] = d
+        if self.misses % 20 == 0:  # checkpoint long live runs so nothing is lost
+            self.flush()
         return d
 
     def flush(self) -> None:
@@ -359,6 +361,12 @@ def main() -> int:
     ap.add_argument(
         "--cli-bin", default="claude", help="claude-cli runner: path to the claude binary"
     )
+    ap.add_argument(
+        "--ladder",
+        choices=["full", "quick"],
+        default="full",
+        help="quick = 4 rungs (byte-exact, lossless, truncate@250, truncate@120) to cut paid calls",
+    )
     ap.add_argument("--alpha", type=float, default=0.05, help="risk budget (decision-change rate)")
     ap.add_argument("--delta", type=float, default=0.05, help="LTT confidence 1-δ")
     ap.add_argument("--method", choices=["ltt", "crc"], default="ltt")
@@ -430,6 +438,9 @@ def main() -> int:
 
     evidential = args.runner != "smoke"
     ladder = default_ladder()
+    if args.ladder == "quick":
+        keep = {"byte-exact", "lossless", "truncate@250", "truncate@120"}
+        ladder = [rung for rung in ladder if rung[0] in keep]
     cache = DecisionCache(runner, ns)
     matrix = build_matrix(entries, cache, ladder, gold)
     cache.flush()
