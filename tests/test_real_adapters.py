@@ -344,3 +344,86 @@ def test_expand_loop_recovers_a_folded_decision():
 
     assert no_expand != base  # folding hid the load-bearing record → decision flips
     assert with_expand == base  # recovery restores byte-exact content → decision preserved
+
+
+# --------------------------------------------------------------------------- #
+# structured forced-tool grading
+# --------------------------------------------------------------------------- #
+
+
+def test_fingerprint_from_args_canonicalizes():
+    from distil.replay.prompts import canonical, fingerprint_from_args
+
+    assert fingerprint_from_args({"action": "Search_Flights", "target": "NYC SEA"}) == canonical(
+        "search_flights", "nyc sea"
+    )
+    assert fingerprint_from_args('{"action":"edit","target":"a.py"}') == canonical("edit", "a.py")
+    assert fingerprint_from_args({"nope": 1}) == "<no-decision>"
+
+
+def test_openai_forced_tool_path(monkeypatch):
+    from distil.replay.openai_runner import OpenAIRunner
+    from distil.replay.prompts import canonical
+
+    runner = OpenAIRunner("local", base_url="http://x/v1")
+    # server returns a forced function call with structured args (no prose)
+    tool_body = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "record_decision",
+                                "arguments": '{"action":"Issue_Refund","target":"A1"}',
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    monkeypatch.setattr(OpenAIRunner, "_post", lambda self, payload: tool_body)
+    entries = realtrace.load_swe_bench(FIX / "swe_bench_sample.json")
+    blocks = entries[0].trajectory.turns[0].blocks
+    assert runner.decide(blocks) == canonical("issue_refund", "A1")
+
+
+def test_openai_tool_fallback_to_text(monkeypatch):
+    import urllib.error
+
+    from distil.replay.openai_runner import OpenAIRunner
+    from distil.replay.prompts import canonical
+
+    runner = OpenAIRunner("local", base_url="http://x/v1")
+    text_body = {"choices": [{"message": {"content": '{"action":"edit","target":"f.py"}'}}]}
+
+    def fake_post(self, payload):
+        if "tools" in payload:  # server can't do tools
+            raise urllib.error.URLError("no tools")
+        return text_body
+
+    monkeypatch.setattr(OpenAIRunner, "_post", fake_post)
+    entries = realtrace.load_swe_bench(FIX / "swe_bench_sample.json")
+    blocks = entries[0].trajectory.turns[0].blocks
+    assert runner.decide(blocks) == canonical("edit", "f.py")  # fell back to free-text
+
+
+def test_anthropic_runner_returns_canonical():
+    from types import SimpleNamespace
+
+    from distil.replay.anthropic_runner import AnthropicRunner
+    from distil.replay.prompts import canonical
+
+    class _FakeMessages:
+        def create(self, **kw):
+            blk = SimpleNamespace(
+                type="tool_use", input={"action": "Search Flights", "target": "X"}
+            )
+            return SimpleNamespace(content=[blk])
+
+    client = SimpleNamespace(messages=_FakeMessages())
+    runner = AnthropicRunner(client=client)
+    entries = realtrace.load_tau_bench(FIX / "tau_bench_sample.json")
+    blocks = entries[0].trajectory.turns[-1].blocks
+    assert runner.decide(blocks) == canonical("searchflights", "x")  # normalized, not raw

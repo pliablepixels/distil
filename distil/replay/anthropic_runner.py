@@ -13,23 +13,14 @@ key); treat live results as UNVERIFIED until you run them against your account.
 
 from __future__ import annotations
 
-import json
-
 from ..trajectory import Block, Kind, Stability
+from . import prompts
 
 _DECISION_TOOL = {
-    "name": "record_decision",
-    "description": "Record the single next action the agent will take given the context.",
+    "name": prompts.DECISION_TOOL_NAME,
+    "description": prompts.DECISION_TOOL_DESC,
     "strict": True,
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "action": {"type": "string", "description": "The tool/operation to invoke next."},
-            "target": {"type": "string", "description": "The primary argument or target."},
-        },
-        "required": ["action", "target"],
-        "additionalProperties": False,
-    },
+    "input_schema": prompts.DECISION_PARAMS,
 }
 
 
@@ -97,7 +88,7 @@ class AnthropicRunner:
         )
         for block in resp.content:
             if getattr(block, "type", None) == "tool_use":
-                return json.dumps(block.input, sort_keys=True, separators=(",", ":"))
+                return prompts.fingerprint_from_args(block.input)
         return "<no-decision>"
 
     def _raw(self, system: str, user: str) -> str:

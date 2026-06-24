@@ -107,6 +107,37 @@ def canonical(action: str, target: str) -> str:
     )
 
 
+# A single forced "record_decision" tool, used by the structured graders (Anthropic
+# forced tool, OpenAI forced function). A structured schema makes the model fill an
+# `action` and a `target` field rather than emit prose, which removes the paraphrase
+# noise that free-text grading suffers (§ fingerprint granularity). The expand loop
+# still uses the free-text `_raw` protocol so it works across all backends.
+DECISION_TOOL_NAME = "record_decision"
+DECISION_PARAMS = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string", "description": "The tool/operation to invoke next."},
+        "target": {"type": "string", "description": "The primary argument or target."},
+    },
+    "required": ["action", "target"],
+    "additionalProperties": False,
+}
+DECISION_TOOL_DESC = "Record the single next action the agent will take given the context."
+
+
+def fingerprint_from_args(args) -> str:
+    """Canonical fingerprint from a tool/function call's parsed arguments (dict or
+    JSON string)."""
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except (json.JSONDecodeError, ValueError):
+            return parse_fingerprint(args)
+    if isinstance(args, dict) and "action" in args:
+        return canonical(args.get("action", ""), args.get("target", ""))
+    return "<no-decision>"
+
+
 def parse_fingerprint(text: str) -> str:
     """Extract a canonical ``{"action":..,"target":..}`` fingerprint from free model
     text (handles ```json fences, surrounding prose, key reordering). The action is
