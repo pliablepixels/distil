@@ -29,6 +29,36 @@
 \newcommand{\HLrisk}{0.1\%}
 \IfFileExists{generated/macros.tex}{\input{generated/macros.tex}}{}
 
+% E5 head-to-head macros — original (gold-last) and shuffled-position (seed=1729) runs.
+% Defaults below are the committed numbers; report_to_latex.py --only e5macros
+% \renewcommands them from docs/paper/results/swe_localization_e5*headtohead.json.
+\newcommand{\OrigRecencyDC}{5.5\%}   \newcommand{\OrigRecencySav}{16.1\%}
+\newcommand{\OrigLLMtwoDC}{7.0\%}    \newcommand{\OrigLLMtwoSav}{11.6\%}
+\newcommand{\OrigRecompDC}{14.0\%}   \newcommand{\OrigRecompSav}{18.5\%}
+\newcommand{\OrigLosslessDC}{12.0\%} \newcommand{\OrigLosslessSav}{21.8\%}
+\newcommand{\OrigTruncShortDC}{13.0\%} \newcommand{\OrigTruncShortSav}{23.0\%}
+\newcommand{\OrigByteExactDC}{0.0\%} \newcommand{\OrigByteExactSav}{-0.1\%}
+\newcommand{\OrigLongLLDC}{3.5\%}    \newcommand{\OrigLongLLSav}{5.7\%}
+\newcommand{\OrigCoverage}{99.3\%}
+\newcommand{\ShufRecencyDC}{8.5\%}   \newcommand{\ShufRecencySav}{15.9\%}
+\newcommand{\ShufLLMtwoDC}{8.0\%}    \newcommand{\ShufLLMtwoSav}{11.8\%}
+\newcommand{\ShufRecompDC}{7.5\%}    \newcommand{\ShufRecompSav}{16.8\%}
+\newcommand{\ShufLosslessDC}{16.0\%} \newcommand{\ShufLosslessSav}{21.7\%}
+\newcommand{\ShufTruncShortDC}{11.5\%} \newcommand{\ShufTruncShortSav}{22.8\%}
+\newcommand{\ShufByteExactDC}{0.5\%} \newcommand{\ShufByteExactSav}{-0.1\%}
+\newcommand{\ShufLongLLDC}{5.0\%}    \newcommand{\ShufLongLLSav}{5.6\%}
+\newcommand{\ShufCoverage}{100.0\%}
+\IfFileExists{generated/e5macros_orig.tex}{\input{generated/e5macros_orig.tex}}{}
+\IfFileExists{generated/e5macros_shuffled.tex}{\input{generated/e5macros_shuffled.tex}}{}
+
+% Phase-2 operating-point sweep (cal-selected, test-evaluated). Defaults are the
+% committed numbers; sweep_operating_point.py --latex-dir \renewcommands them.
+\newcommand{\SweepPoint}{\texttt{t@500}}
+\newcommand{\SweepCalSav}{16.3\%}
+\newcommand{\SweepTestSav}{14.0\%}
+\newcommand{\SweepTestDC}{4.0\%}
+\IfFileExists{generated/sweepmacros.tex}{\input{generated/sweepmacros.tex}}{}
+
 \definecolor{distilblue}{HTML}{2b6cb0}
 \definecolor{distilgreen}{HTML}{2f855a}
 \definecolor{distilred}{HTML}{c53030}
@@ -460,13 +490,63 @@ The generated tables below are auto-generated from \texttt{results.json} by
   \emph{last} in the observation, so recency/tail-truncation baselines benefit from
   needle \emph{position} rather than content; we read E5 as a frontier illustration,
   not a dominance claim, and rest the contribution on E2. The real LLMLingua packages
-  now run on Apple-silicon (MPS), not just wired: LLMLingua-2 (XLM-RoBERTa) certifies
-  at 11.6\% savings / 7.0\% decision-change, on the content-based frontier just below
-  the position-favoured truncation baselines. LongLLMLingua (Llama-2-7B, question-aware)
-  yields no net compression on these already-short volatile tails---and a subset of
-  blocks trips an upstream \texttt{transformers}/\texttt{llmlingua} incompatibility that
-  the sweep catches and falls back from---so its $0\%$ row is fall-back, not a tuned
-  operating point.}\input{generated/headtohead.tex}\end{table}}{}
+  run on Apple-silicon (MPS), not just wired: LLMLingua-2 (XLM-RoBERTa) certifies at
+  \OrigLLMtwoSav{} savings / \OrigLLMtwoDC{} decision-change, on the content-based
+  frontier just below the position-favoured truncation baselines. LongLLMLingua
+  (Llama-2-7B, question-aware) certifies too, at \OrigLongLLSav{} / \OrigLongLLDC{}:
+  its earlier $0\%$ row was an \emph{adapter bug}, not the technique---the compressor
+  returns the compressed context with the (uncompressed) question re-appended per
+  \texttt{condition\_in\_question}, so the longer string tripped a reject-if-bigger
+  guard and every result was discarded as a no-op; splicing the question back out
+  restores the intended compression (fixed in this revision, with a regression
+  test).}\label{tab:e5}\input{generated/headtohead.tex}\end{table}}{}
+\IfFileExists{generated/headtohead_shuffled.tex}{%
+  \begin{table}[t]\centering\caption{E5 \emph{shuffled-position} (gold hunk randomly
+  placed). Identical to \Cref{tab:e5} except the gold hunk's position within the
+  code-search observation is randomly permuted (seed~$=1729$, deterministic,
+  per-instance), removing the recency/tail-truncation advantage that the gold-last
+  construction handed the baselines. Same 100-trajectory subset, grader, ladder, and
+  $\alpha/\delta$. \textbf{What the variant shows:} the confound is \emph{real but not
+  load-bearing}. Once the needle is no longer pinned to the tail, the recency-window
+  baseline's decision-change rises from \OrigRecencyDC{} to \ShufRecencyDC{}---yet it
+  still certifies, and so do the content-aware baselines (RECOMP-extractive even
+  \emph{improves}, \OrigRecompDC$\rightarrow$\ShufRecompDC, crossing into certification).
+  Distil's aggressive levels still do \emph{not} certify (lossless
+  \OrigLosslessDC$\rightarrow$\ShufLosslessDC; truncate@120
+  \OrigTruncShortDC$\rightarrow$\ShufTruncShortDC), so byte-exact remains the only
+  distil level that certifies---exactly as in \Cref{tab:e5}. Removing the position
+  confound does not rescue the aggressive ladder on this localization task; the
+  contribution continues to rest on E2, whose out-of-sample coverage holds on this
+  shuffled corpus too (\ShufCoverage{}, \Cref{tab:e2gen}).}
+  \label{tab:e5shuf}\input{generated/headtohead_shuffled.tex}\end{table}}{}
+\IfFileExists{generated/sweep.tex}{%
+  \begin{table}[t]\centering\caption{E6 operating-point selection on the
+  shuffled-position corpus, with \textbf{no test-set tuning}. The 100 trajectories
+  are split into disjoint calibration (50) and test (50) halves; every candidate
+  operating point---distil's two anchors plus a grid of salience-\emph{protected}
+  truncations (budget $\in\{500,250,120\}$ chars $\times$ \texttt{min\_entropy}
+  $\in\{2.6,3.2,3.8\}\times$ \texttt{min\_len}$\in\{6,10\}$) and the plain
+  truncations---is graded on both halves. We \emph{select} on calibration the
+  highest-savings point whose decision-change certifies (Hoeffding--Bentkus
+  $p\le\delta$ at $\alpha$), then \emph{evaluate it once} on the held-out test half.
+  The calibration-side selection ranges over all $23$ candidates and is
+  \emph{exploratory} (uncorrected for multiplicity); the finite-sample $\delta$
+  guarantee is carried only by the \emph{single} Hoeffding--Bentkus test applied to
+  the disjoint test half---which is what ``certifies out-of-sample'' below refers to.
+  \textbf{Result:} the winner is \SweepPoint{} (\SweepCalSav{} cal savings), and it
+  certifies out-of-sample at \SweepTestSav{} test savings / \SweepTestDC{}
+  decision-change. So distil's full ladder \emph{does} contain a certified
+  positive-savings operating point on this task---the E5 \texttt{quick} ladder simply
+  omitted it. Two honest caveats the table makes plain: (i)~salience protection does
+  \emph{not} help here (\texttt{protect+t@$L$} matches plain \texttt{t@$L$} at every
+  budget), and (ii)~the reversible \texttt{lossless} digest flips \emph{more} (20\%
+  cal) than \SweepPoint{}, so the ladder's assumed risk-ordering (lossless before
+  truncation) is miscalibrated for localization---which is exactly why fixed-sequence
+  LTT on the \texttt{quick} ladder fell back to byte-exact. The certified point here
+  is plain head-truncation; distil's contribution is the certificate that
+  \emph{selects} it and rejects the aggressive rungs, not a bespoke compressor that
+  beats truncation on this corpus.}
+  \label{tab:e6sweep}\input{generated/sweep.tex}\end{table}}{}
 \IfFileExists{generated/tasksuccess.tex}{%
   \begin{table}[t]\centering
   \caption{E4 retained decision-equivalence on the full SWE-bench\_Lite ($n=300$).
@@ -527,6 +607,33 @@ savings here. Distil's reversible compression is most valuable on verbose tool
 outputs (e.g.\ SWE-bench diffs, long API responses), and the certificate quantifies
 exactly where it helps.
 
+\paragraph{Position confound, stress-tested (E5--E6).} The edit-localization
+construction places the gold hunk \emph{last} in the search results, which could
+flatter tail-truncation / recency baselines. We rebuilt the corpus with the gold
+hunk at a deterministic random position (seed~$=1729$, per-instance) and re-ran E5
+(\Cref{tab:e5shuf}). The confound is \emph{real but not load-bearing}: the recency
+baseline's decision-change rises from \OrigRecencyDC{} to \ShufRecencyDC{} once the
+needle is no longer pinned to the tail, yet it still certifies, and distil's
+aggressive levels still do not---byte-exact remains the only certifying distil level,
+exactly as in the gold-last E5, and the E2 certificate holds out-of-sample on the
+shuffled corpus too (\ShufCoverage{}). Two consequences we report rather than gloss:
+(i)~the reversible digest's edge over equally-aggressive truncation is itself
+position-sensitive---on the de-confounded corpus \texttt{lossless} flips
+\emph{more} than \texttt{truncate@120} (\ShufLosslessDC{} vs.\ \ShufTruncShortDC{} at
+$\approx22\%$ savings), the reverse of the gold-last ordering reported above; and
+(ii)~when we select an operating point honestly on a calibration half and evaluate
+once on a disjoint test half (\Cref{tab:e6sweep}), distil \emph{does} certify positive
+savings (\SweepPoint{}: \SweepTestSav{} test savings / \SweepTestDC{} decision-change),
+but the certified point is plain head-truncation---salience protection and the
+reversible digest do not beat truncation on this single-turn synthetic task. The
+net reading: on edit-localization, distil's contribution is the \emph{certificate}
+that selects a safe operating point and rejects the unsafe ones, not a bespoke
+compressor that dominates truncation; the reversible engine's advantage is a
+multi-turn, verbose-context phenomenon (the $\tau$-bench and corpus-gate results),
+which a real end-to-end task-success evaluation---running the agent and its test
+suite rather than the decision-equivalence proxy---would test directly, left to
+future work.
+
 \paragraph{E4 non-evidential on SWE-bench.} SWE-bench HuggingFace evaluators mark
 all submissions resolved=True by construction of the localization task, so E4 on
 SWE reports retained decision-equivalence (lossless $+$expand: 85.0\%; no-expand:
@@ -546,9 +653,11 @@ holds out-of-sample at 96.6--100\% coverage across $\alpha \in \{10\%, 12.5\%, 1
 20\%\}$ ($\delta=0.05$, real SWE-bench\_Lite, 300 instances, 500 splits). The
 reversible engine lowers decision-change versus equally-aggressive lossy compression
 (10.2\% vs.\ 11.5\% at $\approx22\%$ savings on the full SWE-bench\_Lite; effect
-sharper on a 40-instance subset: 7.5\% vs.\ 12.5\%), and the certificate correctly
-declines to certify savings on compact $\tau$-bench contexts---quantifying where
-recoverable compression helps rather than overclaiming a single headline ratio.
+sharper on a 40-instance subset: 7.5\% vs.\ 12.5\%)---though on the de-confounded,
+position-shuffled localization corpus this particular edge reverses
+(\Cref{sec:analysis}), a sensitivity we report rather than hide---and the certificate
+correctly declines to certify savings on compact $\tau$-bench contexts, quantifying
+where recoverable compression helps rather than overclaiming a single headline ratio.
 
 \paragraph{Reproducibility.} The harness, adapters, runners, and this paper are
 released at \url{https://github.com/dshakes/distil} (see \texttt{benchmarks/PROVE.md}
