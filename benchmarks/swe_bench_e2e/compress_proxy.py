@@ -43,6 +43,7 @@ contains prompt text.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import urllib.error
@@ -101,11 +102,59 @@ def llmlingua2(text: str) -> str:
     return adapter.compress([text])[0]
 
 
+# --------------------------------------------------------------------------- #
+# distil reversible tier: digest-behind-handle + recover-on-demand (distil_expand)
+# --------------------------------------------------------------------------- #
+DIGEST_HEAD = 400  # chars of head kept verbatim before the digest marker
+
+DISTIL_EXPAND_TOOL = {
+    "name": "distil_expand",
+    "description": (
+        "Retrieve the FULL original text of a digested context block. Any file or "
+        "command output shown with a '<<distil-digest: … handle=\"XXXX\">>' marker has "
+        "been shortened; you are seeing only its head. BEFORE you reason about or edit "
+        "such a block, call distil_expand with its handle to read the complete content. "
+        "Returns the exact original text."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"handle": {"type": "string", "description": "the 8-char handle"}},
+        "required": ["handle"],
+    },
+}
+
+
+def digest_block(text: str, restore: dict[str, str]) -> str:
+    """distil's reversible tier: keep a head, fold the tail behind a content handle,
+    and record handle->original in ``restore`` so the proxy can recover it on demand.
+
+    handle = sha256(original)[:8] — the same content-addressed scheme as
+    ``distil.compress.tier1`` / ``distil.replay.expand_runner``, so it is deterministic
+    and re-derivable from the same block on a later turn.
+    """
+    if len(text) <= MIN_CHARS:
+        return text
+    h = hashlib.sha256(text.encode()).hexdigest()[:8]
+    restore[h] = text
+    hidden = len(text) - DIGEST_HEAD
+    return (
+        text[:DIGEST_HEAD]
+        + f"\n<<distil-digest: {hidden} more chars hidden; "
+        + f'call distil_expand(handle="{h}") to view the full block>>'
+    )
+
+
 COMPRESSORS: dict[str, Compressor | None] = {
     "full": None,
     "distil_trunc500": trunc_500,
     "llmlingua2": llmlingua2,
+    # distil_expand is realised as a stateful digest + recovery loop in the proxy
+    # (not a pure per-block Compressor), so it maps to None in this table and is
+    # selected via ProxyState.expand instead.
+    "distil_expand": None,
 }
+EXPAND_CONDITION = "distil_expand"
+MAX_EXPAND_ITERS = 4  # cap the recover-then-redecide round-trips per agent request
 
 
 # --------------------------------------------------------------------------- #
@@ -146,6 +195,8 @@ class CompressStats:
     cache_read_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
     blocks_protected: int = 0
+    expansions: int = 0  # distil_expand recovery calls the model made (reversible tier)
+    expand_requests: int = 0  # agent requests that triggered >=1 recovery loop
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -156,11 +207,17 @@ def compress_body(
     compressor: Compressor | None,
     stats: CompressStats,
     protect: str | None = None,
+    digest_restore: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Return a new request body with compressible context blocks rewritten.
 
     ``compressor=None`` (condition A) leaves the body byte-identical but still tallies
     block/token stats so all conditions report comparable pre-compression context size.
+
+    ``digest_restore`` selects the **reversible** tier (condition distil_expand): each
+    compressible block is digested with :func:`digest_block` and handle->original is
+    recorded in this dict so the proxy's recovery loop can restore it on demand. When
+    set it takes precedence over ``compressor``.
 
     ``protect`` is a substring (the SWE-bench *problem statement*) that must never be
     compressed: it is the task definition the agent is solving, not "file content the
@@ -182,16 +239,12 @@ def compress_body(
         is_protected = protect is not None and protect in text
         if is_protected:
             stats.blocks_protected += 1
-        if (
-            compressor is None
-            or before < MIN_CHARS
-            or role not in ("user", "tool")
-            or is_protected
-        ):
+        inactive = compressor is None and digest_restore is None
+        if inactive or before < MIN_CHARS or role not in ("user", "tool") or is_protected:
             stats.chars_after += before
             stats.tokens_after += _tokenizer.count(text)
             return text
-        out = compressor(text)
+        out = digest_block(text, digest_restore) if digest_restore is not None else compressor(text)
         stats.blocks_compressed += 1
         stats.chars_after += len(out)
         stats.tokens_after += _tokenizer.count(out)
@@ -233,9 +286,7 @@ def compress_body(
     return {**body, "messages": new_messages}
 
 
-def _rewrite_tool_result(
-    role: str, block: dict[str, Any], rewrite_text
-) -> dict[str, Any]:
+def _rewrite_tool_result(role: str, block: dict[str, Any], rewrite_text) -> dict[str, Any]:
     inner = block.get("content")
     if isinstance(inner, str):
         return {**block, "content": rewrite_text(role, inner)}
@@ -263,9 +314,8 @@ class ProxyState:
     stats: CompressStats = field(default_factory=CompressStats)
     capture_path: Path | None = None  # when set, append raw request bodies (debug only)
     accounting_path: Path | None = None
-    protect: str | None = (
-        None  # problem statement: never compressed (task, not file content)
-    )
+    protect: str | None = None  # problem statement: never compressed (task, not file content)
+    expand: bool = False  # distil reversible tier: digest + distil_expand recovery loop
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -276,73 +326,136 @@ def _make_handler(state: ProxyState):
         def log_message(self, *a):  # silence default stderr spam
             pass
 
-        def _proxy(self):
-            length = int(self.headers.get("Content-Length", 0) or 0)
-            raw = self.rfile.read(length) if length else b""
-            path = self.path
-            body_out = raw
-            if path.endswith("/v1/messages") and raw:
-                try:
-                    body = json.loads(raw)
-                    if state.capture_path is not None:
-                        with state.lock, state.capture_path.open("a") as fh:
-                            fh.write(json.dumps(body) + "\n")
-                    new_body = compress_body(
-                        body, state.compressor, state.stats, protect=state.protect
-                    )
-                    body_out = json.dumps(new_body).encode()
-                except (ValueError, TypeError):
-                    body_out = raw  # malformed — forward untouched
-
-            url = UPSTREAM + path
-            req = urllib.request.Request(url, data=body_out, method=self.command)
+        def _upstream_headers(self) -> dict[str, str]:
+            out: dict[str, str] = {}
             for k, v in self.headers.items():
-                if k.lower() in (
-                    "host",
-                    "content-length",
-                    "connection",
-                    "accept-encoding",
-                ):
+                if k.lower() in ("host", "content-length", "connection", "accept-encoding"):
                     continue
+                out[k] = v
+            return out
+
+        def _forward(self, path: str, body_bytes: bytes, hdrs: dict[str, str]):
+            """POST to upstream; return (status, [(hdr,val)…], payload). Accounts usage."""
+            req = urllib.request.Request(UPSTREAM + path, data=body_bytes, method=self.command)
+            for k, v in hdrs.items():
                 req.add_header(k, v)
-            req.add_header("Content-Length", str(len(body_out)))
+            req.add_header("Content-Length", str(len(body_bytes)))
             try:
                 with urllib.request.urlopen(req, timeout=600) as resp:
                     payload = resp.read()
                     self._account(payload)
-                    self.send_response(resp.status)
-                    for k, v in resp.headers.items():
-                        if k.lower() in (
+                    items = [
+                        (k, v)
+                        for k, v in resp.headers.items()
+                        if k.lower()
+                        not in (
                             "transfer-encoding",
                             "connection",
                             "content-length",
                             "content-encoding",
-                        ):
-                            continue
-                        self.send_header(k, v)
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                        )
+                    ]
+                    return resp.status, items, payload
             except urllib.error.HTTPError as e:
-                payload = e.read()
-                self.send_response(e.code)
-                self.send_header(
-                    "Content-Type", e.headers.get("Content-Type", "application/json")
+                return (
+                    e.code,
+                    [("Content-Type", e.headers.get("Content-Type", "application/json"))],
+                    e.read(),
                 )
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-            except (
-                Exception
-            ) as e:  # noqa: BLE001 — surface upstream/network errors as 502
-                payload = json.dumps(
-                    {"error": {"type": "proxy_error", "message": str(e)}}
-                ).encode()
-                self.send_response(502)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
+
+        def _send(self, status: int, header_items, payload: bytes):
+            self.send_response(status)
+            for k, v in header_items:
+                self.send_header(k, v)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def _expand_loop(self, path: str, raw: bytes, hdrs: dict[str, str]):
+            """distil reversible tier: digest context blocks behind handles, expose a
+            distil_expand tool, and run the recover-then-redecide loop INSIDE the proxy.
+            aider sees only the final (post-recovery) assistant message — a transparent
+            recovery loop, the honest way to grade a reversible compressor end-to-end."""
+            body = json.loads(raw)
+            if state.capture_path is not None:
+                with state.lock, state.capture_path.open("a") as fh:
+                    fh.write(json.dumps(body) + "\n")
+            restore: dict[str, str] = {}
+            new_body = compress_body(
+                body, None, state.stats, protect=state.protect, digest_restore=restore
+            )
+            tools = list(new_body.get("tools") or [])
+            if not any(isinstance(t, dict) and t.get("name") == "distil_expand" for t in tools):
+                tools.append(DISTIL_EXPAND_TOOL)
+            new_body["tools"] = tools
+
+            status, items, payload = self._forward(path, json.dumps(new_body).encode(), hdrs)
+            did_expand = False
+            for _ in range(MAX_EXPAND_ITERS):
+                try:
+                    resp = json.loads(payload)
+                except (ValueError, TypeError):
+                    break
+                content = resp.get("content") or []
+                wants = [
+                    b
+                    for b in content
+                    if isinstance(b, dict)
+                    and b.get("type") == "tool_use"
+                    and b.get("name") == "distil_expand"
+                ]
+                if not wants or resp.get("stop_reason") != "tool_use":
+                    break
+                results = []
+                for tu in wants:
+                    h = (tu.get("input") or {}).get("handle", "")
+                    full = restore.get(h)
+                    res = {"type": "tool_result", "tool_use_id": tu.get("id")}
+                    if full is None:
+                        res["content"] = f"(no digested block with handle {h})"
+                        res["is_error"] = True
+                    else:
+                        res["content"] = full
+                        with state.lock:
+                            state.stats.expansions += 1
+                    results.append(res)
+                did_expand = True
+                new_body["messages"].append({"role": "assistant", "content": content})
+                new_body["messages"].append({"role": "user", "content": results})
+                status, items, payload = self._forward(path, json.dumps(new_body).encode(), hdrs)
+            if did_expand:
+                with state.lock:
+                    state.stats.expand_requests += 1
+            return status, items, payload
+
+        def _proxy(self):
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length) if length else b""
+            path = self.path
+            hdrs = self._upstream_headers()
+            try:
+                if state.expand and path.endswith("/v1/messages") and raw:
+                    status, items, payload = self._expand_loop(path, raw, hdrs)
+                    self._send(status, items, payload)
+                    return
+                body_out = raw
+                if path.endswith("/v1/messages") and raw:
+                    try:
+                        body = json.loads(raw)
+                        if state.capture_path is not None:
+                            with state.lock, state.capture_path.open("a") as fh:
+                                fh.write(json.dumps(body) + "\n")
+                        new_body = compress_body(
+                            body, state.compressor, state.stats, protect=state.protect
+                        )
+                        body_out = json.dumps(new_body).encode()
+                    except (ValueError, TypeError):
+                        body_out = raw  # malformed — forward untouched
+                status, items, payload = self._forward(path, body_out, hdrs)
+                self._send(status, items, payload)
+            except Exception as e:  # noqa: BLE001 — surface upstream/network errors as 502
+                payload = json.dumps({"error": {"type": "proxy_error", "message": str(e)}}).encode()
+                self._send(502, [("Content-Type", "application/json")], payload)
 
         def _account(self, payload: bytes):
             try:
@@ -352,9 +465,7 @@ def _make_handler(state: ProxyState):
                 return
             with state.lock:
                 state.stats.usage_input_tokens += int(usage.get("input_tokens", 0) or 0)
-                state.stats.usage_output_tokens += int(
-                    usage.get("output_tokens", 0) or 0
-                )
+                state.stats.usage_output_tokens += int(usage.get("output_tokens", 0) or 0)
                 state.stats.cache_read_input_tokens += int(
                     usage.get("cache_read_input_tokens", 0) or 0
                 )
@@ -379,18 +490,21 @@ def serve(
     capture_path: Path | None = None,
     accounting_path: Path | None = None,
     protect: str | None = None,
+    expand: bool = False,
 ) -> tuple[ThreadingHTTPServer, ProxyState]:
     """Start the proxy on a background thread. Returns ``(server, state)``.
 
     Use ``port=0`` to bind an ephemeral port (read it from ``server.server_address[1]``).
     Call ``server.shutdown()`` to stop. ``protect`` (the problem statement) is never
-    compressed.
+    compressed. ``expand=True`` selects distil's reversible tier (digest + distil_expand
+    recovery loop); ``compressor`` is ignored in that mode.
     """
     state = ProxyState(
         compressor=compressor,
         capture_path=capture_path,
         accounting_path=accounting_path,
         protect=protect,
+        expand=expand,
     )
     httpd = ThreadingHTTPServer((host, port), _make_handler(state))
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -414,10 +528,9 @@ if __name__ == "__main__":
         compressor=COMPRESSORS[args.condition],
         capture_path=args.capture,
         accounting_path=args.accounting,
+        expand=(args.condition == EXPAND_CONDITION),
     )
-    print(
-        f"distil-e7 proxy: condition={args.condition} on {args.host}:{httpd.server_address[1]}"
-    )
+    print(f"distil-e7 proxy: condition={args.condition} on {args.host}:{httpd.server_address[1]}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

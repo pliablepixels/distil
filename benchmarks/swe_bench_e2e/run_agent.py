@@ -38,13 +38,18 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from benchmarks.swe_bench_e2e.compress_proxy import COMPRESSORS, CompressStats, serve
+from benchmarks.swe_bench_e2e.compress_proxy import (
+    COMPRESSORS,
+    EXPAND_CONDITION,
+    CompressStats,
+    serve,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = "anthropic/claude-sonnet-4-6"
 TEMPERATURE = 0.0
 AIDER_BIN = os.environ.get("AIDER_BIN", str(Path.home() / ".local/bin/aider"))
-CONDITIONS = ("full", "distil_trunc500", "llmlingua2")
+CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "distil_expand")
 
 # git worktree add/remove mutate shared state under a clone's .git; serialise per-clone.
 _CLONE_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -107,9 +112,7 @@ def make_worktree(clone: Path, base_commit: str, work_root: Path) -> Path:
             timeout=600,
         )
         if res.returncode != 0:
-            raise RuntimeError(
-                f"worktree add @ {base_commit} failed: {res.stderr[-500:]}"
-            )
+            raise RuntimeError(f"worktree add @ {base_commit} failed: {res.stderr[-500:]}")
     return wt
 
 
@@ -130,9 +133,7 @@ def capture_patch(wt: Path) -> str:
     contains only the agent's source edits.
     """
     _run(["git", "add", "-A", "-N", "--", ".", *_EXCLUDES], cwd=wt, timeout=120)
-    res = _run(
-        ["git", "diff", "--no-color", "--", ".", *_EXCLUDES], cwd=wt, timeout=120
-    )
+    res = _run(["git", "diff", "--no-color", "--", ".", *_EXCLUDES], cwd=wt, timeout=120)
     return res.stdout
 
 
@@ -147,13 +148,9 @@ def run_aider(
     prompt_file.write_text(problem)
     env = dict(os.environ)
     env["ANTHROPIC_API_KEY"] = api_key
-    env["ANTHROPIC_BASE_URL"] = (
-        base_url  # litellm/anthropic honour this; proxy forwards upstream
-    )
+    env["ANTHROPIC_BASE_URL"] = base_url  # litellm/anthropic honour this; proxy forwards upstream
     env["AIDER_ANTHROPIC_API_BASE"] = base_url
-    env.setdefault(
-        "OPENAI_API_KEY", "sk-unused"
-    )  # aider sometimes probes; keep it quiet
+    env.setdefault("OPENAI_API_KEY", "sk-unused")  # aider sometimes probes; keep it quiet
     cmd = [
         AIDER_BIN,
         "--model",
@@ -182,9 +179,7 @@ def run_aider(
     try:
         res = _run(cmd, cwd=wt, env=env, timeout=timeout)
         status = "ok" if res.returncode == 0 else f"exit{res.returncode}"
-        tail = (
-            (res.stdout or "")[-2000:] + "\n--STDERR--\n" + (res.stderr or "")[-1000:]
-        )
+        tail = (res.stdout or "")[-2000:] + "\n--STDERR--\n" + (res.stderr or "")[-1000:]
     except subprocess.TimeoutExpired:
         status, tail = "timeout", "aider timed out"
     finally:
@@ -210,7 +205,9 @@ def run_instance(
     # The problem statement is the task, not "file content the agent reads" — never
     # compress it (would handicap B/C for the wrong reason). Pass it as the protected text.
     httpd, state = serve(
-        compressor=COMPRESSORS[condition], protect=inst["problem_statement"]
+        compressor=COMPRESSORS[condition],
+        protect=inst["problem_statement"],
+        expand=(condition == EXPAND_CONDITION),
     )
     base_url = f"http://127.0.0.1:{httpd.server_address[1]}"
     try:
@@ -251,15 +248,9 @@ def main() -> None:
     ap.add_argument("--out-dir", type=Path, default=ROOT / "docs/paper/results/swe_e2e")
     ap.add_argument("--cache-dir", type=Path, default=ROOT / ".e7_cache/repos")
     ap.add_argument("--work-root", type=Path, default=ROOT / ".e7_cache/work")
-    ap.add_argument(
-        "--timeout", type=float, default=900.0, help="per-instance aider timeout (s)"
-    )
-    ap.add_argument(
-        "--limit", type=int, default=None, help="only first N instances (smoke)"
-    )
-    ap.add_argument(
-        "--only", type=str, default=None, help="comma-separated instance_ids to run"
-    )
+    ap.add_argument("--timeout", type=float, default=900.0, help="per-instance aider timeout (s)")
+    ap.add_argument("--limit", type=int, default=None, help="only first N instances (smoke)")
+    ap.add_argument("--only", type=str, default=None, help="comma-separated instance_ids to run")
     ap.add_argument(
         "--workers",
         type=int,
