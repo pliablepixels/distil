@@ -11,11 +11,13 @@
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
 
-<h3 align="center">Cut LLM agent costs ~30% — and <em>prove</em> the agent still makes the same decisions.</h3>
+<h3 align="center">Cut LLM agent token costs — with a statistical <em>decision-equivalence</em> contract, measured on the same runs.</h3>
 
 <p align="center">
 Most context compressors ship a token-savings <em>estimate</em>.<br/>
-<strong>Distil ships a quality contract:</strong> a strategy compresses only as far as a statistical non-inferiority test certifies the agent behaves identically — across 7 domains, as a CI gate.
+<strong>Distil ships a quality contract:</strong> a strategy compresses only as far as a statistical non-inferiority test certifies the agent's <em>next action</em> is unchanged — across 7 domains, as a CI gate.</p>
+
+<p align="center"><sub><b>Honest scope (read this):</b> the contract certifies <b>decision-equivalence on a trajectory corpus</b> — a <em>proxy</em> (the agent's next action), not a guarantee of end-to-end task success. Our own real end-to-end test (<a href="docs/PAPER.md">SWE-bench Verified, E7</a>) shows the proxy <b>does not transfer</b> to task success under <em>aggressive</em> compression. Treat the savings numbers below as proxy/corpus results; see <a href="#-end-to-end-reality-swe-bench-verified-e7">End-to-end reality</a>.</sub>
 </p>
 
 <p align="center">
@@ -35,7 +37,7 @@ Most context compressors ship a token-savings <em>estimate</em>.<br/>
 
 **👔 For decision-makers**
 
-Agents re-send their whole context every turn — you pay for it every turn. Distil cuts that **~27% (up to 33% per domain) with certified zero decision change**, and *proves* it: the savings and the accuracy are measured on the **same runs**, gated in CI. No "trust us."
+Agents re-send their whole context every turn — you pay for it every turn. Distil cuts that **~27% (up to 33% per domain) at a certified-zero *decision-change* rate on our 7-domain trajectory corpus**, and *measures* it: savings and next-action accuracy on the **same runs**, gated in CI. That certificate is a **proxy** (next-action match), not a promise of end-to-end task success — and our real end-to-end test ([E7](#-end-to-end-reality-swe-bench-verified-e7)) shows aggressive compression *does* cost task success. So: honest proxy guarantee + cache-aware savings, not "trust us" and not "compression is free."
 
 </td>
 <td width="33%" valign="top">
@@ -59,7 +61,7 @@ Compression reframed as **decision-equivalence** and certified with **TOST non-i
 
 ## 💡 The one idea
 
-**You don't need byte-equivalence, you need decision-equivalence.** Byte-lossless compression and high savings are information-theoretically in tension. But an agent only has to take the *same actions* and produce the *same outputs* whether or not its context was compressed. That's measurable and certifiable — so **"100% accuracy" becomes a statistical guarantee on outcomes, not a diff of strings.** Everything here makes that real and measured.
+**You don't need byte-equivalence, you need decision-equivalence.** Byte-lossless compression and high savings are information-theoretically in tension. But an agent only has to take the *same actions* whether or not its context was compressed — and *that* is measurable and certifiable as a **statistical bound on the next-action change rate**. Important caveat we measured ourselves: next-action equivalence is a **proxy**, and on a real multi-turn task (SWE-bench Verified, [E7](#-end-to-end-reality-swe-bench-verified-e7)) it **does not fully transfer to task success** once compression gets aggressive. Distil's honest value is *cache-aware savings inside a proxy-certified safety gate* — with a reversible recovery tier so the model can pull back anything it needs.
 
 ---
 
@@ -166,6 +168,27 @@ $ distil frontier --corpus benchmarks/corpus_xl
      100%             100%          58.1%      ← certified-safe
       80%              82%          62.9%      ← deeper, by an amount you chose
 ```
+
+> **What these numbers are (and aren't).** Everything above is **decision-equivalence on a proxy** — the agent's *next action* on a trajectory corpus (some of it synthetically decision-determined). They are real and reproducible *as proxy/corpus results*. They are **not** a measurement of end-to-end task success. See the next section.
+
+---
+
+## 🔬 End-to-end reality (SWE-bench Verified, E7)
+
+We ran the honest test the proxy can't give you: a **real coding agent end-to-end** (aider + `claude-sonnet-4-6`) on **SWE-bench Verified** (n=50, official `swebench` harness, hidden tests), comparing **full context** vs compressed, scored on **actual test-pass rate** — not a proxy.
+
+| condition | context reduction | pass@1 | vs full |
+|---|--:|--:|--:|
+| full (no compression) | — | **52%** | — |
+| distil `trunc@500` (aggressive lossy) | 85% | 16% | −36pp, McNemar *p*<0.001 |
+| LLMLingua-2 | 48% | 26% | −26pp, *p*=0.002 |
+
+**The honest finding: aggressive compression significantly degrades real task success, and a decision-equivalence certificate earned on a single-turn localization proxy does _not_ transfer to multi-turn coding.** This is the opposite of "compression is free," and we publish it because it's true. Two consequences we act on:
+
+- `trunc@500` is distil's *aggressive lossy* rung; it is the wrong operating point for code. Distil's **reversible tier** (digest + `distil_expand` recover-on-demand) lets the model pull back any file it needs — we are measuring *that* end-to-end now (early data: it preserves the information but the recovery round-trips can erode the token savings on code). Results land in [`docs/PAPER.md`](docs/PAPER.md).
+- The defensible use today is **cache-aware savings on the periphery** (old turns, skimmed output) with the working set kept full — not blanket aggressive compression of code the agent must edit.
+
+Full methodology, per-instance data, and the certificate-non-transfer analysis: [`docs/PAPER.md`](docs/PAPER.md) §E7 and the committed results in `docs/paper/results/swe_e2e/`.
 
 ---
 

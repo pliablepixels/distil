@@ -8,14 +8,14 @@
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="Distil"/>
 <meta property="og:title" content="Concepts — Distil"/>
-<meta property="og:description" content="Cache-aware, causally-pruned context compression for LLM agentic runtimes — certified non-inferior across 7 domains. Compress input and output; prove the agent makes the same decisions."/>
+<meta property="og:description" content="Cache-aware, causally-pruned context compression for LLM agentic runtimes — certified non-inferior across 7 domains. Compress input and output; certify the agent's next action is unchanged (a proxy; see E7)."/>
 <meta property="og:url" content="https://dshakes.github.io/distil/concepts.html"/>
 <meta property="og:image" content="https://dshakes.github.io/distil/og.png"/>
 <meta property="og:image:width" content="1200"/>
 <meta property="og:image:height" content="630"/>
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="Concepts — Distil"/>
-<meta name="twitter:description" content="Cache-aware, causally-pruned context compression for LLM agentic runtimes — certified non-inferior across 7 domains. Compress input and output; prove the agent makes the same decisions."/>
+<meta name="twitter:description" content="Cache-aware, causally-pruned context compression for LLM agentic runtimes — certified non-inferior across 7 domains. Compress input and output; certify the agent's next action is unchanged (a proxy; see E7)."/>
 <meta name="twitter:image" content="https://dshakes.github.io/distil/og.png"/>
 </head>
 <body>
@@ -155,7 +155,10 @@
     <p>This is measurable, certifiable, and <strong>compatible with aggressive compression</strong>. Context blocks that are causally inert — they never change a decision when removed — are provably free to drop, regardless of how many bytes they contain. Distil's <strong>salience protection</strong> identifies the load-bearing frontier (model-free, using a causal ablation pass rather than a scorer model) and ensures those blocks are never touched, regardless of compression depth.</p>
 
     <div class="callout good">
-      <b>The reframe in one sentence:</b> "100% accuracy" becomes a statistical non-inferiority guarantee on <em>outcomes</em>, not a diff of strings — and that makes it real. On a live <code>claude-opus-4-8</code> grading run, Distil hit <strong>83.2% token savings at a measured 0% decision-change rate</strong> — with the &le;5%-at-95% bound <em>certified offline</em> by the conformal risk control (DERC).
+      <b>The reframe in one sentence:</b> "100% accuracy" becomes a statistical non-inferiority guarantee on the agent's <em>next action</em>, not a diff of strings. On a live <code>claude-opus-4-8</code> grading run, Distil hit <strong>83.2% token savings at a measured 0% decision-change rate</strong> — with the &le;5%-at-95% bound <em>certified offline</em> by the conformal risk control (DERC).
+    </div>
+    <div class="callout">
+      <b>Honest scope (we measured this).</b> Next-action equivalence is a <em>proxy</em>. On a real multi-turn task — <a href="research.html#e7">SWE-bench Verified, end-to-end (E7)</a> — the proxy certificate does <strong>not</strong> transfer to task success once compression is aggressive (pass@1 52%→16% at <code>trunc@500</code>). The contract is right; the lesson is that a certificate earned on a single-turn proxy must be re-earned on the real task. Distil's defensible value: cache-aware savings inside a proxy-certified gate, plus a reversible recovery tier.
     </div>
 
     <p>Two recently shipped techniques apply decision-equivalence directly to the coding-agent read &rarr; edit &rarr; re-read loop. <strong>Cache-delta context coding</strong> (<code>distil/cachedelta.py</code>) replaces an exact or near-duplicate re-read with a back-reference or reference&nbsp;+&nbsp;diff. It is decision-equivalent because the prior version of the file is already present earlier in the cached conversation — prior version + diff carries the same information. It also enforces <strong>cache-monotonicity</strong>: only the volatile suffix is mutated, so every prompt-cache hit that existed before the turn still exists after it. The deepest layer, <strong>AST-structural delta</strong> (<code>distil/astdelta.py</code>), fingerprints Python definitions with <code>ast.dump</code> (invariant to whitespace, comments, and import order), so a reformat-only re-read is a zero-change reference rather than a spurious diff. For a full treatment see <a href="techniques.html#cache-delta">Techniques &rarr; Cache-delta</a> and <a href="techniques.html#ast-structural-delta">AST-structural delta</a>.</p>
