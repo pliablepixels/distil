@@ -21,6 +21,7 @@ of run_agent.run_aider's return value so the driver can log uniformly.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -32,6 +33,7 @@ from benchmarks.long_horizon.tools import TOOL_SCHEMAS, execute_tool
 MODEL = "claude-sonnet-4-6"
 TEMPERATURE = 0
 MAX_TOKENS = 4096
+MAX_NUDGES = 4  # how many times to push a prematurely-stopping model to keep working
 
 # OpenAI function-tool equivalents of the Anthropic TOOL_SCHEMAS.
 # Each Anthropic schema {name, description, input_schema} maps to the OpenAI
@@ -96,6 +98,7 @@ def run_agent(
     base_url: str,
     api_key: str,
     *,
+    model: str = MODEL,
     max_turns: int = 30,
     timeout: float = 900.0,
 ) -> dict[str, Any]:
@@ -153,7 +156,7 @@ def run_agent(
             break
 
         body: dict[str, Any] = {
-            "model": MODEL,
+            "model": model,
             "temperature": TEMPERATURE,
             "max_tokens": MAX_TOKENS,
             "system": system,
@@ -238,6 +241,50 @@ def run_agent(
     }
 
 
+_TOOL_NAMES = {t["name"] for t in TOOL_SCHEMAS}
+_JSON_OBJ = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def _normalize_tool_calls(structured: list, content: str):
+    """Return a list of ``(id, name, args_dict, from_content)`` tool calls.
+
+    Prefers OpenAI structured ``tool_calls``. If there are none, recovers a call that a
+    local model spoke as text — a bare ``{"name": …, "arguments": {…}}`` object (optionally
+    in a ```json fence or amid prose). ``from_content`` marks the text-recovered path so
+    the caller feeds the result back as a user turn (no real tool_call_id to reference)."""
+    out = []
+    for tc in structured or []:
+        if not isinstance(tc, dict):
+            continue
+        fn = tc.get("function") or {}
+        try:
+            args = json.loads(fn.get("arguments", "{}") or "{}")
+        except (ValueError, TypeError):
+            args = {}
+        out.append(
+            (tc.get("id", ""), fn.get("name", ""), args if isinstance(args, dict) else {}, False)
+        )
+    if out:
+        return out
+    # Text fallback: find the first JSON object with a known tool name.
+    if not content:
+        return out
+    candidates = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL) or []
+    m = _JSON_OBJ.search(content)
+    if m:
+        candidates.append(m.group(0))
+    for blob in candidates:
+        try:
+            obj = json.loads(blob)
+        except (ValueError, TypeError):
+            continue
+        name = obj.get("name")
+        if name in _TOOL_NAMES:
+            args = obj.get("arguments") or obj.get("input") or {}
+            return [("", name, args if isinstance(args, dict) else {}, True)]
+    return out
+
+
 def _post_openai(url: str, body: dict[str, Any], api_key: str) -> dict[str, Any]:
     """POST ``body`` as JSON to ``url`` using OpenAI auth headers."""
     raw = json.dumps(body).encode()
@@ -318,6 +365,7 @@ def run_agent_openai(
     t0 = time.time()
     turns = 0
     status = "max_turns"
+    nudges = 0
 
     def _log(msg: str) -> None:
         log_lines.append(msg)
@@ -368,46 +416,49 @@ def run_agent_openai(
         else:
             _log(f"[turn {turn}] finish={finish_reason}")
 
-        # Append the full assistant message (with any tool_calls) to history.
+        # Append the full assistant message to history.
         messages.append(assistant_msg)
 
-        if finish_reason == "stop":
-            status = "end_turn"
-            break
+        # Structured OpenAI tool_calls, OR — for local models (e.g. qwen via Ollama) that
+        # emit the call as a JSON blob in `content` instead — recovered from the text.
+        structured = assistant_msg.get("tool_calls") or []
+        calls = _normalize_tool_calls(
+            structured, text_content if isinstance(text_content, str) else ""
+        )
 
-        if finish_reason != "tool_calls":
-            # Unexpected finish reason — treat as done.
-            status = f"stop:{finish_reason}"
-            break
-
-        # Execute every tool call in the response.
-        tool_calls: list[dict[str, Any]] = assistant_msg.get("tool_calls") or []
-        finished = False
-        for tc in tool_calls:
-            if not isinstance(tc, dict):
+        if not calls:
+            # No tool call. Weaker (esp. local) models often stop prematurely before
+            # editing; nudge them to keep working, up to a small bound, before accepting
+            # the turn as final. If an edit has already been made, let it stop.
+            made_edit = any("edit_file" in ln for ln in log_lines)
+            if nudges < MAX_NUDGES and not made_edit:
+                nudges += 1
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "You have not yet edited a file and called finish. Keep going: "
+                            "use the tools to locate the bug, apply the fix with edit_file, "
+                            "run the tests, then call finish. Respond with a tool call."
+                        ),
+                    }
+                )
                 continue
-            tc_id: str = tc.get("id", "")
-            func: dict[str, Any] = tc.get("function") or {}
-            tool_name: str = func.get("name", "")
-            raw_args: str = func.get("arguments", "{}")
-            try:
-                tool_input: dict = json.loads(raw_args)
-            except (ValueError, TypeError):
-                tool_input = {}
+            status = "end_turn" if finish_reason in ("stop", "") else f"stop:{finish_reason}"
+            break
 
+        finished = False
+        for tc_id, tool_name, tool_input, from_content in calls:
             result_text = execute_tool(tool_name, tool_input, worktree)
             _log(f"  tool={tool_name} result={result_text[:80]!r}")
-
-            # Append one role:"tool" message per call — the accumulated tool
-            # results are the large peripheral context that exercises the proxy.
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tc_id,
-                    "content": result_text,
-                }
-            )
-
+            if from_content:
+                # The model spoke the call as text (no real tool_call_id) — feed the
+                # result back as a user turn so there is no tool_call_id mismatch.
+                messages.append(
+                    {"role": "user", "content": f"Result of {tool_name}:\n{result_text}"}
+                )
+            else:
+                messages.append({"role": "tool", "tool_call_id": tc_id, "content": result_text})
             if tool_name == "finish":
                 finished = True
 

@@ -125,6 +125,7 @@ def run_instance(
                 worktree=wt,
                 base_url=base_url,
                 api_key=api_key,
+                model=model,
                 max_turns=max_turns,
                 timeout=timeout,
             )
