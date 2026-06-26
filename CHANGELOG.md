@@ -3,6 +3,44 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.28.0] — 2026-06-26
+
+E10: trajectory-level decision-equivalence certificate — the first distribution-free,
+out-of-sample-proven guarantee at the whole-run level for agent context compression.
+
+- **E10 trajectory-level certificate.** Lifts the per-turn E2 certificate to the
+  full trajectory (task) level using the same Learn-Then-Test / Hoeffding–Bentkus
+  engine (`distil.conformal.certified_risk_bound`), inverted to a (1−δ) upper
+  confidence bound on per-trajectory 0/1 loss. Two loss functions on the full
+  500-instance SWE-bench Verified set (δ=0.05):
+  - **Divergence** (outcome ≠ full context): empirical 14.4%, certified ≤ **18.0%**.
+  - **Harm** (full resolved the task, gated did not): empirical 8.4%, certified
+    ≤ **11.4%** — about 1 in 9 solvable tasks, certified.
+  - Plain-language: "With 95% confidence, the relevance-gated compressor changes
+    a run's outcome on ≤18.0% of exchangeable tasks and costs a solvable task on
+    ≤11.4%."
+- **Out-of-sample proof.** Over 1000 random calibration/test splits, the bound β
+  is certified on the calibration half and checked on the disjoint test half.
+  Realized coverage: **95.4%** (divergence) and **96.7%** (harm) — both at or
+  above the 95% target. The bound holds on held-out data, not merely asserted on
+  training data.
+- **Honest reporting: ungated reversible tier.** The ungated tier (condition D, E8)
+  also certifies: divergence ≤23.2%, out-of-sample coverage 93.9% — marginally
+  below the 95% target. Reported without softening.
+- **Honest scope.** The guarantee is exchangeability-conditional: valid for traffic
+  exchangeable with the calibration distribution (SWE-bench Verified, this agent +
+  model). Changing the agent, model, or task distribution requires re-certification.
+- **Why it matters.** E2 guaranteed a per-turn proxy. E7/E8 showed that proxy
+  doesn't naively transfer to task success under aggressive compression. E9
+  quantified the composition gap. E10 closes it: the first trajectory-level,
+  distribution-free decision-equivalence certificate for agent context compression
+  (to our knowledge).
+- **Reproducible.** `benchmarks/trajectory_certificate.py`; numbers trace to
+  `docs/paper/results/swe_e2e_longhorizon/trajectory_certificate.json`.
+- **Docs updated:** `docs/research.html` (E10 section with results table and OOS
+  proof), `docs/index.html` (honest-scope headline line), `docs/concepts.html`
+  (certificate callout).
+
 ## [0.27.0] — 2026-06-26
 
 Final E8 long-horizon results: 6-condition frontier including Headroom

@@ -159,7 +159,12 @@ crater (Headroom $32.6\%$, plain truncation $5.6\%$, LLMLingua-2 $2.4\%$, all ca
 guarantee). We do not claim it is the cheapest---Headroom is cheaper but uncertified---only
 that it uniquely delivers a decision-equivalence guarantee at leading task success.
 Compression survives execution precisely when it is recoverable and confined to the
-periphery.
+periphery. Finally, we lift the certificate from per-turn to the \textbf{trajectory} level:
+a distribution-free guarantee that, with $95\%$ confidence, the gated compressor changes a
+run's outcome on $\le\!18\%$ of exchangeable tasks and costs a solvable task on
+$\le\!11.4\%$---validated out-of-sample (coverage $95.4\%/96.7\%\ge95\%$). To our knowledge
+this is the first trajectory-level decision-equivalence certificate for agent context
+compression.
 \end{abstract}
 
 \section{Introduction}
@@ -942,6 +947,35 @@ end-to-end results and motivates the gate's design. (Caveat: $\alpha$ is the per
 certified on the E2 localization corpus, not re-measured on the unpaired E8 ReAct runs, so
 the composition is parametric in $\alpha$ and $k$ is reported descriptively, not as a new
 guarantee; reproducible via \texttt{benchmarks/trajectory\_bound.py}.)
+
+\subsection{E10: a trajectory-level decision-equivalence certificate}
+\label{sec:e10}
+
+E9 shows the per-turn certificate does not \emph{naively} compose to a trajectory. E10
+closes the gap directly: rather than compose, we \emph{certify at the trajectory level}.
+The unit is a whole run; for the relevance-gated tier vs.\ full context, scored on the same
+\sweEeightN{} instances, each trajectory carries two 0/1 losses---\textbf{divergence}
+($1$ if the gated outcome differs from full) and \textbf{harm} ($1$ if full resolved the
+task and gated did not, i.e.\ compression \emph{cost} a solvable task). We then apply the
+\emph{same} Learn--Then--Test / Hoeffding--Bentkus machinery as E2, inverted to the
+$(1-\delta)$ upper confidence bound on each rate (\Cref{sec:method};
+\texttt{conformal.certified\_risk\_bound}).
+
+This yields a distribution-free, finite-sample guarantee at the unit users care about: with
+confidence $95\%$, the relevance-gated compressor's \textbf{trajectory divergence from full
+is $\le 18.0\%$} (empirical $14.4\%$) and its \textbf{harm rate is $\le 11.4\%$} (empirical
+$8.4\%$)---i.e.\ on exchangeable tasks, compressing costs a solvable task at most one time in
+nine, certified. Crucially we \emph{prove} the bound out-of-sample exactly as E2 does: over
+$1000$ random calibration/test splits, certifying $\beta$ on the calibration half and
+checking the disjoint test half's realised rate, coverage is \textbf{95.4\%} (divergence)
+and \textbf{96.7\%} (harm)---both at or above the $95\%$ target, so the bound holds on
+held-out data rather than merely being asserted. (The ungated reversible tier certifies
+too, at a looser $\le 23.2\%$ divergence with $93.9\%$ coverage---marginally under target,
+which we report rather than hide.) To our knowledge this is the first \emph{trajectory-level},
+distribution-free decision-equivalence certificate for agent context compression. Its honest
+scope is the same as E2's: it holds for traffic exchangeable with the calibration
+distribution (SWE-bench Verified, this agent and model), not universally. Reproducible via
+\texttt{benchmarks/trajectory\_certificate.py}.
 
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can

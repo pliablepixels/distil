@@ -129,6 +129,61 @@
 
     <p>The skeleton digest is <strong>100% byte-exact reversible</strong> — its decision-equivalence rate with recovery is 0% (96% raw, like all lossy methods; safety comes from reversibility). The E9 trajectory-composition bound extends the per-turn certificate to multi-turn trajectories: across ~27-turn runs, the naive composition bound becomes vacuous (only ~1.8 turns are outcome-determining), so the per-turn certificate's integrity on full trajectories is tighter than a naive product would suggest, though the formal bound for arbitrary trajectories remains an open problem. The honest position: reversibility is the safety guarantee for the active-recovery tier; non-inferiority to full context is the empirical result for the relevance-gated tier.</p>
 
+    <!-- E10: trajectory-level certificate -->
+    <h2 id="e10">E10: trajectory-level decision-equivalence certificate</h2>
+
+    <p><strong>E2 gave a per-turn guarantee. E7 showed that guarantee does not naively transfer to task success under aggressive compression. E8 showed relevance-gated compression is empirically non-inferior to full context. E10 closes the loop with a real statistical guarantee at the trajectory (task) level</strong> — lifting the per-turn certificate all the way to whole-run outcomes.</p>
+
+    <p>E10 is the first trajectory-level, distribution-free decision-equivalence certificate for agent context compression (to our knowledge). It runs the same Learn-Then-Test / Hoeffding&ndash;Bentkus engine as E2 (<code>distil.conformal.certified_risk_bound</code>), but inverted to a (1&minus;&delta;) upper confidence bound on per-trajectory 0/1 loss, over the full 500-instance SWE-bench Verified set used in E8. Two loss functions are measured:</p>
+
+    <ul>
+      <li><strong>Divergence</strong> — trajectory outcome differs from full context (1 if different, 0 if same).</li>
+      <li><strong>Harm</strong> — full context resolved the task but the compressor did not (1 if compression cost a solvable task, 0 otherwise). This is the stricter, user-relevant loss.</li>
+    </ul>
+
+    <h3>Results — relevance-gated (passive) tier, 500 instances, &delta;=0.05</h3>
+
+    <table style="border-collapse:collapse;width:100%;margin:16px 0">
+      <thead>
+        <tr style="border-bottom:2px solid var(--line)">
+          <th style="text-align:left;padding:6px 12px">Loss</th>
+          <th style="text-align:right;padding:6px 12px">Empirical</th>
+          <th style="text-align:right;padding:6px 12px">Certified &le; (95% CI)</th>
+          <th style="text-align:right;padding:6px 12px">Out-of-sample coverage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--line)">
+          <td style="padding:6px 12px">Divergence (outcome &ne; full)</td>
+          <td style="text-align:right;padding:6px 12px">14.4%</td>
+          <td style="text-align:right;padding:6px 12px"><strong>18.0%</strong></td>
+          <td style="text-align:right;padding:6px 12px">95.4%</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px">Harm (full solved, gated did not)</td>
+          <td style="text-align:right;padding:6px 12px">8.4%</td>
+          <td style="text-align:right;padding:6px 12px"><strong>11.4%</strong></td>
+          <td style="text-align:right;padding:6px 12px">96.7%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout good">
+      <b>Plain-language guarantee.</b> With 95% confidence, the relevance-gated compressor changes a run&rsquo;s outcome on &le;18.0% of exchangeable tasks and costs a solvable task on &le;11.4% — about 1 in 9, certified.
+    </div>
+
+    <h3>Out-of-sample proof (the bound actually holds)</h3>
+
+    <p>Like E2, E10 is proven out-of-sample, not merely asserted. Over 1000 random calibration/test splits of the 500 instances: the bound &beta; is certified on the calibration half, then the disjoint test half&rsquo;s realized rate is measured. Coverage lands at <strong>95.4%</strong> (divergence) and <strong>96.7%</strong> (harm), both at or above the 95% target. The bound holds on held-out data.</p>
+
+    <h3>Honest scope: ungated reversible tier</h3>
+
+    <p>The ungated reversible tier (skeleton digest, condition D in E8) also certifies under E10: divergence &le;23.2%, out-of-sample coverage 93.9%. Coverage is marginally below the 95% target — a borderline result, reported here without softening. The relevance gate is the tier with a clean certificate.</p>
+
+    <h3>Honest scope: exchangeability</h3>
+
+    <p>The guarantee holds for traffic <strong>exchangeable with the calibration distribution</strong> (SWE-bench Verified, this agent + model combination). It is not a universal bound. Changing the agent, the model, or the task distribution requires re-certification. Reproducible via <code>benchmarks/trajectory_certificate.py</code>; numbers trace to <code>docs/paper/results/swe_e2e_longhorizon/trajectory_certificate.json</code>.</p>
+
     <hr/>
 
     <!-- Feature 1: Certified compression frontier -->

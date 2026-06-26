@@ -221,7 +221,15 @@ Six conditions through the identical agent, scored on **actual test-pass rate** 
 - **Digest mode per tier** (honest ablation): skeleton for the *active* `distil_expand` tier; head-truncation for the *passive* relevance-gated tier — a navigable skeleton *backfires* there (the agent over-trusts it, never re-reads, edits against body-less context: 36.8% → 5.6%). Matching digest to tier behavior is the finding.
 - **Certificate:** skeleton digest is **100% byte-exact reversible**, **0% decision-change with recovery** (E9 also bounds per-turn → trajectory: only ~1.8 of ~27 turns are outcome-determining).
 
-Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/`.
+### The guarantee, lifted to whole runs (E10)
+
+The certificate above is *per-turn* (next-action equivalence). **E10 lifts it to the trajectory level** — a distribution-free, finite-sample guarantee on the unit you actually care about, the whole run:
+
+> With **95% confidence**, the relevance-gated compressor changes a run's **outcome on ≤ 18.0%** of exchangeable tasks (empirical 14.4%) and **costs a solvable task on ≤ 11.4%** (empirical 8.4%) — i.e. compressing loses a task you'd otherwise solve **at most ~1 in 9 times, certified.**
+
+And we **prove it out-of-sample** (the E2 method, at trajectory level): over 1000 calibration/test splits, certify the bound on one half and check the other — coverage is **95.4% / 96.7%**, at/above the 95% target. The bound *holds on held-out data*, not just asserted. To our knowledge this is the **first trajectory-level decision-equivalence certificate** for agent context compression. Honest scope: exchangeable with this distribution (SWE-bench Verified, this agent/model). Reproducible: `benchmarks/trajectory_certificate.py`.
+
+Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E10 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/`.
 
 ---
 

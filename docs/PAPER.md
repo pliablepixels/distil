@@ -319,6 +319,33 @@ non-transfer result at n=500). Per-instance breakdown, scores, ablation, certifi
 official harness reports: `benchmarks/long_horizon/`, `benchmarks/skeleton_certificate.py`,
 `docs/paper/results/swe_e2e_longhorizon/`.
 
+### 6.0.5 Trajectory-level decision-equivalence certificate (E10)
+
+E2 certifies the *per-turn* decision-change rate; E9 shows that bound does not naively
+compose to a trajectory. **E10 certifies at the trajectory level directly** — the unit users
+care about. For the relevance-gated tier vs. full context on the same 500 instances, each
+trajectory carries two 0/1 losses: **divergence** (outcome differs from full) and **harm**
+(full resolved the task, gated did not — compression *cost* a solvable task). We apply the
+*same* Learn-Then-Test / Hoeffding–Bentkus engine as E2, inverted to the (1−δ) upper
+confidence bound (`distil.conformal.certified_risk_bound`).
+
+| loss | empirical | certified ≤ (95% conf) | OOS coverage (target 95%) |
+|---|--:|--:|--:|
+| divergence (outcome ≠ full) | 14.4% | **18.0%** | **95.4%** |
+| harm (full solved, gated did not) | 8.4% | **11.4%** | **96.7%** |
+
+**The guarantee:** with 95% confidence, the gated compressor changes a run's outcome on
+≤18.0% of exchangeable tasks and **costs a solvable task on ≤11.4%** (~1 in 9). We **prove
+it out-of-sample** exactly as E2 does — over 1000 calibration/test splits, certify β on the
+calibration half and check the disjoint test half: coverage **95.4% / 96.7%**, at/above the
+95% target, so the bound *holds on held-out data*. The ungated reversible tier also
+certifies (divergence ≤23.2%, coverage 93.9% — marginally under target, reported not hidden).
+**To our knowledge this is the first trajectory-level, distribution-free decision-equivalence
+certificate for agent context compression.** Honest scope: holds for traffic exchangeable
+with the calibration distribution (SWE-bench Verified, this agent + model), not universally.
+Reproducible: `benchmarks/trajectory_certificate.py`,
+`docs/paper/results/swe_e2e_longhorizon/trajectory_certificate.json`.
+
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
