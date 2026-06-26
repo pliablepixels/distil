@@ -246,7 +246,8 @@ user/tool messages full, digest older periphery), these SWE conversations are �
 the gate is a **no-op** — only 1 block digested across all 50 instances, hence ~0 context
 reduction and full-vs-gated McNemar `p=1.0` (statistically identical to full). The gate is
 designed for long-horizon agents with large peripheral context; this focused localization
-workload does not exercise it (tunable via `DISTIL_E7_GATE_RECENT`).
+workload does not exercise it (tunable via `DISTIL_E7_GATE_RECENT`). **E8 (§6.0.4) runs
+exactly that workload.**
 
 **Findings, reported without cherry-picking.** (1) Both **lossy** conditions (B, C)
 **significantly** collapse pass@1 vs. full — aggressive lossy compression does **not**
@@ -262,6 +263,47 @@ expanded; 135 recoveries total). (4) The honest catch: D's *realised* coding sav
 parity at a modest discount*, not the proxy headline ratios. **Keep compression
 recoverable.** Per-instance breakdown: `benchmarks/swe_bench_e2e/` and
 `docs/paper/results/swe_bench_verified_e2e.json`. Total API spend: $50.04.
+
+### 6.0.4 Long-horizon agent task-success (E8) — the gate's proper test
+
+E7's relevance-gate (condition E) was a no-op because aider's localization runs are ≤6
+turns: nothing ages out of the working set, so there is no periphery to digest. **E8 is
+the workload the gate was designed for.** We built a multi-turn **ReAct** coding agent
+(read/search/`edit_file`/`run_tests` tools, up to 30 turns) and ran it on the **full
+500-instance SWE-bench Verified** set (seed 1729), scored by the same **official `swebench`
+4.1.0 harness**. Runs are genuinely long-horizon (**mean ≈27 turns**), so read-file and
+tool outputs accumulate into a large peripheral context behind a small active working set.
+To keep a 500-instance four-condition sweep affordable we use **`claude-haiku-4-5`** at
+temp 0; conditions differ only in the compressor, so the comparison is internally valid
+regardless of base model.
+
+| condition | ctx reduction | pass@1 | 95% CI (Wilson) | resolved | cost |
+|---|--:|--:|---|--:|--:|
+| **A. full context** | — | **39.2%** | [35.0%, 43.5%] | 196/500 | $190.60 |
+| **B. distil `trunc@500`** (aggressive **lossy**) | 85% | **5.6%** | [3.9%, 8.0%] | 28/500 | $84.43 |
+| **D. distil reversible + `distil_expand`** (ungated) | 84% | **28.8%** | [25.0%, 32.9%] | 144/500 | $127.91 |
+| **E. distil reversible, relevance-gated** | 53% | **36.8%** | [32.7%, 41.1%] | 184/500 | $133.89 |
+
+Paired exact McNemar (same 500 instances): **E vs. full `p=0.19`** (n.s. — *statistically
+indistinguishable from full*; 42 lost, 30 gained), **B vs. full `p<0.001`** (173 lost, 5
+gained), **D vs. full `p<0.001`**, **E vs. D `p<0.001`** (the gate decisively beats blind
+reversibility). Recovery round-trips: D issues **9.6 `distil_expand` calls per instance**
+(it digested the whole history, so must keep recovering the working set); E issues only
+**0.58 per instance** (it digests only aged-out periphery, leaving the working set full).
+
+**Findings.** (1) **The relevance-gate preserves task success where blunt compression
+cannot:** E resolves 36.8% vs. full's 39.2% — *not* significant (`p=0.19`), i.e.
+indistinguishable from full context — while removing **53%** of context at **~30% lower
+cost** ($133.89 vs. $190.60). (2) **Lossy truncation craters and the damage grows with
+horizon:** `trunc@500` falls to 5.6% (`p<0.001`, 173 instances lost) — the E7
+certificate-non-transfer result, reproduced at n=500 and amplified by run length. (3)
+**What you compress matters more than whether you can recover it:** ungated reversible (D)
+recovers byte-exact content but must do so constantly (9.6×/instance) and still lands
+significantly below full (28.8%, `p<0.001`); the gate avoids this by never compressing the
+active working set (0.58×/instance). E8 is the experiment E7 could not run, and it confirms
+the design claim the E7 gate row could only assert. Per-instance breakdown, scores, and
+official harness reports: `benchmarks/long_horizon/` and
+`docs/paper/results/swe_e2e_longhorizon/`. Total API spend: $536.83.
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 

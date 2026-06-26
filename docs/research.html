@@ -91,6 +91,30 @@
 
     <hr/>
 
+    <!-- E8: long-horizon agent task-success -->
+    <h2 id="e8">E8: long-horizon agent task-success</h2>
+    <p><strong>Harness:</strong> <code>benchmarks/swe_bench_e2e/</code> (official <code>swebench</code>) &middot; <strong>Numbers:</strong> <a href="paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json"><code>docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json</code></a></p>
+
+    <p>E7 flagged relevance-gated reversible compression as an untested path on real long-horizon execution. E8 runs that test. A custom multi-turn <strong>ReAct</strong> coding agent (read / search / edit_file / run_tests tools, up to 30 turns, <strong>claude-haiku-4-5</strong>, temp 0) is run end-to-end on the <strong>full 500-instance SWE-bench Verified set</strong> (seed 1729), scored by the <strong>official <code>swebench</code> harness</strong> (hidden tests, per-instance Docker). Runs average <strong>~27 turns</strong> — read-file and tool outputs accumulate into large peripheral context behind a small active working set, which is exactly the regime the relevance gate was designed for. Four conditions share the identical agent; only the compressor differs.</p>
+
+    <table>
+      <thead><tr><th>Condition</th><th>Ctx reduction</th><th>Resolved</th><th>pass@1</th><th>95% CI</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td>A &mdash; full context (no compression)</td><td>&mdash;</td><td>196 / 500</td><td>39.2%</td><td>[35.0%, 43.5%]</td><td>$190.60</td></tr>
+        <tr><td>B &mdash; distil <code>trunc@500</code> (aggressive lossy)</td><td>85%</td><td>28 / 500</td><td>5.6%</td><td>[3.9%, 8.0%]</td><td>$84.43</td></tr>
+        <tr><td>D &mdash; distil reversible (<code>+distil_expand</code>)</td><td>84%</td><td>144 / 500</td><td>28.8%</td><td>[25.0%, 32.9%]</td><td>$127.91</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td><strong>E &mdash; distil reversible, relevance-gated</strong></td><td>53%</td><td>184 / 500</td><td><strong>36.8%</strong></td><td>[32.7%, 41.1%]</td><td>$133.89</td></tr>
+      </tbody>
+    </table>
+
+    <p>All four conditions score the same 500 instances (paired McNemar). Relevance-gated (E) vs full context: <strong>p=0.19 — not significant</strong> (42 instances lost, 30 gained) — statistically indistinguishable at n=500. Lossy truncation (B) vs full context: p&lt;0.001 (173 lost, 5 gained). The gate wins decisively over ungated reversible (D): p&lt;0.001. Recovery round-trips tell the mechanism: ungated (D) issues <strong>9.6 <code>distil_expand</code> calls per instance</strong> (it digested the whole history, so must keep recovering the working set); gated (E) issues only <strong>0.58 per instance</strong> (it digests only aged-out periphery, keeping the working set full).</p>
+
+    <div class="callout good">
+      <b>The positive resolution to E7.</b> On a real long-horizon agent, <strong>relevance-gated reversible compression is statistically indistinguishable from full context</strong> (36.8% vs 39.2%, McNemar p=0.19) while removing <strong>53% of context</strong> and costing <strong>~30% less</strong> ($133.89 vs $190.60). Aggressive lossy truncation on the same workload craters to 5.6% &mdash; the E7 certificate-non-transfer result, reproduced at n=500 and amplified by horizon. The mechanism: <strong>what</strong> you compress (stale periphery, not the active working set) matters more than <strong>whether</strong> you can recover it. Keep compression recoverable <em>and</em> confined to the periphery, and end-to-end task success survives. Note: E8 did not run an LLMLingua-2 condition; E7 covers that baseline.
+    </div>
+
+    <hr/>
+
     <!-- Feature 1: Certified compression frontier -->
     <h2 id="frontier">Certified compression frontier</h2>
     <p><strong>Module:</strong> <code>distil/eval.py</code> &middot; <strong>Command:</strong> <code>distil eval [--corpus --runner --out]</code></p>

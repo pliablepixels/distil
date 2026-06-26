@@ -3,6 +3,35 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [0.26.0] — 2026-06-26
+
+E8: long-horizon agent benchmark — the proper end-to-end test E7 explicitly
+flagged as unrun.
+
+- **E8 long-horizon SWE-bench Verified (n=500).** A custom multi-turn ReAct
+  coding agent (read / search / edit_file / run_tests, up to 30 turns,
+  `claude-haiku-4-5`, temp 0) run end-to-end on the full 500-instance
+  SWE-bench Verified set (seed 1729), scored by the official `swebench`
+  harness. Runs average ~27 turns; read-file outputs accumulate into large
+  peripheral context — the regime the relevance gate was designed for.
+  Four conditions, same agent, compressor differs:
+  - **A (full context):** 196/500 resolved — 39.2% pass@1 — $190.60
+  - **B (`trunc@500`, aggressive lossy):** 28/500 — 5.6% — $84.43
+  - **D (reversible, ungated):** 144/500 — 28.8% — $127.91
+  - **E (reversible, relevance-gated):** 184/500 — **36.8%** — $133.89
+- **Key result.** Relevance-gated (E) vs full context: McNemar **p=0.19 —
+  not significant** — statistically indistinguishable at n=500, while
+  removing 53% of context and costing ~30% less. Lossy truncation (B)
+  vs full context: p<0.001. The mechanism: ungated reversible issues 9.6
+  `distil_expand` calls per instance (digested the whole history, must keep
+  recovering the working set); gated reversible issues only 0.58 (digests
+  only aged-out periphery, keeps the working set full).
+- **Docs updated:** `docs/research.html` (new `#e8` section with full
+  results table), `docs/index.html`, `docs/concepts.html`, and
+  `docs/benchmark.html` (E8 callout added alongside E7).
+- Numbers trace to
+  `docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json`.
+
 ## [0.25.1] — 2026-06-25
 
 Version bump only; same content as the v0.25.0 release notes — fixes the PyPI
