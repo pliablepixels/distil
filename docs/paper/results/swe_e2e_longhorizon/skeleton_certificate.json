@@ -1,0 +1,15 @@
+{
+  "reversibility": {
+    "blocks": 48,
+    "byte_exact_recoverable": 48,
+    "reversible_pct": 100.0,
+    "visible_digest_pct": 42.9
+  },
+  "decision_equivalence": {
+    "decisions": 28,
+    "raw_decision_change_pct": 96.4,
+    "recovered_decision_change_pct": 0.0,
+    "recoverable_blocks": 56,
+    "raw_savings_pct": 19.3
+  }
+}

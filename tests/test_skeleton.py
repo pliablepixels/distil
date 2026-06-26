@@ -104,3 +104,14 @@ def test_skeleton_is_a_certified_ladder_level():
 
     names = [n for n, _ in default_ladder()]
     assert "skeleton" in names and "protect+skeleton" in names
+
+
+def test_skeleton_certificate_reversible_and_recovers_decisions():
+    from benchmarks.skeleton_certificate import decision_equivalence, reversibility_check
+
+    rev = reversibility_check()
+    assert rev["reversible_pct"] == 100.0  # byte-exact recovery contract
+    de = decision_equivalence()
+    # Reversible tier: raw digest is lossy, but WITH recovery it is decision-equivalent.
+    assert de["recovered_decision_change_pct"] == 0.0
+    assert de["raw_decision_change_pct"] > de["recovered_decision_change_pct"]
