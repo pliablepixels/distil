@@ -36,6 +36,7 @@ CONDITIONS = [
     ("full", "A. full context"),
     ("distil_trunc500", "B. distil (trunc@500)"),
     ("llmlingua2", "C. LLMLingua-2"),
+    ("headroom", "F. Headroom"),
     ("distil_expand", "D. distil (reversible + distil_expand)"),
     ("distil_gated", "E. distil (reversible, relevance-gated)"),
 ]
@@ -163,6 +164,9 @@ def paired_analysis(conditions: list[dict[str, Any]], all_ids: list[str]) -> lis
         ("full", "distil_gated"),
         ("distil_expand", "distil_gated"),
         ("llmlingua2", "distil_gated"),
+        ("full", "headroom"),
+        ("headroom", "distil_gated"),
+        ("distil_expand", "headroom"),
     ]
     # Pre-specified non-inferiority margin (proportion). A McNemar p only tells us whether
     # a difference exists; for pairs against full context we also ask the deployment-relevant
@@ -206,6 +210,7 @@ def write_macros(agg: dict[str, Any], path: Path, prefix: str = "sweEseven") -> 
         "full": "Full",
         "distil_trunc500": "Distil",
         "llmlingua2": "Lingua",
+        "headroom": "Headroom",
         "distil_expand": "Expand",
         "distil_gated": "Gated",
     }
@@ -245,8 +250,15 @@ def write_macros(agg: dict[str, Any], path: Path, prefix: str = "sweEseven") -> 
         ("full", "distil_gated"): "GatedVsFullP",
         ("distil_expand", "distil_gated"): "GatedVsExpandP",
         ("llmlingua2", "distil_gated"): "GatedVsLinguaP",
+        ("full", "headroom"): "HeadroomVsFullP",
+        ("headroom", "distil_gated"): "GatedVsHeadroomP",
+        ("distil_expand", "headroom"): "HeadroomVsExpandP",
     }
-    ni_macro = {("full", "distil_expand"): "Expand", ("full", "distil_gated"): "Gated"}
+    ni_macro = {
+        ("full", "distil_expand"): "Expand",
+        ("full", "distil_gated"): "Gated",
+        ("full", "headroom"): "Headroom",
+    }
     for pr in agg.get("paired_mcnemar", []):
         key = pair_macro.get((pr["a"], pr["b"]))
         if key:

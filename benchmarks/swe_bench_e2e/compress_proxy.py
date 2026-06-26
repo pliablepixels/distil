@@ -129,6 +129,8 @@ def headroom(text: str) -> str:
 # --------------------------------------------------------------------------- #
 DIGEST_HEAD = 400  # chars of head kept verbatim (non-code fallback / tiny blocks)
 DIGEST_TAIL = 200  # chars of tail kept for non-code (tracebacks/assertions live there)
+# 'skeleton' = content-aware navigable digest (for the active-recovery distil_expand tier);
+# 'head' = head-truncation (for the passive distil_gated tier — see digest_block).
 
 DISTIL_EXPAND_TOOL = {
     "name": "distil_expand",
@@ -171,8 +173,20 @@ def digest_block(text: str, restore: dict[str, str]) -> str:
         return text
     h = _handle(text)
     restore[h] = text
-    body = smart_digest(text, head=DIGEST_HEAD, tail=DIGEST_TAIL)
-    if len(body) >= len(text):  # skeleton not smaller (tiny/odd block) — keep head only
+    # Digest mode (DISTIL_DIGEST_MODE): 'skeleton' (content-aware, navigable) suits the
+    # ACTIVE-recovery tier (distil_expand) — the agent expands the bodies it needs. 'head'
+    # (head-truncation) suits the PASSIVE tier (distil_gated), which rarely expands: a
+    # navigable skeleton there backfires (the agent trusts it, never re-reads, and edits
+    # against body-less context). E8 ablation: skeleton lifts expand 28.8->32.4% but
+    # collapses gated 36.8->5.6%; head-trunc is gated's correct digest. See
+    # docs/paper/results/swe_e2e_longhorizon/skeleton_ablation/.
+    import os
+
+    if os.environ.get("DISTIL_DIGEST_MODE", "skeleton") == "head":
+        body = text[:DIGEST_HEAD]
+    else:
+        body = smart_digest(text, head=DIGEST_HEAD, tail=DIGEST_TAIL)
+    if len(body) >= len(text):  # digest not smaller (tiny/odd block) — keep head only
         body = text[:DIGEST_HEAD]
     hidden = len(text) - len(body)
     return (
