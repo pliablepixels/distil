@@ -36,9 +36,7 @@ CONDITIONS = [
     ("full", "A. full context"),
     ("distil_trunc500", "B. distil (trunc@500)"),
     ("llmlingua2", "C. LLMLingua-2"),
-    # ("distil_expand", "D. distil (reversible + distil_expand)") — added once its
-    # predictions + scores exist (run benchmarks.swe_bench_e2e.run_agent --condition
-    # distil_expand, then score), so the committed aggregator never reads a missing file.
+    ("distil_expand", "D. distil (reversible + distil_expand)"),
 ]
 MODEL = "claude-sonnet-4-6"
 
@@ -156,6 +154,8 @@ def paired_analysis(conditions: list[dict[str, Any]], all_ids: list[str]) -> lis
         ("full", "distil_trunc500"),
         ("full", "llmlingua2"),
         ("llmlingua2", "distil_trunc500"),
+        ("full", "distil_expand"),
+        ("distil_trunc500", "distil_expand"),
     ]
     out = []
     for a, b in pairs:
@@ -182,7 +182,12 @@ def write_macros(agg: dict[str, Any], path: Path) -> None:
     def pct(x: float) -> str:
         return f"{100 * x:.1f}"
 
-    short = {"full": "Full", "distil_trunc500": "Distil", "llmlingua2": "Lingua"}
+    short = {
+        "full": "Full",
+        "distil_trunc500": "Distil",
+        "llmlingua2": "Lingua",
+        "distil_expand": "Expand",
+    }
     full_pass = by.get("full", {}).get("pass_at_1", 0.0)
     for cond, name in short.items():
         c = by.get(cond)
@@ -214,6 +219,8 @@ def write_macros(agg: dict[str, Any], path: Path) -> None:
         ("full", "distil_trunc500"): "DistilVsFullP",
         ("full", "llmlingua2"): "LinguaVsFullP",
         ("llmlingua2", "distil_trunc500"): "DistilVsLinguaP",
+        ("full", "distil_expand"): "ExpandVsFullP",
+        ("distil_trunc500", "distil_expand"): "ExpandVsTruncP",
     }
     for pr in agg.get("paired_mcnemar", []):
         key = pair_macro.get((pr["a"], pr["b"]))

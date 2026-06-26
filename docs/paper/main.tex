@@ -711,15 +711,20 @@ we also report exact paired McNemar tests. Total API spend: \sweEsevenTotalCost{
 condition & ctx.\ reduction & pass@1 & 95\% CI & cost \\
 \midrule
 A. full context & --- & \textbf{\sweEsevenFullPass} & [\sweEsevenFullCIlo, \sweEsevenFullCIhi] & \sweEsevenFullCost \\
-B. distil \texttt{trunc@500} & \sweEsevenDistilCtxRed & \sweEsevenDistilPass & [\sweEsevenDistilCIlo, \sweEsevenDistilCIhi] & \sweEsevenDistilCost \\
-C. LLMLingua-2 & \sweEsevenLinguaCtxRed & \sweEsevenLinguaPass & [\sweEsevenLinguaCIlo, \sweEsevenLinguaCIhi] & \sweEsevenLinguaCost \\
+B. distil \texttt{trunc@500} (lossy) & \sweEsevenDistilCtxRed & \sweEsevenDistilPass & [\sweEsevenDistilCIlo, \sweEsevenDistilCIhi] & \sweEsevenDistilCost \\
+C. LLMLingua-2 (lossy) & \sweEsevenLinguaCtxRed & \sweEsevenLinguaPass & [\sweEsevenLinguaCIlo, \sweEsevenLinguaCIhi] & \sweEsevenLinguaCost \\
+D. distil reversible ($+$\texttt{distil\_expand}) & \sweEsevenExpandCtxRed$^{\dagger}$ & \textbf{\sweEsevenExpandPass} & [\sweEsevenExpandCIlo, \sweEsevenExpandCIhi] & \sweEsevenExpandCost \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{E7: SWE-bench Verified end-to-end task-success} (\sweEsevenN{} instances,
 seed~$=\sweEsevenSeed{}$, aider~+~\texttt{claude-sonnet-4-6}, official \texttt{swebench}
 harness). Pass@1 with Wilson 95\% intervals; ``ctx.\ reduction'' is the realised
 char-level shrink of compressed blocks. B is distil at its Phase-2 certifying operating
-point; C is LLMLingua-2 at its default rate.}
+point; C is LLMLingua-2 at its default rate; D is distil's \emph{reversible} tier
+(digest-behind-handle $+$ recover-on-demand). $^{\dagger}$For D, ctx.\ reduction is the
+\emph{pre-recovery} digest view; after the model's \texttt{distil\_expand} calls the
+\emph{realised} cost is \sweEsevenExpandCost{} vs.\ \sweEsevenFullCost{} for full
+($\approx$7\% cheaper), because the agent recovers what it edits.}
 \label{tab:e7}
 \end{table}
 
@@ -755,6 +760,27 @@ resolved under \texttt{trunc@500} that full context missed), and one network-dep
 instance (\texttt{psf\_\_requests-2317}) is unresolvable under our offline harness and
 counts as a failure for all three conditions identically.
 
+\paragraph{The reversible tier \emph{does} survive execution (condition D).} The
+non-transfer above is a property of \emph{lossy} compression, not of distil's design.
+distil's actual product is the \emph{reversible} tier: each context block is digested
+behind a content handle, the original is kept, and the agent is given a
+\texttt{distil\_expand} tool to recover any block on demand (a transparent
+recover-then-redecide loop inside the proxy; \Cref{tab:e7} row D). Run end-to-end on the
+same \sweEsevenN{} instances, it resolves \textbf{\sweEsevenExpandPass}---\emph{statistically
+indistinguishable from full context} (\sweEsevenFullPass{}; exact paired McNemar
+$p=\sweEsevenExpandVsFullP{}$, i.e.\ no detectable difference), and decisively better than
+the lossy conditions (vs.\ \texttt{trunc@500}: 22 instances recovered, 2 lost,
+$p=\sweEsevenExpandVsTruncP{}$). The model expanded reliably (every instance issued
+$\ge 1$ recovery; 135 expansions total). \textbf{The lesson is the converse of the
+lossy result: keep the information \emph{recoverable} and end-to-end task success is
+preserved.} The price is that \emph{realised} token savings on coding are modest---the
+digest view removes \sweEsevenExpandCtxRed{} but the agent expands most of what it edits,
+so the net cost is \sweEsevenExpandCost{} vs.\ \sweEsevenFullCost{} ($\approx$7\%), with
+the savings coming from periphery the agent never expands. Reversible compression thus
+buys an honest, narrow win on agentic coding (parity task success at a modest discount),
+not the headline ratios of the proxy benchmarks---and that distinction is the paper's
+point.
+
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
 carry a distribution-free guarantee validated on real traces. The certificate
@@ -768,12 +794,16 @@ position-shuffled localization corpus this particular edge reverses
 correctly declines to certify savings on compact $\tau$-bench contexts, quantifying
 where recoverable compression helps rather than overclaiming a single headline ratio.
 Our end-to-end evaluation (E7, \Cref{sec:e7}) draws the boundary sharply: on
-SWE-bench Verified the operating point the certificate \emph{selects}
+SWE-bench Verified the \emph{lossy} operating point the certificate selected
 (\texttt{trunc@500}) cuts pass@1 from \sweEsevenFullPass{} to \sweEsevenDistilPass{}
-($p=\sweEsevenDistilVsFullP{}$, paired)---so the decision-equivalence guarantee is sound
-for what it measures but must not be read as a task-success guarantee once compression is
-aggressive. The contract is right; the certified \emph{rate}, not the chosen compressor,
-is the contribution.
+($p=\sweEsevenDistilVsFullP{}$, paired)---so a decision-equivalence guarantee earned on a
+single-turn proxy must not be read as a task-success guarantee once \emph{lossy}
+compression is aggressive. But the same evaluation shows distil's \emph{reversible} tier
+(digest $+$ \texttt{distil\_expand}) is end-to-end \emph{task-equivalent to full context}
+(\sweEsevenExpandPass{} vs.\ \sweEsevenFullPass{}, McNemar $p=\sweEsevenExpandVsFullP{}$)
+at a modest realised discount---the actionable conclusion being \emph{keep compression
+recoverable}. The contract is right; the lesson is that proxy certification and lossy
+aggression are the failure mode, recoverability the fix.
 
 \paragraph{Reproducibility.} The harness, adapters, runners, and this paper are
 released at \url{https://github.com/dshakes/distil} (see \texttt{benchmarks/PROVE.md}

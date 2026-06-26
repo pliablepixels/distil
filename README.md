@@ -177,18 +177,20 @@ $ distil frontier --corpus benchmarks/corpus_xl
 
 We ran the honest test the proxy can't give you: a **real coding agent end-to-end** (aider + `claude-sonnet-4-6`) on **SWE-bench Verified** (n=50, official `swebench` harness, hidden tests), comparing **full context** vs compressed, scored on **actual test-pass rate** — not a proxy.
 
-| condition | context reduction | pass@1 | vs full |
+| condition | pass@1 | vs full (paired McNemar) | realised cost |
 |---|--:|--:|--:|
-| full (no compression) | — | **52%** | — |
-| distil `trunc@500` (aggressive lossy) | 85% | 16% | −36pp, McNemar *p*<0.001 |
-| LLMLingua-2 | 48% | 26% | −26pp, *p*=0.002 |
+| full (no compression) | **52%** | — | $17.63 |
+| distil `trunc@500` (aggressive **lossy**) | 16% | −36pp, *p*<0.001 (craters) | $4.00 |
+| LLMLingua-2 (**lossy**) | 26% | −26pp, *p*=0.002 (craters) | $12.03 |
+| **distil reversible + `distil_expand`** | **56%** | **+4pp, *p*=0.69 — statistically equal to full** | $16.38 |
 
-**The honest finding: aggressive compression significantly degrades real task success, and a decision-equivalence certificate earned on a single-turn localization proxy does _not_ transfer to multi-turn coding.** This is the opposite of "compression is free," and we publish it because it's true. Two consequences we act on:
+**Two honest findings, both real:**
+1. **Aggressive _lossy_ compression significantly degrades end-to-end task success** — and a decision-equivalence certificate earned on a single-turn proxy does **not** transfer to multi-turn coding. The opposite of "compression is free." We publish it because it's true.
+2. **Distil's _reversible_ tier (digest + recover-on-demand) survives execution** — task-equivalent to full context (56% vs 52%, McNemar *p*=0.69; it resolves 22 instances `trunc@500` failed). Keep the information **recoverable** and the agent pulls back exactly what it edits.
 
-- `trunc@500` is distil's *aggressive lossy* rung; it is the wrong operating point for code. Distil's **reversible tier** (digest + `distil_expand` recover-on-demand) lets the model pull back any file it needs — we are measuring *that* end-to-end now (early data: it preserves the information but the recovery round-trips can erode the token savings on code). Results land in [`docs/PAPER.md`](docs/PAPER.md).
-- The defensible use today is **cache-aware savings on the periphery** (old turns, skimmed output) with the working set kept full — not blanket aggressive compression of code the agent must edit.
+**The catch (also honest):** on coding the agent expands most of what it edits, so the *realised* token saving of the reversible tier is **only ~7%** ($16.38 vs $17.63) — not the proxy headline ratios. The real savings come from periphery the agent never expands. So: **recoverable compression = task-success parity at a modest discount on agentic coding**, not 80%-off.
 
-Full methodology, per-instance data, and the certificate-non-transfer analysis: [`docs/PAPER.md`](docs/PAPER.md) §E7 and the committed results in `docs/paper/results/swe_e2e/`.
+Full methodology, per-instance data, McNemar tests, and the certificate-non-transfer analysis: [`docs/PAPER.md`](docs/PAPER.md) · paper §E7 · committed results in `docs/paper/results/swe_e2e/`.
 
 ---
 

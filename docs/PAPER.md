@@ -232,24 +232,30 @@ problem statement) is compressed in flight.
 | condition | ctx reduction | pass@1 | 95% CI (Wilson) | resolved | cost |
 |---|--:|--:|---|--:|--:|
 | **A. full context** | — | **52.0%** | [38.5%, 65.2%] | 26/50 | $17.63 |
-| **B. distil `trunc@500`** (certified op-point) | 86% | **16.0%** | [8.3%, 28.5%] | 8/50 | $4.00 |
-| **C. LLMLingua-2** (default rate) | 48% | **26.0%** | [15.9%, 39.6%] | 13/50 | $12.03 |
+| **B. distil `trunc@500`** (aggressive **lossy**) | 86% | **16.0%** | [8.3%, 28.5%] | 8/50 | $4.00 |
+| **C. LLMLingua-2** (**lossy**) | 48% | **26.0%** | [15.9%, 39.6%] | 13/50 | $12.03 |
+| **D. distil reversible + `distil_expand`** | 81%* | **56.0%** | [42.3%, 68.8%] | 28/50 | $16.38 |
 
-Paired exact McNemar (same 50 instances): **distil vs. full `p<0.001`** (20 lost, 2
-gained), **LLMLingua-2 vs. full `p=0.002`**, **distil vs. LLMLingua-2 `p=0.18`** (n.s.).
+Paired exact McNemar (same 50 instances): **B vs. full `p<0.001`** (20 lost, 2 gained),
+**C vs. full `p=0.002`**, **C vs. B `p=0.18`** (n.s.), **D vs. full `p=0.69`** (n.s. —
+*statistically equal to full*), **D vs. B `p<0.001`** (D recovers 22 instances B failed).
+\*For D, 81% is the *pre-recovery* digest view; the realised cost is $16.38 vs. $17.63 for
+full (~7% cheaper) after the model's `distil_expand` calls.
 
-**Findings, reported without cherry-picking.** (1) Both compressed conditions
-**significantly** collapse pass@1 vs. full context — compression at these operating points
-does **not** survive real execution. (2) distil's certified `trunc@500` (16.0%) trails
-LLMLingua-2 (26.0%) on point estimate but **not significantly** at n=50, and it compresses
-~1.8× harder (86% vs. 48% of context removed), so its lower score is confounded with
-aggression, not established as a method gap. (3) The headline: **the localization
-certificate does not transfer to execution** — `trunc@500` was *certified* at 4.0%
-decision-change (E6) yet collapses end-to-end success by 36 points. The decision-equivalence
-contract is sound for what it measures (the calibration distribution); it is **not** a
-task-success guarantee once compression is aggressive. Harness, runners, and the full
-per-instance breakdown: `benchmarks/swe_bench_e2e/` and
-`docs/paper/results/swe_bench_verified_e2e.json`. Total API spend: $33.66.
+**Findings, reported without cherry-picking.** (1) Both **lossy** conditions (B, C)
+**significantly** collapse pass@1 vs. full — aggressive lossy compression does **not**
+survive real execution. (2) The **localization certificate does not transfer**:
+`trunc@500` was *certified* at 4.0% decision-change (E6) yet collapses end-to-end success
+by 36 points; a decision-equivalence guarantee on a single-turn proxy is **not** a
+task-success guarantee once lossy compression is aggressive. (3) **But distil's reversible
+tier (D) survives execution** — digest + recover-on-demand is end-to-end **task-equivalent
+to full context** (56.0% vs. 52.0%, McNemar `p=0.69`) and decisively beats the lossy
+conditions, because the agent pulls back the byte-exact content it edits (every instance
+expanded; 135 recoveries total). (4) The honest catch: D's *realised* coding savings are
+**modest (~7%)** — the agent expands most of what it edits — so the win is *task-success
+parity at a modest discount*, not the proxy headline ratios. **Keep compression
+recoverable.** Per-instance breakdown: `benchmarks/swe_bench_e2e/` and
+`docs/paper/results/swe_bench_verified_e2e.json`. Total API spend: $50.04.
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
