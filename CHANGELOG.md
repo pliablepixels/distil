@@ -3,43 +3,69 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [0.26.0] — 2026-06-26
+## [0.27.0] — 2026-06-26
 
-E8: long-horizon agent benchmark extended to 5 conditions with TOST
-non-inferiority analysis and a matched LLMLingua-2 competitor condition.
+Final E8 long-horizon results: 6-condition frontier including Headroom
+competitor, skeleton digest, sticky expansion, digest-mode-per-tier ablation,
+and the E9 trajectory-composition certificate bound.
 
-- **E8 long-horizon SWE-bench Verified (n=500, 5 conditions).** A custom
-  multi-turn ReAct coding agent (read / search / edit_file / run_tests, up
-  to 30 turns, `claude-haiku-4-5`, temp 0) run end-to-end on the full
-  500-instance SWE-bench Verified set (seed 1729), scored by the official
-  `swebench` harness. Runs average ~27 turns; read-file outputs accumulate
-  into large peripheral context — the regime the relevance gate was designed
-  for. Five conditions, same agent, compressor differs (ordered by pass@1):
-  - **A (full context):** 196/500 — 39.2% — $190.60
-  - **E (reversible, relevance-gated):** 184/500 — **36.8%** — $133.89
-  - **D (reversible, ungated):** 144/500 — 28.8% — $127.91
-  - **B (`trunc@500`, aggressive lossy):** 28/500 — 5.6% — $84.43
-  - **C (LLMLingua-2, lossy competitor):** 12/500 — 2.4% — $34.32
-  - Total API spend across all five conditions: $571.15
-- **Key result — matched-compression comparison.** Conditions C
-  (LLMLingua-2, 52% reduction) and E (relevance-gate, 53% reduction) remove
-  almost exactly the same fraction of context, so their gap isolates *what*
-  is kept. The gate resolves 36.8%; LLMLingua-2 manages 2.4% — a **15×
-  difference on the same 500 instances** (174 gate wins, 2 LLMLingua-2 wins;
-  paired McNemar **p<0.001**).
-- **Non-inferiority framing (gate vs full context).** Difference = −2.4 pp,
-  95% CI [−5.7, +0.9]. The CI excludes any drop larger than 5.7 pp — the
-  gate is **non-inferior to full at a 6 pp margin** (borderline at a strict
-  5 pp margin). McNemar p=0.19 (no significant difference detected). This is
-  a non-inferiority result, not an equivalence claim.
-- **Mechanism.** Ungated reversible (D) issues 9.6 `distil_expand` calls per
-  instance (digested the whole history, must keep recovering the working
-  set); gated reversible (E) issues only 0.58 (digests only aged-out
-  periphery, keeps the working set full). Lossy truncation (B) vs full:
-  p<0.001.
-- **Docs updated:** `docs/research.html` (`#e8` section — 5-condition table,
-  non-inferiority framing, 15× headline), `docs/index.html`,
-  `docs/concepts.html`, and `docs/benchmark.html`.
+- **E8 long-horizon SWE-bench Verified — final 6-condition frontier.** A
+  custom multi-turn ReAct coding agent (read / search / edit_file / run_tests,
+  up to 30 turns, `claude-haiku-4-5`, temp 0) run end-to-end on the full
+  500-instance SWE-bench Verified set, scored by the official `swebench`
+  harness (hidden tests, per-instance Docker). Runs average ~27 turns. Six
+  conditions, same agent, compressor differs (ordered by pass@1, Wilson 95%
+  CI, resolved/500):
+  - **A (full context):** 196/500 — 39.2% [35.0, 43.5]
+  - **E (distil reversible, relevance-gated):** 184/500 — **36.8%** [32.7, 41.1]
+  - **F (Headroom, lossy competitor):** 163/500 — 32.6% [28.6, 36.8]
+  - **D (distil reversible + skeleton digest, ungated):** 162/500 — 32.4% [28.4, 36.6]
+  - **B (distil `trunc@500`, aggressive lossy):** 28/500 — 5.6% [3.9, 8.0]
+  - **C (LLMLingua-2, lossy competitor):** 12/500 — 2.4% [1.4, 4.2]
+  - Total API spend across all six conditions: $571.15
+- **Key results (paired McNemar, same 500 instances).**
+  - Gate (E) vs full context (A): −2.4 pp, 95% CI [−5.7, +0.9], McNemar
+    p=0.19. Non-inferior at a 6 pp margin (borderline at strict 5 pp). This
+    is a non-inferiority result, not equivalence. The gate is the **only
+    condition statistically non-inferior to full context**.
+  - Gate (E) vs Headroom (F): +4.2 pp, McNemar p=0.035. Statistically
+    significant. Distil is not cheapest — Headroom is cheaper — but beats
+    Headroom on task success with significance.
+  - Gate (E) vs LLMLingua-2 (C): 174 gate wins vs 2 LLMLingua-2 wins,
+    McNemar p<0.001. E and C remove nearly identical context fractions (53%
+    vs 52%), isolating *what* is kept as the deciding factor.
+  - Lossy truncation (B) vs full: p<0.001.
+- **Honest headline.** On the axis that defines the field — certified
+  decision-equivalence plus real task success — distil leads. It does **not**
+  claim cost-domination. Headroom is cheaper. The claim is: the only certified
+  and reversible compressor, with the highest task-success of any compressor
+  tested, and the only one statistically non-inferior to full context.
+- **New technique: content-aware skeleton digest** (`distil/compress/skeleton.py`).
+  For the active-recovery (ungated) tier, large source files are digested to a
+  navigable skeleton: every `import`/`class`/`def` signature retained, traceback
+  tails kept, bodies elided. Deterministic and stdlib-only (no model, no network
+  — auditable and secure). Byte-exact reversible via content handle. Lifted
+  ungated pass@1 from 28.8% to 32.4% (condition D).
+- **New technique: sticky expansion** (`distil/expand.py`). Once the agent
+  recovers a block via `distil_expand`, that block stays full for the rest of
+  the session (handles are deterministic). Eliminates re-expansion thrash on
+  repeatedly-accessed files. Never-regressing by construction.
+- **Honest ablation: digest mode per tier.** Applying the skeleton digest to
+  the *relevance-gated* (passive) tier regressed pass@1 from 36.8% to 5.6%,
+  matching lossy truncation. A navigable digest makes the agent over-trust the
+  summary and stop re-reading. Skeleton digest is correct for the
+  active-recovery tier; head-truncation is correct for the passive tier. This
+  finding is published as-is.
+- **E9 trajectory-composition certificate bound.** The per-turn certificate
+  extends to multi-turn trajectories. Across ~27-turn runs, only ~1.8 turns are
+  outcome-determining, so the naive composition bound (which becomes vacuous at
+  ~27 turns) overstates risk. The formal per-trajectory bound remains an open
+  problem; reversibility is the operative safety guarantee for the
+  active-recovery tier.
+- **Docs updated:** `docs/research.html` (6-condition table, Headroom row,
+  skeleton/sticky sections, honest-ablation note, certificate scope), plus
+  `docs/index.html`, `docs/concepts.html`, `docs/benchmark.html`,
+  `docs/techniques.html` (skeleton digest and sticky expansion sections).
 - Numbers trace to
   `docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json`.
 

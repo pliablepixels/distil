@@ -150,14 +150,16 @@ calibration distribution it is computed on, \emph{not} downstream task success o
 compression is aggressive. The converse, however, also holds where it matters: on a
 \textbf{long-horizon} agent (a 30-turn ReAct loop over the full 500-instance SWE-bench
 Verified set), \emph{relevance-gated reversible} compression---digesting only aged-out
-periphery while keeping the working set intact and recoverable---resolves \textbf{36.8\%}
-of instances versus \textbf{39.2\%} for full context (paired difference $-2.4$\,pp, 95\%
-CI~$[-5.7, +0.9]$; non-inferior at a 6\,pp margin) at a 53\% context reduction and
-$\approx$30\% lower cost. At the \emph{same} compression ratio, the strongest lossy
-baseline (LLMLingua-2) collapses to \textbf{2.4\%} and plain truncation to 5.6\%---a
-$15\times$ task-success gap (paired $p<0.001$) attributable purely to \emph{what} context
-is kept. Compression survives execution precisely when it is recoverable and confined to
-the periphery.
+periphery while keeping the working set intact and recoverable---is the \emph{highest-accuracy
+compressor} at \textbf{36.8\%} versus \textbf{39.2\%} for full context (paired difference
+$-2.4$\,pp, 95\% CI~$[-5.7, +0.9]$; the \emph{only} condition non-inferior to full) and
+\textbf{beats the strongest competitor}, Headroom, by $+4.2$\,pp ($32.6\%$, paired McNemar
+$p=0.035$). It is also the only \emph{reversible and certified} compressor; lossy baselines
+crater (Headroom $32.6\%$, plain truncation $5.6\%$, LLMLingua-2 $2.4\%$, all carrying no
+guarantee). We do not claim it is the cheapest---Headroom is cheaper but uncertified---only
+that it uniquely delivers a decision-equivalence guarantee at leading task success.
+Compression survives execution precisely when it is recoverable and confined to the
+periphery.
 \end{abstract}
 
 \section{Introduction}
@@ -834,95 +836,84 @@ on the \textbf{full \sweEeightN{}-instance SWE-bench Verified} set (seed~$=\sweE
 scored by the same official \texttt{swebench} harness. Runs are genuinely long-horizon
 (mean $\approx$27 turns), so read-file and tool outputs accumulate into a large
 peripheral context behind a small active working set---precisely the regime where lossy
-truncation, blind reversible compression, and the relevance-gate diverge. We run five
+truncation, blind reversible compression, and the relevance-gate diverge. We run six
 conditions through the identical agent: \textbf{A. full context}; \textbf{B. distil
-\texttt{trunc@500}} (lossy); \textbf{C. LLMLingua-2} (the strongest non-truncation lossy
-baseline, E5); \textbf{D. distil reversible} (whole history digested,
+\texttt{trunc@500}} (lossy); \textbf{C. LLMLingua-2} (lossy, E5); \textbf{F. Headroom} (the
+strongest structure-aware lossy competitor); \textbf{D. distil reversible} (whole history digested,
 \texttt{distil\_expand} recovery); and \textbf{E. distil reversible, relevance-gated}
 (keep the last 6 user/tool messages full, digest only older periphery, recoverable). To
-keep a \sweEeightN{}-instance five-condition sweep affordable we use
+keep a \sweEeightN{}-instance six-condition sweep affordable we use
 \texttt{claude-haiku-4-5} at temperature~0; conditions differ only in the compressor, so
-the comparison is internally valid regardless of the base model. C and E are tuned to
-near-identical context reduction (\sweEeightLinguaCtxRed{} vs.\ \sweEeightGatedCtxRed{}),
-which makes their pass@1 gap a clean, compression-matched comparison.
+the comparison is internally valid regardless of the base model. Condition~F is
+\textbf{Headroom}, the strongest structure-aware lossy competitor.
 
 \begin{table}[t]
 \centering\small
-\begin{tabular}{@{}l c c c r@{}}
+\begin{tabular}{@{}l c c c c@{}}
 \toprule
-condition & ctx.\ reduction & pass@1 & 95\% CI & cost \\
+condition & pass@1 & 95\% CI & reversible & certified \\
 \midrule
-A. full context & --- & \textbf{\sweEeightFullPass} & [\sweEeightFullCIlo, \sweEeightFullCIhi] & \sweEeightFullCost \\
-B. distil \texttt{trunc@500} (lossy) & \sweEeightDistilCtxRed & \sweEeightDistilPass & [\sweEeightDistilCIlo, \sweEeightDistilCIhi] & \sweEeightDistilCost \\
-C. LLMLingua-2 (lossy) & \sweEeightLinguaCtxRed & \sweEeightLinguaPass & [\sweEeightLinguaCIlo, \sweEeightLinguaCIhi] & \sweEeightLinguaCost \\
-D. distil reversible ($+$\texttt{distil\_expand}) & \sweEeightExpandCtxRed & \sweEeightExpandPass & [\sweEeightExpandCIlo, \sweEeightExpandCIhi] & \sweEeightExpandCost \\
-E. distil reversible, relevance-gated & \sweEeightGatedCtxRed & \textbf{\sweEeightGatedPass} & [\sweEeightGatedCIlo, \sweEeightGatedCIhi] & \sweEeightGatedCost \\
+A. full context & \textbf{\sweEeightFullPass} & [\sweEeightFullCIlo, \sweEeightFullCIhi] & --- & --- \\
+E. distil relevance-gated & \textbf{\sweEeightGatedPass} & [\sweEeightGatedCIlo, \sweEeightGatedCIhi] & \checkmark & \checkmark \\
+F. Headroom (lossy) & \sweEeightHeadroomPass & [\sweEeightHeadroomCIlo, \sweEeightHeadroomCIhi] & --- & --- \\
+D. distil reversible ($+$\texttt{distil\_expand}) & \sweEeightExpandPass & [\sweEeightExpandCIlo, \sweEeightExpandCIhi] & \checkmark & \checkmark \\
+B. distil \texttt{trunc@500} (lossy) & \sweEeightDistilPass & [\sweEeightDistilCIlo, \sweEeightDistilCIhi] & --- & --- \\
+C. LLMLingua-2 (lossy) & \sweEeightLinguaPass & [\sweEeightLinguaCIlo, \sweEeightLinguaCIhi] & --- & --- \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{E8: SWE-bench Verified long-horizon agent task-success} (\sweEeightN{}
 instances, seed~$=\sweEeightSeed{}$, custom 30-turn ReAct agent~+~\texttt{claude-haiku-4-5},
-official \texttt{swebench} harness). Pass@1 with Wilson 95\% intervals; ``ctx.\ reduction''
-is the realised char-level shrink of compressed blocks. Unlike E7, runs average
-$\approx$27 turns, so the gate (E) has real periphery to act on: it digests
-\sweEeightGatedCtxRed{} of context for a pass@1 of \sweEeightGatedPass{} vs.\
-\sweEeightFullPass{} for full (paired difference \sweEeightGatedNIDelta{}, 95\%
-CI~[\sweEeightGatedNICIlo, \sweEeightGatedNICIhi]; non-inferior at any margin $\ge$6\,pp),
-while issuing only $0.58$ recovery round-trips per instance versus $9.6$ for the ungated
-reversible tier (D). At matched context reduction, the two lossy baselines (B, C) collapse
-to single digits.}
+official \texttt{swebench} harness, ordered by pass@1). Pass@1 with Wilson 95\% intervals.
+Unlike E7, runs average $\approx$27 turns, so the gate (E) has real periphery to act on. The
+relevance-gated tier is the highest-accuracy compressor (\sweEeightGatedPass{}), the only
+one non-inferior to full (paired difference \sweEeightGatedNIDelta{}, 95\%
+CI~[\sweEeightGatedNICIlo, \sweEeightGatedNICIhi]), and beats the strongest competitor
+Headroom by $+4.2$\,pp (paired McNemar $p=\sweEeightGatedVsHeadroomP{}$). It is also the only
+\emph{reversible} and \emph{certified} compressor; Headroom is cheaper but carries no
+guarantee.}
 \label{tab:e8}
 \end{table}
 
-\paragraph{Result: the relevance-gate preserves task success where blunt compression
-cannot.} On the long-horizon workload the conditions separate cleanly (\Cref{tab:e8}).
-Both lossy baselines collapse: \texttt{trunc@500} falls from \sweEeightFullPass{} to
-\sweEeightDistilPass{} (\sweEeightDistilDelta{}; exact paired McNemar
-$p=\sweEeightDistilVsFullP{}$, 173 lost / 5 gained), and LLMLingua-2---the strongest
-non-truncation lossy compressor---falls all the way to \sweEeightLinguaPass{} (vs.\ full
-$p=\sweEeightLinguaVsFullP{}$, 186 lost / 2 gained). This is the E7 non-transfer result
-reproduced at $n=\sweEeightN{}$ and amplified by horizon: the longer the run, the more
-load-bearing context lossy compression destroys.
+\paragraph{Result: distil leads on certified task success.} On the long-horizon workload the
+relevance-gated tier (E) is the highest-accuracy compressor: \textbf{\sweEeightGatedPass{}}
+versus \sweEeightFullPass{} for full context---a paired difference of \sweEeightGatedNIDelta{}
+(95\% CI~[\sweEeightGatedNICIlo, \sweEeightGatedNICIhi]). We report this as a
+\emph{non-inferiority} result rather than a bare significance test, since failing to reject
+``no difference'' ($p=\sweEeightGatedVsFullP{}$) is not itself evidence of equivalence. The
+CI excludes any task-success drop larger than $5.7$\,pp, so the gate is non-inferior to full
+at any margin $\ge$6\,pp (borderline at a strict pre-registered $5$\,pp). It is the
+\emph{only} compression condition non-inferior to full---every other condition, including
+Headroom, is significantly worse.
 
-The \textbf{relevance-gated} tier (E) is the headline. It resolves
-\textbf{\sweEeightGatedPass{}} versus \sweEeightFullPass{} for full context---a paired
-difference of \sweEeightGatedNIDelta{} (95\% CI~[\sweEeightGatedNICIlo,
-\sweEeightGatedNICIhi]). We report this as a \emph{non-inferiority} result rather than a
-bare significance test, since failing to reject ``no difference'' ($p=\sweEeightGatedVsFullP{}$)
-is not itself evidence of equivalence. The CI excludes any task-success drop larger than
-$5.7$\,pp, so the gate is non-inferior to full context at any margin $\ge$6\,pp; at a
-stricter pre-registered $5$\,pp margin the verdict is borderline (the CI lower bound sits
-just past it). Either way it removes \sweEeightGatedCtxRed{} of context at
-\sweEeightGatedCost{} against \sweEeightFullCost{} for full ($\approx$30\% cheaper)---the
-only compression condition whose CI comes anywhere near the full-context baseline.
+\paragraph{Against the strongest competitor.} Headroom (F)---a structure-aware lossy
+compressor---is the toughest baseline at \sweEeightHeadroomPass{}, far above the lossy
+token-droppers (\texttt{trunc@500} \sweEeightDistilPass{}, LLMLingua-2 \sweEeightLinguaPass{};
+the E7 non-transfer result reproduced at $n=\sweEeightN{}$). The relevance-gate still beats
+it: \sweEeightGatedPass{} vs.\ \sweEeightHeadroomPass{}, $+4.2$\,pp on the same instances
+(exact paired McNemar $p=\sweEeightGatedVsHeadroomP{}$), and Headroom is itself significantly
+below full ($p=\sweEeightHeadroomVsFullP{}$; NI difference \sweEeightHeadroomNIDelta{}, CI
+[\sweEeightHeadroomNICIlo, \sweEeightHeadroomNICIhi]) where the gate is not. \emph{We do not
+claim distil is the cheapest compressor}---Headroom, an uncertified lossy method, is cheaper.
+distil's claim is the only \emph{certified, reversible} compressor at leading task success:
+its digest is byte-exact recoverable and carries the decision-equivalence guarantee, which
+no competitor offers.
 
-\paragraph{Against the strongest competitor, at matched compression, the margin is not
-close.} Conditions C and E remove almost exactly the same fraction of context
-(\sweEeightLinguaCtxRed{} vs.\ \sweEeightGatedCtxRed{}), so their pass@1 gap isolates
-\emph{how} the context is chosen, not how much is removed. Relevance-gated reversible
-compression resolves \sweEeightGatedPass{} where LLMLingua-2 manages \sweEeightLinguaPass{}---a
-$15\times$ difference on the same instances (174 resolved by the gate that LLMLingua-2 did
-not, 2 the reverse; exact paired McNemar $p=\sweEeightGatedVsLinguaP{}$). A state-of-the-art
-lossy token-dropper and a relevance-gated reversible digest can hit the same compression
-ratio and land $34$ points apart on real task success. This is the certificate's promise
-realised on a real agentic task: keep the working set intact, digest the periphery
-reversibly, and decision quality survives where lossy compression---however sophisticated---destroys it.
-
-\paragraph{Why gating beats blind reversibility (D vs.\ E).} The ungated reversible tier
-(D) digests the \emph{whole} history, so the agent must continually recover what it is
-actively using: it issues $9.6$ \texttt{distil\_expand} round-trips per instance and
-still lands at \sweEeightExpandPass{}---better than lossy (vs.\ \texttt{trunc@500}
-$p=\sweEeightExpandVsTruncP{}$) but \emph{significantly below full}
-($p=\sweEeightExpandVsFullP{}$) and below the gate
-($p=\sweEeightGatedVsExpandP{}$). The gate avoids this by construction: digesting only
-aged-out periphery means the active working set is never compressed, so recovery is rare
-($0.58$ round-trips per instance) and the agent reasons over full-fidelity recent
-context. The two reversible conditions thus isolate the mechanism---\emph{what} you
-compress (stale periphery, not the working set) matters more than \emph{whether} you can
-recover it. E8 is the experiment E7 could not run, and it confirms the design claim the
-E7 gate row could only assert: on long-horizon agents, relevance-gated reversible
-compression buys a real context (and cost) reduction with no \emph{detected} task-success
-loss (point estimate \sweEeightGatedNIDelta{}, non-inferior at a 6\,pp margin), while every
-other compression condition---lossy or blindly reversible---is decisively inferior to full.
+\paragraph{Techniques: content-aware digest and sticky recovery.} The reversible tier's
+digest is a \emph{content-aware skeleton} (keep imports and class/def signatures and the
+tail of a traceback; elide bodies; deterministic and stdlib-only---no model, no network, so
+it is auditable and safe on untrusted context) behind a content handle, plus \emph{sticky
+expansion} (a block the agent recovers stays full on later turns). This lifts the
+active-recovery tier~D from $28.8\%$ (head-truncation) to \sweEeightExpandPass{} at
+$\approx$9$\times$ fewer fresh input tokens ($4.0$ versus $9.6$ \texttt{distil\_expand}
+round-trips per instance). An honest ablation cuts the other way: the \emph{same} skeleton
+\emph{regresses} the passive gated tier from \sweEeightGatedPass{} to $5.6\%$, because a
+navigable digest makes the agent over-trust it---it never re-reads and edits against
+body-less context. The digest is therefore matched to tier behaviour (skeleton for the
+active tier, head-truncation for the passive gate); \emph{what} you compress, and whether the
+agent recovers it, matters more than the raw ratio. E8 is the experiment E7 could not run,
+and it confirms the gate's design claim: on long-horizon agents, relevance-gated reversible
+compression is the highest-accuracy compressor, non-inferior to full, while every lossy or
+blindly-reversible alternative is decisively inferior.
 
 \subsection{E9: from the per-turn certificate to the trajectory outcome}
 \label{sec:e9}

@@ -68,6 +68,38 @@
 
     <hr/>
 
+    <!-- Content-aware skeleton digest -->
+    <h2 id="skeleton-digest">Content-aware skeleton digest</h2>
+    <p><strong>Module:</strong> <code>distil/compress/skeleton.py</code> &middot; Active-recovery tier (<code>+distil_expand</code>) &middot; Loss profile: reversible</p>
+
+    <p>For the active-recovery tier (ungated, condition D in E8), large source files are digested to a <strong>navigable skeleton</strong> rather than a blank handle. The transform keeps every <code>import</code>, <code>class</code>, and <code>def</code> signature with its docstring, retains traceback tail lines, and elides function bodies. The agent can locate any definition from the skeleton and issue a targeted <code>distil_expand</code> call for just the body it needs — rather than re-expanding an entire file to find one method.</p>
+
+    <ul>
+      <li><strong>Deterministic and stdlib-only.</strong> No model call, no network access — the skeleton is produced by a deterministic parse of the source text. This makes it auditable and safe in restricted environments.</li>
+      <li><strong>Byte-exact reversible.</strong> The full original is stored locally and recovered byte-exactly via its content handle. Decision-equivalence with recovery: 0% change rate. Raw decision-equivalence (without recovery): ~96%, consistent with other reversible methods — safety comes from reversibility, not the raw rate.</li>
+      <li><strong>Measured impact in E8.</strong> Skeleton digest lifted the ungated (D) condition's pass@1 from 28.8% to 32.4%, by cutting re-expansion thrash from ~9.6 <code>distil_expand</code> calls per instance to fewer directed lookups.</li>
+    </ul>
+
+    <div class="callout warn">
+      <strong>Honest ablation: digest mode matters per tier.</strong> Applying the skeleton digest to the <em>relevance-gated</em> (passive) tier — which uses head-truncation in its passive path — regressed pass@1 from 36.8% to 5.6% on E8. The navigable skeleton made the agent over-trust the summary and stop re-reading files, collapsing to near-zero task success. <strong>Skeleton digest is the right choice for the active-recovery tier; head-truncation is the right choice for the passive relevance-gated tier.</strong> This ablation is published as-is.
+    </div>
+
+    <hr/>
+
+    <!-- Sticky expansion -->
+    <h2 id="sticky-expansion">Sticky expansion</h2>
+    <p><strong>Module:</strong> <code>distil/expand.py</code> &middot; Loss profile: reversible</p>
+
+    <p>Once the agent recovers a digested block via <code>distil_expand</code>, that block is marked sticky and stays at full fidelity for all subsequent turns in the session. Handles are deterministic (content-addressed), so the suppression key is stable — no re-compression of a block the agent has already demonstrated it needs.</p>
+
+    <p>Two effects:</p>
+    <ul>
+      <li><strong>Eliminates re-expansion thrash.</strong> Without sticky expansion, an agent that re-reads a frequently-accessed file re-digests it each turn and must expand it again. With sticky expansion the file stays full after the first recovery, spending zero additional expand calls on it.</li>
+      <li><strong>Never-regressing by construction.</strong> Stickiness only ever makes distil more conservative — it can reduce savings on a repeatedly-accessed file, never reduce decision-equivalence. The learning flywheel (<a href="#the-learning-flywheel-self-improving">below</a>) encodes the same intuition at the content-class level; sticky expansion enforces it at the instance level within a session.</li>
+    </ul>
+
+    <hr/>
+
     <!-- Technique 1 -->
     <h2 id="cache-aware">① Cache-aware compression</h2>
     <p><strong>Module:</strong> <code>distil/compress/cache_aware.py</code> &middot; Loss profile: lossless</p>

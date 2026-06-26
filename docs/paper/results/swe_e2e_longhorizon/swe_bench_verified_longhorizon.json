@@ -1,10 +1,10 @@
 {
-  "experiment": "E8",
+  "experiment": "E8: SWE-bench Verified long-horizon agent task-success",
   "dataset": "princeton-nlp/SWE-bench_Verified",
   "split": "test",
   "seed": 1729,
   "n": 500,
-  "agent": "long-horizon ReAct",
+  "agent": "long-horizon ReAct (custom, 30-turn)",
   "model": "claude-haiku-4-5",
   "temperature": 0.0,
   "harness": "swebench 4.1.0 (official run_evaluation, namespace=swebench, x86_64 under emulation)",
