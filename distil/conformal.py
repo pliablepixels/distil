@@ -65,6 +65,28 @@ def hb_pvalue(rhat: float, n: int, alpha: float) -> float:
     return min(1.0, _hoeffding_p(rhat, n, alpha), _bentkus_p(rhat, n, alpha))
 
 
+def certified_risk_bound(rhat: float, n: int, delta: float) -> float:
+    """The (1−δ) upper confidence bound on a 0/1 risk — the smallest α the data certifies.
+
+    Inverts :func:`hb_pvalue`: returns the smallest α for which we can reject H₀: risk ≥ α
+    at level δ (``hb_pvalue(rhat, n, α) ≤ δ``). The guarantee is one-sided and
+    distribution-free: ``P(true risk ≤ returned bound) ≥ 1 − δ``. Used to certify a single
+    operating point (e.g. a trajectory-outcome divergence rate) rather than select among a
+    ladder. Returns 1.0 if nothing below 1 certifies (n too small / rhat too high)."""
+    if n <= 0:
+        return 1.0
+    lo, hi = rhat, 1.0
+    if hb_pvalue(rhat, n, hi) > delta:
+        return 1.0
+    for _ in range(60):  # bisection to ~1e-18; 60 iters is overkill-safe
+        mid = (lo + hi) / 2
+        if hb_pvalue(rhat, n, mid) <= delta:
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
 # --------------------------------------------------------------------------- #
 # Selection procedures
 # --------------------------------------------------------------------------- #

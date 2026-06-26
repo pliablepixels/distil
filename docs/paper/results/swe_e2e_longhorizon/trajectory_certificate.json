@@ -1,0 +1,28 @@
+{
+  "candidate": "distil_gated",
+  "reference": "full",
+  "n": 500,
+  "delta": 0.05,
+  "divergence": {
+    "empirical_rate": 0.144,
+    "certified_bound": 0.1801,
+    "oos": {
+      "coverage": 0.954,
+      "target": 0.95,
+      "mean_certified_beta": 0.1964,
+      "mean_test_rate": 0.1445,
+      "reps": 1000
+    }
+  },
+  "harm": {
+    "empirical_rate": 0.084,
+    "certified_bound": 0.1137,
+    "oos": {
+      "coverage": 0.967,
+      "target": 0.95,
+      "mean_certified_beta": 0.1283,
+      "mean_test_rate": 0.084,
+      "reps": 1000
+    }
+  }
+}
