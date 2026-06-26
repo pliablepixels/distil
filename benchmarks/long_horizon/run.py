@@ -44,7 +44,8 @@ from benchmarks.swe_bench_e2e.run_agent import (
     make_worktree,
     remove_worktree,
 )
-from benchmarks.long_horizon.agent import MODEL, TEMPERATURE, run_agent
+from benchmarks.long_horizon.agent import MODEL, TEMPERATURE, run_agent, run_agent_openai
+from benchmarks.swe_bench_e2e.compress_proxy_openai import serve as serve_openai
 
 ROOT = Path(__file__).resolve().parents[2]
 CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "distil_expand", "distil_gated")
@@ -72,8 +73,19 @@ def run_instance(
     work_root: Path,
     timeout: float,
     max_turns: int,
+    *,
+    backend: str = "anthropic",
+    upstream: str = "http://127.0.0.1:11434/v1",
+    model: str = MODEL,
 ) -> dict[str, Any]:
-    """Run one SWE-bench instance under ``condition`` and return a prediction row."""
+    """Run one SWE-bench instance under ``condition`` and return a prediction row.
+
+    ``backend`` selects the agent + proxy pair:
+    * ``"anthropic"`` — Anthropic Messages API via :func:`run_agent` (default).
+    * ``"openai"``    — OpenAI Chat-Completions via :func:`run_agent_openai`;
+      the proxy is :func:`compress_proxy_openai.serve` and ``upstream`` is the
+      local model base URL (e.g. Ollama at ``http://127.0.0.1:11434/v1``).
+    """
     iid = inst["instance_id"]
     clone = ensure_clone(inst["repo"], cache_dir)
     with _get_clone_lock(clone):
@@ -81,22 +93,41 @@ def run_instance(
 
     # The problem statement is the task definition — protect it from compression so
     # conditions are compared on equal footing (same task, only context compressed).
-    httpd, state = serve(
-        compressor=COMPRESSORS[condition],
-        protect=inst["problem_statement"],
-        expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
-        gate_recent=(GATE_RECENT if condition == GATED_CONDITION else None),
-    )
+    if backend == "openai":
+        httpd, state = serve_openai(
+            compressor=COMPRESSORS[condition],
+            upstream=upstream,
+            protect=inst["problem_statement"],
+            expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
+        )
+    else:
+        httpd, state = serve(
+            compressor=COMPRESSORS[condition],
+            protect=inst["problem_statement"],
+            expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
+            gate_recent=(GATE_RECENT if condition == GATED_CONDITION else None),
+        )
     base_url = f"http://127.0.0.1:{httpd.server_address[1]}"
     try:
-        meta = run_agent(
-            problem_statement=inst["problem_statement"],
-            worktree=wt,
-            base_url=base_url,
-            api_key=api_key,
-            max_turns=max_turns,
-            timeout=timeout,
-        )
+        if backend == "openai":
+            meta = run_agent_openai(
+                worktree=wt,
+                problem_statement=inst["problem_statement"],
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                max_turns=max_turns,
+                timeout=timeout,
+            )
+        else:
+            meta = run_agent(
+                problem_statement=inst["problem_statement"],
+                worktree=wt,
+                base_url=base_url,
+                api_key=api_key,
+                max_turns=max_turns,
+                timeout=timeout,
+            )
         patch = capture_patch(wt)
     finally:
         httpd.shutdown()
@@ -110,7 +141,7 @@ def run_instance(
         "model_patch": patch,
         "_condition": condition,
         "_agent": "long_horizon_react",
-        "_model": MODEL,
+        "_model": model,
         "_temperature": TEMPERATURE,
         "_run": meta,
         "_compress": asdict(stats),
@@ -185,15 +216,63 @@ def main() -> None:
         default=1,
         help="concurrent instances; each gets its own proxy + worktree",
     )
+    ap.add_argument(
+        "--backend",
+        choices=("anthropic", "openai"),
+        default="anthropic",
+        help="agent + proxy backend: 'anthropic' (default) or 'openai' (local model via Ollama/vLLM)",
+    )
+    ap.add_argument(
+        "--upstream",
+        default=os.environ.get("OPENAI_BASE_URL", "http://127.0.0.1:11434/v1"),
+        help=(
+            "OpenAI-compatible upstream base URL (only used when --backend openai). "
+            "Defaults to OPENAI_BASE_URL env var or http://127.0.0.1:11434/v1 (Ollama)."
+        ),
+    )
+    ap.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Model identifier sent in each request. Defaults to claude-sonnet-4-6 for "
+            "--backend anthropic; required for --backend openai (e.g. qwen2.5-coder:32b)."
+        ),
+    )
+    ap.add_argument(
+        "--api-key-env",
+        default=None,
+        help=(
+            "Environment variable holding the API key. Defaults to ANTHROPIC_API_KEY for "
+            "--backend anthropic, OPENAI_API_KEY for --backend openai. "
+            "For Ollama any non-empty value works; pass --api-key-env '' to use 'ollama'."
+        ),
+    )
     args = ap.parse_args()
+
+    # Resolve model default per backend.
+    effective_model = args.model
+    if effective_model is None:
+        if args.backend == "openai":
+            raise SystemExit(
+                "--model is required for --backend openai (e.g. --model qwen2.5-coder:32b)"
+            )
+        effective_model = MODEL  # claude-sonnet-4-6
 
     from dotenv import dotenv_values
 
-    api_key = dotenv_values(ROOT / ".env").get("ANTHROPIC_API_KEY") or os.environ.get(
-        "ANTHROPIC_API_KEY", ""
-    )
-    if not api_key:
-        raise SystemExit("no ANTHROPIC_API_KEY available (.env or env)")
+    env_vals = dotenv_values(ROOT / ".env")
+
+    if args.backend == "openai":
+        key_env = args.api_key_env if args.api_key_env is not None else "OPENAI_API_KEY"
+        api_key = (env_vals.get(key_env) or os.environ.get(key_env, "")) if key_env else "ollama"
+        if not api_key:
+            # Ollama accepts any non-empty bearer value — fall back gracefully.
+            api_key = "ollama"
+    else:
+        key_env = args.api_key_env if args.api_key_env is not None else "ANTHROPIC_API_KEY"
+        api_key = env_vals.get(key_env) or os.environ.get(key_env, "")
+        if not api_key:
+            raise SystemExit(f"no {key_env} available (.env or env)")
 
     instances = load_sample(args.sample)
     if args.limit:
@@ -236,6 +315,9 @@ def main() -> None:
                 args.work_root,
                 args.timeout,
                 args.max_turns,
+                backend=args.backend,
+                upstream=args.upstream,
+                model=effective_model,
             )
         except Exception as e:  # noqa: BLE001 — record failure, keep going
             row = {
@@ -244,7 +326,7 @@ def main() -> None:
                 "model_patch": "",
                 "_condition": args.condition,
                 "_agent": "long_horizon_react",
-                "_model": MODEL,
+                "_model": effective_model,
                 "_temperature": TEMPERATURE,
                 "_run": {"status": "error", "turns": 0, "seconds": round(time.time() - t0, 1)},
                 "_error": str(e)[:500],

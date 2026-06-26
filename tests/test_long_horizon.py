@@ -397,3 +397,145 @@ def test_e2e_gated_condition_digests_periphery(wt: Path) -> None:
         f"got stats={state.stats}"
     )
     assert meta["status"] == "finish"
+
+
+# --------------------------------------------------------------------------- #
+# Mock-upstream end-to-end: OpenAI loop + proxy + fake OpenAI API
+# --------------------------------------------------------------------------- #
+
+
+def _make_mock_openai_api(wt: Path) -> tuple[HTTPServer, list[dict]]:
+    """Build a mock OpenAI Chat-Completions server that drives the agent through a fixed script.
+
+    Turn 0: model calls read_file src/module.py  (finish_reason="tool_calls")
+    Turn 1: model calls finish                   (finish_reason="tool_calls")
+
+    Asserts:
+    - The agent sends a role:"tool" message back after the tool result.
+    - The loop terminates with status "finish" after the finish() call.
+    """
+    script = [
+        # Turn 0: model asks to read_file
+        {
+            "id": "chatcmpl-0",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_0",
+                                "type": "function",
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": json.dumps({"path": "src/module.py"}),
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 20},
+        },
+        # Turn 1: model calls finish
+        {
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {
+                                    "name": "finish",
+                                    "arguments": json.dumps({"reason": "done"}),
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "usage": {"prompt_tokens": 200, "completion_tokens": 10},
+        },
+    ]
+    requests_log: list[dict] = []
+    turn_index = [0]
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass  # silence
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length)
+            try:
+                body = json.loads(raw)
+            except (ValueError, TypeError):
+                body = {}
+            requests_log.append(body)
+
+            idx = turn_index[0]
+            turn_index[0] += 1
+            response = script[min(idx, len(script) - 1)]
+            payload = json.dumps(response).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    return server, requests_log
+
+
+def test_openai_loop_executes_tool_and_terminates(wt: Path) -> None:
+    """OpenAI loop: executes a tool call, appends role:'tool' message, then terminates on finish().
+
+    No real network or model — the mock server plays a two-turn script.
+    """
+    from benchmarks.long_horizon.agent import run_agent_openai
+
+    mock_server, requests_log = _make_mock_openai_api(wt)
+    mock_url = f"http://127.0.0.1:{mock_server.server_address[1]}"
+    try:
+        meta = run_agent_openai(
+            worktree=wt,
+            problem_statement="Fix the add function.",
+            base_url=mock_url,
+            api_key="test-key",
+            model="test-model",
+            max_turns=10,
+            timeout=30.0,
+        )
+    finally:
+        mock_server.shutdown()
+
+    # Agent should have terminated via finish().
+    assert meta["status"] == "finish", f"expected finish, got {meta['status']!r}"
+    assert meta["turns"] >= 1
+
+    # The second request sent to the mock must contain a role:"tool" message —
+    # that is the tool result appended after the read_file call in turn 0.
+    assert len(requests_log) >= 2, f"expected >=2 requests, got {len(requests_log)}"
+    second_request_messages = requests_log[1].get("messages", [])
+    tool_messages = [m for m in second_request_messages if m.get("role") == "tool"]
+    assert tool_messages, (
+        "expected at least one role:'tool' message in the second request to the mock server; "
+        f"got roles={[m.get('role') for m in second_request_messages]}"
+    )
+    # The tool message should carry the tool_call_id from turn 0.
+    assert tool_messages[0].get("tool_call_id") == "call_0", (
+        f"unexpected tool_call_id: {tool_messages[0].get('tool_call_id')!r}"
+    )
