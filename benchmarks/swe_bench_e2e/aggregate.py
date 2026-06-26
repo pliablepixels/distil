@@ -162,6 +162,7 @@ def paired_analysis(conditions: list[dict[str, Any]], all_ids: list[str]) -> lis
         ("distil_trunc500", "distil_expand"),
         ("full", "distil_gated"),
         ("distil_expand", "distil_gated"),
+        ("llmlingua2", "distil_gated"),
     ]
     # Pre-specified non-inferiority margin (proportion). A McNemar p only tells us whether
     # a difference exists; for pairs against full context we also ask the deployment-relevant
@@ -243,6 +244,7 @@ def write_macros(agg: dict[str, Any], path: Path, prefix: str = "sweEseven") -> 
         ("distil_trunc500", "distil_expand"): "ExpandVsTruncP",
         ("full", "distil_gated"): "GatedVsFullP",
         ("distil_expand", "distil_gated"): "GatedVsExpandP",
+        ("llmlingua2", "distil_gated"): "GatedVsLinguaP",
     }
     ni_macro = {("full", "distil_expand"): "Expand", ("full", "distil_gated"): "Gated"}
     for pr in agg.get("paired_mcnemar", []):

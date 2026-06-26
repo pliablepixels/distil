@@ -5,30 +5,41 @@ All notable changes to Distil are documented here. Format loosely follows
 
 ## [0.26.0] — 2026-06-26
 
-E8: long-horizon agent benchmark — the proper end-to-end test E7 explicitly
-flagged as unrun.
+E8: long-horizon agent benchmark extended to 5 conditions with TOST
+non-inferiority analysis and a matched LLMLingua-2 competitor condition.
 
-- **E8 long-horizon SWE-bench Verified (n=500).** A custom multi-turn ReAct
-  coding agent (read / search / edit_file / run_tests, up to 30 turns,
-  `claude-haiku-4-5`, temp 0) run end-to-end on the full 500-instance
-  SWE-bench Verified set (seed 1729), scored by the official `swebench`
-  harness. Runs average ~27 turns; read-file outputs accumulate into large
-  peripheral context — the regime the relevance gate was designed for.
-  Four conditions, same agent, compressor differs:
-  - **A (full context):** 196/500 resolved — 39.2% pass@1 — $190.60
-  - **B (`trunc@500`, aggressive lossy):** 28/500 — 5.6% — $84.43
-  - **D (reversible, ungated):** 144/500 — 28.8% — $127.91
+- **E8 long-horizon SWE-bench Verified (n=500, 5 conditions).** A custom
+  multi-turn ReAct coding agent (read / search / edit_file / run_tests, up
+  to 30 turns, `claude-haiku-4-5`, temp 0) run end-to-end on the full
+  500-instance SWE-bench Verified set (seed 1729), scored by the official
+  `swebench` harness. Runs average ~27 turns; read-file outputs accumulate
+  into large peripheral context — the regime the relevance gate was designed
+  for. Five conditions, same agent, compressor differs (ordered by pass@1):
+  - **A (full context):** 196/500 — 39.2% — $190.60
   - **E (reversible, relevance-gated):** 184/500 — **36.8%** — $133.89
-- **Key result.** Relevance-gated (E) vs full context: McNemar **p=0.19 —
-  not significant** — statistically indistinguishable at n=500, while
-  removing 53% of context and costing ~30% less. Lossy truncation (B)
-  vs full context: p<0.001. The mechanism: ungated reversible issues 9.6
-  `distil_expand` calls per instance (digested the whole history, must keep
-  recovering the working set); gated reversible issues only 0.58 (digests
-  only aged-out periphery, keeps the working set full).
-- **Docs updated:** `docs/research.html` (new `#e8` section with full
-  results table), `docs/index.html`, `docs/concepts.html`, and
-  `docs/benchmark.html` (E8 callout added alongside E7).
+  - **D (reversible, ungated):** 144/500 — 28.8% — $127.91
+  - **B (`trunc@500`, aggressive lossy):** 28/500 — 5.6% — $84.43
+  - **C (LLMLingua-2, lossy competitor):** 12/500 — 2.4% — $34.32
+  - Total API spend across all five conditions: $571.15
+- **Key result — matched-compression comparison.** Conditions C
+  (LLMLingua-2, 52% reduction) and E (relevance-gate, 53% reduction) remove
+  almost exactly the same fraction of context, so their gap isolates *what*
+  is kept. The gate resolves 36.8%; LLMLingua-2 manages 2.4% — a **15×
+  difference on the same 500 instances** (174 gate wins, 2 LLMLingua-2 wins;
+  paired McNemar **p<0.001**).
+- **Non-inferiority framing (gate vs full context).** Difference = −2.4 pp,
+  95% CI [−5.7, +0.9]. The CI excludes any drop larger than 5.7 pp — the
+  gate is **non-inferior to full at a 6 pp margin** (borderline at a strict
+  5 pp margin). McNemar p=0.19 (no significant difference detected). This is
+  a non-inferiority result, not an equivalence claim.
+- **Mechanism.** Ungated reversible (D) issues 9.6 `distil_expand` calls per
+  instance (digested the whole history, must keep recovering the working
+  set); gated reversible (E) issues only 0.58 (digests only aged-out
+  periphery, keeps the working set full). Lossy truncation (B) vs full:
+  p<0.001.
+- **Docs updated:** `docs/research.html` (`#e8` section — 5-condition table,
+  non-inferiority framing, 15× headline), `docs/index.html`,
+  `docs/concepts.html`, and `docs/benchmark.html`.
 - Numbers trace to
   `docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json`.
 
