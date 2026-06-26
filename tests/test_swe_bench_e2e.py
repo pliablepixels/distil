@@ -276,3 +276,26 @@ def test_ungated_digest_compresses_all_eligible():
         {"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=None
     )
     assert len(restore) == 5  # no gate ⇒ every eligible block digested
+
+
+def test_sticky_expansion_keeps_recovered_block_full_on_later_turns():
+    from benchmarks.swe_bench_e2e.compress_proxy import _handle, compress_body
+
+    block = "def f():\n" + "x" * 1500
+    msgs = [{"role": "user", "content": [{"type": "text", "text": block}]}]
+    h = _handle(block)
+
+    # Turn 1: not yet expanded -> digested.
+    r1: dict[str, str] = {}
+    out1 = compress_body(
+        {"messages": msgs}, None, CompressStats(), digest_restore=r1, expanded=set()
+    )
+    assert "distil-digest" in out1["messages"][0]["content"][0]["text"]
+
+    # Turn N: the agent already recovered this handle -> kept FULL (no re-expansion thrash),
+    # but still recorded as recoverable.
+    r2: dict[str, str] = {}
+    out2 = compress_body({"messages": msgs}, None, CompressStats(), digest_restore=r2, expanded={h})
+    txt = out2["messages"][0]["content"][0]["text"]
+    assert "distil-digest" not in txt and txt == block
+    assert r2[h] == block

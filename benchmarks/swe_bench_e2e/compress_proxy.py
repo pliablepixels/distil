@@ -147,6 +147,12 @@ DISTIL_EXPAND_TOOL = {
 }
 
 
+def _handle(text: str) -> str:
+    """Content-addressed handle for a block — deterministic across turns (same block ->
+    same handle), which is what lets the proxy recognise an already-expanded block."""
+    return hashlib.sha256(text.encode()).hexdigest()[:8]
+
+
 def digest_block(text: str, restore: dict[str, str]) -> str:
     """distil's reversible tier: replace a block with a *content-aware skeleton* (code
     signatures kept + bodies elided; head+tail for non-code) behind a content handle, and
@@ -163,7 +169,7 @@ def digest_block(text: str, restore: dict[str, str]) -> str:
     """
     if len(text) <= MIN_CHARS:
         return text
-    h = hashlib.sha256(text.encode()).hexdigest()[:8]
+    h = _handle(text)
     restore[h] = text
     body = smart_digest(text, head=DIGEST_HEAD, tail=DIGEST_TAIL)
     if len(body) >= len(text):  # skeleton not smaller (tiny/odd block) — keep head only
@@ -252,6 +258,7 @@ def compress_body(
     protect: str | None = None,
     digest_restore: dict[str, str] | None = None,
     gate_recent: int | None = None,
+    expanded: set[str] | None = None,
 ) -> dict[str, Any]:
     """Return a new request body with compressible context blocks rewritten.
 
@@ -302,9 +309,20 @@ def compress_body(
         if is_protected:
             stats.blocks_protected += 1
         inactive = compressor is None and digest_restore is None
+        # Sticky expansion: a block the agent already recovered this session stays FULL on
+        # every later turn (handles are deterministic). Without this the proxy re-digests
+        # it each turn and the agent must re-expand it — the thrash that drives expansion
+        # counts into the double digits. Keep it recoverable (record the handle) but verbatim.
+        sticky = False
+        if digest_restore is not None and expanded is not None and before > MIN_CHARS:
+            h = _handle(text)
+            if h in expanded:
+                digest_restore[h] = text
+                sticky = True
         if (
             inactive
             or gated_keep
+            or sticky
             or before < MIN_CHARS
             or role not in ("user", "tool")
             or is_protected
@@ -388,6 +406,7 @@ class ProxyState:
     protect: str | None = None  # problem statement: never compressed (task, not file content)
     expand: bool = False  # distil reversible tier: digest + distil_expand recovery loop
     gate_recent: int | None = None  # distil_gated: keep last N user/tool msgs full
+    expanded: set[str] = field(default_factory=set)  # handles recovered this session (sticky)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -460,6 +479,7 @@ def _make_handler(state: ProxyState):
                 protect=state.protect,
                 digest_restore=restore,
                 gate_recent=state.gate_recent,
+                expanded=state.expanded,
             )
             tools = list(new_body.get("tools") or [])
             if not any(isinstance(t, dict) and t.get("name") == "distil_expand" for t in tools):
@@ -495,6 +515,7 @@ def _make_handler(state: ProxyState):
                         res["content"] = full
                         with state.lock:
                             state.stats.expansions += 1
+                            state.expanded.add(h)  # sticky: keep full on later turns
                     results.append(res)
                 did_expand = True
                 new_body["messages"].append({"role": "assistant", "content": content})
