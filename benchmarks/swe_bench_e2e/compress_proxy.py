@@ -60,6 +60,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in _sys.path:
     _sys.path.insert(0, str(_ROOT))
 
+from distil.skeleton import smart_digest  # noqa: E402
 from distil.tokenizer import DEFAULT as _tokenizer  # noqa: E402
 
 UPSTREAM = "https://api.anthropic.com"
@@ -126,7 +127,8 @@ def headroom(text: str) -> str:
 # --------------------------------------------------------------------------- #
 # distil reversible tier: digest-behind-handle + recover-on-demand (distil_expand)
 # --------------------------------------------------------------------------- #
-DIGEST_HEAD = 400  # chars of head kept verbatim before the digest marker
+DIGEST_HEAD = 400  # chars of head kept verbatim (non-code fallback / tiny blocks)
+DIGEST_TAIL = 200  # chars of tail kept for non-code (tracebacks/assertions live there)
 
 DISTIL_EXPAND_TOOL = {
     "name": "distil_expand",
@@ -146,8 +148,14 @@ DISTIL_EXPAND_TOOL = {
 
 
 def digest_block(text: str, restore: dict[str, str]) -> str:
-    """distil's reversible tier: keep a head, fold the tail behind a content handle,
-    and record handle->original in ``restore`` so the proxy can recover it on demand.
+    """distil's reversible tier: replace a block with a *content-aware skeleton* (code
+    signatures kept + bodies elided; head+tail for non-code) behind a content handle, and
+    record handle->original in ``restore`` so the proxy can recover it on demand.
+
+    Unlike head-truncation, the skeleton is **navigable**: the agent sees every symbol
+    that exists and the exception/assertion at a traceback's tail, so it can
+    ``distil_expand`` the one block it needs instead of recovering everything. Recovery is
+    byte-exact (the original is kept), preserving the reversible-tier contract.
 
     handle = sha256(original)[:8] — the same content-addressed scheme as
     ``distil.compress.tier1`` / ``distil.replay.expand_runner``, so it is deterministic
@@ -157,9 +165,12 @@ def digest_block(text: str, restore: dict[str, str]) -> str:
         return text
     h = hashlib.sha256(text.encode()).hexdigest()[:8]
     restore[h] = text
-    hidden = len(text) - DIGEST_HEAD
+    body = smart_digest(text, head=DIGEST_HEAD, tail=DIGEST_TAIL)
+    if len(body) >= len(text):  # skeleton not smaller (tiny/odd block) — keep head only
+        body = text[:DIGEST_HEAD]
+    hidden = len(text) - len(body)
     return (
-        text[:DIGEST_HEAD]
+        body
         + f"\n<<distil-digest: {hidden} more chars hidden; "
         + f'call distil_expand(handle="{h}") to view the full block>>'
     )
