@@ -299,3 +299,25 @@ def test_sticky_expansion_keeps_recovered_block_full_on_later_turns():
     txt = out2["messages"][0]["content"][0]["text"]
     assert "distil-digest" not in txt and txt == block
     assert r2[h] == block
+
+
+def test_gated_cache_breakpoint_at_stable_boundary():
+    from benchmarks.swe_bench_e2e.compress_proxy import GATE_RECENT, compress_body
+
+    msgs = [{"role": "system", "content": "sys"}]
+    for i in range(10):
+        msgs.append({"role": "user", "content": [{"type": "text", "text": f"F{i}\n" + "x" * 1500}]})
+    out = compress_body(
+        {"messages": msgs}, None, CompressStats(), digest_restore={}, gate_recent=GATE_RECENT
+    )
+    marked = [
+        i
+        for i, m in enumerate(out["messages"])
+        if isinstance(m.get("content"), list)
+        and any(isinstance(b, dict) and "cache_control" in b for b in m["content"])
+    ]
+    ut = [i for i, m in enumerate(out["messages"]) if m.get("role") in ("user", "tool")]
+    ws_start = ut[-GATE_RECENT]
+    # exactly one breakpoint, at the last periphery message before the working set —
+    # caches the byte-stable digested prefix (read) instead of re-creating it each turn.
+    assert marked == [ws_start - 1]

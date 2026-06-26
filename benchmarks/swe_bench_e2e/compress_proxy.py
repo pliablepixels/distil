@@ -384,7 +384,30 @@ def compress_body(
                 else:
                     new_content.append(block)
         new_messages.append({**msg, "content": new_content})
+
+    # Cache-stability for the relevance gate: the digested periphery is deterministic and
+    # grows append-only, so the whole prefix BEFORE the working set is byte-stable across
+    # turns. Placing a cache breakpoint at that boundary lets Anthropic serve the stable
+    # prefix as a 0.1x cache READ instead of re-CREATING it every turn (the failure mode of
+    # a single end-of-prompt breakpoint, where the sliding working set invalidates the
+    # suffix). Only meaningful in gated mode (keep_full set).
+    if keep_full:
+        first_ws = min(keep_full)
+        if first_ws > 0:
+            _mark_block_cache(new_messages[first_ws - 1])
     return {**body, "messages": new_messages}
+
+
+def _mark_block_cache(msg: Any) -> None:
+    """Set an ephemeral cache_control on the last content block of ``msg`` (in place)."""
+    if not isinstance(msg, dict):
+        return
+    content = msg.get("content")
+    if isinstance(content, list):
+        for b in reversed(content):
+            if isinstance(b, dict):
+                b["cache_control"] = {"type": "ephemeral"}
+                return
 
 
 def _rewrite_tool_result(
