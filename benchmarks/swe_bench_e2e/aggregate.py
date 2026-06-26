@@ -29,7 +29,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from benchmarks.swe_bench_e2e.stats import wilson_ci  # noqa: E402
+from benchmarks.swe_bench_e2e.stats import noninferiority_paired, wilson_ci  # noqa: E402
 from distil.pricing import get as get_pricing  # noqa: E402
 
 CONDITIONS = [
@@ -40,6 +40,9 @@ CONDITIONS = [
     ("distil_gated", "E. distil (reversible, relevance-gated)"),
 ]
 MODEL = "claude-sonnet-4-6"
+# Pre-specified non-inferiority margin for pass@1 vs full context (5 pp absolute). Declared
+# before scoring; we report the paired difference + 95% CI so any margin can be applied.
+NI_MARGIN = 0.05
 
 
 def _cost_usd(usage: dict[str, int]) -> float:
@@ -160,20 +163,28 @@ def paired_analysis(conditions: list[dict[str, Any]], all_ids: list[str]) -> lis
         ("full", "distil_gated"),
         ("distil_expand", "distil_gated"),
     ]
+    # Pre-specified non-inferiority margin (proportion). A McNemar p only tells us whether
+    # a difference exists; for pairs against full context we also ask the deployment-relevant
+    # question — is b no worse than a by more than NI_MARGIN? — via a paired NI test.
+    ni_against_full = {"full"}
     out = []
     for a, b in pairs:
         a_only = sum(1 for i in all_ids if res[a][i] and not res[b][i])
         b_only = sum(1 for i in all_ids if not res[a][i] and res[b][i])
-        out.append(
-            {
-                "a": a,
-                "b": b,
-                "a_only": a_only,
-                "b_only": b_only,
-                "discordant": a_only + b_only,
-                "mcnemar_p": round(_mcnemar_exact(a_only, b_only), 4),
-            }
-        )
+        entry = {
+            "a": a,
+            "b": b,
+            "a_only": a_only,
+            "b_only": b_only,
+            "discordant": a_only + b_only,
+            "mcnemar_p": round(_mcnemar_exact(a_only, b_only), 4),
+        }
+        # b is the candidate, a the reference: a_only = candidate losses, b_only = gains.
+        if a in ni_against_full:
+            entry["noninferiority"] = noninferiority_paired(
+                b=a_only, c=b_only, n=len(all_ids), margin=NI_MARGIN
+            )
+        out.append(entry)
     return out
 
 
@@ -233,10 +244,22 @@ def write_macros(agg: dict[str, Any], path: Path, prefix: str = "sweEseven") -> 
         ("full", "distil_gated"): "GatedVsFullP",
         ("distil_expand", "distil_gated"): "GatedVsExpandP",
     }
+    ni_macro = {("full", "distil_expand"): "Expand", ("full", "distil_gated"): "Gated"}
     for pr in agg.get("paired_mcnemar", []):
         key = pair_macro.get((pr["a"], pr["b"]))
         if key:
             lines.append(f"\\newcommand{{\\{p}{key}}}{{{fmtp(pr['mcnemar_p'])}}}")
+        # Non-inferiority (paired difference + 95% CI + margin) for candidates vs full.
+        ni = pr.get("noninferiority")
+        nk = ni_macro.get((pr["a"], pr["b"]))
+        if ni and nk:
+            lines += [
+                f"\\newcommand{{\\{p}{nk}NIDelta}}{{{100 * ni['delta']:+.1f}\\,pp}}",
+                f"\\newcommand{{\\{p}{nk}NICIlo}}{{{100 * ni['ci95_low']:+.1f}\\,pp}}",
+                f"\\newcommand{{\\{p}{nk}NICIhi}}{{{100 * ni['ci95_high']:+.1f}\\,pp}}",
+                f"\\newcommand{{\\{p}{nk}NIMargin}}{{{100 * ni['margin']:.0f}\\,pp}}",
+                f"\\newcommand{{\\{p}{nk}NIVerdict}}{{{'non-inferior' if ni['noninferior'] else 'not established'}}}",
+            ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")
 

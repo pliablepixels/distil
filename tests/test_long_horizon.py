@@ -95,6 +95,38 @@ def test_read_file_directory_error(wt: Path) -> None:
     assert result.startswith("ERROR")
 
 
+def test_read_file_range_packed_into_one_field(wt: Path) -> None:
+    # Model packs the whole window into start_line ("1, 2") — must not crash the tool.
+    result = execute_tool("read_file", {"path": "src/module.py", "start_line": "1, 2"}, wt)
+    assert not result.startswith("ERROR")
+    assert "lines 1-2" in result
+
+
+def test_read_file_stringified_and_dashed_ranges(wt: Path) -> None:
+    from benchmarks.long_horizon.tools import _coerce_line_window
+
+    assert _coerce_line_window("1, 50", None, 100) == (1, 50)
+    assert _coerce_line_window("1-50", None, 100) == (1, 50)  # dash is a separator, not sign
+    assert _coerce_line_window("10", "20", 100) == (10, 20)
+    assert _coerce_line_window("10", None, 100) == (10, 100)
+    assert _coerce_line_window("nonsense", None, 100) == (None, None)
+    assert _coerce_line_window(None, None, 100) == (None, None)
+
+
+def test_read_file_binary_does_not_crash(wt: Path) -> None:
+    # Non-UTF8 bytes in a tracked file must degrade gracefully, not raise.
+    (wt / "blob.bin").write_bytes(b"\xd8\xd8 not utf8 \x00\xff")
+    result = execute_tool("read_file", {"path": "blob.bin"}, wt)
+    assert isinstance(result, str) and not result.startswith("ERROR")
+
+
+def test_search_binary_output_does_not_crash(wt: Path) -> None:
+    # grep dumping bytes from a binary file must not crash the decode (errors="replace").
+    (wt / "blob.bin").write_bytes(b"prefix \xd8\xd8 needle \xff tail")
+    result = execute_tool("search", {"pattern": "needle"}, wt)
+    assert isinstance(result, str)
+
+
 def test_search_finds_pattern(wt: Path) -> None:
     result = execute_tool("search", {"pattern": "def add"}, wt)
     assert "add" in result

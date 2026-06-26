@@ -235,6 +235,36 @@ def _list_dir(rel: str, worktree: Path) -> str:
     return _cap("\n".join(lines) or "(empty directory)")
 
 
+def _coerce_line_window(
+    start_line: object, end_line: object, total: int
+) -> tuple[int | None, int | None]:
+    """Robustly parse a line window from possibly-messy model arguments.
+
+    Models sometimes pack a whole range into one field (``start_line="1, 50"`` or
+    ``"1-50"``) or send stringified ints. We extract integers rather than calling
+    ``int()`` directly, which would crash the whole tool call (and the instance) on
+    inputs like ``"1, 50"``. Returns ``(start, end)`` or ``(None, None)`` if no integer
+    is present at all.
+    """
+
+    def _ints(v: object) -> list[int]:
+        if v is None:
+            return []
+        if isinstance(v, bool):  # avoid True/False sneaking through as 1/0
+            return []
+        if isinstance(v, int):
+            return [v]
+        return [int(x) for x in re.findall(r"\d+", str(v))]  # line nums are non-negative
+
+    s_ints, e_ints = _ints(start_line), _ints(end_line)
+    if len(s_ints) >= 2 and not e_ints:
+        return s_ints[0], s_ints[1]  # range packed into start_line, e.g. "1, 50"
+    nums = s_ints + e_ints
+    if not nums:
+        return None, None
+    return nums[0], (nums[1] if len(nums) > 1 else total)
+
+
 def _read_file(
     rel: str, worktree: Path, start_line: int | None = None, end_line: int | None = None
 ) -> str:
@@ -257,8 +287,11 @@ def _read_file(
     # Explicit window: return exactly those lines, numbered (how an agent reads around a
     # search hit to construct an exact edit).
     if start_line is not None or end_line is not None:
-        s = max(1, int(start_line or 1))
-        e = min(total, int(end_line or total))
+        s_raw, e_raw = _coerce_line_window(start_line, end_line, total)
+        if s_raw is None:
+            return f"ERROR: could not parse line window from start_line={start_line!r} end_line={end_line!r}"
+        s = max(1, s_raw)
+        e = min(total, e_raw)
         if s > total:
             return f"ERROR: start_line {s} > file length {total}"
         body = "\n".join(f"{i + 1:>6}\t{lines[i]}" for i in range(s - 1, e))
@@ -286,6 +319,7 @@ def _search(pattern: str, worktree: Path) -> str:
             cwd=str(worktree),
             capture_output=True,
             text=True,
+            errors="replace",  # grep can emit bytes from binary files; never crash on decode
             timeout=30,
         )
         output = result.stdout or result.stderr or "(no matches)"
@@ -350,6 +384,7 @@ def _run_tests(rel: str | None, worktree: Path) -> str:
             cwd=str(worktree),
             capture_output=True,
             text=True,
+            errors="replace",  # test output can contain non-UTF8 bytes; never crash on decode
             timeout=120,
         )
         output = result.stdout + ("\n" + result.stderr if result.stderr else "")

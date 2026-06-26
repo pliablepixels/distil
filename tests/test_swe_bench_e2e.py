@@ -42,9 +42,7 @@ def test_sample_is_deterministic_and_order_independent():
 
 def test_sample_changes_with_seed():
     rows = _fake_rows(500)
-    assert smp.sample_instance_ids(rows, 50, seed=1729) != smp.sample_instance_ids(
-        rows, 50, seed=1
-    )
+    assert smp.sample_instance_ids(rows, 50, seed=1729) != smp.sample_instance_ids(rows, 50, seed=1)
 
 
 # --------------------------------------------------------------------------- #
@@ -97,9 +95,7 @@ def test_compresses_user_context_not_system_or_assistant():
 
 def test_small_blocks_untouched():
     body = {
-        "messages": [
-            {"role": "user", "content": [{"type": "text", "text": "tiny instruction"}]}
-        ]
+        "messages": [{"role": "user", "content": [{"type": "text", "text": "tiny instruction"}]}]
     }
     stats = CompressStats()
     out = compress_body(body, trunc_500, stats)
@@ -146,10 +142,7 @@ def test_full_condition_is_passthrough_but_counts():
 def test_problem_statement_is_protected_from_compression():
     # The problem statement is the task, not file content — it must pass through verbatim
     # even though it is a large user block, while a separate file-content block compresses.
-    problem = (
-        "ModelBackend.authenticate() should not query the DB when username is None. "
-        * 20
-    )
+    problem = "ModelBackend.authenticate() should not query the DB when username is None. " * 20
     file_block = _big("source-file")
     body = {
         "messages": [
@@ -193,6 +186,26 @@ def test_wilson_ci_zero_n():
     assert wilson_ci(0, 0) == (0.0, 0.0)
 
 
+def test_noninferiority_paired_verdict_flips_at_margin():
+    from benchmarks.swe_bench_e2e.stats import noninferiority_paired
+
+    # E8 gated-vs-full discordant counts: 42 full-only losses, 30 gated-only gains, n=500.
+    r = noninferiority_paired(b=42, c=30, n=500, margin=0.06)
+    assert r["delta"] < 0  # candidate (gated) point estimate slightly below reference
+    assert r["ci95_low"] > -0.06  # lower bound clears a 6pp margin -> non-inferior
+    assert r["noninferior"] is True
+    # A stricter 5pp margin is not cleared (CI lower bound ~ -5.7pp).
+    assert noninferiority_paired(b=42, c=30, n=500, margin=0.05)["noninferior"] is False
+    # A clearly-inferior candidate (ungated reversible: 80 losses, 28 gains) fails even at 10pp.
+    assert noninferiority_paired(b=80, c=28, n=500, margin=0.10)["noninferior"] is False
+
+
+def test_noninferiority_paired_zero_n():
+    from benchmarks.swe_bench_e2e.stats import noninferiority_paired
+
+    assert noninferiority_paired(0, 0, 0, 0.05)["noninferior"] is False
+
+
 # --- reversible tier: digest + relevance gate (distil_expand / distil_gated) -------- #
 
 
@@ -215,9 +228,13 @@ def test_relevance_gate_keeps_working_set_full_digests_periphery():
 
     msgs = [{"role": "system", "content": "sys " + "s" * 600}]
     for i in range(10):
-        msgs.append({"role": "user", "content": [{"type": "text", "text": f"FILE{i}\n" + "x" * 1500}]})
+        msgs.append(
+            {"role": "user", "content": [{"type": "text", "text": f"FILE{i}\n" + "x" * 1500}]}
+        )
     restore: dict[str, str] = {}
-    out = compress_body({"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=GATE_RECENT)
+    out = compress_body(
+        {"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=GATE_RECENT
+    )
     ut = out["messages"][1:]
     digested = [i for i, m in enumerate(ut) if "distil-digest" in m["content"][0]["text"]]
     full = [i for i, m in enumerate(ut) if "distil-digest" not in m["content"][0]["text"]]
@@ -230,7 +247,12 @@ def test_relevance_gate_keeps_working_set_full_digests_periphery():
 def test_ungated_digest_compresses_all_eligible():
     from benchmarks.swe_bench_e2e.compress_proxy import compress_body
 
-    msgs = [{"role": "user", "content": [{"type": "text", "text": f"F{i}\n" + "x" * 1500}]} for i in range(5)]
+    msgs = [
+        {"role": "user", "content": [{"type": "text", "text": f"F{i}\n" + "x" * 1500}]}
+        for i in range(5)
+    ]
     restore: dict[str, str] = {}
-    compress_body({"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=None)
+    compress_body(
+        {"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=None
+    )
     assert len(restore) == 5  # no gate ⇒ every eligible block digested
