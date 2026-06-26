@@ -114,13 +114,55 @@ def code_skeleton(text: str) -> str | None:
     return skeleton if len(skeleton) < len(text) else None
 
 
-def text_window(text: str, *, head: int = 400, tail: int = 200) -> str:
-    """Head+tail window for non-code blocks. Unlike head-only truncation this keeps the
-    *end* — where tracebacks put the exception and tests put the failing assertion."""
+def _info(line: str) -> int:
+    """Lexical informativeness proxy: count of distinct alphanumeric tokens (len>2).
+    A stand-in for the self-information score extractive compressors rank lines by."""
+    toks = {
+        w for w in "".join(c if c.isalnum() else " " for c in line.lower()).split() if len(w) > 2
+    }
+    return len(toks)
+
+
+def text_window(
+    text: str, *, head: int = 400, tail: int = 200, keep_head: int = 6, keep_tail: int = 4
+) -> str:
+    """Salience-aware window for non-code blocks.
+
+    Head-only truncation drops the end (tracebacks/assertions); a plain head+tail window
+    drops *buried* high-signal lines (an error or decision line in the middle of noisy
+    output). This keeps the first ``keep_head`` and last ``keep_tail`` lines as structural
+    anchors, plus the most-informative middle lines (by :func:`_info`) up to a char budget
+    of ``head + tail`` — in original order — so a decision/error line survives wherever it
+    sits. Recovery stays byte-exact via the caller's content handle."""
     if len(text) <= head + tail:
         return text
-    omitted = len(text) - head - tail
-    return f"{text[:head]}\n... [{omitted} chars elided] ...\n{text[-tail:]}"
+    lines = text.split("\n")
+    if len(lines) <= keep_head + keep_tail + 1:
+        omitted = len(text) - head - tail
+        return f"{text[:head]}\n... [{omitted} chars elided] ...\n{text[-tail:]}"
+
+    keep: set[int] = set(range(keep_head)) | set(range(len(lines) - keep_tail, len(lines)))
+    budget = head + tail - sum(len(lines[i]) for i in keep)
+    middle = sorted(
+        range(keep_head, len(lines) - keep_tail),
+        key=lambda i: _info(lines[i]),
+        reverse=True,
+    )
+    for i in middle:
+        if budget <= 0:
+            break
+        keep.add(i)
+        budget -= len(lines[i]) + 1
+
+    out: list[str] = []
+    prev = -1
+    for i in sorted(keep):
+        if i != prev + 1:
+            out.append("... [elided] ...")
+        out.append(lines[i])
+        prev = i
+    result = "\n".join(out)
+    return result if len(result) < len(text) else text
 
 
 def smart_digest(text: str, *, head: int = 400, tail: int = 200) -> str:
