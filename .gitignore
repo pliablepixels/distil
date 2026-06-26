@@ -32,3 +32,5 @@ logs/
 gold.*.json
 distil-e7-*.json
 docs/paper/results/swe_e2e/sample_full.json
+docs/paper/results/swe_e2e/sample_500_full.json
+distil-lh-*.json

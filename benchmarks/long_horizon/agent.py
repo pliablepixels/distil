@@ -73,6 +73,24 @@ ISSUE
 """
 
 
+def _mark_cache(messages: list[dict[str, Any]]) -> None:
+    """Place a single rolling Anthropic prompt-cache breakpoint on the last content block
+    of the conversation (the API caches the whole prefix up to it). Strips any earlier
+    breakpoint first so we never exceed the 4-breakpoint limit as the history grows. With
+    the cached system prompt this turns each turn's repeated prefix into a 0.1x cache read
+    instead of full-price input — the cache-aware lever distil is built around."""
+    last_block = None
+    for msg in messages:
+        c = msg.get("content")
+        if isinstance(c, list):
+            for b in c:
+                if isinstance(b, dict):
+                    b.pop("cache_control", None)
+                    last_block = b
+    if last_block is not None:
+        last_block["cache_control"] = {"type": "ephemeral"}
+
+
 def _post(url: str, body: dict[str, Any], api_key: str) -> dict[str, Any]:
     """POST ``body`` as JSON to ``url`` and return the parsed JSON response."""
     raw = json.dumps(body).encode()
@@ -155,11 +173,15 @@ def run_agent(
             _log(f"[turn {turn}] timeout after {elapsed:.1f}s")
             break
 
+        # Prompt caching: cache the stable system prompt (large — holds the problem
+        # statement) and a rolling breakpoint on the latest turn, so the repeated prefix
+        # is billed at the 0.1x cache-read rate instead of full input every turn.
+        _mark_cache(messages)
         body: dict[str, Any] = {
             "model": model,
             "temperature": TEMPERATURE,
             "max_tokens": MAX_TOKENS,
-            "system": system,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             "tools": TOOL_SCHEMAS,
             "messages": messages,
         }
