@@ -361,102 +361,6 @@ All figures and tables are produced by the released harness
 \texttt{docs/paper/results/} and the generated LaTeX in
 \texttt{docs/paper/generated/}.\par}
 
-\subsection{E1: Decision-change frontier (real SWE-bench traces)}
-
-\Cref{fig:frontier} plots the four ladder levels on the full real SWE-bench\_Lite
-edit-localization (300 instances, 600 decisions; Claude grader, structured,
-majority-of-3, $+$expand). A 40-instance subset with both no-expand and $+$expand
-measurements is described in \Cref{fig:expand}.
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-  width=0.72\textwidth,
-  height=6.5cm,
-  xlabel={token savings (\%)},
-  ylabel={decision-change (\%)},
-  xmin=-2, xmax=31,
-  ymin=-2, ymax=18,
-  legend style={font=\scriptsize,at={(0.5,-0.20)},anchor=north,legend columns=3,/tikz/every even column/.append style={column sep=8pt}},
-  title={\small E1: savings vs.\ decision-change (SWE-bench\_Lite, 300 instances, $+$expand)},
-  xtick={0,5,10,15,20,25,30},
-  ytick={0,5,10,15},
-  grid=major,
-  grid style={dotted,gray!40}]
-% +expand series (filled markers) — full 300-instance run
-\addplot[only marks,mark=*,mark size=3pt,distilgreen]
-  coordinates {(0,0) (21.7,10.2) (20.4,11.5) (22.8,11.7)};
-\addlegendentry{reversible $+$expand (300 instances)}
-% alpha reference lines
-\addplot[dashed,distilgray,thick] coordinates {(-2,10) (31,10)};
-\addlegendentry{$\alpha=10\%$}
-\addplot[dotted,distilblue,thick] coordinates {(-2,15) (31,15)};
-\addlegendentry{$\alpha=15\%$}
-% node labels — the three aggressive points are near-coincident, so fan the labels
-% out (below / left / right) with thin leaders to avoid overlap.
-\node[font=\scriptsize,anchor=south west] at (axis cs:0.3,0.5) {byte-exact};
-\node[font=\scriptsize,anchor=north] (Llossless) at (axis cs:21.7,8.7) {lossless};
-\draw[gray!60,thin] (Llossless.north) -- (axis cs:21.7,10.0);
-\node[font=\scriptsize,anchor=east] (Lt250) at (axis cs:16.0,13.6) {trunc@250};
-\draw[gray!60,thin] (Lt250.east) -- (axis cs:20.4,11.6);
-\node[font=\scriptsize,anchor=west] (Lt120) at (axis cs:24.4,13.3) {trunc@120};
-\draw[gray!60,thin] (Lt120.west) -- (axis cs:22.9,11.8);
-\end{axis}
-\end{tikzpicture}
-\caption{\textbf{E1 frontier on full real SWE-bench\_Lite} (300 instances, 600
-decisions; Claude grader, majority-of-3 structured, $+$expand recovery loop). The
-reversible digest at 21.7\% savings achieves \textbf{10.2\%} decision-change,
-beating equally-aggressive lossy truncation (11.5--11.7\%) at $\approx\!22\%$
-savings. On a 40-instance subset the recovery effect is sharper (11.2\% no-expand
-$\to$ 7.5\% with $+$expand; see \Cref{fig:expand}). Dashed lines show the
-$\alpha=10\%$ and $\alpha=15\%$ risk budgets. $\tau$-bench airline (25 traj, 105
-decisions) is not plotted: the data is already compact (lossless saves only 1.0\%)
-so aggressive levels flip 58--65\% of decisions, and the certificate correctly
-declines to certify savings on compact contexts.}
-\label{fig:frontier}
-\end{figure}
-
-\subsection{Three measurement requirements (established on real data)}
-Run cheaply, the harness surfaced three confounds that any credible
-decision-equivalence evaluation must control; each is now enforced or flagged.
-\begin{enumerate}
-  \item \textbf{Majority voting is mandatory.} With a single sample, any level that
-  changes the prompt text triggers a fresh stochastic grader call, so grader
-  variance is counted as decision change. Only majority-of-$k$ isolates true loss.
-  \item \textbf{The grader must be faithful.} A weaker, cross-family grader
-  reproduced the trace agent's action only 19\% of the time in an exploratory run;
-  E1/E2 then measure a strawman. Grade with a same-family/strength model and publish
-  the agreement number as a gate.
-  \item \textbf{The reversible tier must be graded \emph{with} its recovery loop.}
-  {\sloppy
-  Graded without \texttt{distil\_expand}, folding a decision-relevant tool output
-  behind a handle changes the decision; graded with the loop, the model recovers the
-  content and the decision is preserved (\Cref{fig:expand}). Reporting only the
-  no-expand bound understates the reversible tier; reporting only perfect recovery
-  overstates it---we report both on the 40-instance subset where we have both
-  measurements (11.2\% no-expand vs.\ 7.5\% $+$expand at 23.9\% savings).\par}
-\end{enumerate}
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[font=\small,node distance=5mm]
-  \tikzstyle{b}=[draw,rounded corners,align=center,minimum height=7mm,inner sep=3pt]
-  \node[b,fill=gray!8] (c) {digested\\context};
-  \node[b,fill=distilred!10,right=26mm of c] (no) {decide now\\\textcolor{distilred}{\textsf{flip}}};
-  \node[b,fill=distilblue!12,below=8mm of no] (ex) {\texttt{\{"expand":[h]\}}};
-  \node[b,fill=gray!8,right=12mm of ex] (rec) {recover original\\(byte-exact)};
-  \node[b,fill=distilgreen!12,right=10mm of rec] (yes) {decide\\\textcolor{distilgreen}{\textsf{preserved}}};
-  \draw[-{Latex}] (c) -- node[above,font=\scriptsize,midway]{no-expand} (no);
-  \draw[-{Latex}] (c) |- node[below,font=\scriptsize,pos=0.72]{with-expand} (ex);
-  \draw[-{Latex}] (ex) -- (rec); \draw[-{Latex}] (rec) -- (yes);
-\end{tikzpicture}
-\caption{Expand-aware grading. Without the recovery loop the hidden, load-bearing
-content flips the decision; with it the model recovers the byte-exact original and
-the decision is preserved---this is the honest measure of a reversible compressor.}
-\label{fig:expand}
-\end{figure}
-
 \subsection{E2: Certificate validity out-of-sample}
 \label{sec:e2}
 
@@ -525,217 +429,38 @@ Risk budget $\alpha$ & Coverage $\Pr(\text{realized}\le\alpha)$ & Mean realized 
 \end{tabular}
 \end{table}
 
-\subsection{Headline results}
-
-On the full SWE-bench\_Lite (300 instances, $+$expand, $\alpha=0.15$, $\delta=0.05$,
-500 splits), the reversible engine inside the certified frontier achieves mean
-certified savings \HLsavings{} at a mean realized decision-change rate of
-\HLrisk{}, with out-of-sample coverage \HLcoverage{} ($\ge 1-\delta=95\%$).
-The generated tables below are auto-generated from \texttt{results.json} by
-\texttt{benchmarks/report\_to\_latex.py}.
-
-\IfFileExists{generated/frontier.tex}{%
-  \begin{figure}[t]\centering\input{generated/frontier.tex}
-  \caption{E1 certified frontier on the SWE-bench headline run (real grader).}\end{figure}}{}
-\IfFileExists{generated/coverage.tex}{%
-  \begin{table}[t]\centering\caption{E2 certification coverage (out-of-sample, $\alpha=0.15$, $\delta=0.05$, 500 splits, full SWE-bench\_Lite).}
-  \label{tab:e2gen}
-  \input{generated/coverage.tex}\end{table}}{}
-\IfFileExists{generated/headtohead.tex}{%
-  \begin{table}[t]\centering\caption{E5 head-to-head (100-trajectory SWE subset, same
-  grader). The \texttt{certifies?} column is the \emph{single-shot} Hoeffding--Bentkus
-  test over the full data---weaker than the split-calibrated E2 (\Cref{tab:e2gen}).
-  \textbf{Honest confound:} our edit-localization construction appends the gold hunk
-  \emph{last} in the observation, so recency/tail-truncation baselines benefit from
-  needle \emph{position} rather than content; we read E5 as a frontier illustration,
-  not a dominance claim, and rest the contribution on E2. The real LLMLingua packages
-  run on Apple-silicon (MPS), not just wired: LLMLingua-2 (XLM-RoBERTa) certifies at
-  \OrigLLMtwoSav{} savings / \OrigLLMtwoDC{} decision-change, on the content-based
-  frontier just below the position-favoured truncation baselines. LongLLMLingua
-  (Llama-2-7B, question-aware) certifies too, at \OrigLongLLSav{} / \OrigLongLLDC{}:
-  its earlier $0\%$ row was an \emph{adapter bug}, not the technique---the compressor
-  returns the compressed context with the (uncompressed) question re-appended per
-  \texttt{condition\_in\_question}, so the longer string tripped a reject-if-bigger
-  guard and every result was discarded as a no-op; splicing the question back out
-  restores the intended compression (fixed in this revision, with a regression
-  test).}\label{tab:e5}\input{generated/headtohead.tex}\end{table}}{}
-\IfFileExists{generated/headtohead_shuffled.tex}{%
-  \begin{table}[t]\centering\caption{E5 \emph{shuffled-position} (gold hunk randomly
-  placed). Identical to \Cref{tab:e5} except the gold hunk's position within the
-  code-search observation is randomly permuted (seed~$=1729$, deterministic,
-  per-instance), removing the recency/tail-truncation advantage that the gold-last
-  construction handed the baselines. Same 100-trajectory subset, grader, ladder, and
-  $\alpha/\delta$. \textbf{What the variant shows:} the confound is \emph{real but not
-  load-bearing}. Once the needle is no longer pinned to the tail, the recency-window
-  baseline's decision-change rises from \OrigRecencyDC{} to \ShufRecencyDC{}---yet it
-  still certifies, and so do the content-aware baselines (RECOMP-extractive even
-  \emph{improves}, \OrigRecompDC$\rightarrow$\ShufRecompDC, crossing into certification).
-  Distil's aggressive levels still do \emph{not} certify (lossless
-  \OrigLosslessDC$\rightarrow$\ShufLosslessDC; truncate@120
-  \OrigTruncShortDC$\rightarrow$\ShufTruncShortDC), so byte-exact remains the only
-  distil level that certifies---exactly as in \Cref{tab:e5}. Removing the position
-  confound does not rescue the aggressive ladder on this localization task; the
-  contribution continues to rest on E2, whose out-of-sample coverage holds on this
-  shuffled corpus too (\ShufCoverage{}, \Cref{tab:e2gen}).}
-  \label{tab:e5shuf}\input{generated/headtohead_shuffled.tex}\end{table}}{}
-\IfFileExists{generated/sweep.tex}{%
-  \begin{table}[t]\centering\caption{E6 operating-point selection on the
-  shuffled-position corpus, with \textbf{no test-set tuning}. The 100 trajectories
-  are split into disjoint calibration (50) and test (50) halves; every candidate
-  operating point---distil's two anchors plus a grid of salience-\emph{protected}
-  truncations (budget $\in\{500,250,120\}$ chars $\times$ \texttt{min\_entropy}
-  $\in\{2.6,3.2,3.8\}\times$ \texttt{min\_len}$\in\{6,10\}$) and the plain
-  truncations---is graded on both halves. We \emph{select} on calibration the
-  highest-savings point whose decision-change certifies (Hoeffding--Bentkus
-  $p\le\delta$ at $\alpha$), then \emph{evaluate it once} on the held-out test half.
-  The calibration-side selection ranges over all $23$ candidates and is
-  \emph{exploratory} (uncorrected for multiplicity); the finite-sample $\delta$
-  guarantee is carried only by the \emph{single} Hoeffding--Bentkus test applied to
-  the disjoint test half---which is what ``certifies out-of-sample'' below refers to.
-  \textbf{Result:} the winner is \SweepPoint{} (\SweepCalSav{} cal savings), and it
-  certifies out-of-sample at \SweepTestSav{} test savings / \SweepTestDC{}
-  decision-change. So distil's full ladder \emph{does} contain a certified
-  positive-savings operating point on this task---the E5 \texttt{quick} ladder simply
-  omitted it. Two honest caveats the table makes plain: (i)~salience protection does
-  \emph{not} help here (\texttt{protect+t@$L$} matches plain \texttt{t@$L$} at every
-  budget), and (ii)~the reversible \texttt{lossless} digest flips \emph{more} (20\%
-  cal) than \SweepPoint{}, so the ladder's assumed risk-ordering (lossless before
-  truncation) is miscalibrated for localization---which is exactly why fixed-sequence
-  LTT on the \texttt{quick} ladder fell back to byte-exact. The certified point here
-  is plain head-truncation; distil's contribution is the certificate that
-  \emph{selects} it and rejects the aggressive rungs, not a bespoke compressor that
-  beats truncation on this corpus.}
-  \label{tab:e6sweep}\input{generated/sweep.tex}\end{table}}{}
-\IfFileExists{generated/tasksuccess.tex}{%
-  \begin{table}[t]\centering
-  \caption{E4 retained decision-equivalence on the full SWE-bench\_Lite ($n=300$).
-  SWE-localization trajectories are resolved \emph{by construction}, so this measures
-  retained decision-equivalence under compression, \emph{not} a measured task-success
-  rate (the harness flags this; only $\tau$-bench reward labels drive a real outcome E4).}
-  \input{generated/tasksuccess.tex}\end{table}}{}
-% E3 (leave-one-domain-out distribution shift) requires >=2 domains graded by ONE
-% shared model; our domains were graded by different models (gpt-4o for tau, Claude for
-% SWE), so E3 is left to future work — we do not render an empty table.
-
-\begin{table}[t]
-\centering
-\caption{What the harness measures, and the requirement each result depends on.}
-\begin{tabular}{@{}lll@{}}
-\toprule
-Experiment & Quantity & Requirement enforced \\
-\midrule
-E1 frontier & savings vs.\ decision-change & structured grader; majority vote; \\
-            &                               & both no-expand and $+$expand \\
-E2 coverage & $\Pr(\text{realized}\le\alpha)$ out-of-sample & trajectory-level disjoint splits \\
-E3 shift & realized risk under domain shift & exchangeability stress test \\
-E4 task success & outcome retained vs.\ baseline (real $\tau$-bench) & bootstrap CI over trajectories \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \section{Analysis and limitations}
 \label{sec:analysis}
-The tightest certifiable $\alpha$ scales with the number of calibration turns
-(Hoeffding--Bentkus). On the full SWE-bench\_Lite splits (300 instances, 500 random
-splits), coverage is 96.6--100\% across all $\alpha \in \{10\%, 12.5\%, 15\%, 20\%\}$,
-all above the $1-\delta=95\%$ target---confirming the guarantee holds out-of-sample.
-Realized risk at $\alpha=15\%$ is 8.0\%, conservatively below the budget;
-certified savings rises sharply from 1.7\% at $\alpha=12.5\%$ to 15.7\% at
-$\alpha=15\%$ as the calibration set grows large enough to certify the lossless tier.
-
-\paragraph{Grader faithfulness.} Model$\leftrightarrow$gold next-action agreement is
-48.6\% ($\tau$-bench) and 47.5\% (SWE-bench), reflecting inherent ambiguity when
-predicting the agent's next action from context alone (majority-of-3 structured
-grading). Decision-equivalence is a \emph{self-consistency} measure, not a
-gold-matching measure, so the faithfulness gate is a diagnostic, not the loss
-itself; future work with larger grader ensembles should improve this.
-
-\paragraph{Single-grader limitation.} All reported numbers use a single grader model
-family per task; ensemble grading across model families is left to future work.
-
-\paragraph{Sample-size cost of $\alpha$.} Certified savings at $\alpha=10\%$ is 0\%
-even on the full 300-instance SWE-bench\_Lite (the lossless tier's empirical loss
-exceeds the budget at this $\alpha$); savings jump to 15.7\% at $\alpha=15\%$ once
-calibration turns are plentiful. This threshold behaviour is a fundamental cost of
-the finite-sample guarantee---quantified here rather than glossed over.
-
-\paragraph{$\tau$-bench compactness.} On $\tau$-bench airline traces (25 traj, 105
-decisions), the context is already compact: lossless saves only 1.0\% and aggressive
-levels flip 58--65\% of decisions. The certificate correctly refuses to certify
-savings here. Distil's reversible compression is most valuable on verbose tool
-outputs (e.g.\ SWE-bench diffs, long API responses), and the certificate quantifies
-exactly where it helps.
-
-\paragraph{Position confound, stress-tested (E5--E6).} The edit-localization
-construction places the gold hunk \emph{last} in the search results, which could
-flatter tail-truncation / recency baselines. We rebuilt the corpus with the gold
-hunk at a deterministic random position (seed~$=1729$, per-instance) and re-ran E5
-(\Cref{tab:e5shuf}). The confound is \emph{real but not load-bearing}: the recency
-baseline's decision-change rises from \OrigRecencyDC{} to \ShufRecencyDC{} once the
-needle is no longer pinned to the tail, yet it still certifies, and distil's
-aggressive levels still do not---byte-exact remains the only certifying distil level,
-exactly as in the gold-last E5, and the E2 certificate holds out-of-sample on the
-shuffled corpus too (\ShufCoverage{}). Two consequences we report rather than gloss:
-(i)~the reversible digest's edge over equally-aggressive truncation is itself
-position-sensitive---on the de-confounded corpus \texttt{lossless} flips
-\emph{more} than \texttt{truncate@120} (\ShufLosslessDC{} vs.\ \ShufTruncShortDC{} at
-$\approx22\%$ savings), the reverse of the gold-last ordering reported above; and
-(ii)~when we select an operating point honestly on a calibration half and evaluate
-once on a disjoint test half (\Cref{tab:e6sweep}), distil \emph{does} certify positive
-savings (\SweepPoint{}: \SweepTestSav{} test savings / \SweepTestDC{} decision-change),
-but the certified point is plain head-truncation---salience protection and the
-reversible digest do not beat truncation on this single-turn synthetic task. The
-net reading: on edit-localization, distil's contribution is the \emph{certificate}
-that selects a safe operating point and rejects the unsafe ones, not a bespoke
-compressor that dominates truncation; the reversible engine's advantage is a
-multi-turn, verbose-context phenomenon (the $\tau$-bench and corpus-gate results),
-which a real end-to-end task-success evaluation---running the agent and its test
-suite rather than the decision-equivalence proxy---tests directly. \textbf{E7
-(\Cref{sec:e7}) is that evaluation, and it is sobering}: at the certified
-\texttt{trunc@500} operating point the localization certificate does \emph{not}
-transfer to execution.
-
-\paragraph{E4 non-evidential on SWE-bench.} SWE-bench HuggingFace evaluators mark
-all submissions resolved=True by construction of the localization task, so E4 on
-SWE reports retained decision-equivalence (lossless $+$expand: 85.0\%; no-expand:
-77.5\%), not a real task-success rate. The 19 outcome-labelled $\tau$-bench
-trajectories with real reward labels show the digest-only tier (no expand) retains
-0\% baseline success---consistent with the certificate's refusal to certify savings
-on compact $\tau$-bench contexts.
-
-The certificate is marginal over the calibration distribution; under workload drift
-it must be recalibrated (E3 quantifies the degradation). Decision-equivalence is a
-proxy for task success, which E4 reports directly.
+The certificate holds out-of-sample: coverage is $96.6$--$100\%$ across
+$\alpha\in\{10,12.5,15,20\}\%$ at the $95\%$ target, with realized risk $8.0\%$ at
+$\alpha=15\%$ (below budget). We note four limitations. \textbf{Grader faithfulness:}
+decision-equivalence is a \emph{self-consistency} measure---model$\leftrightarrow$gold
+next-action agreement ($48.6\%$ on $\tau$-bench, $47.5\%$ on SWE-bench) is a diagnostic
+gate, not the loss---and we use a single grader family per task; ensemble grading is future
+work. \textbf{Sample-size cost:} the tightest certifiable $\alpha$ scales with calibration
+size (Hoeffding--Bentkus)---certified savings is $0\%$ at $\alpha=10\%$ but $15.7\%$ at
+$\alpha=15\%$, a fundamental cost of the finite-sample guarantee. \textbf{Scope:} the
+guarantee is marginal over the calibration distribution and must be recalibrated under
+drift; on already-compact contexts ($\tau$-bench, $58$--$65\%$ flips under aggression) the
+certificate correctly \emph{declines} to certify savings. \textbf{Proxy gap:} the per-turn
+certificate is a proxy for task success; E7 (\Cref{sec:e7}) tests this end-to-end, and it is
+sobering. The E1 frontier, the three measurement requirements, the E5--E6 head-to-head and
+position-confound stress tests, operating-point selection, and E4 are in the appendix
+(\Cref{app:extended}).
 
 \subsection{E7: SWE-bench Verified end-to-end task-success}
 \label{sec:e7}
 
-E1--E6 measure decision-equivalence---a \emph{proxy} for task success. E7 closes that
-gap by running a real coding agent end-to-end on \textbf{SWE-bench Verified} (the
-500-instance human-curated subset) and scoring \emph{actual test-pass rates} with the
-\textbf{official} \texttt{swebench} harness, not the decision proxy. We draw a fixed
-random sample of \sweEsevenN{} instances (seed~$=\sweEsevenSeed{}$; ids sorted then
-sampled, so the draw is machine-independent) and run \textbf{three conditions through the
-identical agent}, differing only in how the agent's \emph{context} is compressed in
-flight: \textbf{A. full context} (no compression); \textbf{B. distil}---the Phase-2
-certifying operating point \texttt{trunc@500} (head-truncate each compressible context
-block to 500 chars) applied by a drop-in Anthropic-Messages proxy; and \textbf{C.
-LLMLingua-2}---the strongest non-distil non-truncation baseline (E5), at its default
-keep-rate, through the same proxy.
-
-\paragraph{Setup.} The agent is \textbf{aider} (v0.86.2, \texttt{claude-sonnet-4-6},
-temperature~0, search/replace diff edit format) driven from each instance's
-\texttt{problem\_statement} with no oracle files---it must localise the fix itself. The
-proxy compresses only the \emph{file contents and tool output the agent reads}: system
-instructions, the agent's own reasoning, and---critically---the \emph{problem statement}
-itself are never compressed (the problem statement is the task, not retrieved context;
-truncating it would handicap B/C for the wrong reason). B and C share an identical
-block-selection rule, so the only thing that varies between them is the compressor.
-Patches are scored by \texttt{swebench}~\texttt{4.1.0}'s \texttt{run\_evaluation} against
-each instance's hidden test patch in the official per-instance Docker image; every
-reported number traces to a harness-written report. Pass@1 carries a Wilson 95\%
-interval, and because all three conditions score the \emph{same} \sweEsevenN{} instances
-we also report exact paired McNemar tests. Total API spend: \sweEsevenTotalCost{}.
+E1--E6 measure decision-equivalence---a \emph{proxy}. E7 closes the gap: a real coding
+agent (\textbf{aider}, \texttt{claude-sonnet-4-6}, temp~0) run end-to-end on \textbf{SWE-bench
+Verified} and scored by the \textbf{official} \texttt{swebench} harness over \sweEsevenN{}
+instances (seed~$=\sweEsevenSeed{}$). Five conditions share the identical agent, differing only
+in how the read-context is compressed in flight: \textbf{A} full; \textbf{B} distil
+\texttt{trunc@500} (the certified operating point); \textbf{C} LLMLingua-2; \textbf{D} distil's
+reversible tier ($+$\texttt{distil\_expand}); and \textbf{E} its relevance-gated variant. Only
+file contents and tool output are compressed---the problem statement is never touched. Pass@1
+carries a Wilson 95\% interval; paired McNemar tests compare the \emph{same} instances. Total
+API spend: \sweEsevenTotalCost{}.
 
 \begin{table}[t]
 \centering\small
@@ -765,64 +490,28 @@ McNemar vs.\ full $p=\sweEsevenGatedVsFullP{}$) — it targets long-horizon cont
 \label{tab:e7}
 \end{table}
 
-\paragraph{Result: compression does not survive execution, and the certificate does not
-transfer.} Both compressed conditions collapse task success relative to full context
-(\Cref{tab:e7}). distil at its \emph{certified} \texttt{trunc@500} operating point
-resolves only \sweEsevenDistilPass{} of instances versus \sweEsevenFullPass{} with full
-context---a \sweEsevenDistilDelta{} drop that is significant under an exact paired
-McNemar test ($p=\sweEsevenDistilVsFullP{}$: 20 instances lost, 2 gained). LLMLingua-2
-also drops significantly (\sweEsevenLinguaPass{}, $p=\sweEsevenLinguaVsFullP{}$). distil's
-point estimate trails LLMLingua-2 (\sweEsevenDistilPass{} vs.\ \sweEsevenLinguaPass{}),
-but the paired difference is \emph{not} significant at $n=\sweEsevenN{}$
-($p=\sweEsevenDistilVsLinguaP{}$), and distil compresses far harder
-(\sweEsevenDistilCtxRed{} of context removed vs.\ \sweEsevenLinguaCtxRed{}), so its lower
-score is confounded with operating-point aggression rather than established as a method
-gap. We report this rather than tune \texttt{trunc@500} down to match LLMLingua-2's
-aggression: the point of E7 is to test the operating point the certificate \emph{actually
-selected}.
+\paragraph{Lossy compression does not survive execution.} Both lossy conditions collapse
+(\Cref{tab:e7}): distil at its \emph{certified} \texttt{trunc@500} point resolves
+\sweEsevenDistilPass{} versus \sweEsevenFullPass{} for full (\sweEsevenDistilDelta{}, exact
+paired McNemar $p=\sweEsevenDistilVsFullP{}$), and LLMLingua-2 \sweEsevenLinguaPass{}
+($p=\sweEsevenLinguaVsFullP{}$). The headline is the certificate's \emph{non-transfer}:
+\texttt{trunc@500} was certified at $4.0\%$ decision-change on the single-turn proxy (E6),
+yet the same transform collapses end-to-end success by $36$ points. A guarantee earned on the
+localization proxy thus says \emph{nothing} about task success once \emph{lossy} compression
+is aggressive---the proxy and the outcome diverge.
 
-The headline is the certificate's \emph{non-transfer}. \texttt{trunc@500} was certified
-at 4.0\% decision-change on the single-turn localization corpus (E6, \Cref{tab:e6sweep})
-and accepted as a safe operating point; here the same transform removes
-\sweEsevenDistilCtxRed{} of agentic context and collapses end-to-end success by 36
-points. A decision-equivalence guarantee earned on the localization proxy thus says
-\emph{nothing} about end-to-end task success once compression is aggressive---the proxy
-and the outcome diverge sharply. This is consistent with, and sharpens, the E5--E6
-reading: distil's contribution is the certificate, never a compressor that dominates
-truncation (here it dominates nothing---it is beaten by full context and does not beat
-LLMLingua-2), and the certificate's honest scope is exactly what it measures,
-decision-equivalence on the calibration distribution, \emph{not} task success. Two
-caveats we report rather than bury: compression is not strictly dominated (2 instances
-resolved under \texttt{trunc@500} that full context missed), and one network-dependent
-instance (\texttt{psf\_\_requests-2317}) is unresolvable under our offline harness and
-counts as a failure for all three conditions identically.
-
-\paragraph{The reversible tier \emph{does} survive execution (condition D).} The
-non-transfer above is a property of \emph{lossy} compression, not of distil's design.
-distil's actual product is the \emph{reversible} tier: each context block is digested
-behind a content handle, the original is kept, and the agent is given a
-\texttt{distil\_expand} tool to recover any block on demand (a transparent
-recover-then-redecide loop inside the proxy; \Cref{tab:e7} row D). Run end-to-end on the
-same \sweEsevenN{} instances, it resolves \textbf{\sweEsevenExpandPass}---\emph{statistically
-indistinguishable from full context} (\sweEsevenFullPass{}; exact paired McNemar
-$p=\sweEsevenExpandVsFullP{}$, i.e.\ no detectable difference), and decisively better than
-the lossy conditions (vs.\ \texttt{trunc@500}: 22 instances recovered, 2 lost,
-$p=\sweEsevenExpandVsTruncP{}$). The model expanded reliably (every instance issued
-$\ge 1$ recovery; 135 expansions total). \textbf{The lesson is the converse of the
-lossy result: keep the information \emph{recoverable} and end-to-end task success is
-preserved.} The price is that \emph{realised} token savings on coding are modest---the
-digest view removes \sweEsevenExpandCtxRed{} but the agent expands most of what it edits,
-so the net cost is \sweEsevenExpandCost{} vs.\ \sweEsevenFullCost{} ($\approx$7\%), with
-the savings coming from periphery the agent never expands. Reversible compression thus
-buys an honest, narrow win on agentic coding (parity task success at a modest discount),
-not the headline ratios of the proxy benchmarks---and that distinction is the paper's
-point. A \emph{relevance-gated} variant (condition E; keep the last six user/tool
-messages full, digest only older periphery, recoverable) likewise holds task success
-(\sweEsevenGatedPass{}, McNemar vs.\ full $p=\sweEsevenGatedVsFullP{}$) with \emph{zero}
-recovery round-trips, but is a no-op on these $\le$6-turn conversations (nothing is
-periphery); its intended regime is long-horizon agents with large peripheral context,
-which this focused localization workload does not exercise. E8 (\Cref{sec:e8}) runs
-exactly that test.
+\paragraph{The reversible tier survives (D, E).} The non-transfer is a property of
+\emph{lossy} compression, not of distil's design. The reversible tier---each block digested
+behind a content handle, the original kept, recovered on demand via a transparent
+\texttt{distil\_expand} loop---resolves \textbf{\sweEsevenExpandPass}, statistically
+indistinguishable from full ($p=\sweEsevenExpandVsFullP{}$) and far above the lossy
+conditions (vs.\ \texttt{trunc@500} $p=\sweEsevenExpandVsTruncP{}$); every instance issued
+$\ge1$ recovery. Realised savings are modest here ($\approx$7\%---the agent expands most of
+what it edits), so the win is task-success parity at a discount, not the proxy headline
+ratios; \textbf{keep the information recoverable and task success is preserved}. The
+relevance-gated variant likewise holds full parity ($p=\sweEsevenGatedVsFullP{}$) but is a
+\emph{no-op} on these $\le$6-turn runs (nothing is periphery)---its regime is long-horizon
+agents, which E8 (\Cref{sec:e8}) tests directly.
 
 \subsection{E8: long-horizon agent task-success---the gate's proper test}
 \label{sec:e8}
@@ -1039,35 +728,23 @@ solved that the compressed run did not.}
 \end{figure}
 
 \section{Conclusion}
-Decision-equivalence is the right contract for agent context compression, and it can
-carry a distribution-free guarantee validated on real traces. The certificate
-holds out-of-sample at 96.6--100\% coverage across $\alpha \in \{10\%, 12.5\%, 15\%,
-20\%\}$ ($\delta=0.05$, real SWE-bench\_Lite, 300 instances, 500 splits). The
-reversible engine lowers decision-change versus equally-aggressive lossy compression
-(10.2\% vs.\ 11.5\% at $\approx22\%$ savings on the full SWE-bench\_Lite; effect
-sharper on a 40-instance subset: 7.5\% vs.\ 12.5\%)---though on the de-confounded,
-position-shuffled localization corpus this particular edge reverses
-(\Cref{sec:analysis}), a sensitivity we report rather than hide---and the certificate
-correctly declines to certify savings on compact $\tau$-bench contexts, quantifying
-where recoverable compression helps rather than overclaiming a single headline ratio.
-Our end-to-end evaluation (E7, \Cref{sec:e7}) draws the boundary sharply: on
-SWE-bench Verified the \emph{lossy} operating point the certificate selected
-(\texttt{trunc@500}) cuts pass@1 from \sweEsevenFullPass{} to \sweEsevenDistilPass{}
-($p=\sweEsevenDistilVsFullP{}$, paired)---so a decision-equivalence guarantee earned on a
-single-turn proxy must not be read as a task-success guarantee once \emph{lossy}
-compression is aggressive. But the same evaluation shows distil's \emph{reversible} tier
-(digest $+$ \texttt{distil\_expand}) is end-to-end \emph{task-equivalent to full context}
-(\sweEsevenExpandPass{} vs.\ \sweEsevenFullPass{}, McNemar $p=\sweEsevenExpandVsFullP{}$)
-at a modest realised discount---the actionable conclusion being \emph{keep compression
-recoverable}. Scaled to a real long-horizon agent (E8, \Cref{sec:e8}: a 30-turn ReAct loop
-over the full 500-instance SWE-bench Verified set), the reversible \emph{relevance-gated} tier
-is the highest-accuracy compressor (\sweEeightGatedPass{}), the only one non-inferior to full
-context, and ahead of the strongest competitor---uniquely reversible \emph{and} certified.
-Finally, E10 (\Cref{sec:e10}) lifts the guarantee from the per-turn proxy to the
-\emph{trajectory} level, validated out-of-sample: the contract now binds the outcome users
-actually pay for, not just the next action. The contract is right; the lesson is that proxy
-certification and lossy aggression are the failure mode, while recoverability, a relevance gate
-that protects the working set, and a trajectory-level certificate are the fix.
+Decision-equivalence is the right contract for agent context compression, and it carries a
+distribution-free guarantee validated out-of-sample on real traces (coverage $96.6$--$100\%$
+at the $95\%$ target). The certificate correctly declines to certify savings on
+already-compact contexts, quantifying \emph{where} recoverable compression helps rather than
+overclaiming a single ratio. Our end-to-end evaluation draws the boundary sharply (E7,
+\Cref{sec:e7}): the \emph{lossy} operating point the certificate selected cuts pass@1 from
+\sweEsevenFullPass{} to \sweEsevenDistilPass{} ($p=\sweEsevenDistilVsFullP{}$)---a proxy
+guarantee must not be read as a task-success guarantee once lossy compression is
+aggressive---whereas distil's \emph{reversible} tier is end-to-end task-equivalent to full
+($p=\sweEsevenExpandVsFullP{}$). Scaled to a real long-horizon agent (E8, \Cref{sec:e8}), the
+reversible \emph{relevance-gated} tier is the highest-accuracy compressor
+(\sweEeightGatedPass{}), the only one non-inferior to full and ahead of the strongest
+competitor---uniquely reversible \emph{and} certified. Finally, E10 (\Cref{sec:e10}) lifts the
+guarantee to the \emph{trajectory} level, validated out-of-sample, binding the outcome users
+actually pay for. The lesson: proxy certification with lossy aggression is the failure mode;
+recoverability, a working-set-protecting relevance gate, and a trajectory-level certificate
+are the fix.
 
 \paragraph{Reproducibility.} The harness, adapters, runners, and this paper are
 released at \url{https://github.com/dshakes/distil} (see \texttt{benchmarks/PROVE.md}
@@ -1098,5 +775,289 @@ Efficient Generative Inference of Large Language Models.} NeurIPS 2023.
 \bibitem{vovk} V.~Vovk, A.~Gammerman, G.~Shafer. \emph{Algorithmic Learning in a Random
 World.} Springer, 2005.
 \end{thebibliography}
+
+\appendix
+\section{Extended experiments and analysis}
+\label{app:extended}
+This appendix contains the supporting experiments (E1, E3--E6) and the detailed analysis summarized in \Cref{sec:analysis}; the main text reports the headline guarantees (E2) and end-to-end results (E7--E10).
+
+\subsection{E1: Decision-change frontier (real SWE-bench traces)}
+
+\Cref{fig:frontier} plots the four ladder levels on the full real SWE-bench\_Lite
+edit-localization (300 instances, 600 decisions; Claude grader, structured,
+majority-of-3, $+$expand). A 40-instance subset with both no-expand and $+$expand
+measurements is described in \Cref{fig:expand}.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.72\textwidth,
+  height=6.5cm,
+  xlabel={token savings (\%)},
+  ylabel={decision-change (\%)},
+  xmin=-2, xmax=31,
+  ymin=-2, ymax=18,
+  legend style={font=\scriptsize,at={(0.5,-0.20)},anchor=north,legend columns=3,/tikz/every even column/.append style={column sep=8pt}},
+  title={\small E1: savings vs.\ decision-change (SWE-bench\_Lite, 300 instances, $+$expand)},
+  xtick={0,5,10,15,20,25,30},
+  ytick={0,5,10,15},
+  grid=major,
+  grid style={dotted,gray!40}]
+% +expand series (filled markers) — full 300-instance run
+\addplot[only marks,mark=*,mark size=3pt,distilgreen]
+  coordinates {(0,0) (21.7,10.2) (20.4,11.5) (22.8,11.7)};
+\addlegendentry{reversible $+$expand (300 instances)}
+% alpha reference lines
+\addplot[dashed,distilgray,thick] coordinates {(-2,10) (31,10)};
+\addlegendentry{$\alpha=10\%$}
+\addplot[dotted,distilblue,thick] coordinates {(-2,15) (31,15)};
+\addlegendentry{$\alpha=15\%$}
+% node labels — the three aggressive points are near-coincident, so fan the labels
+% out (below / left / right) with thin leaders to avoid overlap.
+\node[font=\scriptsize,anchor=south west] at (axis cs:0.3,0.5) {byte-exact};
+\node[font=\scriptsize,anchor=north] (Llossless) at (axis cs:21.7,8.7) {lossless};
+\draw[gray!60,thin] (Llossless.north) -- (axis cs:21.7,10.0);
+\node[font=\scriptsize,anchor=east] (Lt250) at (axis cs:16.0,13.6) {trunc@250};
+\draw[gray!60,thin] (Lt250.east) -- (axis cs:20.4,11.6);
+\node[font=\scriptsize,anchor=west] (Lt120) at (axis cs:24.4,13.3) {trunc@120};
+\draw[gray!60,thin] (Lt120.west) -- (axis cs:22.9,11.8);
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{E1 frontier on full real SWE-bench\_Lite} (300 instances, 600
+decisions; Claude grader, majority-of-3 structured, $+$expand recovery loop). The
+reversible digest at 21.7\% savings achieves \textbf{10.2\%} decision-change,
+beating equally-aggressive lossy truncation (11.5--11.7\%) at $\approx\!22\%$
+savings. On a 40-instance subset the recovery effect is sharper (11.2\% no-expand
+$\to$ 7.5\% with $+$expand; see \Cref{fig:expand}). Dashed lines show the
+$\alpha=10\%$ and $\alpha=15\%$ risk budgets. $\tau$-bench airline (25 traj, 105
+decisions) is not plotted: the data is already compact (lossless saves only 1.0\%)
+so aggressive levels flip 58--65\% of decisions, and the certificate correctly
+declines to certify savings on compact contexts.}
+\label{fig:frontier}
+\end{figure}
+
+\subsection{Three measurement requirements (established on real data)}
+Run cheaply, the harness surfaced three confounds that any credible
+decision-equivalence evaluation must control; each is now enforced or flagged.
+\begin{enumerate}
+  \item \textbf{Majority voting is mandatory.} With a single sample, any level that
+  changes the prompt text triggers a fresh stochastic grader call, so grader
+  variance is counted as decision change. Only majority-of-$k$ isolates true loss.
+  \item \textbf{The grader must be faithful.} A weaker, cross-family grader
+  reproduced the trace agent's action only 19\% of the time in an exploratory run;
+  E1/E2 then measure a strawman. Grade with a same-family/strength model and publish
+  the agreement number as a gate.
+  \item \textbf{The reversible tier must be graded \emph{with} its recovery loop.}
+  {\sloppy
+  Graded without \texttt{distil\_expand}, folding a decision-relevant tool output
+  behind a handle changes the decision; graded with the loop, the model recovers the
+  content and the decision is preserved (\Cref{fig:expand}). Reporting only the
+  no-expand bound understates the reversible tier; reporting only perfect recovery
+  overstates it---we report both on the 40-instance subset where we have both
+  measurements (11.2\% no-expand vs.\ 7.5\% $+$expand at 23.9\% savings).\par}
+\end{enumerate}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\small,node distance=5mm]
+  \tikzstyle{b}=[draw,rounded corners,align=center,minimum height=7mm,inner sep=3pt]
+  \node[b,fill=gray!8] (c) {digested\\context};
+  \node[b,fill=distilred!10,right=26mm of c] (no) {decide now\\\textcolor{distilred}{\textsf{flip}}};
+  \node[b,fill=distilblue!12,below=8mm of no] (ex) {\texttt{\{"expand":[h]\}}};
+  \node[b,fill=gray!8,right=12mm of ex] (rec) {recover original\\(byte-exact)};
+  \node[b,fill=distilgreen!12,right=10mm of rec] (yes) {decide\\\textcolor{distilgreen}{\textsf{preserved}}};
+  \draw[-{Latex}] (c) -- node[above,font=\scriptsize,midway]{no-expand} (no);
+  \draw[-{Latex}] (c) |- node[below,font=\scriptsize,pos=0.72]{with-expand} (ex);
+  \draw[-{Latex}] (ex) -- (rec); \draw[-{Latex}] (rec) -- (yes);
+\end{tikzpicture}
+\caption{Expand-aware grading. Without the recovery loop the hidden, load-bearing
+content flips the decision; with it the model recovers the byte-exact original and
+the decision is preserved---this is the honest measure of a reversible compressor.}
+\label{fig:expand}
+\end{figure}
+
+\subsection{Headline results}
+
+On the full SWE-bench\_Lite (300 instances, $+$expand, $\alpha=0.15$, $\delta=0.05$,
+500 splits), the reversible engine inside the certified frontier achieves mean
+certified savings \HLsavings{} at a mean realized decision-change rate of
+\HLrisk{}, with out-of-sample coverage \HLcoverage{} ($\ge 1-\delta=95\%$).
+The generated tables below are auto-generated from \texttt{results.json} by
+\texttt{benchmarks/report\_to\_latex.py}.
+
+\IfFileExists{generated/frontier.tex}{%
+  \begin{figure}[t]\centering\input{generated/frontier.tex}
+  \caption{E1 certified frontier on the SWE-bench headline run (real grader).}\end{figure}}{}
+\IfFileExists{generated/coverage.tex}{%
+  \begin{table}[t]\centering\caption{E2 certification coverage (out-of-sample, $\alpha=0.15$, $\delta=0.05$, 500 splits, full SWE-bench\_Lite).}
+  \label{tab:e2gen}
+  \input{generated/coverage.tex}\end{table}}{}
+\IfFileExists{generated/headtohead.tex}{%
+  \begin{table}[t]\centering\caption{E5 head-to-head (100-trajectory SWE subset, same
+  grader). The \texttt{certifies?} column is the \emph{single-shot} Hoeffding--Bentkus
+  test over the full data---weaker than the split-calibrated E2 (\Cref{tab:e2gen}).
+  \textbf{Honest confound:} our edit-localization construction appends the gold hunk
+  \emph{last} in the observation, so recency/tail-truncation baselines benefit from
+  needle \emph{position} rather than content; we read E5 as a frontier illustration,
+  not a dominance claim, and rest the contribution on E2. The real LLMLingua packages
+  run on Apple-silicon (MPS), not just wired: LLMLingua-2 (XLM-RoBERTa) certifies at
+  \OrigLLMtwoSav{} savings / \OrigLLMtwoDC{} decision-change, on the content-based
+  frontier just below the position-favoured truncation baselines. LongLLMLingua
+  (Llama-2-7B, question-aware) certifies too, at \OrigLongLLSav{} / \OrigLongLLDC{}:
+  its earlier $0\%$ row was an \emph{adapter bug}, not the technique---the compressor
+  returns the compressed context with the (uncompressed) question re-appended per
+  \texttt{condition\_in\_question}, so the longer string tripped a reject-if-bigger
+  guard and every result was discarded as a no-op; splicing the question back out
+  restores the intended compression (fixed in this revision, with a regression
+  test).}\label{tab:e5}\input{generated/headtohead.tex}\end{table}}{}
+\IfFileExists{generated/headtohead_shuffled.tex}{%
+  \begin{table}[t]\centering\caption{E5 \emph{shuffled-position} (gold hunk randomly
+  placed). Identical to \Cref{tab:e5} except the gold hunk's position within the
+  code-search observation is randomly permuted (seed~$=1729$, deterministic,
+  per-instance), removing the recency/tail-truncation advantage that the gold-last
+  construction handed the baselines. Same 100-trajectory subset, grader, ladder, and
+  $\alpha/\delta$. \textbf{What the variant shows:} the confound is \emph{real but not
+  load-bearing}. Once the needle is no longer pinned to the tail, the recency-window
+  baseline's decision-change rises from \OrigRecencyDC{} to \ShufRecencyDC{}---yet it
+  still certifies, and so do the content-aware baselines (RECOMP-extractive even
+  \emph{improves}, \OrigRecompDC$\rightarrow$\ShufRecompDC, crossing into certification).
+  Distil's aggressive levels still do \emph{not} certify (lossless
+  \OrigLosslessDC$\rightarrow$\ShufLosslessDC; truncate@120
+  \OrigTruncShortDC$\rightarrow$\ShufTruncShortDC), so byte-exact remains the only
+  distil level that certifies---exactly as in \Cref{tab:e5}. Removing the position
+  confound does not rescue the aggressive ladder on this localization task; the
+  contribution continues to rest on E2, whose out-of-sample coverage holds on this
+  shuffled corpus too (\ShufCoverage{}, \Cref{tab:e2gen}).}
+  \label{tab:e5shuf}\input{generated/headtohead_shuffled.tex}\end{table}}{}
+\IfFileExists{generated/sweep.tex}{%
+  \begin{table}[t]\centering\caption{E6 operating-point selection on the
+  shuffled-position corpus, with \textbf{no test-set tuning}. The 100 trajectories
+  are split into disjoint calibration (50) and test (50) halves; every candidate
+  operating point---distil's two anchors plus a grid of salience-\emph{protected}
+  truncations (budget $\in\{500,250,120\}$ chars $\times$ \texttt{min\_entropy}
+  $\in\{2.6,3.2,3.8\}\times$ \texttt{min\_len}$\in\{6,10\}$) and the plain
+  truncations---is graded on both halves. We \emph{select} on calibration the
+  highest-savings point whose decision-change certifies (Hoeffding--Bentkus
+  $p\le\delta$ at $\alpha$), then \emph{evaluate it once} on the held-out test half.
+  The calibration-side selection ranges over all $23$ candidates and is
+  \emph{exploratory} (uncorrected for multiplicity); the finite-sample $\delta$
+  guarantee is carried only by the \emph{single} Hoeffding--Bentkus test applied to
+  the disjoint test half---which is what ``certifies out-of-sample'' below refers to.
+  \textbf{Result:} the winner is \SweepPoint{} (\SweepCalSav{} cal savings), and it
+  certifies out-of-sample at \SweepTestSav{} test savings / \SweepTestDC{}
+  decision-change. So distil's full ladder \emph{does} contain a certified
+  positive-savings operating point on this task---the E5 \texttt{quick} ladder simply
+  omitted it. Two honest caveats the table makes plain: (i)~salience protection does
+  \emph{not} help here (\texttt{protect+t@$L$} matches plain \texttt{t@$L$} at every
+  budget), and (ii)~the reversible \texttt{lossless} digest flips \emph{more} (20\%
+  cal) than \SweepPoint{}, so the ladder's assumed risk-ordering (lossless before
+  truncation) is miscalibrated for localization---which is exactly why fixed-sequence
+  LTT on the \texttt{quick} ladder fell back to byte-exact. The certified point here
+  is plain head-truncation; distil's contribution is the certificate that
+  \emph{selects} it and rejects the aggressive rungs, not a bespoke compressor that
+  beats truncation on this corpus.}
+  \label{tab:e6sweep}\input{generated/sweep.tex}\end{table}}{}
+\IfFileExists{generated/tasksuccess.tex}{%
+  \begin{table}[t]\centering
+  \caption{E4 retained decision-equivalence on the full SWE-bench\_Lite ($n=300$).
+  SWE-localization trajectories are resolved \emph{by construction}, so this measures
+  retained decision-equivalence under compression, \emph{not} a measured task-success
+  rate (the harness flags this; only $\tau$-bench reward labels drive a real outcome E4).}
+  \input{generated/tasksuccess.tex}\end{table}}{}
+% E3 (leave-one-domain-out distribution shift) requires >=2 domains graded by ONE
+% shared model; our domains were graded by different models (gpt-4o for tau, Claude for
+% SWE), so E3 is left to future work — we do not render an empty table.
+
+\begin{table}[t]
+\centering
+\caption{What the harness measures, and the requirement each result depends on.}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Experiment & Quantity & Requirement enforced \\
+\midrule
+E1 frontier & savings vs.\ decision-change & structured grader; majority vote; \\
+            &                               & both no-expand and $+$expand \\
+E2 coverage & $\Pr(\text{realized}\le\alpha)$ out-of-sample & trajectory-level disjoint splits \\
+E3 shift & realized risk under domain shift & exchangeability stress test \\
+E4 task success & outcome retained vs.\ baseline (real $\tau$-bench) & bootstrap CI over trajectories \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Extended analysis (limitations in full)}
+The tightest certifiable $\alpha$ scales with the number of calibration turns
+(Hoeffding--Bentkus). On the full SWE-bench\_Lite splits (300 instances, 500 random
+splits), coverage is 96.6--100\% across all $\alpha \in \{10\%, 12.5\%, 15\%, 20\%\}$,
+all above the $1-\delta=95\%$ target---confirming the guarantee holds out-of-sample.
+Realized risk at $\alpha=15\%$ is 8.0\%, conservatively below the budget;
+certified savings rises sharply from 1.7\% at $\alpha=12.5\%$ to 15.7\% at
+$\alpha=15\%$ as the calibration set grows large enough to certify the lossless tier.
+
+\paragraph{Grader faithfulness.} Model$\leftrightarrow$gold next-action agreement is
+48.6\% ($\tau$-bench) and 47.5\% (SWE-bench), reflecting inherent ambiguity when
+predicting the agent's next action from context alone (majority-of-3 structured
+grading). Decision-equivalence is a \emph{self-consistency} measure, not a
+gold-matching measure, so the faithfulness gate is a diagnostic, not the loss
+itself; future work with larger grader ensembles should improve this.
+
+\paragraph{Single-grader limitation.} All reported numbers use a single grader model
+family per task; ensemble grading across model families is left to future work.
+
+\paragraph{Sample-size cost of $\alpha$.} Certified savings at $\alpha=10\%$ is 0\%
+even on the full 300-instance SWE-bench\_Lite (the lossless tier's empirical loss
+exceeds the budget at this $\alpha$); savings jump to 15.7\% at $\alpha=15\%$ once
+calibration turns are plentiful. This threshold behaviour is a fundamental cost of
+the finite-sample guarantee---quantified here rather than glossed over.
+
+\paragraph{$\tau$-bench compactness.} On $\tau$-bench airline traces (25 traj, 105
+decisions), the context is already compact: lossless saves only 1.0\% and aggressive
+levels flip 58--65\% of decisions. The certificate correctly refuses to certify
+savings here. Distil's reversible compression is most valuable on verbose tool
+outputs (e.g.\ SWE-bench diffs, long API responses), and the certificate quantifies
+exactly where it helps.
+
+\paragraph{Position confound, stress-tested (E5--E6).} The edit-localization
+construction places the gold hunk \emph{last} in the search results, which could
+flatter tail-truncation / recency baselines. We rebuilt the corpus with the gold
+hunk at a deterministic random position (seed~$=1729$, per-instance) and re-ran E5
+(\Cref{tab:e5shuf}). The confound is \emph{real but not load-bearing}: the recency
+baseline's decision-change rises from \OrigRecencyDC{} to \ShufRecencyDC{} once the
+needle is no longer pinned to the tail, yet it still certifies, and distil's
+aggressive levels still do not---byte-exact remains the only certifying distil level,
+exactly as in the gold-last E5, and the E2 certificate holds out-of-sample on the
+shuffled corpus too (\ShufCoverage{}). Two consequences we report rather than gloss:
+(i)~the reversible digest's edge over equally-aggressive truncation is itself
+position-sensitive---on the de-confounded corpus \texttt{lossless} flips
+\emph{more} than \texttt{truncate@120} (\ShufLosslessDC{} vs.\ \ShufTruncShortDC{} at
+$\approx22\%$ savings), the reverse of the gold-last ordering reported above; and
+(ii)~when we select an operating point honestly on a calibration half and evaluate
+once on a disjoint test half (\Cref{tab:e6sweep}), distil \emph{does} certify positive
+savings (\SweepPoint{}: \SweepTestSav{} test savings / \SweepTestDC{} decision-change),
+but the certified point is plain head-truncation---salience protection and the
+reversible digest do not beat truncation on this single-turn synthetic task. The
+net reading: on edit-localization, distil's contribution is the \emph{certificate}
+that selects a safe operating point and rejects the unsafe ones, not a bespoke
+compressor that dominates truncation; the reversible engine's advantage is a
+multi-turn, verbose-context phenomenon (the $\tau$-bench and corpus-gate results),
+which a real end-to-end task-success evaluation---running the agent and its test
+suite rather than the decision-equivalence proxy---tests directly. \textbf{E7
+(\Cref{sec:e7}) is that evaluation, and it is sobering}: at the certified
+\texttt{trunc@500} operating point the localization certificate does \emph{not}
+transfer to execution.
+
+\paragraph{E4 non-evidential on SWE-bench.} SWE-bench HuggingFace evaluators mark
+all submissions resolved=True by construction of the localization task, so E4 on
+SWE reports retained decision-equivalence (lossless $+$expand: 85.0\%; no-expand:
+77.5\%), not a real task-success rate. The 19 outcome-labelled $\tau$-bench
+trajectories with real reward labels show the digest-only tier (no expand) retains
+0\% baseline success---consistent with the certificate's refusal to certify savings
+on compact $\tau$-bench contexts.
+
+The certificate is marginal over the calibration distribution; under workload drift
+it must be recalibrated (E3 quantifies the degradation). Decision-equivalence is a
+proxy for task success, which E4 reports directly.
+
 
 \end{document}
