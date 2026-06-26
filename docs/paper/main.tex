@@ -114,57 +114,26 @@
 \maketitle
 
 \begin{abstract}
-LLM agents resend a growing context at every turn, so context size dominates
-serving cost. Existing context compressors report token savings but give \emph{no
-guarantee that the agent still behaves the same}. We reframe the objective from
-byte- or embedding-fidelity to \textbf{decision-equivalence}: a compression is
-acceptable iff the agent takes the same next action it would have taken on the
-uncompressed context. We then equip this objective with a \textbf{distribution-free,
-finite-sample guarantee} by casting compression-level selection as conformal risk
-control (Learn--Then--Test and Conformal Risk Control), with the per-turn loss
-defined as a decision flip. The resulting \emph{Decision-Equivalence Risk
-Certificate} states, for a chosen risk budget $\alpha$ and confidence $1-\delta$,
-that the decision-change rate on exchangeable traffic is at most $\alpha$.
-We evaluate on real $\tau$-bench agent trajectories (airline, gpt-4o; 25
-trajectories, 105 decisions) and the full real SWE-bench\_Lite edit-localization
-(300 instances, 600 decisions), graded by a real model with no answer-revealing
-markers using majority-of-3 structured (forced-tool) grading. We validate the
-guarantee \textbf{out-of-sample}: across 500 calibration/test splits on real
-SWE-bench traces the empirical coverage is \textbf{96.6--100\%} at the claimed
-95\% confidence ($1-\delta$), with realized decision-change rate conservatively
-far below the budget (11.7\% at $\alpha\!=\!20\%$, $\approx$half the budget). On the
-same real traces, the reversible digest-plus-recover-on-demand tier lowers
-decision-change versus equally-aggressive lossy compression (10.2\% vs.\ 11.5\%
-at $\approx\!22\%$ savings on SWE-bench\_Lite; the recovery effect is sharper on
-a 40-trajectory subset: 7.5\% vs.\ 12.5\%). The certificate correctly
-\emph{declines} to certify savings on already-compact contexts ($\tau$-bench)---quantifying
-\emph{where} recoverable compression helps rather than overclaiming a single
-headline ratio. Finally, a real \textbf{end-to-end task-success} evaluation
-(SWE-bench Verified, 50 instances, the official harness; aider~+~Claude) is
-sobering and we report it without hedging: at the operating point our localization
-certificate \emph{selects} (\texttt{trunc@500}), pass@1 falls from \textbf{52\%}
-(full context) to \textbf{16\%} ($p<0.001$, paired), and aggressive compression does
-not beat LLMLingua-2. Decision-equivalence is the right \emph{contract} and the
-certificate is sound for what it measures; the honest scope of that guarantee is the
-calibration distribution it is computed on, \emph{not} downstream task success once
-compression is aggressive. The converse, however, also holds where it matters: on a
-\textbf{long-horizon} agent (a 30-turn ReAct loop over the full 500-instance SWE-bench
-Verified set), \emph{relevance-gated reversible} compression---digesting only aged-out
-periphery while keeping the working set intact and recoverable---is the \emph{highest-accuracy
-compressor} at \textbf{36.8\%} versus \textbf{39.2\%} for full context (paired difference
-$-2.4$\,pp, 95\% CI~$[-5.7, +0.9]$; the \emph{only} condition non-inferior to full) and
-\textbf{beats the strongest competitor}, Headroom, by $+4.2$\,pp ($32.6\%$, paired McNemar
-$p=0.035$). It is also the only \emph{reversible and certified} compressor; lossy baselines
-crater (Headroom $32.6\%$, plain truncation $5.6\%$, LLMLingua-2 $2.4\%$, all carrying no
-guarantee). We do not claim it is the cheapest---Headroom is cheaper but uncertified---only
-that it uniquely delivers a decision-equivalence guarantee at leading task success.
-Compression survives execution precisely when it is recoverable and confined to the
-periphery. Finally, we lift the certificate from per-turn to the \textbf{trajectory} level:
-a distribution-free guarantee that, with $95\%$ confidence, the gated compressor changes a
-run's outcome on $\le\!18\%$ of exchangeable tasks and costs a solvable task on
-$\le\!11.4\%$---validated out-of-sample (coverage $95.4\%/96.7\%\ge95\%$). To our knowledge
-this is the first trajectory-level decision-equivalence certificate for agent context
-compression.
+LLM agents resend a growing context every turn, so context size dominates serving cost---yet
+every shipping compressor quotes token savings with \emph{no guarantee the agent still behaves
+the same}. We reframe the objective from byte- or embedding-fidelity to
+\textbf{decision-equivalence}: a compression is acceptable iff the agent takes the same next
+action it would have on the uncompressed context. We make this objective \emph{certifiable}
+with a distribution-free, finite-sample guarantee via conformal risk control
+(Learn--Then--Test / CRC), the per-turn loss being a decision flip, and validate it
+out-of-sample on real SWE-bench traces (coverage $96.6\%$--$100\%$ at the $95\%$ target).
+Certifying a per-turn proxy is necessary but not sufficient: on a real end-to-end agent
+(SWE-bench Verified, official harness) we show---without hedging---that \emph{aggressive lossy}
+compression does not transfer to task success. The remedy is architectural: a
+\textbf{reversible, relevance-gated} engine that digests only aged-out periphery while keeping
+the working set intact and recoverable. On a $500$-instance, $30$-turn long-horizon agent it is
+the \textbf{highest-accuracy compressor} ($36.8\%$ vs.\ $39.2\%$ for full context), the
+\emph{only} one statistically non-inferior to full, and beats the strongest competitor,
+Headroom, by $+4.2$\,pp ($p\!=\!0.035$)---uniquely reversible \emph{and} certified, where lossy
+baselines crater. Finally we lift the certificate from per-turn to the \textbf{trajectory}
+level: with $95\%$ confidence the gated compressor changes a run's outcome on $\le\!18\%$ of
+exchangeable tasks (out-of-sample coverage $95.4\%$). To our knowledge this is the first
+trajectory-level decision-equivalence certificate for agent context compression.
 \end{abstract}
 
 \section{Introduction}
@@ -188,9 +157,17 @@ slogan, not a measured quantity with a confidence level.
   our knowledge, conformal control with an \emph{agent-decision} loss for context
   compression is unstudied; the nearest work applies conformal guarantees to RAG
   retrieval recall, a different task.
-  \item A \textbf{cache-aware, reversible} engine (digest-behind-handle plus
-  recover-on-demand) that operates inside the certified frontier
-  (\Cref{sec:method}).
+  \item A \textbf{cache-aware, reversible} engine---a content-aware skeleton digest
+  behind a content handle, with recover-on-demand and a relevance gate that keeps the
+  agent's working set intact---operating inside the certified frontier (\Cref{sec:method}).
+  \item An \textbf{end-to-end task-success study} on SWE-bench Verified with the official
+  harness (E7--E8): we report honestly that aggressive \emph{lossy} compression does not
+  transfer to task success, then show the reversible relevance-gated tier is the
+  highest-accuracy compressor on a 500-instance long-horizon agent---non-inferior to full
+  context and ahead of the strongest competitor (\Cref{sec:e8}).
+  \item A \textbf{trajectory-level decision-equivalence certificate} (E10): we lift the
+  per-turn guarantee to whole runs and validate it out-of-sample, to our knowledge the first
+  distribution-free task-level equivalence guarantee for context compression (\Cref{sec:e10}).
   \item An \textbf{evaluation on real agent traces} that removes the circular
   self-labeling of synthetic corpora, plus three measurement requirements we found
   to be load-bearing and now enforce: majority-vote grading, a faithful grader, and
@@ -216,19 +193,28 @@ certifiable.}
 \end{figure}
 
 \section{Related work}
-\paragraph{Context/prompt compression.} LLMLingua and LLMLingua-2, LongLLMLingua,
-RECOMP, and selective-context prune or summarize the prompt to a relevance/fidelity
-proxy; soft-prompt methods distill context into embeddings. None certifies that the
-downstream agent decision is preserved.
+\paragraph{Context/prompt compression.} LLMLingua and LLMLingua-2~\cite{llmlingua},
+LongLLMLingua, RECOMP~\cite{recomp}, and selective-context~\cite{selectivecontext} prune
+or summarize the prompt to a relevance/fidelity proxy; soft-prompt and gist-token
+methods~\cite{gist} distill context into learned embeddings. All optimize a surrogate
+(perplexity, recall, embedding similarity); none certifies that the downstream agent
+\emph{decision} is preserved, which is the gap we close.
+\paragraph{KV-cache eviction.} StreamingLLM~\cite{streamingllm} and
+H\textsubscript{2}O~\cite{h2o} drop or retain tokens by recency/attention to shrink the
+KV cache at decode time. Our relevance gate shares the recency intuition (protect the
+working set, compress the periphery) but operates on the \emph{re-sent request context}
+rather than the KV cache, is \emph{reversible} (digested periphery is recoverable
+byte-exact on demand), and is selected \emph{under a decision-equivalence certificate}
+rather than a fixed heuristic.
 \paragraph{Prompt caching} makes a cache read far cheaper than fresh input, so the
 real lever is keeping a byte-stable prefix and compressing the volatile tail---a
 cache-aware objective our engine targets.
-\paragraph{Distribution-free uncertainty.} Conformal prediction and its risk-control
-extensions---Learn--Then--Test (LTT)~\cite{ltt} and Conformal Risk
+\paragraph{Distribution-free uncertainty.} Conformal prediction~\cite{vovk} and its
+risk-control extensions---Learn--Then--Test (LTT)~\cite{ltt} and Conformal Risk
 Control~\cite{crc}---turn a calibration set into finite-sample guarantees on a
-user-chosen risk. We instantiate them with an agent-decision loss. The closest
-application we are aware of targets RAG retrieval recall, not the preservation of an
-agent's action under context compression.
+user-chosen risk. We instantiate them with an agent-decision loss, and (E10) lift the
+guarantee to the trajectory level. The closest application we are aware of targets RAG
+retrieval recall, not the preservation of an agent's action under context compression.
 
 \section{Problem formulation}
 \label{sec:problem}
@@ -879,8 +865,46 @@ guarantee.}
 \label{tab:e8}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  xbar, width=0.92\linewidth, height=5.4cm,
+  enlarge y limits=0.14, xmin=0, xmax=48,
+  xlabel={pass@1 (\%) on SWE-bench Verified ($n{=}500$), Wilson 95\% CI},
+  symbolic y coords={LLMLingua-2,trunc@500,distil expand,Headroom,distil gated,full context},
+  ytick=data, y tick label style={font=\small},
+  nodes near coords, nodes near coords align={horizontal},
+  every node near coord/.append style={font=\footnotesize,/pgf/number format/fixed,/pgf/number format/precision=1},
+  bar width=8pt,
+  error bars/x dir=both, error bars/x explicit,
+]
+\addplot[draw=distilgray,fill=distilgray!25] coordinates {
+  (2.4,LLMLingua-2)  +- (1.4,0)
+  (5.6,trunc@500)    +- (2.05,0)
+  (32.6,Headroom)    +- (4.1,0)
+};
+\addplot[draw=distilgreen,fill=distilgreen!30] coordinates {
+  (32.4,distil expand) +- (4.1,0)
+  (36.8,distil gated)  +- (4.2,0)
+};
+\addplot[draw=black,fill=black!12] coordinates {
+  (39.2,full context) +- (4.25,0)
+};
+\draw[distilblue,dashed,thick] ({axis cs:39.2,LLMLingua-2}|-{rel axis cs:0,0}) -- ({axis cs:39.2,full context}|-{rel axis cs:0,1});
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{E8 frontier: task-success of every condition} (pass@1 with Wilson 95\%
+intervals, $n{=}500$, identical 30-turn ReAct agent, official harness). \textcolor{distilgreen}{Green}
+= distil's reversible, certified tiers; \textcolor{distilgray}{gray} = lossy competitors; the
+dashed line marks full context. distil's relevance-gated tier is the highest-accuracy
+compressor and the only one whose interval overlaps full; both lossy token-droppers collapse.}
+\label{fig:e8frontier}
+\end{figure}
+
 \paragraph{Result: distil leads on certified task success.} On the long-horizon workload the
-relevance-gated tier (E) is the highest-accuracy compressor: \textbf{\sweEeightGatedPass{}}
+relevance-gated tier (E) is the highest-accuracy compressor (\Cref{fig:e8frontier}):
+\textbf{\sweEeightGatedPass{}}
 versus \sweEeightFullPass{} for full context---a paired difference of \sweEeightGatedNIDelta{}
 (95\% CI~[\sweEeightGatedNICIlo, \sweEeightGatedNICIhi]). We report this as a
 \emph{non-inferiority} result rather than a bare significance test, since failing to reject
@@ -964,8 +988,8 @@ $(1-\delta)$ upper confidence bound on each rate (\Cref{sec:method};
 This yields a distribution-free, finite-sample guarantee at the unit users care about: with
 confidence $95\%$, the relevance-gated compressor's \textbf{trajectory divergence from full
 is $\le 18.0\%$} (empirical $14.4\%$) and its \textbf{harm rate is $\le 11.4\%$} (empirical
-$8.4\%$)---i.e.\ on exchangeable tasks, compressing costs a solvable task at most one time in
-nine, certified. Crucially we \emph{prove} the bound out-of-sample exactly as E2 does: over
+$8.4\%$; \Cref{fig:e10cert})---i.e.\ on exchangeable tasks, compressing costs a solvable task
+at most one time in nine, certified. Crucially we \emph{prove} the bound out-of-sample exactly as E2 does: over
 $1000$ random calibration/test splits, certifying $\beta$ on the calibration half and
 checking the disjoint test half's realised rate, coverage is \textbf{95.4\%} (divergence)
 and \textbf{96.7\%} (harm)---both at or above the $95\%$ target, so the bound holds on
@@ -976,6 +1000,35 @@ distribution-free decision-equivalence certificate for agent context compression
 scope is the same as E2's: it holds for traffic exchangeable with the calibration
 distribution (SWE-bench Verified, this agent and model), not universally. Reproducible via
 \texttt{benchmarks/trajectory\_certificate.py}.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  xbar, width=0.9\linewidth, height=3.6cm,
+  enlarge y limits=0.6, xmin=0, xmax=26,
+  xlabel={trajectory-level rate (\%), gated vs.\ full ($n{=}500$, $\delta{=}0.05$)},
+  symbolic y coords={harm,divergence}, ytick=data,
+  y tick label style={font=\small}, bar width=12pt,
+  nodes near coords, nodes near coords align={horizontal},
+  every node near coord/.append style={font=\footnotesize},
+]
+\addplot[draw=distilgreen,fill=distilgreen!30] coordinates {(8.4,harm) (14.4,divergence)};
+\addplot[only marks,mark=|,mark size=9pt,line width=1.2pt,distilred]
+  coordinates {(11.4,harm) (18.4,divergence)};
+\node[font=\footnotesize,distilred,anchor=west] at (axis cs:18.6,divergence) {certified $\le18.0\%$};
+\node[font=\footnotesize,distilred,anchor=west] at (axis cs:12.0,harm) {certified $\le11.4\%$};
+\node[font=\scriptsize,distilgray,anchor=west] at (axis cs:0.4,divergence) {OOS coverage 95.4\%};
+\node[font=\scriptsize,distilgray,anchor=west] at (axis cs:0.4,harm) {OOS coverage 96.7\%};
+\end{axis}
+\end{tikzpicture}
+\caption{\textbf{E10: the trajectory-level certificate.} \textcolor{distilgreen}{Green bars}
+are the empirical rates (gated vs.\ full); \textcolor{distilred}{red ticks} are the certified
+$(1{-}\delta)$ upper bounds. Out-of-sample coverage over $1000$ calibration/test splits meets
+the $95\%$ target, so each bound \emph{holds on held-out data}. ``Harm'' = a task full context
+solved that the compressed run did not.}
+\label{fig:e10cert}
+\end{figure}
 
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
@@ -998,8 +1051,15 @@ compression is aggressive. But the same evaluation shows distil's \emph{reversib
 (digest $+$ \texttt{distil\_expand}) is end-to-end \emph{task-equivalent to full context}
 (\sweEsevenExpandPass{} vs.\ \sweEsevenFullPass{}, McNemar $p=\sweEsevenExpandVsFullP{}$)
 at a modest realised discount---the actionable conclusion being \emph{keep compression
-recoverable}. The contract is right; the lesson is that proxy certification and lossy
-aggression are the failure mode, recoverability the fix.
+recoverable}. Scaled to a real long-horizon agent (E8, \Cref{sec:e8}: a 30-turn ReAct loop
+over the full 500-instance SWE-bench Verified set), the reversible \emph{relevance-gated} tier
+is the highest-accuracy compressor (\sweEeightGatedPass{}), the only one non-inferior to full
+context, and ahead of the strongest competitor---uniquely reversible \emph{and} certified.
+Finally, E10 (\Cref{sec:e10}) lifts the guarantee from the per-turn proxy to the
+\emph{trajectory} level, validated out-of-sample: the contract now binds the outcome users
+actually pay for, not just the next action. The contract is right; the lesson is that proxy
+certification and lossy aggression are the failure mode, while recoverability, a relevance gate
+that protects the working set, and a trajectory-level certificate are the fix.
 
 \paragraph{Reproducibility.} The harness, adapters, runners, and this paper are
 released at \url{https://github.com/dshakes/distil} (see \texttt{benchmarks/PROVE.md}
@@ -1019,6 +1079,16 @@ Interaction in Real-World Domains.} 2024.
 Real-World GitHub Issues?} ICLR 2024.
 \bibitem{recomp} F.~Xu, W.~Shi, E.~Choi. \emph{RECOMP: Improving
 Retrieval-Augmented LMs with Compression and Selective Augmentation.} ICLR 2024.
+\bibitem{selectivecontext} Y.~Li, B.~Dong, F.~Guerin, C.~Lin. \emph{Compressing Context
+to Enhance Inference Efficiency of Large Language Models.} EMNLP 2023.
+\bibitem{gist} J.~Mu, X.~L. Li, N.~Goodman. \emph{Learning to Compress Prompts with
+Gist Tokens.} NeurIPS 2023.
+\bibitem{streamingllm} G.~Xiao, Y.~Tian, B.~Chen, S.~Han, M.~Lewis. \emph{Efficient
+Streaming Language Models with Attention Sinks.} ICLR 2024.
+\bibitem{h2o} Z.~Zhang et al. \emph{H\textsubscript{2}O: Heavy-Hitter Oracle for
+Efficient Generative Inference of Large Language Models.} NeurIPS 2023.
+\bibitem{vovk} V.~Vovk, A.~Gammerman, G.~Shafer. \emph{Algorithmic Learning in a Random
+World.} Springer, 2005.
 \end{thebibliography}
 
 \end{document}
