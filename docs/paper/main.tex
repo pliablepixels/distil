@@ -714,6 +714,7 @@ A. full context & --- & \textbf{\sweEsevenFullPass} & [\sweEsevenFullCIlo, \sweE
 B. distil \texttt{trunc@500} (lossy) & \sweEsevenDistilCtxRed & \sweEsevenDistilPass & [\sweEsevenDistilCIlo, \sweEsevenDistilCIhi] & \sweEsevenDistilCost \\
 C. LLMLingua-2 (lossy) & \sweEsevenLinguaCtxRed & \sweEsevenLinguaPass & [\sweEsevenLinguaCIlo, \sweEsevenLinguaCIhi] & \sweEsevenLinguaCost \\
 D. distil reversible ($+$\texttt{distil\_expand}) & \sweEsevenExpandCtxRed$^{\dagger}$ & \textbf{\sweEsevenExpandPass} & [\sweEsevenExpandCIlo, \sweEsevenExpandCIhi] & \sweEsevenExpandCost \\
+E. distil reversible, relevance-gated & \sweEsevenGatedCtxRed$^{\ddagger}$ & \textbf{\sweEsevenGatedPass} & [\sweEsevenGatedCIlo, \sweEsevenGatedCIhi] & \sweEsevenGatedCost \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{E7: SWE-bench Verified end-to-end task-success} (\sweEsevenN{} instances,
@@ -724,7 +725,10 @@ point; C is LLMLingua-2 at its default rate; D is distil's \emph{reversible} tie
 (digest-behind-handle $+$ recover-on-demand). $^{\dagger}$For D, ctx.\ reduction is the
 \emph{pre-recovery} digest view; after the model's \texttt{distil\_expand} calls the
 \emph{realised} cost is \sweEsevenExpandCost{} vs.\ \sweEsevenFullCost{} for full
-($\approx$7\% cheaper), because the agent recovers what it edits.}
+($\approx$7\% cheaper), because the agent recovers what it edits. $^{\ddagger}$E keeps
+the last 6 user/tool messages full and digests only older periphery; these conversations
+are $\le$6 turns, so the gate is a \emph{no-op} here (1 block digested across all 50,
+McNemar vs.\ full $p=\sweEsevenGatedVsFullP{}$) — it targets long-horizon contexts.}
 \label{tab:e7}
 \end{table}
 
@@ -779,7 +783,13 @@ so the net cost is \sweEsevenExpandCost{} vs.\ \sweEsevenFullCost{} ($\approx$7\
 the savings coming from periphery the agent never expands. Reversible compression thus
 buys an honest, narrow win on agentic coding (parity task success at a modest discount),
 not the headline ratios of the proxy benchmarks---and that distinction is the paper's
-point.
+point. A \emph{relevance-gated} variant (condition E; keep the last six user/tool
+messages full, digest only older periphery, recoverable) likewise holds task success
+(\sweEsevenGatedPass{}, McNemar vs.\ full $p=\sweEsevenGatedVsFullP{}$) with \emph{zero}
+recovery round-trips, but is a no-op on these $\le$6-turn conversations (nothing is
+periphery); its intended regime is long-horizon agents with large peripheral context,
+which this focused localization workload does not exercise---we flag it as the gate's
+proper, unrun test rather than over-fit the knob to a workload that cannot move it.
 
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can

@@ -156,7 +156,14 @@ COMPRESSORS: dict[str, Compressor | None] = {
 }
 EXPAND_CONDITION = "distil_expand"
 GATED_CONDITION = "distil_gated"
-GATE_RECENT = 6  # distil_gated: keep the last N user/tool messages (working set) full
+# distil_gated: keep the last N user/tool messages (working set) full, digest older
+# periphery. Tunable via DISTIL_E7_GATE_RECENT — on short conversations (<= N user/tool
+# turns, e.g. focused SWE-localization) the gate is a no-op (everything is "recent"); its
+# payoff is long-horizon agents with large peripheral context. Lower N digests more
+# periphery (more savings) but risks digesting the file under edit.
+import os as _os  # noqa: E402
+
+GATE_RECENT = int(_os.environ.get("DISTIL_E7_GATE_RECENT", "6"))
 MAX_EXPAND_ITERS = 4  # cap the recover-then-redecide round-trips per agent request
 
 

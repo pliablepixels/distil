@@ -235,12 +235,18 @@ problem statement) is compressed in flight.
 | **B. distil `trunc@500`** (aggressive **lossy**) | 86% | **16.0%** | [8.3%, 28.5%] | 8/50 | $4.00 |
 | **C. LLMLingua-2** (**lossy**) | 48% | **26.0%** | [15.9%, 39.6%] | 13/50 | $12.03 |
 | **D. distil reversible + `distil_expand`** | 81%* | **56.0%** | [42.3%, 68.8%] | 28/50 | $16.38 |
+| **E. distil reversible, relevance-gated** | 0%** | **54.0%** | [40.4%, 67.0%] | 27/50 | $17.27 |
 
 Paired exact McNemar (same 50 instances): **B vs. full `p<0.001`** (20 lost, 2 gained),
 **C vs. full `p=0.002`**, **C vs. B `p=0.18`** (n.s.), **D vs. full `p=0.69`** (n.s. —
 *statistically equal to full*), **D vs. B `p<0.001`** (D recovers 22 instances B failed).
 \*For D, 81% is the *pre-recovery* digest view; the realised cost is $16.38 vs. $17.63 for
-full (~7% cheaper) after the model's `distil_expand` calls.
+full (~7% cheaper) after the model's `distil_expand` calls. \*\*For E (gate = keep last 6
+user/tool messages full, digest older periphery), these SWE conversations are ≤6 turns so
+the gate is a **no-op** — only 1 block digested across all 50 instances, hence ~0 context
+reduction and full-vs-gated McNemar `p=1.0` (statistically identical to full). The gate is
+designed for long-horizon agents with large peripheral context; this focused localization
+workload does not exercise it (tunable via `DISTIL_E7_GATE_RECENT`).
 
 **Findings, reported without cherry-picking.** (1) Both **lossy** conditions (B, C)
 **significantly** collapse pass@1 vs. full — aggressive lossy compression does **not**

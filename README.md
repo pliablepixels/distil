@@ -182,13 +182,16 @@ We ran the honest test the proxy can't give you: a **real coding agent end-to-en
 | full (no compression) | **52%** | — | $17.63 |
 | distil `trunc@500` (aggressive **lossy**) | 16% | −36pp, *p*<0.001 (craters) | $4.00 |
 | LLMLingua-2 (**lossy**) | 26% | −26pp, *p*=0.002 (craters) | $12.03 |
-| **distil reversible + `distil_expand`** | **56%** | **+4pp, *p*=0.69 — statistically equal to full** | $16.38 |
+| **distil reversible + `distil_expand`** | **56%** | **+4pp, *p*=0.69 — equal to full** | $16.38 |
+| **distil reversible, relevance-gated** | **54%** | **+2pp, *p*=1.0 — equal to full** | $17.27 |
 
 **Two honest findings, both real:**
 1. **Aggressive _lossy_ compression significantly degrades end-to-end task success** — and a decision-equivalence certificate earned on a single-turn proxy does **not** transfer to multi-turn coding. The opposite of "compression is free." We publish it because it's true.
 2. **Distil's _reversible_ tier (digest + recover-on-demand) survives execution** — task-equivalent to full context (56% vs 52%, McNemar *p*=0.69; it resolves 22 instances `trunc@500` failed). Keep the information **recoverable** and the agent pulls back exactly what it edits.
 
 **The catch (also honest):** on coding the agent expands most of what it edits, so the *realised* token saving of the reversible tier is **only ~7%** ($16.38 vs $17.63) — not the proxy headline ratios. The real savings come from periphery the agent never expands. So: **recoverable compression = task-success parity at a modest discount on agentic coding**, not 80%-off.
+
+**The relevance-gated variant** (keep the last 6 messages — the working set — full, digest only older periphery) also holds task success (54%, *p*=1.0) with **zero recovery round-trips** — but on these *focused* SWE tasks it's effectively a no-op (the conversations are ≤6 turns, so there's no periphery to digest; only 1 block compressed across all 50). Its payoff is **long-horizon agents with large peripheral context** (many turns, distractor files) — the workload that actually exercises the gate (tunable via `DISTIL_E7_GATE_RECENT`); evaluating it there is the honest next step.
 
 Full methodology, per-instance data, McNemar tests, and the certificate-non-transfer analysis: [`docs/PAPER.md`](docs/PAPER.md) · paper §E7 · committed results in `docs/paper/results/swe_e2e/`.
 
