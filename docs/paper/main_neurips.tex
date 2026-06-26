@@ -1,6 +1,5 @@
 % Certified Decision-Equivalent Context Compression for LLM Agents — NeurIPS format.
-% Uses neurips_2024.sty (faithful reconstruction; drop in the official .sty for
-% submission, same interface). Body identical to main.tex (the arXiv version).
+% Uses neurips_2024.sty (faithful reconstruction; drop in the official .sty for submission).
 \documentclass{article}
 \usepackage[preprint,nonatbib]{neurips_2024}
 
@@ -239,21 +238,26 @@ truncation sweep.
 
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}[font=\small]
-  \tikzstyle{b}=[draw,rounded corners,align=center,minimum height=8mm,inner sep=3pt]
-  \node[b,fill=gray!8] (ctx) {context\\blocks};
-  \node[b,fill=gray!8,right=8mm of ctx] (stab) {stabilize\\(cacheable prefix)};
-  \node[b,fill=distilblue!12,right=8mm of stab] (t1) {Tier-1 digest\\behind handle};
-  \node[b,fill=distilblue!12,right=8mm of t1] (t0) {Tier-0\\minify};
-  \node[b,fill=distilgreen!12,right=8mm of t0] (grade) {grader\\$d(\cdot)$};
-  \node[b,fill=gray!8,below=9mm of grade,align=center] (store) {local store\\handle$\to$original};
-  \node[b,fill=distilgreen!12,below=9mm of t1,align=center] (cert) {conformal\\certificate};
-  \draw[-{Latex}] (ctx)--(stab); \draw[-{Latex}] (stab)--(t1);
-  \draw[-{Latex}] (t1)--(t0); \draw[-{Latex}] (t0)--(grade);
-  \draw[-{Latex}] (store) -- node[right,font=\scriptsize]{\texttt{distil\_expand}} (grade);
-  \draw[-{Latex},dashed] (t1) |- (store);
-  \draw[-{Latex}] (grade) -- ++(0,-0.0) -| (cert);
-  \draw[-{Latex}] (cert) -- node[below,font=\scriptsize]{select $\hat\lambda$} (stab);
+\begin{tikzpicture}[font=\small,
+    b/.style={draw,rounded corners,align=center,minimum height=9mm,inner sep=4pt}]
+  % --- main pipeline (top row) ---
+  \node[b,fill=gray!8]        (ctx)   at (0,0)   {context\\blocks};
+  \node[b,fill=gray!8]        (stab)  at (3.0,0) {stabilize\\(cacheable prefix)};
+  \node[b,fill=distilblue!12] (comp)  at (6.6,0) {compress\\(Tier-1 digest\\$+$ Tier-0 minify)};
+  \node[b,fill=distilgreen!12](grade) at (10.0,0){grader\\$d(\cdot)$};
+  % --- recovery + certificate (bottom row) ---
+  \node[b,fill=gray!8]        (store) at (6.6,-2.3){local store\\handle$\to$original};
+  \node[b,fill=distilgreen!12](cert)  at (10.0,-2.3){conformal\\certificate};
+  % main flow
+  \draw[-{Latex}] (ctx)--(stab);
+  \draw[-{Latex}] (stab)--(comp);
+  \draw[-{Latex}] (comp)--(grade);
+  % digest keeps the original; grader recovers it on demand
+  \draw[-{Latex},dashed] (comp)--(store) node[midway,left,font=\scriptsize]{keep original};
+  \draw[-{Latex}] (store) -- node[pos=0.55,sloped,above,font=\scriptsize]{\texttt{distil\_expand}} (grade.south);
+  % decisions feed the certificate; certificate selects the operating level
+  \draw[-{Latex}] (grade)--(cert) node[midway,right,font=\scriptsize]{decisions};
+  \draw[-{Latex}] (cert) -- ++(0,-1.0) -| node[pos=0.25,below,font=\scriptsize]{select $\hat\lambda$} (stab);
 \end{tikzpicture}
 \caption{The pipeline. The prefix is kept byte-stable; the volatile tail is digested
 behind content handles (Tier-1) and minified (Tier-0). The original is kept locally
@@ -372,28 +376,32 @@ measurements is described in \Cref{fig:expand}.
   height=6.5cm,
   xlabel={token savings (\%)},
   ylabel={decision-change (\%)},
-  xmin=-2, xmax=28,
+  xmin=-2, xmax=31,
   ymin=-2, ymax=18,
-  legend style={font=\scriptsize,at={(0.02,0.98)},anchor=north west},
+  legend style={font=\scriptsize,at={(0.5,-0.20)},anchor=north,legend columns=3,/tikz/every even column/.append style={column sep=8pt}},
   title={\small E1: savings vs.\ decision-change (SWE-bench\_Lite, 300 instances, $+$expand)},
-  xtick={0,5,10,15,20,25},
+  xtick={0,5,10,15,20,25,30},
   ytick={0,5,10,15},
   grid=major,
   grid style={dotted,gray!40}]
 % +expand series (filled markers) — full 300-instance run
-\addplot[only marks,mark=*,mark size=3.5pt,distilgreen]
+\addplot[only marks,mark=*,mark size=3pt,distilgreen]
   coordinates {(0,0) (21.7,10.2) (20.4,11.5) (22.8,11.7)};
 \addlegendentry{reversible $+$expand (300 instances)}
 % alpha reference lines
-\addplot[dashed,distilgray,thick] coordinates {(-2,10) (28,10)};
+\addplot[dashed,distilgray,thick] coordinates {(-2,10) (31,10)};
 \addlegendentry{$\alpha=10\%$}
-\addplot[dotted,distilblue,thick] coordinates {(-2,15) (28,15)};
+\addplot[dotted,distilblue,thick] coordinates {(-2,15) (31,15)};
 \addlegendentry{$\alpha=15\%$}
-% node labels
-\node[font=\scriptsize,anchor=south west] at (axis cs:0.3,0.3) {byte-exact};
-\node[font=\scriptsize,anchor=south] at (axis cs:21.7,10.7) {lossless};
-\node[font=\scriptsize,anchor=north east] at (axis cs:20.4,11.0) {trunc@250};
-\node[font=\scriptsize,anchor=north west] at (axis cs:22.8,11.7) {trunc@120};
+% node labels — the three aggressive points are near-coincident, so fan the labels
+% out (below / left / right) with thin leaders to avoid overlap.
+\node[font=\scriptsize,anchor=south west] at (axis cs:0.3,0.5) {byte-exact};
+\node[font=\scriptsize,anchor=north] (Llossless) at (axis cs:21.7,8.7) {lossless};
+\draw[gray!60,thin] (Llossless.north) -- (axis cs:21.7,10.0);
+\node[font=\scriptsize,anchor=east] (Lt250) at (axis cs:16.0,13.6) {trunc@250};
+\draw[gray!60,thin] (Lt250.east) -- (axis cs:20.4,11.6);
+\node[font=\scriptsize,anchor=west] (Lt120) at (axis cs:24.4,13.3) {trunc@120};
+\draw[gray!60,thin] (Lt120.west) -- (axis cs:22.9,11.8);
 \end{axis}
 \end{tikzpicture}
 \caption{\textbf{E1 frontier on full real SWE-bench\_Lite} (300 instances, 600
@@ -435,12 +443,12 @@ decision-equivalence evaluation must control; each is now enforced or flagged.
 \begin{tikzpicture}[font=\small,node distance=5mm]
   \tikzstyle{b}=[draw,rounded corners,align=center,minimum height=7mm,inner sep=3pt]
   \node[b,fill=gray!8] (c) {digested\\context};
-  \node[b,fill=distilred!10,right=10mm of c] (no) {decide now\\\textcolor{distilred}{\textsf{flip}}};
-  \node[b,fill=distilblue!12,below=7mm of no] (ex) {\texttt{\{"expand":[h]\}}};
+  \node[b,fill=distilred!10,right=26mm of c] (no) {decide now\\\textcolor{distilred}{\textsf{flip}}};
+  \node[b,fill=distilblue!12,below=8mm of no] (ex) {\texttt{\{"expand":[h]\}}};
   \node[b,fill=gray!8,right=12mm of ex] (rec) {recover original\\(byte-exact)};
   \node[b,fill=distilgreen!12,right=10mm of rec] (yes) {decide\\\textcolor{distilgreen}{\textsf{preserved}}};
-  \draw[-{Latex}] (c) -- node[above,font=\scriptsize]{no-expand} (no);
-  \draw[-{Latex}] (c) |- node[below,font=\scriptsize,pos=0.75]{with-expand} (ex);
+  \draw[-{Latex}] (c) -- node[above,font=\scriptsize,midway]{no-expand} (no);
+  \draw[-{Latex}] (c) |- node[below,font=\scriptsize,pos=0.72]{with-expand} (ex);
   \draw[-{Latex}] (ex) -- (rec); \draw[-{Latex}] (rec) -- (yes);
 \end{tikzpicture}
 \caption{Expand-aware grading. Without the recovery loop the hidden, load-bearing
@@ -867,32 +875,29 @@ guarantee.}
 
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}
-\begin{axis}[
-  xbar, width=0.92\linewidth, height=5.4cm,
-  enlarge y limits=0.14, xmin=0, xmax=48,
-  xlabel={pass@1 (\%) on SWE-bench Verified ($n{=}500$), Wilson 95\% CI},
-  symbolic y coords={LLMLingua-2,trunc@500,distil expand,Headroom,distil gated,full context},
-  ytick=data, y tick label style={font=\small},
-  nodes near coords, nodes near coords align={horizontal},
-  every node near coord/.append style={font=\footnotesize,/pgf/number format/fixed,/pgf/number format/precision=1},
-  bar width=8pt,
-  error bars/x dir=both, error bars/x explicit,
-]
-\addplot[draw=distilgray,fill=distilgray!25] coordinates {
-  (2.4,LLMLingua-2)  +- (1.4,0)
-  (5.6,trunc@500)    +- (2.05,0)
-  (32.6,Headroom)    +- (4.1,0)
-};
-\addplot[draw=distilgreen,fill=distilgreen!30] coordinates {
-  (32.4,distil expand) +- (4.1,0)
-  (36.8,distil gated)  +- (4.2,0)
-};
-\addplot[draw=black,fill=black!12] coordinates {
-  (39.2,full context) +- (4.25,0)
-};
-\draw[distilblue,dashed,thick] ({axis cs:39.2,LLMLingua-2}|-{rel axis cs:0,0}) -- ({axis cs:39.2,full context}|-{rel axis cs:0,1});
-\end{axis}
+\begin{tikzpicture}[x=0.215cm,y=0.92cm,font=\small]
+  % rows (y): 6=top ... 1=bottom; bar half-height 0.27
+  % full reference line
+  \draw[distilblue,dashed,thick] (39.2,0.55) -- (39.2,6.55);
+  \node[distilblue,font=\scriptsize,above] at (39.2,6.55) {full};
+  % bars: \i / name / value / lo / hi / fillcolor / drawcolor
+  \foreach \i/\name/\v/\lo/\hi/\fc/\dc in {%
+    6/full context/39.2/35.0/43.5/black!12/black!55,%
+    5/distil gated/36.8/32.7/41.1/distilgreen!30/distilgreen,%
+    4/Headroom/32.6/28.6/36.8/distilgray!25/distilgray,%
+    3/distil expand/32.4/28.4/36.6/distilgreen!30/distilgreen,%
+    2/distil trunc@500/5.6/3.9/8.0/distilgray!25/distilgray,%
+    1/LLMLingua-2/2.4/1.4/4.2/distilgray!25/distilgray}{
+    \fill[\fc,draw=\dc] (0,\i-0.27) rectangle (\v,\i+0.27);
+    \draw[\dc,thick] (\lo,\i)--(\hi,\i);
+    \draw[\dc,thick] (\lo,\i-0.12)--(\lo,\i+0.12) (\hi,\i-0.12)--(\hi,\i+0.12);
+    \node[anchor=east,font=\small] at (-1.2,\i) {\name};
+    \node[anchor=west,font=\footnotesize] at (\hi+1.2,\i) {\v};
+  }
+  % x axis
+  \draw (0,0.45)--(48,0.45);
+  \foreach \x in {0,10,20,30,40}{\draw (\x,0.45)--(\x,0.30); \node[below,font=\footnotesize] at (\x,0.30){\x};}
+  \node[below,font=\small] at (24,-0.35) {pass@1 (\%) on SWE-bench Verified ($n{=}500$), Wilson 95\% CI};
 \end{tikzpicture}
 \caption{\textbf{E8 frontier: task-success of every condition} (pass@1 with Wilson 95\%
 intervals, $n{=}500$, identical 30-turn ReAct agent, official harness). \textcolor{distilgreen}{Green}
@@ -1005,21 +1010,24 @@ distribution (SWE-bench Verified, this agent and model), not universally. Reprod
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-  xbar, width=0.9\linewidth, height=3.6cm,
-  enlarge y limits=0.6, xmin=0, xmax=26,
+  xbar, width=0.9\linewidth, height=3.8cm,
+  enlarge y limits=0.7, xmin=0, xmax=27,
   xlabel={trajectory-level rate (\%), gated vs.\ full ($n{=}500$, $\delta{=}0.05$)},
   symbolic y coords={harm,divergence}, ytick=data,
-  y tick label style={font=\small}, bar width=12pt,
-  nodes near coords, nodes near coords align={horizontal},
-  every node near coord/.append style={font=\footnotesize},
+  y tick label style={font=\small}, bar width=13pt,
 ]
-\addplot[draw=distilgreen,fill=distilgreen!30] coordinates {(8.4,harm) (14.4,divergence)};
-\addplot[only marks,mark=|,mark size=9pt,line width=1.2pt,distilred]
-  coordinates {(11.4,harm) (18.4,divergence)};
-\node[font=\footnotesize,distilred,anchor=west] at (axis cs:18.6,divergence) {certified $\le18.0\%$};
-\node[font=\footnotesize,distilred,anchor=west] at (axis cs:12.0,harm) {certified $\le11.4\%$};
-\node[font=\scriptsize,distilgray,anchor=west] at (axis cs:0.4,divergence) {OOS coverage 95.4\%};
-\node[font=\scriptsize,distilgray,anchor=west] at (axis cs:0.4,harm) {OOS coverage 96.7\%};
+% empirical-rate bars, with their value labelled at the bar end
+\addplot[draw=distilgreen,fill=distilgreen!30,
+  nodes near coords,nodes near coords align={horizontal},
+  every node near coord/.append style={font=\footnotesize,xshift=2pt}]
+  coordinates {(8.4,harm) (14.4,divergence)};
+% certified (1-delta) upper bound: red tick (no auto label)
+\addplot[only marks,mark=|,mark size=10pt,line width=1.3pt,distilred,forget plot]
+  coordinates {(11.4,harm) (18.0,divergence)};
+\node[font=\scriptsize,distilred,anchor=south] at (axis cs:18.0,divergence) {certified $\le18.0\%$};
+\node[font=\scriptsize,distilred,anchor=south] at (axis cs:11.4,harm) {certified $\le11.4\%$};
+\node[font=\scriptsize,distilgray,anchor=west] at (axis cs:0.5,divergence) {OOS cov.\ 95.4\%};
+\node[font=\scriptsize,distilgray,anchor=west] at (axis cs:0.5,harm) {OOS cov.\ 96.7\%};
 \end{axis}
 \end{tikzpicture}
 \caption{\textbf{E10: the trajectory-level certificate.} \textcolor{distilgreen}{Green bars}
