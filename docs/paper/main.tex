@@ -924,6 +924,34 @@ compression buys a real context (and cost) reduction with no \emph{detected} tas
 loss (point estimate \sweEeightGatedNIDelta{}, non-inferior at a 6\,pp margin), while every
 other compression condition---lossy or blindly reversible---is decisively inferior to full.
 
+\subsection{E9: from the per-turn certificate to the trajectory outcome}
+\label{sec:e9}
+
+The certificate bounds the \emph{per-turn} decision-change rate at $\alpha$; task success is
+a \emph{trajectory-level} property. The honest link is a composition bound: if each turn
+flips with probability $\le\alpha$, a $T$-turn trajectory diverges with probability
+$\le 1-(1-\alpha)^T \le T\alpha$ (union bound). At distil's certified operating point
+($\alpha=0.08$, E2) and E8's mean $T\approx27$ turns this evaluates to $\le$\textbf{89\%}
+(union: $214\%$)---\emph{vacuous}. A per-turn certificate, composed naively, guarantees
+almost nothing about a long trajectory, which is precisely \emph{why} E7--E8 find the proxy
+fails to transfer once compression is aggressive (large $\alpha$): the contribution is a
+sound per-turn contract, not a free trajectory guarantee.
+
+Yet the \emph{observed} outcome-divergence between the relevance-gated condition and full
+context in E8 is only \textbf{14.4\%}---over $6\times$ below the naive bound. Inverting the
+composition, $d=1-(1-\alpha)^{k}$, yields an \textbf{effective consequential-horizon} of
+$k\approx\textbf{1.8}$ turns: of $\approx$27 turns in a long coding trajectory, fewer than
+two are outcome-determining (equivalently $d\le k\alpha$ with $k\approx1.8$). The remaining
+$\sim$93\% are exploration the agent can get wrong---or have compressed---without changing
+the result, because the reversible tier lets it recover and the gate never compresses the
+active working set. \textbf{The trajectory guarantee is tight exactly when per-turn
+equivalence is certified on the consequential turns---the working set the relevance-gate
+protects by construction.} This formally connects the certificate (\Cref{sec:e2}) to the
+end-to-end results and motivates the gate's design. (Caveat: $\alpha$ is the per-turn rate
+certified on the E2 localization corpus, not re-measured on the unpaired E8 ReAct runs, so
+the composition is parametric in $\alpha$ and $k$ is reported descriptively, not as a new
+guarantee; reproducible via \texttt{benchmarks/trajectory\_bound.py}.)
+
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
 carry a distribution-free guarantee validated on real traces. The certificate

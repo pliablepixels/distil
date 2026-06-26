@@ -206,6 +206,26 @@ def test_noninferiority_paired_zero_n():
     assert noninferiority_paired(0, 0, 0, 0.05)["noninferior"] is False
 
 
+def test_trajectory_bound_composition_and_k():
+    import pytest
+
+    from benchmarks.trajectory_bound import analyze
+
+    r = analyze()  # E8 gated vs full, committed data
+    # The naive per-turn->trajectory composition must be vacuous at agentic horizons,
+    # while the observed divergence is far smaller — the gap the analysis quantifies.
+    assert r["naive_bound"] > 0.5
+    assert r["observed_divergence"] < 0.25
+    assert r["naive_bound"] > r["observed_divergence"]
+    # Effective consequential turns: a small handful out of ~27, by both estimators.
+    assert 1.0 < r["k_consequential_linear"] < 4.0
+    assert 1.0 < r["k_consequential_exact"] < 4.0
+    # Linear bound reconstructs the observed divergence: d <= k*alpha (tight by fit).
+    assert r["k_consequential_linear"] * r["alpha"] == pytest.approx(
+        r["observed_divergence"], abs=1e-9
+    )
+
+
 # --- reversible tier: digest + relevance gate (distil_expand / distil_gated) -------- #
 
 

@@ -102,6 +102,27 @@ def llmlingua2(text: str) -> str:
     return adapter.compress([text])[0]
 
 
+_HEADROOM = None
+
+
+def _headroom_compressor():
+    global _HEADROOM
+    if _HEADROOM is None:
+        # Reuse the exact E5 adapter so E8's Headroom matches E5's invocation. Headroom is
+        # an LLM-compressor: each call drives a Claude model internally (optimize=True), so
+        # this condition adds compression-time API cost — imported lazily, only when used.
+        from benchmarks import headroom_adapter
+
+        _HEADROOM = headroom_adapter
+    return _HEADROOM
+
+
+def headroom(text: str) -> str:
+    """Headroom (headroom-ai) at its default optimize pipeline. One block in, one out."""
+    out = _headroom_compressor().compress([text])
+    return out[0] if out else text
+
+
 # --------------------------------------------------------------------------- #
 # distil reversible tier: digest-behind-handle + recover-on-demand (distil_expand)
 # --------------------------------------------------------------------------- #
@@ -148,6 +169,7 @@ COMPRESSORS: dict[str, Compressor | None] = {
     "full": None,
     "distil_trunc500": trunc_500,
     "llmlingua2": llmlingua2,
+    "headroom": headroom,
     # distil_expand and distil_gated are realised as a stateful digest + recovery loop
     # in the proxy (not a pure per-block Compressor), so they map to None here and are
     # selected via ProxyState.expand (+ ProxyState.gate_recent for the gated variant).

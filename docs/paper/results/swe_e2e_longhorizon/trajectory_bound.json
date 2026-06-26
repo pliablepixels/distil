@@ -1,0 +1,12 @@
+{
+  "alpha": 0.08,
+  "mean_turns": 26.806,
+  "n": 500,
+  "diverged": 72,
+  "observed_divergence": 0.144,
+  "naive_bound": 0.8930215010623472,
+  "union_bound": 2.14448,
+  "k_consequential_exact": 1.8647385774727483,
+  "k_consequential_linear": 1.7999999999999998,
+  "consequential_fraction": 0.06714914571364619
+}

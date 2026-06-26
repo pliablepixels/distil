@@ -48,7 +48,7 @@ from benchmarks.long_horizon.agent import MODEL, TEMPERATURE, run_agent, run_age
 from benchmarks.swe_bench_e2e.compress_proxy_openai import serve as serve_openai
 
 ROOT = Path(__file__).resolve().parents[2]
-CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "distil_expand", "distil_gated")
+CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "headroom", "distil_expand", "distil_gated")
 
 # Serialise worktree add/remove per clone (mirrors run_agent._CLONE_LOCKS).
 _CLONE_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
