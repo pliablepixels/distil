@@ -97,3 +97,10 @@ def test_smart_digest_nested_functions_do_not_break():
     assert "def outer():" in sk
     assert sk.count("...") == 1
     assert "return inner()" not in sk
+
+
+def test_skeleton_is_a_certified_ladder_level():
+    from distil.conformal import default_ladder
+
+    names = [n for n, _ in default_ladder()]
+    assert "skeleton" in names and "protect+skeleton" in names

@@ -142,6 +142,24 @@ def _truncate_level(limit: int):
     return strat
 
 
+def _skeleton_level():
+    """Content-aware skeleton digest as a ladder level (see :mod:`distil.skeleton`).
+
+    Unlike truncation it preserves structure — code signatures and traceback tails — so it
+    sits at a much better savings/decision-change point on most volatile context, while
+    remaining reversible (the original is recoverable behind a content handle)."""
+    from .skeleton import smart_digest
+    from .trajectory import Stability
+
+    def strat(blocks, turn):
+        return [
+            b.copy_with(smart_digest(b.text)) if b.stability is Stability.VOLATILE else b
+            for b in blocks
+        ]
+
+    return strat
+
+
 def default_ladder():
     """Least → most aggressive compression levels, ordered by expected risk. Reuses
     Distil's safe operating points, then salience-PROTECTED aggressive levels (which
@@ -155,6 +173,8 @@ def default_ladder():
     return [
         ("byte-exact", byte_exact),
         ("lossless", distil),
+        ("skeleton", _skeleton_level()),
+        ("protect+skeleton", protect(_skeleton_level())),
         ("protect+truncate@500", protect(_truncate_level(500))),
         ("protect+truncate@250", protect(_truncate_level(250))),
         ("truncate@1000", _truncate_level(1000)),
