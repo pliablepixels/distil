@@ -41,6 +41,8 @@ from typing import Any
 from benchmarks.swe_bench_e2e.compress_proxy import (
     COMPRESSORS,
     EXPAND_CONDITION,
+    GATE_RECENT,
+    GATED_CONDITION,
     CompressStats,
     serve,
 )
@@ -49,7 +51,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MODEL = "anthropic/claude-sonnet-4-6"
 TEMPERATURE = 0.0
 AIDER_BIN = os.environ.get("AIDER_BIN", str(Path.home() / ".local/bin/aider"))
-CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "distil_expand")
+CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "distil_expand", "distil_gated")
 
 # git worktree add/remove mutate shared state under a clone's .git; serialise per-clone.
 _CLONE_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -207,7 +209,8 @@ def run_instance(
     httpd, state = serve(
         compressor=COMPRESSORS[condition],
         protect=inst["problem_statement"],
-        expand=(condition == EXPAND_CONDITION),
+        expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
+        gate_recent=(GATE_RECENT if condition == GATED_CONDITION else None),
     )
     base_url = f"http://127.0.0.1:{httpd.server_address[1]}"
     try:

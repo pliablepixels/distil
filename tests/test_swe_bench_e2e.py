@@ -191,3 +191,46 @@ def test_wilson_ci_bounds():
 
 def test_wilson_ci_zero_n():
     assert wilson_ci(0, 0) == (0.0, 0.0)
+
+
+# --- reversible tier: digest + relevance gate (distil_expand / distil_gated) -------- #
+
+
+def test_digest_block_is_reversible_and_content_addressed():
+    import hashlib
+
+    from benchmarks.swe_bench_e2e.compress_proxy import MIN_CHARS, digest_block
+
+    restore: dict[str, str] = {}
+    big = "def f():\n" + "x" * 2000
+    out = digest_block(big, restore)
+    h = hashlib.sha256(big.encode()).hexdigest()[:8]
+    assert "distil-digest" in out and h in out and len(out) < len(big)
+    assert restore[h] == big  # byte-exact original recoverable
+    assert digest_block("short" * (MIN_CHARS // 10), {}) is not None
+
+
+def test_relevance_gate_keeps_working_set_full_digests_periphery():
+    from benchmarks.swe_bench_e2e.compress_proxy import GATE_RECENT, compress_body
+
+    msgs = [{"role": "system", "content": "sys " + "s" * 600}]
+    for i in range(10):
+        msgs.append({"role": "user", "content": [{"type": "text", "text": f"FILE{i}\n" + "x" * 1500}]})
+    restore: dict[str, str] = {}
+    out = compress_body({"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=GATE_RECENT)
+    ut = out["messages"][1:]
+    digested = [i for i, m in enumerate(ut) if "distil-digest" in m["content"][0]["text"]]
+    full = [i for i, m in enumerate(ut) if "distil-digest" not in m["content"][0]["text"]]
+    assert full == list(range(10 - GATE_RECENT, 10))  # last N = working set, kept full
+    assert digested == list(range(0, 10 - GATE_RECENT))  # older periphery digested
+    assert len(restore) == len(digested)  # only digested blocks are recoverable
+    assert "distil-digest" not in out["messages"][0]["content"]  # system never digested
+
+
+def test_ungated_digest_compresses_all_eligible():
+    from benchmarks.swe_bench_e2e.compress_proxy import compress_body
+
+    msgs = [{"role": "user", "content": [{"type": "text", "text": f"F{i}\n" + "x" * 1500}]} for i in range(5)]
+    restore: dict[str, str] = {}
+    compress_body({"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=None)
+    assert len(restore) == 5  # no gate ⇒ every eligible block digested

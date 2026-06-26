@@ -148,12 +148,15 @@ COMPRESSORS: dict[str, Compressor | None] = {
     "full": None,
     "distil_trunc500": trunc_500,
     "llmlingua2": llmlingua2,
-    # distil_expand is realised as a stateful digest + recovery loop in the proxy
-    # (not a pure per-block Compressor), so it maps to None in this table and is
-    # selected via ProxyState.expand instead.
+    # distil_expand and distil_gated are realised as a stateful digest + recovery loop
+    # in the proxy (not a pure per-block Compressor), so they map to None here and are
+    # selected via ProxyState.expand (+ ProxyState.gate_recent for the gated variant).
     "distil_expand": None,
+    "distil_gated": None,
 }
 EXPAND_CONDITION = "distil_expand"
+GATED_CONDITION = "distil_gated"
+GATE_RECENT = 6  # distil_gated: keep the last N user/tool messages (working set) full
 MAX_EXPAND_ITERS = 4  # cap the recover-then-redecide round-trips per agent request
 
 
@@ -208,6 +211,7 @@ def compress_body(
     stats: CompressStats,
     protect: str | None = None,
     digest_restore: dict[str, str] | None = None,
+    gate_recent: int | None = None,
 ) -> dict[str, Any]:
     """Return a new request body with compressible context blocks rewritten.
 
@@ -218,6 +222,14 @@ def compress_body(
     compressible block is digested with :func:`digest_block` and handle->original is
     recorded in this dict so the proxy's recovery loop can restore it on demand. When
     set it takes precedence over ``compressor``.
+
+    ``gate_recent`` is the **relevance gate** (condition distil_gated): when set, the
+    last ``gate_recent`` user/tool messages — the agent's *working set* — are left FULL,
+    and only the older *periphery* is digested. This keeps the file the agent is actively
+    editing intact (so it need not spend a recovery round-trip to re-read it) while still
+    compressing the stable older context (which the prompt cache also rewards), and the
+    digested periphery remains recoverable via ``distil_expand``. Applies only in the
+    reversible (``digest_restore``) mode.
 
     ``protect`` is a substring (the SWE-bench *problem statement*) that must never be
     compressed: it is the task definition the agent is solving, not "file content the
@@ -231,7 +243,17 @@ def compress_body(
     stats.requests += 1
     protect = protect or None
 
-    def rewrite_text(role: str, text: str) -> str:
+    # Relevance gate: indices of the last `gate_recent` user/tool messages = working set.
+    keep_full: set[int] | None = None
+    if gate_recent is not None and digest_restore is not None:
+        ut = [
+            i
+            for i, m in enumerate(messages)
+            if isinstance(m, dict) and m.get("role") in ("user", "tool")
+        ]
+        keep_full = set(ut[-gate_recent:]) if gate_recent > 0 else set()
+
+    def rewrite_text(role: str, text: str, gated_keep: bool = False) -> str:
         stats.blocks_seen += 1
         before = len(text)
         stats.chars_before += before
@@ -240,7 +262,13 @@ def compress_body(
         if is_protected:
             stats.blocks_protected += 1
         inactive = compressor is None and digest_restore is None
-        if inactive or before < MIN_CHARS or role not in ("user", "tool") or is_protected:
+        if (
+            inactive
+            or gated_keep
+            or before < MIN_CHARS
+            or role not in ("user", "tool")
+            or is_protected
+        ):
             stats.chars_after += before
             stats.tokens_after += _tokenizer.count(text)
             return text
@@ -251,14 +279,15 @@ def compress_body(
         return out
 
     new_messages: list[Any] = []
-    for msg in messages:
+    for mi, msg in enumerate(messages):
         if not isinstance(msg, dict):
             new_messages.append(msg)
             continue
+        gk = keep_full is not None and mi in keep_full
         role = msg.get("role", "")
         content = msg.get("content")
         if isinstance(content, str):
-            new_messages.append({**msg, "content": rewrite_text(role, content)})
+            new_messages.append({**msg, "content": rewrite_text(role, content, gk)})
             continue
         if not isinstance(content, list):
             new_messages.append(msg)
@@ -267,7 +296,7 @@ def compress_body(
         for block in content:
             txt = _block_text(block)
             if txt is not None and _compressible(role, block):
-                new_txt = rewrite_text(role, txt)
+                new_txt = rewrite_text(role, txt, gk)
                 if isinstance(block, str):
                     new_content.append(new_txt)
                 else:
@@ -279,17 +308,19 @@ def compress_body(
                     and block.get("type") == "tool_result"
                     and _compressible(role, block)
                 ):
-                    new_content.append(_rewrite_tool_result(role, block, rewrite_text))
+                    new_content.append(_rewrite_tool_result(role, block, rewrite_text, gk))
                 else:
                     new_content.append(block)
         new_messages.append({**msg, "content": new_content})
     return {**body, "messages": new_messages}
 
 
-def _rewrite_tool_result(role: str, block: dict[str, Any], rewrite_text) -> dict[str, Any]:
+def _rewrite_tool_result(
+    role: str, block: dict[str, Any], rewrite_text, gated_keep: bool = False
+) -> dict[str, Any]:
     inner = block.get("content")
     if isinstance(inner, str):
-        return {**block, "content": rewrite_text(role, inner)}
+        return {**block, "content": rewrite_text(role, inner, gated_keep)}
     if isinstance(inner, list):
         new_inner = []
         for sub in inner:
@@ -298,7 +329,7 @@ def _rewrite_tool_result(role: str, block: dict[str, Any], rewrite_text) -> dict
                 and sub.get("type") == "text"
                 and isinstance(sub.get("text"), str)
             ):
-                new_inner.append({**sub, "text": rewrite_text(role, sub["text"])})
+                new_inner.append({**sub, "text": rewrite_text(role, sub["text"], gated_keep)})
             else:
                 new_inner.append(sub)
         return {**block, "content": new_inner}
@@ -316,6 +347,7 @@ class ProxyState:
     accounting_path: Path | None = None
     protect: str | None = None  # problem statement: never compressed (task, not file content)
     expand: bool = False  # distil reversible tier: digest + distil_expand recovery loop
+    gate_recent: int | None = None  # distil_gated: keep last N user/tool msgs full
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -382,7 +414,12 @@ def _make_handler(state: ProxyState):
                     fh.write(json.dumps(body) + "\n")
             restore: dict[str, str] = {}
             new_body = compress_body(
-                body, None, state.stats, protect=state.protect, digest_restore=restore
+                body,
+                None,
+                state.stats,
+                protect=state.protect,
+                digest_restore=restore,
+                gate_recent=state.gate_recent,
             )
             tools = list(new_body.get("tools") or [])
             if not any(isinstance(t, dict) and t.get("name") == "distil_expand" for t in tools):
@@ -491,6 +528,7 @@ def serve(
     accounting_path: Path | None = None,
     protect: str | None = None,
     expand: bool = False,
+    gate_recent: int | None = None,
 ) -> tuple[ThreadingHTTPServer, ProxyState]:
     """Start the proxy on a background thread. Returns ``(server, state)``.
 
@@ -505,6 +543,7 @@ def serve(
         accounting_path=accounting_path,
         protect=protect,
         expand=expand,
+        gate_recent=gate_recent,
     )
     httpd = ThreadingHTTPServer((host, port), _make_handler(state))
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -528,7 +567,8 @@ if __name__ == "__main__":
         compressor=COMPRESSORS[args.condition],
         capture_path=args.capture,
         accounting_path=args.accounting,
-        expand=(args.condition == EXPAND_CONDITION),
+        expand=(args.condition in (EXPAND_CONDITION, GATED_CONDITION)),
+        gate_recent=(GATE_RECENT if args.condition == GATED_CONDITION else None),
     )
     print(f"distil-e7 proxy: condition={args.condition} on {args.host}:{httpd.server_address[1]}")
     try:

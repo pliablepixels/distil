@@ -37,6 +37,7 @@ CONDITIONS = [
     ("distil_trunc500", "B. distil (trunc@500)"),
     ("llmlingua2", "C. LLMLingua-2"),
     ("distil_expand", "D. distil (reversible + distil_expand)"),
+    ("distil_gated", "E. distil (reversible, relevance-gated)"),
 ]
 MODEL = "claude-sonnet-4-6"
 
@@ -156,6 +157,8 @@ def paired_analysis(conditions: list[dict[str, Any]], all_ids: list[str]) -> lis
         ("llmlingua2", "distil_trunc500"),
         ("full", "distil_expand"),
         ("distil_trunc500", "distil_expand"),
+        ("full", "distil_gated"),
+        ("distil_expand", "distil_gated"),
     ]
     out = []
     for a, b in pairs:
@@ -187,6 +190,7 @@ def write_macros(agg: dict[str, Any], path: Path) -> None:
         "distil_trunc500": "Distil",
         "llmlingua2": "Lingua",
         "distil_expand": "Expand",
+        "distil_gated": "Gated",
     }
     full_pass = by.get("full", {}).get("pass_at_1", 0.0)
     for cond, name in short.items():
@@ -221,6 +225,8 @@ def write_macros(agg: dict[str, Any], path: Path) -> None:
         ("llmlingua2", "distil_trunc500"): "DistilVsLinguaP",
         ("full", "distil_expand"): "ExpandVsFullP",
         ("distil_trunc500", "distil_expand"): "ExpandVsTruncP",
+        ("full", "distil_gated"): "GatedVsFullP",
+        ("distil_expand", "distil_gated"): "GatedVsExpandP",
     }
     for pr in agg.get("paired_mcnemar", []):
         key = pair_macro.get((pr["a"], pr["b"]))
