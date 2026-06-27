@@ -7,6 +7,8 @@
 \usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -308,6 +310,34 @@ the expected risk, $\mathbb{E}[L(\hat\lambda)]\le\alpha$, tight to $O(1/n)$.
 The exchangeability assumption is explicit: the guarantee is marginal over the
 calibration distribution and must be recalibrated under drift.
 
+\subsection{From per-turn to trajectory guarantees}
+\label{sec:traj-theory}
+The certificate bounds the \emph{per-turn} risk, yet agents are judged on whole
+\emph{trajectories}. Two facts connect them and motivate certifying the trajectory directly.
+
+\begin{proposition}[Composition]\label{prop:compose}
+For a $T$-turn trajectory in which each turn's compressed decision matches the uncompressed
+one except with marginal probability $\le\alpha$, and the outcome is a function of the decision
+sequence, the probability the compressed run's outcome differs from the uncompressed run's is
+$\le T\alpha$ (and $\le 1-(1-\alpha)^{T}$ under independence).
+\end{proposition}
+\noindent (Outcomes differ only if some decision differs; sub-additivity over the $T$ turns
+gives $\Pr(\bigcup_t\{\text{flip}_t\})\le\sum_t\Pr(\text{flip}_t)\le T\alpha$.) This bound is
+distribution-free but \emph{loose}: at $\alpha=0.08$ and $T\approx27$
+it exceeds $1$ (vacuous)---the gap E9 measures empirically ($\approx1.8$ outcome-determining
+turns). The fix is to certify the trajectory as the unit.
+
+\begin{proposition}[Trajectory certificate]\label{prop:trajcert}
+With the trajectory as the calibration unit and loss $D(\lambda)=\mathbf 1[\text{compressed
+outcome}\neq\text{uncompressed}]$, Learn--Then--Test (resp.\ CRC) over $n$ exchangeable
+calibration trajectories returns $\hat\lambda$ with
+$\Pr(\mathbb E[D(\hat\lambda)]\le\beta)\ge1-\delta$ (resp.\ $\mathbb E[D(\hat\lambda)]\le\beta$),
+finite-sample and distribution-free.
+\end{proposition}
+\noindent \Cref{prop:trajcert} is LTT/CRC~\cite{ltt,crc} with a trajectory-outcome loss; unlike
+\Cref{prop:compose} it is tight by construction. E10 (\Cref{sec:e10}) computes it and validates
+the coverage out-of-sample.
+
 \section{Experimental setup}
 \paragraph{Data.} Real $\tau$-bench trajectories (airline domain; gpt-4o traces;
 25 trajectories, 105 decision points) loaded with no planted markers; the decision
@@ -562,42 +592,9 @@ guarantee.}
 \label{tab:e8}
 \end{table}
 
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[x=0.215cm,y=0.92cm,font=\small]
-  % rows (y): 6=top ... 1=bottom; bar half-height 0.27
-  % full reference line
-  \draw[distilblue,dashed,thick] (39.2,0.55) -- (39.2,6.55);
-  \node[distilblue,font=\scriptsize,above] at (39.2,6.55) {full};
-  % bars: \i / name / value / lo / hi / fillcolor / drawcolor
-  \foreach \i/\name/\v/\lo/\hi/\fc/\dc in {%
-    6/full context/39.2/35.0/43.5/black!12/black!55,%
-    5/distil gated/36.8/32.7/41.1/distilgreen!30/distilgreen,%
-    4/Headroom/32.6/28.6/36.8/distilgray!25/distilgray,%
-    3/distil expand/32.4/28.4/36.6/distilgreen!30/distilgreen,%
-    2/distil trunc@500/5.6/3.9/8.0/distilgray!25/distilgray,%
-    1/LLMLingua-2/2.4/1.4/4.2/distilgray!25/distilgray}{
-    \fill[\fc,draw=\dc] (0,\i-0.27) rectangle (\v,\i+0.27);
-    \draw[\dc,thick] (\lo,\i)--(\hi,\i);
-    \draw[\dc,thick] (\lo,\i-0.12)--(\lo,\i+0.12) (\hi,\i-0.12)--(\hi,\i+0.12);
-    \node[anchor=east,font=\small] at (-1.2,\i) {\name};
-    \node[anchor=west,font=\footnotesize] at (\hi+1.2,\i) {\v};
-  }
-  % x axis
-  \draw (0,0.45)--(48,0.45);
-  \foreach \x in {0,10,20,30,40}{\draw (\x,0.45)--(\x,0.30); \node[below,font=\footnotesize] at (\x,0.30){\x};}
-  \node[below,font=\small] at (24,-0.35) {pass@1 (\%) on SWE-bench Verified ($n{=}500$), Wilson 95\% CI};
-\end{tikzpicture}
-\caption{\textbf{E8 frontier: task-success of every condition} (pass@1 with Wilson 95\%
-intervals, $n{=}500$, identical 30-turn ReAct agent, official harness). \textcolor{distilgreen}{Green}
-= distil's reversible, certified tiers; \textcolor{distilgray}{gray} = lossy competitors; the
-dashed line marks full context. distil's relevance-gated tier is the highest-accuracy
-compressor and the only one whose interval overlaps full; both lossy token-droppers collapse.}
-\label{fig:e8frontier}
-\end{figure}
 
 \paragraph{Result: distil leads on certified task success.} On the long-horizon workload the
-relevance-gated tier (E) is the highest-accuracy compressor (\Cref{fig:e8frontier}):
+relevance-gated tier (E) is the highest-accuracy compressor (\Cref{tab:e8}; \Cref{fig:e8frontier}):
 \textbf{\sweEeightGatedPass{}}
 versus \sweEeightFullPass{} for full context---a paired difference of \sweEeightGatedNIDelta{}
 (95\% CI~[\sweEeightGatedNICIlo, \sweEeightGatedNICIhi]). We report this as a
@@ -641,36 +638,25 @@ blindly-reversible alternative is decisively inferior.
 \subsection{E9: from the per-turn certificate to the trajectory outcome}
 \label{sec:e9}
 
-The certificate bounds the \emph{per-turn} decision-change rate at $\alpha$; task success is
-a \emph{trajectory-level} property. The honest link is a composition bound: if each turn
-flips with probability $\le\alpha$, a $T$-turn trajectory diverges with probability
-$\le 1-(1-\alpha)^T \le T\alpha$ (union bound). At distil's certified operating point
-($\alpha=0.08$, E2) and E8's mean $T\approx27$ turns this evaluates to $\le$\textbf{89\%}
-(union: $214\%$)---\emph{vacuous}. A per-turn certificate, composed naively, guarantees
-almost nothing about a long trajectory, which is precisely \emph{why} E7--E8 find the proxy
-fails to transfer once compression is aggressive (large $\alpha$): the contribution is a
-sound per-turn contract, not a free trajectory guarantee.
-
-Yet the \emph{observed} outcome-divergence between the relevance-gated condition and full
-context in E8 is only \textbf{14.4\%}---over $6\times$ below the naive bound. Inverting the
-composition, $d=1-(1-\alpha)^{k}$, yields an \textbf{effective consequential-horizon} of
-$k\approx\textbf{1.8}$ turns: of $\approx$27 turns in a long coding trajectory, fewer than
-two are outcome-determining (equivalently $d\le k\alpha$ with $k\approx1.8$). The remaining
-$\sim$93\% are exploration the agent can get wrong---or have compressed---without changing
-the result, because the reversible tier lets it recover and the gate never compresses the
-active working set. \textbf{The trajectory guarantee is tight exactly when per-turn
-equivalence is certified on the consequential turns---the working set the relevance-gate
-protects by construction.} This formally connects the certificate (\Cref{sec:e2}) to the
-end-to-end results and motivates the gate's design. (Caveat: $\alpha$ is the per-turn rate
-certified on the E2 localization corpus, not re-measured on the unpaired E8 ReAct runs, so
-the composition is parametric in $\alpha$ and $k$ is reported descriptively, not as a new
-guarantee; reproducible via \texttt{benchmarks/trajectory\_bound.py}.)
+\Cref{prop:compose} bounds trajectory divergence by $T\alpha$; at distil's certified
+$\alpha=0.08$ and E8's mean $T\approx27$ this exceeds $1$ (vacuous), so a per-turn certificate
+guarantees almost nothing about a long trajectory---exactly why E7--E8 find the proxy fails to
+transfer under aggressive (large-$\alpha$) compression. Yet the \emph{observed} gated-vs-full
+divergence in E8 is only \textbf{14.4\%}---over $6\times$ below the bound. Inverting
+$d=1-(1-\alpha)^{k}$ gives an \textbf{effective consequential-horizon} of
+$k\approx\textbf{1.8}$ turns: of $\approx27$ turns, fewer than two are outcome-determining;
+the rest are exploration the agent can get wrong (or have compressed) without changing the
+result, because the reversible tier recovers and the gate never compresses the working set.
+The guarantee is tight exactly when per-turn equivalence is certified on those consequential
+turns---the working set the gate protects. (Caveat: $\alpha$ is from E2, not re-measured on
+the unpaired E8 runs, so $k$ is descriptive, not a new guarantee;
+\texttt{benchmarks/trajectory\_bound.py}.)
 
 \subsection{E10: a trajectory-level decision-equivalence certificate}
 \label{sec:e10}
 
 E9 shows the per-turn certificate does not \emph{naively} compose to a trajectory. E10
-closes the gap directly: rather than compose, we \emph{certify at the trajectory level}.
+instantiates \Cref{prop:trajcert}: rather than compose, we \emph{certify at the trajectory level}.
 The unit is a whole run; for the relevance-gated tier vs.\ full context, scored on the same
 \sweEeightN{} instances, each trajectory carries two 0/1 losses---\textbf{divergence}
 ($1$ if the gated outcome differs from full) and \textbf{harm} ($1$ if full resolved the
@@ -780,6 +766,41 @@ World.} Springer, 2005.
 \section{Extended experiments and analysis}
 \label{app:extended}
 This appendix contains the supporting experiments (E1, E3--E6) and the detailed analysis summarized in \Cref{sec:analysis}; the main text reports the headline guarantees (E2) and end-to-end results (E7--E10).
+
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[x=0.215cm,y=0.92cm,font=\small]
+  % rows (y): 6=top ... 1=bottom; bar half-height 0.27
+  % full reference line
+  \draw[distilblue,dashed,thick] (39.2,0.55) -- (39.2,6.55);
+  \node[distilblue,font=\scriptsize,above] at (39.2,6.55) {full};
+  % bars: \i / name / value / lo / hi / fillcolor / drawcolor
+  \foreach \i/\name/\v/\lo/\hi/\fc/\dc in {%
+    6/full context/39.2/35.0/43.5/black!12/black!55,%
+    5/distil gated/36.8/32.7/41.1/distilgreen!30/distilgreen,%
+    4/Headroom/32.6/28.6/36.8/distilgray!25/distilgray,%
+    3/distil expand/32.4/28.4/36.6/distilgreen!30/distilgreen,%
+    2/distil trunc@500/5.6/3.9/8.0/distilgray!25/distilgray,%
+    1/LLMLingua-2/2.4/1.4/4.2/distilgray!25/distilgray}{
+    \fill[\fc,draw=\dc] (0,\i-0.27) rectangle (\v,\i+0.27);
+    \draw[\dc,thick] (\lo,\i)--(\hi,\i);
+    \draw[\dc,thick] (\lo,\i-0.12)--(\lo,\i+0.12) (\hi,\i-0.12)--(\hi,\i+0.12);
+    \node[anchor=east,font=\small] at (-1.2,\i) {\name};
+    \node[anchor=west,font=\footnotesize] at (\hi+1.2,\i) {\v};
+  }
+  % x axis
+  \draw (0,0.45)--(48,0.45);
+  \foreach \x in {0,10,20,30,40}{\draw (\x,0.45)--(\x,0.30); \node[below,font=\footnotesize] at (\x,0.30){\x};}
+  \node[below,font=\small] at (24,-0.35) {pass@1 (\%) on SWE-bench Verified ($n{=}500$), Wilson 95\% CI};
+\end{tikzpicture}
+\caption{\textbf{E8 frontier: task-success of every condition} (pass@1 with Wilson 95\%
+intervals, $n{=}500$, identical 30-turn ReAct agent, official harness). \textcolor{distilgreen}{Green}
+= distil's reversible, certified tiers; \textcolor{distilgray}{gray} = lossy competitors; the
+dashed line marks full context. distil's relevance-gated tier is the highest-accuracy
+compressor and the only one whose interval overlaps full; both lossy token-droppers collapse.}
+\label{fig:e8frontier}
+\end{figure}
 
 \subsection{E1: Decision-change frontier (real SWE-bench traces)}
 

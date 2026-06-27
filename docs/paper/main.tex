@@ -9,6 +9,8 @@
 \usepackage{microtype}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -165,9 +167,11 @@ slogan, not a measured quantity with a confidence level.
   transfer to task success, then show the reversible relevance-gated tier is the
   highest-accuracy compressor on a 500-instance long-horizon agent---non-inferior to full
   context and ahead of the strongest competitor (\Cref{sec:e8}).
-  \item A \textbf{trajectory-level decision-equivalence certificate} (E10): we lift the
-  per-turn guarantee to whole runs and validate it out-of-sample, to our knowledge the first
-  distribution-free task-level equivalence guarantee for context compression (\Cref{sec:e10}).
+  \item A \textbf{trajectory-level decision-equivalence certificate} (E10): we show the
+  per-turn guarantee composes only loosely to a trajectory (\Cref{prop:compose}) and instead
+  certify the trajectory directly (\Cref{prop:trajcert}), validated out-of-sample---to our
+  knowledge the first distribution-free task-level equivalence guarantee for context
+  compression (\Cref{sec:e10}).
   \item An \textbf{evaluation on real agent traces} that removes the circular
   self-labeling of synthetic corpora, plus three measurement requirements we found
   to be load-bearing and now enforce: majority-vote grading, a faithful grader, and
@@ -309,6 +313,45 @@ the expected risk, $\mathbb{E}[L(\hat\lambda)]\le\alpha$, tight to $O(1/n)$.
 
 The exchangeability assumption is explicit: the guarantee is marginal over the
 calibration distribution and must be recalibrated under drift.
+
+\subsection{From per-turn to trajectory guarantees}
+\label{sec:traj-theory}
+The certificate above bounds the \emph{per-turn} risk, yet agents are judged on whole
+\emph{trajectories}. Two facts connect the two; together they motivate certifying the
+trajectory directly (E10).
+
+\begin{proposition}[Composition]\label{prop:compose}
+Consider a trajectory of $T$ turns in which, at each turn, the compressed context induces the
+same decision as the uncompressed context except with marginal probability at most $\alpha$,
+and the trajectory outcome is a function of the decision sequence. Then the probability that
+the compressed run's outcome differs from the uncompressed run's is at most $T\alpha$, and at
+most $1-(1-\alpha)^{T}$ if the per-turn flips are independent.
+\end{proposition}
+\begin{proof}
+The two outcomes can differ only if some decision differs. By sub-additivity,
+$\Pr\!\big(\bigcup_{t=1}^{T}\{\text{flip}_t\}\big)\le\sum_{t}\Pr(\text{flip}_t)\le T\alpha$;
+under independence the complementary event gives $1-(1-\alpha)^{T}$.
+\end{proof}
+
+\noindent This bound is distribution-free but \emph{loose}: at distil's certified
+$\alpha=0.08$ and the mean $T\approx27$ of our long-horizon agent it exceeds $1$ (vacuous).
+That gap is exactly what E9 (\Cref{sec:e9}) measures---only $\approx1.8$ turns are
+outcome-determining---and it is why a per-turn certificate must not be read as a trajectory
+guarantee. The remedy is to certify the trajectory as the unit.
+
+\begin{proposition}[Trajectory certificate]\label{prop:trajcert}
+Take the trajectory as the calibration unit with loss
+$D(\lambda)=\mathbf 1[\text{compressed outcome}\neq\text{uncompressed outcome}]$. Applying
+Learn--Then--Test (resp.\ CRC) to $\{D_i\}_{i=1}^{n}$ over a calibration set of trajectories
+exchangeable with deployment yields a selected level $\hat\lambda$ with
+$\Pr\!\big(R_{\mathrm{traj}}(\hat\lambda)\le\beta\big)\ge 1-\delta$
+(resp.\ $\mathbb E[D(\hat\lambda)]\le\beta$), finite-sample and distribution-free, where
+$R_{\mathrm{traj}}(\lambda)=\mathbb E[D(\lambda)]$.
+\end{proposition}
+\noindent \Cref{prop:trajcert} is the LTT/CRC guarantee~\cite{ltt,crc} instantiated with a
+trajectory-outcome loss; unlike \Cref{prop:compose} it is tight by construction (it calibrates
+the quantity it bounds). E10 (\Cref{sec:e10}) computes it on SWE-bench Verified and validates
+the coverage out-of-sample.
 
 \section{Experimental setup}
 \paragraph{Data.} Real $\tau$-bench trajectories (airline domain; gpt-4o traces;
@@ -955,9 +998,9 @@ blindly-reversible alternative is decisively inferior.
 \label{sec:e9}
 
 The certificate bounds the \emph{per-turn} decision-change rate at $\alpha$; task success is
-a \emph{trajectory-level} property. The honest link is a composition bound: if each turn
-flips with probability $\le\alpha$, a $T$-turn trajectory diverges with probability
-$\le 1-(1-\alpha)^T \le T\alpha$ (union bound). At distil's certified operating point
+a \emph{trajectory-level} property. The honest link is the composition bound of
+\Cref{prop:compose}: a $T$-turn trajectory diverges with probability
+$\le 1-(1-\alpha)^T \le T\alpha$. At distil's certified operating point
 ($\alpha=0.08$, E2) and E8's mean $T\approx27$ turns this evaluates to $\le$\textbf{89\%}
 (union: $214\%$)---\emph{vacuous}. A per-turn certificate, composed naively, guarantees
 almost nothing about a long trajectory, which is precisely \emph{why} E7--E8 find the proxy
@@ -983,9 +1026,9 @@ guarantee; reproducible via \texttt{benchmarks/trajectory\_bound.py}.)
 \label{sec:e10}
 
 E9 shows the per-turn certificate does not \emph{naively} compose to a trajectory. E10
-closes the gap directly: rather than compose, we \emph{certify at the trajectory level}.
-The unit is a whole run; for the relevance-gated tier vs.\ full context, scored on the same
-\sweEeightN{} instances, each trajectory carries two 0/1 losses---\textbf{divergence}
+instantiates \Cref{prop:trajcert}: rather than compose, we \emph{certify at the trajectory
+level}. The unit is a whole run; for the relevance-gated tier vs.\ full context, scored on the
+same \sweEeightN{} instances, each trajectory carries two 0/1 losses---\textbf{divergence}
 ($1$ if the gated outcome differs from full) and \textbf{harm} ($1$ if full resolved the
 task and gated did not, i.e.\ compression \emph{cost} a solvable task). We then apply the
 \emph{same} Learn--Then--Test / Hoeffding--Bentkus machinery as E2, inverted to the
