@@ -206,9 +206,13 @@ working set, compress the periphery) but operates on the \emph{re-sent request c
 rather than the KV cache, is \emph{reversible} (digested periphery is recoverable
 byte-exact on demand), and is selected \emph{under a decision-equivalence certificate}
 rather than a fixed heuristic.
-\paragraph{Prompt caching} makes a cache read far cheaper than fresh input, so the
-real lever is keeping a byte-stable prefix and compressing the volatile tail---a
-cache-aware objective our engine targets.
+\paragraph{Prompt caching} (e.g.\ LangChain Deep Agents~\cite{deepagents}) keeps a byte-stable
+static prefix cached across turns ($41$--$80\%$ cost cut; $-77\%$ on Haiku). It is
+\emph{complementary}, not a substitute: it discounts the stable prefix but never the volatile
+tail distil compresses, lowers context \emph{cost} but not \emph{size} (so it does not relieve
+the window limit), and is lossless---needing no guarantee, which is precisely distil's
+contribution. The two compose, and our relevance gate is deliberately cache-friendly (stable
+prefix, deterministic periphery).
 \paragraph{Distribution-free uncertainty.} Conformal prediction~\cite{vovk} and its
 risk-control extensions---Learn--Then--Test (LTT)~\cite{ltt} and Conformal Risk
 Control~\cite{crc}---turn a calibration set into finite-sample guarantees on a
@@ -358,30 +362,6 @@ held-out split, over 500 trajectory-level splits $\to$ empirical
 $\Pr(\text{realized}\le\alpha)$); \textbf{E3} leave-one-domain-out shift; \textbf{E4}
 downstream task success (trajectory keeps its outcome iff every decision is
 unchanged), vs.\ the uncompressed baseline with a bootstrap CI.
-
-\paragraph{Baselines.} LLMLingua-2 and LongLLMLingua are run via the real
-\texttt{llmlingua} package at its recommended settings; truncation, recency-window,
-and keep-last-$k$-turns are exact. RECOMP-extractive and selective-context are
-\emph{model-free reference implementations} of those technique families (salience-ranked
-line/token selection), not the original trained models, and are labelled as such---a
-faithful family comparison, not a reproduction of those papers' numbers. Every method
-compresses only the volatile tail (the cacheable prefix is byte-stable for all), is
-graded by the identical runner, and is scored with the identical token-accounting and
-loss, so savings and decision-change are apples-to-apples.
-
-\paragraph{Measurement honesty (enforced by the harness).} (i)~Decision-equivalence
-is \emph{self-consistency}: the loss is $1$ iff the grader's action under the
-compressed context differs from its action under the \emph{uncompressed} context---we
-do not require the grader to match the trace's gold action; gold is reported only as
-the separate faithfulness gate. (ii)~We report, per level, the fraction of turns left
-byte-identical (\emph{trivial}, loss $0$ by construction) and the decision-change rate
-over the remaining \emph{effective} turns, so a corpus of incompressible turns cannot
-inflate equivalence. (iii)~The SWE edit-localization trajectories are resolved
-\emph{by construction} (the gold patch fixes the issue), so E4 on that split reports
-retained decision-equivalence, not a measured task-success rate; only
-outcome-labelled $\tau$-bench traces drive a real E4. (iv)~All headline
-numbers use majority-vote ($k{\ge}3$) structured grading; the released report carries
-the runner identity and the LaTeX generator refuses non-evidential (smoke) reports.
 
 \section{Results}
 \label{sec:results}
@@ -730,11 +710,8 @@ competitor---uniquely reversible \emph{and} certified. Finally, E10 (\Cref{sec:e
 guarantee to the \emph{trajectory} level, validated out-of-sample, binding the outcome users
 actually pay for. The lesson: proxy certification with lossy aggression is the failure mode;
 recoverability, a working-set-protecting relevance gate, and a trajectory-level certificate
-are the fix.
-
-\paragraph{Reproducibility.} The harness, adapters, runners, and this paper are
-released at \url{https://github.com/dshakes/distil} (see \texttt{benchmarks/PROVE.md}
-and \texttt{docs/PAPER\_PLAN.md}).
+are the fix. \textbf{Reproducibility:} harness, adapters, runners, and this paper are at
+\url{https://github.com/dshakes/distil} (\texttt{benchmarks/PROVE.md}, \texttt{docs/PAPER\_PLAN.md}).
 
 \begin{thebibliography}{9}
 \bibitem{ltt} A.~N. Angelopoulos, S.~Bates, E.~Cand\`es, M.~Jordan, L.~Lei.
@@ -760,12 +737,41 @@ Streaming Language Models with Attention Sinks.} ICLR 2024.
 Efficient Generative Inference of Large Language Models.} NeurIPS 2023.
 \bibitem{vovk} V.~Vovk, A.~Gammerman, G.~Shafer. \emph{Algorithmic Learning in a Random
 World.} Springer, 2005.
+\bibitem{deepagents} LangChain. \emph{Prompt Caching with Deep Agents.} Blog, 2025.
+\url{https://www.langchain.com/blog/deep-agents-prompt-caching}.
 \end{thebibliography}
 
 \appendix
 \section{Extended experiments and analysis}
 \label{app:extended}
 This appendix contains the supporting experiments (E1, E3--E6) and the detailed analysis summarized in \Cref{sec:analysis}; the main text reports the headline guarantees (E2) and end-to-end results (E7--E10).
+
+
+\subsection{Baselines and measurement honesty}
+\paragraph{Baselines.} LLMLingua-2 and LongLLMLingua are run via the real
+\texttt{llmlingua} package at its recommended settings; truncation, recency-window,
+and keep-last-$k$-turns are exact. RECOMP-extractive and selective-context are
+\emph{model-free reference implementations} of those technique families (salience-ranked
+line/token selection), not the original trained models, and are labelled as such---a
+faithful family comparison, not a reproduction of those papers' numbers. Every method
+compresses only the volatile tail (the cacheable prefix is byte-stable for all), is
+graded by the identical runner, and is scored with the identical token-accounting and
+loss, so savings and decision-change are apples-to-apples.
+
+\paragraph{Measurement honesty (enforced by the harness).} (i)~Decision-equivalence
+is \emph{self-consistency}: the loss is $1$ iff the grader's action under the
+compressed context differs from its action under the \emph{uncompressed} context---we
+do not require the grader to match the trace's gold action; gold is reported only as
+the separate faithfulness gate. (ii)~We report, per level, the fraction of turns left
+byte-identical (\emph{trivial}, loss $0$ by construction) and the decision-change rate
+over the remaining \emph{effective} turns, so a corpus of incompressible turns cannot
+inflate equivalence. (iii)~The SWE edit-localization trajectories are resolved
+\emph{by construction} (the gold patch fixes the issue), so E4 on that split reports
+retained decision-equivalence, not a measured task-success rate; only
+outcome-labelled $\tau$-bench traces drive a real E4. (iv)~All headline
+numbers use majority-vote ($k{\ge}3$) structured grading; the released report carries
+the runner identity and the LaTeX generator refuses non-evidential (smoke) reports.
+
 
 
 \begin{figure}[t]

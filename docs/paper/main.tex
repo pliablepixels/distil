@@ -210,9 +210,21 @@ working set, compress the periphery) but operates on the \emph{re-sent request c
 rather than the KV cache, is \emph{reversible} (digested periphery is recoverable
 byte-exact on demand), and is selected \emph{under a decision-equivalence certificate}
 rather than a fixed heuristic.
-\paragraph{Prompt caching} makes a cache read far cheaper than fresh input, so the
-real lever is keeping a byte-stable prefix and compressing the volatile tail---a
-cache-aware objective our engine targets.
+\paragraph{Prompt caching} makes a cache read far cheaper than fresh input. Recent agent
+harnesses---e.g.\ LangChain Deep Agents~\cite{deepagents}---structure the prompt to keep a
+byte-stable static prefix (system prompt, tool/skill descriptions) cached across turns,
+reporting large cost reductions on real trajectories ($41$--$80\%$; $-77\%$ on Claude Haiku).
+Caching is \emph{orthogonal and complementary} to our work, not a substitute, for three
+reasons: (i)~it discounts re-sending the \emph{stable prefix} but never the \emph{volatile
+tail}---fresh tool outputs and file reads, new every turn at full price---which is exactly
+what distil compresses; (ii)~it lowers the \emph{cost} of a large context but not its
+\emph{size}, so it does not relieve the context-window limit that long-horizon agents hit,
+whereas compression does; and (iii)~caching is lossless by construction and so needs no
+behavioral guarantee, while distil's contribution \emph{is} the guarantee. The two compose:
+cache the prefix, compress (and certify) the tail. Indeed our relevance gate is designed to
+be cache-friendly---it keeps the working set intact and digests only deterministic, aged-out
+periphery, preserving a stable prefix---and a naive sliding gate that rewrites mid-prompt
+content would, as Deep Agents notes, bust the cache.
 \paragraph{Distribution-free uncertainty.} Conformal prediction~\cite{vovk} and its
 risk-control extensions---Learn--Then--Test (LTT)~\cite{ltt} and Conformal Risk
 Control~\cite{crc}---turn a calibration set into finite-sample guarantees on a
@@ -1142,6 +1154,8 @@ Streaming Language Models with Attention Sinks.} ICLR 2024.
 Efficient Generative Inference of Large Language Models.} NeurIPS 2023.
 \bibitem{vovk} V.~Vovk, A.~Gammerman, G.~Shafer. \emph{Algorithmic Learning in a Random
 World.} Springer, 2005.
+\bibitem{deepagents} LangChain. \emph{Prompt Caching with Deep Agents.} Blog, 2025.
+\url{https://www.langchain.com/blog/deep-agents-prompt-caching}.
 \end{thebibliography}
 
 \end{document}
