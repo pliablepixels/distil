@@ -99,6 +99,7 @@ def run_instance(
             upstream=upstream,
             protect=inst["problem_statement"],
             expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
+            gate_recent=(GATE_RECENT if condition == GATED_CONDITION else None),
         )
     else:
         httpd, state = serve(

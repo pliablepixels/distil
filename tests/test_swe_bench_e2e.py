@@ -321,3 +321,37 @@ def test_gated_cache_breakpoint_at_stable_boundary():
     # exactly one breakpoint, at the last periphery message before the working set —
     # caches the byte-stable digested prefix (read) instead of re-creating it each turn.
     assert marked == [ws_start - 1]
+
+
+def test_openai_proxy_gate_keeps_working_set_full():
+    # Regression: the OpenAI proxy must implement the relevance gate (it previously did
+    # not, silently compressing 100% of blocks and invalidating the distil_gated condition
+    # on the openai/DeepSeek backend).
+    from benchmarks.swe_bench_e2e.compress_proxy import GATE_RECENT
+    from benchmarks.swe_bench_e2e.compress_proxy_openai import compress_body_openai
+
+    msgs = [{"role": "system", "content": "sys"}]
+    for i in range(10):
+        msgs.append({"role": "user", "content": [{"type": "text", "text": f"F{i}\n" + "x" * 1500}]})
+    restore: dict[str, str] = {}
+    out = compress_body_openai(
+        {"messages": msgs}, None, CompressStats(), digest_restore=restore, gate_recent=GATE_RECENT
+    )
+    ut = out["messages"][1:]
+    digested = [i for i, m in enumerate(ut) if "distil-digest" in m["content"][0]["text"]]
+    full = [i for i, m in enumerate(ut) if "distil-digest" not in m["content"][0]["text"]]
+    assert full == list(range(10 - GATE_RECENT, 10))  # working set kept full
+    assert digested == list(range(0, 10 - GATE_RECENT))  # older periphery digested
+    assert len(restore) == len(digested)
+
+
+def test_openai_proxy_sticky_expansion():
+    from benchmarks.swe_bench_e2e.compress_proxy import _handle
+    from benchmarks.swe_bench_e2e.compress_proxy_openai import compress_body_openai
+
+    block = "def f():\n" + "x" * 1500
+    msgs = [{"role": "user", "content": [{"type": "text", "text": block}]}]
+    out = compress_body_openai(
+        {"messages": msgs}, None, CompressStats(), digest_restore={}, expanded={_handle(block)}
+    )
+    assert out["messages"][0]["content"][0]["text"] == block  # sticky: kept full

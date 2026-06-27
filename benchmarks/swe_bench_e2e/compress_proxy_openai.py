@@ -62,6 +62,7 @@ from benchmarks.swe_bench_e2e.compress_proxy import (  # noqa: E402
     MIN_CHARS,
     CompressStats,
     Compressor,
+    _handle,
     digest_block,
 )
 from distil.tokenizer import DEFAULT as _tokenizer  # noqa: E402
@@ -111,6 +112,8 @@ def compress_body_openai(
     stats: CompressStats,
     protect: str | None = None,
     digest_restore: dict[str, str] | None = None,
+    gate_recent: int | None = None,
+    expanded: set[str] | None = None,
 ) -> dict[str, Any]:
     """Return a new OpenAI chat-completions request body with compressible blocks rewritten.
 
@@ -132,7 +135,19 @@ def compress_body_openai(
     stats.requests += 1
     protect = protect or None
 
-    def rewrite_text(role: str, text: str) -> str:
+    # Relevance gate (condition distil_gated): keep the last `gate_recent` user/tool
+    # messages — the working set — FULL; digest only older periphery. Mirrors
+    # compress_proxy.compress_body. Applies only in reversible (digest_restore) mode.
+    keep_full: set[int] | None = None
+    if gate_recent is not None and digest_restore is not None:
+        ut = [
+            i
+            for i, m in enumerate(messages)
+            if isinstance(m, dict) and m.get("role") in ("user", "tool")
+        ]
+        keep_full = set(ut[-gate_recent:]) if gate_recent > 0 else set()
+
+    def rewrite_text(role: str, text: str, gated_keep: bool = False) -> str:
         stats.blocks_seen += 1
         before = len(text)
         stats.chars_before += before
@@ -141,7 +156,20 @@ def compress_body_openai(
         if is_protected:
             stats.blocks_protected += 1
         inactive = compressor is None and digest_restore is None
-        if inactive or before < MIN_CHARS or role not in ("user", "tool") or is_protected:
+        # Sticky expansion: a block the agent already recovered stays FULL on later turns.
+        sticky = False
+        if digest_restore is not None and expanded is not None and before > MIN_CHARS:
+            if _handle(text) in expanded:
+                digest_restore[_handle(text)] = text
+                sticky = True
+        if (
+            inactive
+            or gated_keep
+            or sticky
+            or before < MIN_CHARS
+            or role not in ("user", "tool")
+            or is_protected
+        ):
             stats.chars_after += before
             stats.tokens_after += _tokenizer.count(text)
             return text
@@ -152,17 +180,18 @@ def compress_body_openai(
         return out
 
     new_messages: list[Any] = []
-    for msg in messages:
+    for mi, msg in enumerate(messages):
         if not isinstance(msg, dict):
             new_messages.append(msg)
             continue
+        gk = keep_full is not None and mi in keep_full
         role = msg.get("role", "")
         content = msg.get("content")
 
         if isinstance(content, str):
             # Plain-string content (common for user messages)
             if _oai_compressible(role, content):
-                new_messages.append({**msg, "content": rewrite_text(role, content)})
+                new_messages.append({**msg, "content": rewrite_text(role, content, gk)})
             else:
                 new_messages.append(msg)
             continue
@@ -176,7 +205,7 @@ def compress_body_openai(
         for part in content:
             txt = _part_text(part)
             if txt is not None and _oai_compressible(role, part):
-                new_txt = rewrite_text(role, txt)
+                new_txt = rewrite_text(role, txt, gk)
                 if isinstance(part, str):
                     new_parts.append(new_txt)
                 else:
@@ -202,6 +231,8 @@ class ProxyState:
     accounting_path: Path | None = None
     protect: str | None = None  # problem statement: never compressed
     expand: bool = False  # distil reversible tier: digest + distil_expand recovery loop
+    gate_recent: int | None = None  # distil_gated: keep last N user/tool msgs full
+    expanded: set[str] = field(default_factory=set)  # handles recovered this session (sticky)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -276,7 +307,13 @@ def _make_handler(state: ProxyState):  # noqa: C901
 
             restore: dict[str, str] = {}
             new_body = compress_body_openai(
-                body, None, state.stats, protect=state.protect, digest_restore=restore
+                body,
+                None,
+                state.stats,
+                protect=state.protect,
+                digest_restore=restore,
+                gate_recent=state.gate_recent,
+                expanded=state.expanded,
             )
 
             # Inject the distil_expand function tool (idempotent)
@@ -336,6 +373,7 @@ def _make_handler(state: ProxyState):  # noqa: C901
                         tool_content = full
                         with state.lock:
                             state.stats.expansions += 1
+                            state.expanded.add(h)  # sticky: keep full on later turns
                     new_body["messages"].append(
                         {
                             "role": "tool",
@@ -416,6 +454,7 @@ def serve(
     accounting_path: Path | None = None,
     protect: str | None = None,
     expand: bool = False,
+    gate_recent: int | None = None,
 ) -> tuple[ThreadingHTTPServer, ProxyState]:
     """Start the OpenAI proxy on a background thread. Returns ``(server, state)``.
 
@@ -435,6 +474,7 @@ def serve(
         accounting_path=accounting_path,
         protect=protect,
         expand=expand,
+        gate_recent=gate_recent,
     )
     httpd = ThreadingHTTPServer((host, port), _make_handler(state))
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
