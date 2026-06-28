@@ -346,39 +346,54 @@ with the calibration distribution (SWE-bench Verified, this agent + model), not 
 Reproducible: `benchmarks/trajectory_certificate.py`,
 `docs/paper/results/swe_e2e_longhorizon/trajectory_certificate.json`.
 
-### 6.0.6 Cross-model generality (E11) — a second, stronger model
+### 6.0.6 Cross-model generality (E11) — three models, two vendors
 
 E7–E10 use `claude-haiku-4-5`. **E11 tests whether the gate's non-inferiority is
-model-specific** by re-running the long-horizon harness on **DeepSeek-V3** (open-weights,
-`deepseek-chat` — a different vendor and a far stronger agent) over **n=200** SWE-bench
-Verified instances, scored by the same official `swebench` harness. Full context is much
-stronger here: **60.0%** vs Haiku's 39.2%.
+model-specific** by re-running the long-horizon harness on two more models: **DeepSeek-V3**
+(open-weights, `deepseek-chat` — a different vendor, n=200 SWE-bench Verified instances,
+official `swebench` harness) and **Claude Sonnet 4.6** (strong closed model, same vendor as
+Haiku, n=50 live run). Both are far stronger than Haiku: full context resolves **60.0%** and
+**54.0%** respectively (vs Haiku's 39.2%).
 
-| condition (DeepSeek-V3, n=200) | pass@1 | 95% CI | vs full |
-|---|--:|--|--|
-| A. full context | **60.0%** (120/200) | [53.1%, 66.5%] | — |
-| **E. distil relevance-gated, keep 12** | **55.5%** (111/200) | [48.6%, 62.2%] | **−4.5 pp, McNemar `p=0.15` (n.s.)** |
-| E′. distil relevance-gated, keep 6 | 29.0% (58/200) | [23.2%, 35.6%] | −31 pp, `p<0.001` |
-| B. distil `trunc@500` (lossy) | 17.0% (34/200) | [12.4%, 22.8%] | −43 pp, `p<0.001` |
+| condition (DeepSeek-V3, n=200) | pass@1 | 95% CI | vs full | realized compression |
+|---|--:|--|--|--|
+| A. full context | **60.0%** (120/200) | [53.1%, 66.5%] | — | — |
+| **E. distil relevance-gated, keep 12** | **55.5%** (111/200) | [48.6%, 62.2%] | **−4.5 pp, McNemar `p=0.15` (n.s.)** | 31% |
+| E′. distil relevance-gated, keep 6 | 29.0% (58/200) | [23.2%, 35.6%] | −31 pp, `p<0.001` | 60% |
+| B. distil `trunc@500` (lossy) | 17.0% (34/200) | [12.4%, 22.8%] | −43 pp, `p<0.001` | — |
 
-**The non-inferiority generalizes — *if the operating point scales with capability.*** At
-Haiku's aggressive setting (keep the last 6 messages, compress 60% of blocks) the gate
-collapses to **29.0%** on DeepSeek-V3 (−31 pp): a stronger agent exploits more of the
-periphery the gate digests, so that setting drops too much. At a gentler operating point
-(keep 12, compress 31%) the gate resolves **55.5% vs 60.0% for full — no statistically
-significant difference (McNemar `p=0.15`, NI Δ −4.5 pp, CI [−9.9, +0.9])**, recovering the
-non-inferiority seen on Haiku (−2.4 pp). The design principle, **reported not tuned away:
-compression aggressiveness must scale with agent capability** — weak agents tolerate
-aggressive digestion of periphery they would never use; strong agents need a larger
-protected working set. At the right setting the gate preserves task success on *both* a weak
-and a strong model across *two* vendors, while lossy truncation craters on each. Honest
-scope: n=200, single seed, two operating points — not a full sweep; the certificate itself
-(E2/E10) is model-agnostic by construction. Reproducible:
+| condition (Claude Sonnet 4.6, n=50) | pass@1 | 95% CI | vs full | realized compression |
+|---|--:|--|--|--|
+| A. full context | **54.0%** (27/50) | [40.4%, 67.0%] | — | — |
+| **E. distil relevance-gated, keep 12** | **54.0%** (27/50) | [40.4%, 67.0%] | **+0.0 pp, McNemar `p=1.0` (n.s.)** | 18% |
+| E′. distil relevance-gated, keep 6 | 52.0% (26/50) | [38.5%, 65.2%] | −2.0 pp, `p=1.0` (n.s.) | 34% |
+
+*Sonnet caveat: n=50, wide CIs, p=1.0 on both operating points — no power to separate them.
+A directional third-model confirmation, not a powered comparison. Results in
+`docs/paper/results/swe_e2e_longhorizon_sonnet/`. OpenAI GPT (gpt-4.1/gpt-4o-mini) is
+queued pending account credits.*
+
+**The non-inferiority generalizes; the safe operating point tracks *realized* compression,
+not capability alone.** An earlier reading of the DeepSeek result alone — that *compression
+aggressiveness must scale with model capability* — is too simple, and the Sonnet run corrects
+it. Both DeepSeek and Sonnet are strong, yet keep-6 *broke* on DeepSeek (−31 pp) and *held*
+on Sonnet (−2.0 pp). The discriminating variable is not capability but *realized* compression:
+the same `gate_recent=6` digested 60% of blocks on DeepSeek's trajectories but only 34% on
+Sonnet's, because how much periphery ages out of a fixed working-set window depends on the
+workload's conversation shape, not just the model. What *does* generalize cleanly: the milder
+keep-12 point is non-inferior on all three models (Haiku −2.4, DeepSeek −4.5, Sonnet +0.0 pp)
+across two vendors, while lossy truncation craters on each. The deeper lesson reinforces the
+design: because a fixed `gate_recent` yields different realized compression across workloads,
+it is the wrong abstraction to ship — calibrate on *outcomes* per deployment (auto-calibration
+below), with a fail-safe to full context. Honest scope: Sonnet is n=50 with wide CIs; the
+certificate itself (E2/E10) is model-agnostic by construction. Reproducible:
 `benchmarks/long_horizon/run.py --backend openai` (DeepSeek-V3),
-`docs/paper/results/swe_e2e_longhorizon_deepseek/`.
+`docs/paper/results/swe_e2e_longhorizon_deepseek/` and
+`docs/paper/results/swe_e2e_longhorizon_sonnet/`.
 
-**Operationalized: operating-point calibration.** A capability-dependent operating point is a
-deployment hazard only if hand-tuned. The operating-point analogue of the certificate removes
+**Operationalized: operating-point calibration.** A workload-dependent operating point is a
+deployment hazard only if hand-tuned — point distil at a new model or task distribution and
+it could silently ship a lossy setting. The operating-point analogue of the certificate removes
 it: just as conformal risk control picks the most aggressive *compression level* whose
 decision-change rate is controlled, `distil calibrate` (`distil/calibrate.py`) picks the most
 aggressive *working-set size* whose task-success loss is non-inferior to full context (same

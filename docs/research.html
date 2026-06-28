@@ -187,29 +187,39 @@
     <hr/>
 
     <!-- E11: cross-model generality -->
-    <h2 id="e11">E11: cross-model generality (a second, stronger model)</h2>
+    <h2 id="e11">E11: cross-model generality (three models, two vendors)</h2>
 
-    <p><strong>Reproducible:</strong> <code>benchmarks/long_horizon/run.py --backend openai</code> (DeepSeek-V3) &middot; results in <code>docs/paper/results/swe_e2e_longhorizon_deepseek/</code></p>
+    <p><strong>Reproducible:</strong> <code>benchmarks/long_horizon/run.py --backend openai</code> (DeepSeek-V3) &middot; results in <code>docs/paper/results/swe_e2e_longhorizon_deepseek/</code> and <code>docs/paper/results/swe_e2e_longhorizon_sonnet/</code></p>
 
-    <p>E7&ndash;E10 use <code>claude-haiku-4-5</code>. To test whether the gate's non-inferiority is model-specific, the long-horizon harness was re-run on <strong>DeepSeek-V3</strong> (open-weights, <code>deepseek-chat</code> &mdash; a different vendor and a far stronger agent) over <strong>n=200</strong> SWE-bench Verified instances. Full context is much stronger here: <strong>60.0%</strong> vs Haiku's 39.2%.</p>
+    <p>E7&ndash;E10 use <code>claude-haiku-4-5</code>. To test whether the gate's non-inferiority is model-specific, the long-horizon harness was re-run on two more models: <strong>DeepSeek-V3</strong> (open-weights, <code>deepseek-chat</code> &mdash; a different vendor, n=200) and <strong>Claude Sonnet 4.6</strong> (strong closed model, same vendor as Haiku, n=50 live run). Both are far stronger than Haiku: full context resolves <strong>60.0%</strong> and <strong>54.0%</strong> respectively (vs Haiku's 39.2%).</p>
 
     <table>
-      <thead><tr><th>condition (DeepSeek-V3, n=200)</th><th>pass@1</th><th>95% CI</th><th>vs full</th></tr></thead>
+      <thead><tr><th>condition (DeepSeek-V3, n=200)</th><th>pass@1</th><th>95% CI</th><th>vs full</th><th>realized compression</th></tr></thead>
       <tbody>
-        <tr><td>A &mdash; full context</td><td><strong>60.0%</strong> (120/200)</td><td>[53.1%, 66.5%]</td><td>&mdash;</td></tr>
-        <tr style="background:rgba(90,209,154,.10)"><td><strong>E &mdash; distil relevance-gated, keep 12</strong></td><td><strong>55.5%</strong> (111/200)</td><td>[48.6%, 62.2%]</td><td><strong>&minus;4.5&nbsp;pp, p=0.15 (n.s.)</strong></td></tr>
-        <tr><td>E&prime; &mdash; distil relevance-gated, keep 6</td><td>29.0% (58/200)</td><td>[23.2%, 35.6%]</td><td>&minus;31&nbsp;pp, p&lt;0.001</td></tr>
-        <tr><td>B &mdash; distil <code>trunc@500</code> (lossy)</td><td>17.0% (34/200)</td><td>[12.4%, 22.8%]</td><td>&minus;43&nbsp;pp, p&lt;0.001</td></tr>
+        <tr><td>A &mdash; full context</td><td><strong>60.0%</strong> (120/200)</td><td>[53.1%, 66.5%]</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td><strong>E &mdash; distil relevance-gated, keep 12</strong></td><td><strong>55.5%</strong> (111/200)</td><td>[48.6%, 62.2%]</td><td><strong>&minus;4.5&nbsp;pp, p=0.15 (n.s.)</strong></td><td>31%</td></tr>
+        <tr><td>E&prime; &mdash; distil relevance-gated, keep 6</td><td>29.0% (58/200)</td><td>[23.2%, 35.6%]</td><td>&minus;31&nbsp;pp, p&lt;0.001</td><td>60%</td></tr>
+        <tr><td>B &mdash; distil <code>trunc@500</code> (lossy)</td><td>17.0% (34/200)</td><td>[12.4%, 22.8%]</td><td>&minus;43&nbsp;pp, p&lt;0.001</td><td>&mdash;</td></tr>
       </tbody>
     </table>
 
+    <table>
+      <thead><tr><th>condition (Claude Sonnet 4.6, n=50)</th><th>pass@1</th><th>95% CI</th><th>vs full</th><th>realized compression</th></tr></thead>
+      <tbody>
+        <tr><td>A &mdash; full context</td><td><strong>54.0%</strong> (27/50)</td><td>[40.4%, 67.0%]</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td><strong>E &mdash; distil relevance-gated, keep 12</strong></td><td><strong>54.0%</strong> (27/50)</td><td>[40.4%, 67.0%]</td><td><strong>+0.0&nbsp;pp, p=1.0 (n.s.)</strong></td><td>18%</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td>E&prime; &mdash; distil relevance-gated, keep 6</td><td>52.0% (26/50)</td><td>[38.5%, 65.2%]</td><td>&minus;2.0&nbsp;pp, p=1.0 (n.s.)</td><td>34%</td></tr>
+      </tbody>
+    </table>
+    <p><em>Sonnet caveat: n=50, wide CIs, p=1.0 on both operating points &mdash; no power to separate them. A directional third-model confirmation, not a powered comparison. OpenAI GPT (gpt-4.1/gpt-4o-mini) is queued pending account credits.</em></p>
+
     <div class="callout good">
-      <b>The non-inferiority generalizes &mdash; if the operating point scales with capability.</b> At Haiku's aggressive setting (keep the last 6 messages, compress 60% of blocks) the gate collapses to <strong>29.0%</strong> on DeepSeek-V3: a stronger agent exploits more of the periphery the gate digests, so that setting drops too much. At a gentler operating point (keep 12, compress 31%) the gate resolves <strong>55.5% vs 60.0% for full &mdash; no significant difference (McNemar p=0.15)</strong>, recovering the non-inferiority seen on Haiku (&minus;2.4&nbsp;pp). The design principle, reported not tuned away: <strong>compression aggressiveness must scale with agent capability</strong> &mdash; weak agents tolerate aggressive digestion of periphery they would never use; strong agents need a larger protected working set. At the right setting the gate preserves task success on <em>both</em> a weak and a strong model across <em>two</em> vendors, while lossy truncation craters on each. Honest scope: n=200, single seed, two operating points &mdash; not a full sweep; the certificate itself (E2/E10) is model-agnostic by construction.
+      <b>The non-inferiority generalizes; the safe operating point tracks <em>realized</em> compression, not capability alone.</b> An earlier reading of the DeepSeek result alone &mdash; that <em>compression aggressiveness must scale with model capability</em> &mdash; is too simple, and the Sonnet run corrects it. Both DeepSeek and Sonnet are strong, yet keep-6 <em>broke</em> on DeepSeek (&minus;31&nbsp;pp) and <em>held</em> on Sonnet (&minus;2.0&nbsp;pp). The discriminating variable is not capability but <em>realized</em> compression: the same <code>gate_recent=6</code> digested 60% of blocks on DeepSeek's trajectories but only 34% on Sonnet's, because how much periphery ages out of a fixed working-set window depends on the workload's conversation shape, not just the model. What <em>does</em> generalize cleanly: the milder keep-12 point is non-inferior on all three models (Haiku &minus;2.4, DeepSeek &minus;4.5, Sonnet +0.0&nbsp;pp) across two vendors, while lossy truncation craters on each. The deeper lesson: because a fixed <code>gate_recent</code> yields different realized compression across workloads, it is the wrong abstraction to ship &mdash; calibrate on <em>outcomes</em> per deployment (auto-calibration below), with a fail-safe to full context. Honest scope: Sonnet is n=50 with wide CIs; the certificate itself (E2/E10) is model-agnostic by construction.
     </div>
 
     <h3 id="e11-calibration">Operationalized: auto-calibration of the operating point</h3>
 
-    <p>A capability-dependent operating point is a deployment hazard only if it is hand-tuned &mdash; point distil at a new model and it could silently ship a lossy setting. distil removes the hazard with the <strong>operating-point analogue of the certificate</strong>: just as conformal risk control selects the most aggressive <em>compression level</em> whose decision-change rate is provably controlled, <code>distil calibrate</code> (<code>distil/calibrate.py</code>) selects the most aggressive <em>working-set size</em> whose task-success loss is non-inferior to full context (same paired McNemar test), over a small calibration run. If no candidate certifies non-inferior, it <strong>fails safe to full context</strong> &mdash; absence of evidence degrades to no compression, never to silent loss. On the E11 data the procedure recovers the manual choice automatically (selects gate@12, rejects gate@6 on DeepSeek-V3). The relevance gate itself is now a shippable library primitive (<code>distil/gate.py</code>), not benchmark-only. Production status: <code>docs/GA_READINESS.md</code>.</p>
+    <p>A workload-dependent operating point is a deployment hazard only if it is hand-tuned &mdash; point distil at a new model or task distribution and it could silently ship a lossy setting. distil removes the hazard with the <strong>operating-point analogue of the certificate</strong>: just as conformal risk control selects the most aggressive <em>compression level</em> whose decision-change rate is provably controlled, <code>distil calibrate</code> (<code>distil/calibrate.py</code>) selects the most aggressive <em>working-set size</em> whose task-success loss is non-inferior to full context (same paired McNemar test), over a small calibration run. If no candidate certifies non-inferior, it <strong>fails safe to full context</strong> &mdash; absence of evidence degrades to no compression, never to silent loss. On the E11 data the procedure recovers the manual choice automatically (selects gate@12, rejects gate@6 on DeepSeek-V3). The relevance gate itself is now a shippable library primitive (<code>distil/gate.py</code>), not benchmark-only. Production status: <code>docs/GA_READINESS.md</code>.</p>
 
     <pre><code>distil calibrate \
   --baseline scores/full.json \

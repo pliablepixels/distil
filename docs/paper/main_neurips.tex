@@ -134,8 +134,9 @@ baselines crater. Finally we lift the certificate from per-turn to the \textbf{t
 level: with $95\%$ confidence the gated compressor changes a run's outcome on $\le\!18\%$ of
 exchangeable tasks (out-of-sample coverage $95.4\%$). To our knowledge this is the first
 trajectory-level decision-equivalence certificate for agent context compression. The
-non-inferiority also transfers across vendors to a far stronger model (DeepSeek-V3) at a
-capability-appropriate operating point (\Cref{sec:e11}).
+non-inferiority transfers across two vendors to two more strong models (DeepSeek-V3, Sonnet
+4.6); the runs show the safe operating point tracks \emph{realized} compression and workload,
+not capability alone, which is why we calibrate it on outcomes per deployment (\Cref{sec:e11}).
 \end{abstract}
 
 \section{Introduction}
@@ -1103,9 +1104,9 @@ proxy for task success, which E4 reports directly.
 \label{sec:e11}
 
 E7--E10 use \texttt{claude-haiku-4-5}. To test whether the gate's non-inferiority is
-model-specific, we re-run the long-horizon harness on \textbf{DeepSeek-V3} (open-weights,
-\texttt{deepseek-chat}; a different vendor and a far stronger agent) over $n{=}200$ SWE-bench
-Verified instances.
+model-specific, we re-run the long-horizon harness on two more, far stronger models from two
+vendors: \textbf{DeepSeek-V3} (\texttt{deepseek-chat}, $n{=}200$) and \textbf{Claude Sonnet 4.6}
+($n{=}50$).
 
 \begin{table}[h]
 \centering\small
@@ -1128,18 +1129,18 @@ aggressive setting (keep~6, compress $60\%$) is too aggressive for this stronger
 \label{tab:e11}
 \end{table}
 
-The non-inferiority generalizes, \emph{provided the operating point scales with agent
-capability}. At Haiku's setting (keep the last 6 messages) the gate collapses to $29.0\%$
-($-31$\,pp): a stronger agent exploits more of the peripheral context the gate digests, so
-that setting discards too much. At a gentler operating point (keep 12) the gate resolves
-$55.5\%$ versus $60.0\%$ for full---no statistically significant difference (McNemar
-$p{=}0.15$), recovering the non-inferiority seen on Haiku ($-2.4$\,pp). The design principle,
-reported rather than tuned away: \textbf{compression aggressiveness must scale with agent
-capability}---weaker agents tolerate aggressive digestion of periphery they would not have
-used, stronger agents need a larger protected working set---but at the right setting the
-relevance gate preserves task success on both a weak and a strong model across two vendors,
-while lossy truncation craters on each. Scope: $n{=}200$, single seed, two operating points
-rather than a full sweep; the certificate itself (E2/E10) is model-agnostic by construction.
+A third model, \textbf{Claude Sonnet 4.6} ($n{=}50$), refines the reading. Both gate@12
+($54.0\%$, $+0.0$\,pp, $p{=}1.0$) and gate@6 ($52.0\%$, $-2.0$\,pp, $p{=}1.0$) are non-inferior
+on Sonnet---yet gate@6 \emph{broke} on DeepSeek ($-31$\,pp). The discriminating variable is not
+model capability (both are strong) but \emph{realized} compression: \texttt{gate\_recent}${=}6$
+digested $60\%$ of blocks on DeepSeek's trajectories and only $34\%$ on Sonnet's, because how
+much periphery ages out of a fixed window depends on the workload's conversation shape. What
+generalizes cleanly is the milder keep-12 point---non-inferior on all three models (Haiku
+$-2.4$, DeepSeek $-4.5$, Sonnet $+0.0$\,pp) across two vendors---while lossy truncation craters
+on each. The lesson reinforces the design: because a fixed \texttt{gate\_recent} yields
+different realized compression across workloads, one must calibrate on \emph{outcomes} per
+deployment rather than ship a fixed knob. Scope: Sonnet is $n{=}50$ (wide CIs, $p{=}1.0$, no
+power to separate operating points); the certificate itself (E2/E10) is model-agnostic.
 
 A capability-dependent operating point is a deployment hazard only if hand-tuned. We remove it
 with the operating-point analogue of the certificate: a calibration step selects the most
