@@ -121,3 +121,56 @@ def tost(diffs: list[float], margin: float = 0.02, alpha: float = 0.05) -> TostR
     non_inferior = p_lower < alpha
     equivalent = non_inferior and p_upper < alpha
     return TostResult(n, mean, margin, alpha, p_lower, p_upper, non_inferior, equivalent)
+
+
+Z_95 = 1.959963984540054  # two-sided 95% normal quantile
+
+
+@dataclass(frozen=True)
+class McNemarNI:
+    n: int
+    delta: float  # candidate - reference pass-rate difference (negative => candidate worse)
+    ci95_low: float
+    ci95_high: float
+    se: float
+    margin: float
+    noninferior: bool
+
+    @property
+    def verdict(self) -> str:
+        return "PASS" if self.noninferior else "FAIL"
+
+
+def mcnemar_noninferiority(
+    b: int, c: int, n: int, margin: float = 0.05, z: float = Z_95
+) -> McNemarNI:
+    """Non-inferiority for **paired binary** outcomes (the deployment question).
+
+    This is the test the E8/E11 task-success comparisons use: given the same items scored
+    under a reference (e.g. full context) and a candidate (a compressed operating point),
+    is the candidate no worse than the reference by more than ``margin``? A McNemar
+    p-value only answers "is there *any* difference?"; failing to reject it is *absence of
+    evidence*, not equivalence. Non-inferiority is the FDA-standard framing for "compression
+    must not hurt".
+
+    Args:
+        b: discordant pairs where the **reference** resolved and the candidate did not
+           (candidate *losses*).
+        c: discordant pairs where the **candidate** resolved and the reference did not
+           (candidate *gains*).
+        n: total paired instances (both scored on the same items).
+        margin: largest tolerated absolute pass-rate drop (proportion, e.g. 0.05 = 5 pp).
+
+    Non-inferior iff the lower 95% CI bound on ``delta`` exceeds ``-margin`` (Wald interval
+    using the McNemar variance of correlated proportions). Mirrors
+    ``benchmarks/swe_bench_e2e/stats.noninferiority_paired`` — kept here as the shippable
+    library home so production calibration does not depend on the benchmark harness.
+    """
+    if n <= 0:
+        return McNemarNI(0, 0.0, 0.0, 0.0, 0.0, margin, False)
+    delta = (c - b) / n
+    var = ((b + c) - (b - c) ** 2 / n) / (n * n)
+    se = math.sqrt(max(var, 0.0))
+    lo = delta - z * se
+    hi = delta + z * se
+    return McNemarNI(n, delta, lo, hi, se, margin, bool(lo > -margin))

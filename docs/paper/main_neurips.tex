@@ -1132,5 +1132,12 @@ relevance gate preserves task success on both a weak and a strong model across t
 while lossy truncation craters on each. Scope: $n{=}200$, single seed, two operating points
 rather than a full sweep; the certificate itself (E2/E10) is model-agnostic by construction.
 
+A capability-dependent operating point is a deployment hazard only if hand-tuned. We remove it
+with the operating-point analogue of the certificate: a calibration step selects the most
+aggressive working-set size whose task-success loss is non-inferior to full (same paired test),
+and \textbf{fails safe to full context} when none certifies. On the E11 data this recovers the
+manual choice automatically (selects $g{=}12$, rejects $g{=}6$), turning the tuning burden into
+a one-time calibration.
+
 
 \end{document}

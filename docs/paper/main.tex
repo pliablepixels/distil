@@ -1148,6 +1148,19 @@ weak and a strong model, across two vendors, while lossy truncation craters on e
 scope: $n{=}200$, single seed, two operating points rather than a full sweep; the certificate
 itself (E2/E10) is model-agnostic by construction.)
 
+\paragraph{Operationalizing the principle: operating-point calibration.}
+A capability-dependent operating point is a deployment hazard only if it is hand-tuned---point
+the system at a new model and it may silently ship a lossy setting. We remove the hazard with
+the operating-point analogue of the certificate: just as conformal risk control selects the
+most aggressive \emph{compression level} whose decision-change rate is provably controlled
+(\Cref{sec:method}), a calibration step selects the most aggressive \emph{working-set size}
+$g$ whose task-success loss is non-inferior to full context, using the same paired test, over
+a small calibration run. If no candidate certifies non-inferior, calibration \textbf{fails
+safe to full context} rather than guessing---absence of evidence degrades to no compression,
+never to silent loss. On the E11 data this procedure recovers the manual choice automatically
+(it selects $g{=}12$ and rejects $g{=}6$ on DeepSeek-V3). The capability-dependent operating
+point thus becomes a one-time calibration, not a tuning burden.
+
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
 carry a distribution-free guarantee validated on real traces. The certificate

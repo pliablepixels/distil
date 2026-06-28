@@ -647,6 +647,60 @@ def cmd_conformal(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    """Auto-calibrate the relevance-gate operating point to your agent's capability.
+
+    E11 showed the safe operating point is capability-dependent: a setting non-inferior on a
+    weak agent costs -31 pp on a strong one. This selects the most aggressive working-set size
+    (``gate_recent``) still non-inferior to full context on your calibration scores — and
+    fails safe to full context if none qualifies."""
+    import sys
+
+    from .calibrate import calibrate_from_scores
+
+    candidates = []
+    for spec in args.candidate:
+        # spec form: name=path:gate_recent
+        try:
+            name, rest = spec.split("=", 1)
+            path, gr = rest.rsplit(":", 1)
+            candidates.append((name, path, int(gr)))
+        except ValueError:
+            print(f"bad --candidate '{spec}'; expected name=path:gate_recent", file=sys.stderr)
+            return 2
+
+    cert = calibrate_from_scores(args.baseline, candidates, margin=args.margin)
+
+    if args.json:
+        Path(args.json).write_text(json.dumps(cert.to_dict(), indent=2))
+
+    print("Operating-Point Calibration Certificate\n")
+    print(f"  baseline    : full context ({args.baseline})")
+    print(f"  margin      : {args.margin:.0%}  (max tolerated task-success drop)")
+    print("-" * 64)
+    header = f"  {'operating point':<16}{'gate':>5}{'Δ pass@1':>10}{'95% CI low':>12}   verdict"
+    print(header)
+    for v in cert.levels:
+        mark = "✔ non-inferior" if v.noninferior else "✘ too aggressive"
+        print(
+            f"  {v.name:<16}{v.gate_recent:>5}{v.delta * 100:>+9.1f}%{v.ci95_low * 100:>+11.1f}%"
+            f"   {mark}"
+        )
+    print("-" * 64)
+    if cert.fail_safe:
+        print("  ✘ FAIL-SAFE → keep FULL context (no operating point certified)")
+    else:
+        print(
+            f"  ✔ SELECTED  '{cert.selected}'  →  DISTIL_E7_GATE_RECENT={cert.selected_gate_recent}"
+        )
+    print(f"\n  {cert.rationale}")
+    print(
+        "\n  Paired non-inferiority (McNemar, FDA-standard). Valid under EXCHANGEABILITY with"
+        "\n  your calibration distribution — recalibrate when you change model, agent, or task mix."
+    )
+    return 0
+
+
 def cmd_learn(args: argparse.Namespace) -> int:
     """Show the keep policy Distil has learned from your real expand signals."""
     from .learn import ExpandStats
@@ -918,6 +972,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--samples", type=int, default=3, help="majority-vote samples (anthropic runner)"
     )
     cf.set_defaults(func=cmd_conformal)
+
+    cal = sub.add_parser(
+        "calibrate",
+        help="auto-tune the gate operating point to your agent (fail-safe to full context)",
+    )
+    cal.add_argument("--baseline", required=True, help="full-context score JSON (per_instance map)")
+    cal.add_argument(
+        "--candidate",
+        action="append",
+        required=True,
+        metavar="name=path:gate_recent",
+        help="candidate operating point, e.g. gate@12=scores/distil_gated_gr12.json:12 "
+        "(repeat for each)",
+    )
+    cal.add_argument(
+        "--margin",
+        type=float,
+        default=0.05,
+        help="max tolerated task-success drop as a proportion (default 0.05 = 5 pp)",
+    )
+    cal.add_argument("--json", help="write the calibration certificate to this path")
+    cal.set_defaults(func=cmd_calibrate)
 
     ve = sub.add_parser("verify", help="byte-fidelity gate: reversibility + append-only (phase 6)")
     ve.set_defaults(func=cmd_verify)

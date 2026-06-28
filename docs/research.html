@@ -207,6 +207,17 @@
       <b>The non-inferiority generalizes &mdash; if the operating point scales with capability.</b> At Haiku's aggressive setting (keep the last 6 messages, compress 60% of blocks) the gate collapses to <strong>29.0%</strong> on DeepSeek-V3: a stronger agent exploits more of the periphery the gate digests, so that setting drops too much. At a gentler operating point (keep 12, compress 31%) the gate resolves <strong>55.5% vs 60.0% for full &mdash; no significant difference (McNemar p=0.15)</strong>, recovering the non-inferiority seen on Haiku (&minus;2.4&nbsp;pp). The design principle, reported not tuned away: <strong>compression aggressiveness must scale with agent capability</strong> &mdash; weak agents tolerate aggressive digestion of periphery they would never use; strong agents need a larger protected working set. At the right setting the gate preserves task success on <em>both</em> a weak and a strong model across <em>two</em> vendors, while lossy truncation craters on each. Honest scope: n=200, single seed, two operating points &mdash; not a full sweep; the certificate itself (E2/E10) is model-agnostic by construction.
     </div>
 
+    <h3 id="e11-calibration">Operationalized: auto-calibration of the operating point</h3>
+
+    <p>A capability-dependent operating point is a deployment hazard only if it is hand-tuned &mdash; point distil at a new model and it could silently ship a lossy setting. distil removes the hazard with the <strong>operating-point analogue of the certificate</strong>: just as conformal risk control selects the most aggressive <em>compression level</em> whose decision-change rate is provably controlled, <code>distil calibrate</code> (<code>distil/calibrate.py</code>) selects the most aggressive <em>working-set size</em> whose task-success loss is non-inferior to full context (same paired McNemar test), over a small calibration run. If no candidate certifies non-inferior, it <strong>fails safe to full context</strong> &mdash; absence of evidence degrades to no compression, never to silent loss. On the E11 data the procedure recovers the manual choice automatically (selects gate@12, rejects gate@6 on DeepSeek-V3). The relevance gate itself is now a shippable library primitive (<code>distil/gate.py</code>), not benchmark-only. Production status: <code>docs/GA_READINESS.md</code>.</p>
+
+    <pre><code>distil calibrate \
+  --baseline scores/full.json \
+  --candidate gate@6=scores/gate6.json:6 \
+  --candidate gate@12=scores/gate12.json:12 \
+  --margin 0.05
+# → ✔ SELECTED 'gate@12' → DISTIL_E7_GATE_RECENT=12  (gate@6 ✘ too aggressive)</code></pre>
+
     <hr/>
 
     <!-- Feature 1: Certified compression frontier -->

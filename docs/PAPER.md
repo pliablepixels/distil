@@ -377,6 +377,17 @@ scope: n=200, single seed, two operating points — not a full sweep; the certif
 `benchmarks/long_horizon/run.py --backend openai` (DeepSeek-V3),
 `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
 
+**Operationalized: operating-point calibration.** A capability-dependent operating point is a
+deployment hazard only if hand-tuned. The operating-point analogue of the certificate removes
+it: just as conformal risk control picks the most aggressive *compression level* whose
+decision-change rate is controlled, `distil calibrate` (`distil/calibrate.py`) picks the most
+aggressive *working-set size* whose task-success loss is non-inferior to full context (same
+paired McNemar test), and **fails safe to full context** if none certifies — absence of
+evidence degrades to no compression, never to silent loss. On the E11 data the procedure
+recovers the manual choice automatically (selects gate@12, rejects gate@6 on DeepSeek-V3;
+`tests/test_calibrate.py`). The relevance gate itself is now a shippable library primitive
+(`distil/gate.py`), not benchmark-only. See `docs/GA_READINESS.md`.
+
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1

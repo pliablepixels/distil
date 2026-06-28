@@ -242,6 +242,21 @@ E8–E10 use `claude-haiku-4-5`. Does the gate's non-inferiority transfer to a *
 
 **The non-inferiority generalizes — *if the operating point scales with capability.*** At Haiku's aggressive setting (keep the last 6 messages, compress 60% of blocks) the gate collapses to **29.0%** on DeepSeek-V3: a stronger agent exploits more of the periphery the gate digests, so that setting drops too much. At a gentler operating point (keep 12, compress 31%) the gate resolves **55.5% vs 60.0% for full — no significant difference (McNemar *p*=0.15)**, recovering the same non-inferiority seen on Haiku (−2.4pp). **The design principle, reported not tuned-away: compression aggressiveness must scale with agent capability** — weak agents tolerate aggressive digestion of periphery they'd never use; strong agents need a larger protected working set. At the right setting the gate preserves task success on *both* a weak and a strong model across *two* vendors, while lossy truncation craters on each. *(Honest scope: n=200, single seed, two operating points — not a full sweep. The certificate itself (E2/E10) is model-agnostic by construction.)*
 
+### Auto-calibration — the operating point picks itself (and fails safe)
+
+E11's lesson (the safe operating point scales with agent capability) is a deployment hazard *only if hand-tuned*. Distil removes the hazard with the **operating-point analogue of the certificate**: just as conformal risk control picks the most aggressive *compression level* whose decision-change rate is provably controlled, `distil calibrate` picks the most aggressive *working-set size* whose **task-success loss is non-inferior to full context** (same paired McNemar test) — and **fails safe to full context** if none certifies. Absence of evidence degrades to *no compression*, never to silent loss.
+
+```bash
+distil calibrate \
+  --baseline scores/full.json \
+  --candidate gate@6=scores/gate6.json:6 \
+  --candidate gate@12=scores/gate12.json:12 \
+  --margin 0.05
+# ✔ SELECTED 'gate@12' → DISTIL_E7_GATE_RECENT=12   (gate@6 ✘ too aggressive, −31pp)
+```
+
+On the real E11 data this reproduces the manual choice automatically (selects gate@12, rejects gate@6 on DeepSeek-V3) — validated in `tests/test_calibrate.py`. The relevance gate itself is now a shippable library primitive (`distil/gate.py`), not benchmark-only. **Production status and the GA-readiness ledger: [`docs/GA_READINESS.md`](docs/GA_READINESS.md).**
+
 Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E11 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/` and `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
 
 ---
