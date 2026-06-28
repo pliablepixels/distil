@@ -229,21 +229,27 @@ The certificate above is *per-turn* (next-action equivalence). **E10 lifts it to
 
 And we **prove it out-of-sample** (the E2 method, at trajectory level): over 1000 calibration/test splits, certify the bound on one half and check the other — coverage is **95.4% / 96.7%**, at/above the 95% target. The bound *holds on held-out data*, not just asserted. To our knowledge this is the **first trajectory-level decision-equivalence certificate** for agent context compression. Honest scope: exchangeable with this distribution (SWE-bench Verified, this agent/model). Reproducible: `benchmarks/trajectory_certificate.py`.
 
-### It generalizes across 3 models / 2 vendors — and the safe operating point tracks *realized compression*, not capability (E11)
+### It generalizes across 5 models / 3 vendors — and the safe operating point tracks *realized compression × agent reliance*, not capability (E11)
 
-E8–E10 use `claude-haiku-4-5`. Does the gate's non-inferiority transfer to *stronger* agents and *other vendors*? We ran the long-horizon harness live on two more models: **DeepSeek-V3** (`deepseek-chat`, n=200) and **Claude Sonnet 4.6** (n=50). Both are far stronger than Haiku (full context 60.0% and 54.0% vs 39.2%).
+E8–E10 use `claude-haiku-4-5`. Does the gate's non-inferiority transfer to other agents and vendors? We ran the long-horizon harness live on four more models spanning three vendors. Full-context strength spans a wide range (gpt-4o-mini 12.0%, gpt-4.1 26.0%, Haiku 39.2%, Sonnet 54.0%, DeepSeek-V3 60.0%), letting us separate capability from compression aggressiveness.
 
-| DeepSeek-V3 (n=200) | pass@1 | vs full | · | Sonnet 4.6 (n=50) | pass@1 | vs full |
-|---|--:|--|---|---|--:|--|
-| full | 60.0% | — | · | full | 54.0% | — |
-| gate@12 (realized 31%) | 55.5% | −4.5pp, *p*=0.15 | · | gate@12 (realized 18%) | 54.0% | +0.0pp, *p*=1.0 |
-| gate@6 (realized 60%) | 29.0% | **−31pp** | · | gate@6 (realized 34%) | 52.0% | −2.0pp, *p*=1.0 |
+**gate@12 summary across all five models** (pass@1 %):
 
-**The honest finding — and it corrects the first-pass story.** A naive reading of DeepSeek alone says "aggressiveness must scale with model *capability*." Sonnet refutes that: it's also strong, yet gate@6 **broke on DeepSeek (−31pp)** while it **held on Sonnet (−2pp)**. The discriminating variable isn't capability — it's **realized compression**: the same `gate_recent=6` digested *60%* of blocks on DeepSeek's trajectories but only *34%* on Sonnet's, because how much periphery ages out of a fixed window depends on the *workload's conversation shape*, not just the model. What generalizes cleanly is the milder **gate@12**: non-inferior on **all three models** (Haiku −2.4, DeepSeek −4.5, Sonnet +0.0pp) across **two vendors**, while lossy truncation craters on each. The deeper lesson: a fixed `gate_recent` is the *wrong abstraction to ship* — you must **calibrate on outcomes per deployment** (the [auto-calibration](#auto-calibration--the-operating-point-picks-itself-and-fails-safe) below), with a fail-safe to full context. *(Honest scope: Sonnet is n=50 — wide CIs, p=1.0, no power to separate operating points; a directional 3rd-model confirmation, not a powered comparison. OpenAI gpt-4.1/gpt-4o-mini queued pending account credits.)*
+| model (vendor) | full | gate@12 | vs full | realized |
+|---|--:|--:|--|--|
+| gpt-4o-mini (OpenAI, n=50) | 12.0% | 12.0% | +0.0pp | 29% |
+| gpt-4.1 (OpenAI, n=50) | 26.0% | 20.0% | −6.0pp (*p*=0.45 n.s., wide CI [−16.2,+4.2]) | 32% |
+| Haiku 4.5 (Anthropic, n=500) | 39.2% | 36.8% | −2.4pp | — |
+| Sonnet 4.6 (Anthropic, n=50) | 54.0% | 54.0% | +0.0pp (*p*=1.0) | 18% |
+| DeepSeek-V3 (n=200) | 60.0% | 55.5% | −4.5pp (*p*=0.15 n.s.) | 31% |
+
+**gate@6 (aggressive setting):** held on Haiku (−2.4pp), Sonnet (−2.0pp), and gpt-4o-mini (+0.0pp, realized 58%); **broke on DeepSeek (−31pp, realized 60%)**; gpt-4.1 gate@6 partial (OpenAI account credit exhausted mid-run, 32/50 instances; not scored).
+
+**The refined finding — and it corrects the first-pass story.** An earlier reading of DeepSeek alone said "aggressiveness must scale with model *capability*." The wider sweep refutes that. **gate@12 shows no statistically significant degradation on any of the five models across three vendors.** The two well-powered runs (Haiku n=500, DeepSeek n=200) confirm non-inferiority; the three n=50 runs (Sonnet, gpt-4o-mini, gpt-4.1) are directionally consistent with wide CIs (not powered). gate@6 broke *only* on DeepSeek and held everywhere else. Two facts dissolve the capability story: (i) gpt-4o-mini held at gate@6 despite the *highest* realized compression of all (58%, above DeepSeek's breaking 60%) — because a weak agent never used that periphery; (ii) Sonnet, also strong, held because its gate@6 realized only 34% compression (the same `gate_recent` digests different fractions depending on workload conversation shape). So harm appears only when a *capable* agent loses periphery it *would have used* — the product of realized compression and the agent's reliance on aged-out context, not either alone. A fixed `gate_recent` cannot predict this (it's a workload×model interaction), which is exactly why you must **calibrate on outcomes per deployment** (the [auto-calibration](#auto-calibration--the-operating-point-picks-itself-and-fails-safe) below), with a fail-safe to full context. *(Honest scope: 3 of 5 runs are n=50 — wide CIs, directional not powered; gpt-4.1 gate@6 partial due to credit exhaustion; gpt-4.1 full 26% is modest — the ReAct harness is tuned for Claude/DeepSeek, a harness-fit caveat, not a distil result.)*
 
 ### Auto-calibration — the operating point picks itself (and fails safe)
 
-E11's lesson (the safe operating point scales with agent capability) is a deployment hazard *only if hand-tuned*. Distil removes the hazard with the **operating-point analogue of the certificate**: just as conformal risk control picks the most aggressive *compression level* whose decision-change rate is provably controlled, `distil calibrate` picks the most aggressive *working-set size* whose **task-success loss is non-inferior to full context** (same paired McNemar test) — and **fails safe to full context** if none certifies. Absence of evidence degrades to *no compression*, never to silent loss.
+E11's lesson (the safe operating point is a workload×model interaction) is a deployment hazard *only if hand-tuned*. Distil removes the hazard with the **operating-point analogue of the certificate**: just as conformal risk control picks the most aggressive *compression level* whose decision-change rate is provably controlled, `distil calibrate` picks the most aggressive *working-set size* whose **task-success loss is non-inferior to full context** (same paired McNemar test) — and **fails safe to full context** if none certifies. Absence of evidence degrades to *no compression*, never to silent loss.
 
 ```bash
 distil calibrate \

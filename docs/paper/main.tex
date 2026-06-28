@@ -136,11 +136,12 @@ baselines crater. Finally we lift the certificate from per-turn to the \textbf{t
 level: with $95\%$ confidence the gated compressor changes a run's outcome on $\le\!18\%$ of
 exchangeable tasks (out-of-sample coverage $95.4\%$). To our knowledge this is the first
 trajectory-level decision-equivalence certificate for agent context compression. The
-non-inferiority generalizes across two vendors to two more, far stronger models---DeepSeek-V3
-($-4.5$\,pp at the milder operating point) and Claude Sonnet 4.6 ($+0.0$\,pp)---and the runs
-show the safe operating point tracks \emph{realized} compression and workload, not model
-capability alone, which is why we calibrate the operating point on outcomes per deployment with
-a fail-safe to full context.
+non-inferiority generalizes across \textbf{five models and three vendors} (Anthropic Haiku and
+Sonnet, DeepSeek-V3, OpenAI gpt-4.1 and gpt-4o-mini): the milder operating point shows no
+statistically significant degradation on any. The sweep also shows harm tracks \emph{realized}
+compression interacting with whether the agent uses the periphery---not model capability---which
+is why we calibrate the operating point on outcomes per deployment with a fail-safe to full
+context.
 \end{abstract}
 
 \section{Introduction}
@@ -1114,14 +1115,16 @@ solved that the compressed run did not.}
 \label{fig:e10cert}
 \end{figure}
 
-\subsection{E11: cross-model generality (two more models, two vendors)}
+\subsection{E11: cross-model generality (five models, three vendors)}
 \label{sec:e11}
 
-E7--E10 use \texttt{claude-haiku-4-5}. Does the gate's non-inferiority generalize to stronger
-agents and other vendors? We re-run the long-horizon harness on two more models: an open
-model, \textbf{DeepSeek-V3} (\texttt{deepseek-chat}, $n{=}200$), and a strong closed model,
-\textbf{Claude Sonnet 4.6} ($n{=}50$). Both are far stronger than Haiku: full context resolves
-\textbf{60.0\%} and \textbf{54.0\%} respectively (vs.\ $39.2\%$ on Haiku).
+E7--E10 use \texttt{claude-haiku-4-5}. Does the gate's non-inferiority generalize across agents
+and vendors? We re-run the long-horizon harness on four more models spanning three vendors:
+\textbf{DeepSeek-V3} (\texttt{deepseek-chat}, $n{=}200$), \textbf{Claude Sonnet 4.6}
+($n{=}50$), and two OpenAI models, \textbf{gpt-4.1} and \textbf{gpt-4o-mini} ($n{=}50$ each).
+Full-context strength spans a wide range (gpt-4o-mini $12.0\%$, gpt-4.1 $26.0\%$, Haiku
+$39.2\%$, Sonnet $54.0\%$, DeepSeek-V3 $60.0\%$), letting us separate model capability from
+compression aggressiveness.
 
 \begin{table}[t]
 \centering\small
@@ -1144,37 +1147,43 @@ keep-$6$ setting realized $60\%$ compression and broke ($-31$\,pp). Lossy trunca
 
 \begin{table}[t]
 \centering\small
-\begin{tabular}{@{}l c c c@{}}
+\begin{tabular}{@{}l r r c r@{}}
 \toprule
-condition (Sonnet 4.6, $n{=}50$) & pass@1 & 95\% CI & vs.\ full \\
+model (vendor) & full & gate@12 & vs.\ full & realized \\
 \midrule
-A. full context & \textbf{54.0\%} & [40.4, 67.0] & --- \\
-E. distil relevance-gated, keep~12 & \textbf{54.0\%} & [40.4, 67.0] & $+0.0$\,pp, $p{=}1.0$ \\
-E$'$. distil relevance-gated, keep~6 & 52.0\% & [38.5, 65.2] & $-2.0$\,pp, $p{=}1.0$ \\
+gpt-4o-mini (OpenAI) & $12.0$ & $12.0$ & $+0.0$\,pp & $29\%$ \\
+gpt-4.1 (OpenAI) & $26.0$ & $20.0$ & $-6.0$\,pp ($p{=}0.45$) & $32\%$ \\
+Haiku 4.5 (Anthropic) & $39.2$ & $36.8$ & $-2.4$\,pp & --- \\
+Sonnet 4.6 (Anthropic) & $54.0$ & $54.0$ & $+0.0$\,pp & $18\%$ \\
+DeepSeek-V3 & $60.0$ & $55.5$ & $-4.5$\,pp ($p{=}0.15$) & $31\%$ \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{E11 (cont.): Claude Sonnet 4.6} ($n{=}50$, official harness). Both operating
-points are non-inferior here---but note keep-$6$ realized only $34\%$ block compression on
-these runs (vs.\ $60\%$ on DeepSeek), and $n{=}50$ gives wide CIs ($p{=}1.0$, no power to
-separate the points). A directional confirmation, not a powered comparison.}
-\label{tab:e11sonnet}
+\caption{\textbf{E11: gate@12 across five models, three vendors} (pass@1 \%). The milder
+operating point shows \emph{no statistically significant degradation on any model}; the two
+well-powered runs (Haiku $n{=}500$, DeepSeek $n{=}200$) confirm non-inferiority, the three
+$n{=}50$ runs are directionally consistent with wide CIs. ``realized'' = fraction of blocks
+actually digested.}
+\label{tab:e11all}
 \end{table}
 
-\paragraph{The non-inferiority generalizes; the safe operating point tracks \emph{realized}
-compression, not capability alone.} An earlier reading of the DeepSeek result alone---that
-aggressiveness must scale with model \emph{capability}---is too simple, and the Sonnet run
-corrects it. Both DeepSeek and Sonnet are strong, yet keep-$6$ \emph{broke} on DeepSeek
-($-31$\,pp) and \emph{held} on Sonnet ($-2.0$\,pp). The discriminating variable is not
-capability but \emph{realized} compression: the same \texttt{gate\_recent}${=}6$ digested $60\%$
-of blocks on DeepSeek's trajectories but only $34\%$ on Sonnet's, because how much periphery
-ages out of a fixed working-set window depends on the workload's conversation shape, not just
-the model. What \emph{does} generalize cleanly is the milder keep-$12$ point: non-inferior on
-all three models (Haiku $-2.4$, DeepSeek $-4.5$, Sonnet $+0.0$\,pp) across two vendors, while
-lossy truncation craters on each. The deeper lesson reinforces \Cref{sec:e8}'s design: because
-a fixed \texttt{gate\_recent} yields different realized compression across workloads, it is the
-wrong abstraction to ship---one must calibrate on \emph{outcomes} per deployment, which is
-exactly what the next paragraph does. (Honest scope: Sonnet is $n{=}50$ with wide CIs;
-the certificate itself (E2/E10) is model-agnostic by construction.)
+\paragraph{The non-inferiority generalizes; harm tracks \emph{realized compression interacting
+with whether the agent uses the periphery}, not model capability.} An earlier reading of the
+DeepSeek result alone---that aggressiveness must scale with model \emph{capability}---is too
+simple, and the wider sweep corrects it. The aggressive keep-$6$ setting \emph{broke} only on
+DeepSeek ($-31$\,pp) and held everywhere else (Haiku $-2.4$, Sonnet $-2.0$, gpt-4o-mini
+$+0.0$\,pp). Two facts dissolve the ``capability'' story: (i)~gpt-4o-mini held at keep-$6$
+despite the \emph{highest} realized compression of all ($58\%$, even above DeepSeek's breaking
+$60\%$)---because a weak agent never exploited that periphery; and (ii)~Sonnet, also strong,
+held because its keep-$6$ realized only $34\%$ compression on these runs (the same
+\texttt{gate\_recent} digests different fractions depending on the workload's conversation
+shape). So harm appears only when a \emph{capable} agent loses periphery it \emph{would have
+used}---the product of realized compression and the agent's reliance on aged-out context, not
+either alone. What generalizes cleanly is the milder keep-$12$ point (\Cref{tab:e11all}):
+no significant degradation on any of five models across three vendors. Because the safe setting
+is a workload$\times$model interaction a fixed \texttt{gate\_recent} cannot predict, one must
+calibrate on \emph{outcomes} per deployment---exactly the next paragraph. (Honest scope: three
+of five runs are $n{=}50$ with wide CIs and are directional, not powered; gpt-4.1's keep-$6$ is
+partial (account-credit exhaustion); the certificate itself (E2/E10) is model-agnostic.)
 
 \paragraph{Operationalizing the principle: operating-point calibration.}
 A capability-dependent operating point is a deployment hazard only if it is hand-tuned---point

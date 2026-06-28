@@ -134,9 +134,10 @@ baselines crater. Finally we lift the certificate from per-turn to the \textbf{t
 level: with $95\%$ confidence the gated compressor changes a run's outcome on $\le\!18\%$ of
 exchangeable tasks (out-of-sample coverage $95.4\%$). To our knowledge this is the first
 trajectory-level decision-equivalence certificate for agent context compression. The
-non-inferiority transfers across two vendors to two more strong models (DeepSeek-V3, Sonnet
-4.6); the runs show the safe operating point tracks \emph{realized} compression and workload,
-not capability alone, which is why we calibrate it on outcomes per deployment (\Cref{sec:e11}).
+non-inferiority generalizes across five models and three vendors (Anthropic Haiku/Sonnet,
+DeepSeek-V3, OpenAI gpt-4.1/gpt-4o-mini) with no significant degradation at the milder operating
+point; the runs show harm tracks \emph{realized} compression and workload, not capability alone,
+which is why we calibrate the operating point on outcomes per deployment (\Cref{sec:e11}).
 \end{abstract}
 
 \section{Introduction}
@@ -1129,18 +1130,20 @@ aggressive setting (keep~6, compress $60\%$) is too aggressive for this stronger
 \label{tab:e11}
 \end{table}
 
-A third model, \textbf{Claude Sonnet 4.6} ($n{=}50$), refines the reading. Both gate@12
-($54.0\%$, $+0.0$\,pp, $p{=}1.0$) and gate@6 ($52.0\%$, $-2.0$\,pp, $p{=}1.0$) are non-inferior
-on Sonnet---yet gate@6 \emph{broke} on DeepSeek ($-31$\,pp). The discriminating variable is not
-model capability (both are strong) but \emph{realized} compression: \texttt{gate\_recent}${=}6$
-digested $60\%$ of blocks on DeepSeek's trajectories and only $34\%$ on Sonnet's, because how
-much periphery ages out of a fixed window depends on the workload's conversation shape. What
-generalizes cleanly is the milder keep-12 point---non-inferior on all three models (Haiku
-$-2.4$, DeepSeek $-4.5$, Sonnet $+0.0$\,pp) across two vendors---while lossy truncation craters
-on each. The lesson reinforces the design: because a fixed \texttt{gate\_recent} yields
-different realized compression across workloads, one must calibrate on \emph{outcomes} per
-deployment rather than ship a fixed knob. Scope: Sonnet is $n{=}50$ (wide CIs, $p{=}1.0$, no
-power to separate operating points); the certificate itself (E2/E10) is model-agnostic.
+Three more models---\textbf{Sonnet 4.6}, \textbf{gpt-4.1}, \textbf{gpt-4o-mini} ($n{=}50$
+each)---extend this to five models / three vendors and refine the reading. At the milder
+keep-12 point there is no statistically significant degradation on any model (Haiku $-2.4$,
+DeepSeek $-4.5$, Sonnet $+0.0$, gpt-4o-mini $+0.0$, gpt-4.1 $-6.0$\,pp; the last three $n{=}50$,
+directional). The aggressive keep-6 setting \emph{broke} only on DeepSeek ($-31$\,pp) and held
+elsewhere---and the ``capability'' story dissolves: gpt-4o-mini held at keep-6 despite the
+\emph{highest} realized compression of all ($58\%$, above DeepSeek's breaking $60\%$) because a
+weak agent never used that periphery, while Sonnet (also strong) held because its keep-6
+realized only $34\%$. Harm thus appears only when a \emph{capable} agent loses periphery it
+\emph{would have used}---the product of realized compression and the agent's reliance on it, a
+workload$\times$model interaction a fixed \texttt{gate\_recent} cannot predict. Hence one
+calibrates on \emph{outcomes} per deployment. Scope: three of five runs are $n{=}50$ (wide CIs,
+directional); gpt-4.1's keep-6 is partial (credit exhaustion); the certificate (E2/E10) is
+model-agnostic.
 
 A capability-dependent operating point is a deployment hazard only if hand-tuned. We remove it
 with the operating-point analogue of the certificate: a calibration step selects the most

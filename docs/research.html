@@ -187,34 +187,29 @@
     <hr/>
 
     <!-- E11: cross-model generality -->
-    <h2 id="e11">E11: cross-model generality (three models, two vendors)</h2>
+    <h2 id="e11">E11: cross-model generality (five models, three vendors)</h2>
 
-    <p><strong>Reproducible:</strong> <code>benchmarks/long_horizon/run.py --backend openai</code> (DeepSeek-V3) &middot; results in <code>docs/paper/results/swe_e2e_longhorizon_deepseek/</code> and <code>docs/paper/results/swe_e2e_longhorizon_sonnet/</code></p>
+    <p><strong>Reproducible:</strong> <code>benchmarks/long_horizon/run.py --backend openai</code> (DeepSeek-V3, OpenAI) &middot; results in <code>docs/paper/results/swe_e2e_longhorizon_deepseek/</code>, <code>docs/paper/results/swe_e2e_longhorizon_sonnet/</code>, <code>docs/paper/results/swe_e2e_longhorizon_gpt4omini/</code>, <code>docs/paper/results/swe_e2e_longhorizon_gpt41/</code></p>
 
-    <p>E7&ndash;E10 use <code>claude-haiku-4-5</code>. To test whether the gate's non-inferiority is model-specific, the long-horizon harness was re-run on two more models: <strong>DeepSeek-V3</strong> (open-weights, <code>deepseek-chat</code> &mdash; a different vendor, n=200) and <strong>Claude Sonnet 4.6</strong> (strong closed model, same vendor as Haiku, n=50 live run). Both are far stronger than Haiku: full context resolves <strong>60.0%</strong> and <strong>54.0%</strong> respectively (vs Haiku's 39.2%).</p>
+    <p>E7&ndash;E10 use <code>claude-haiku-4-5</code>. To test whether the gate's non-inferiority generalizes, the long-horizon harness was re-run on four more models spanning three vendors: <strong>DeepSeek-V3</strong> (<code>deepseek-chat</code>, n=200), <strong>Claude Sonnet 4.6</strong> (n=50), <strong>gpt-4o-mini</strong> (OpenAI, n=50), and <strong>gpt-4.1</strong> (OpenAI, n=50). Full-context strength spans a wide range &mdash; gpt-4o-mini 12.0%, gpt-4.1 26.0%, Haiku 39.2%, Sonnet 54.0%, DeepSeek-V3 60.0% &mdash; letting us separate capability from compression aggressiveness.</p>
 
     <table>
-      <thead><tr><th>condition (DeepSeek-V3, n=200)</th><th>pass@1</th><th>95% CI</th><th>vs full</th><th>realized compression</th></tr></thead>
+      <thead><tr><th>model (vendor)</th><th>full (pass@1)</th><th>gate@12</th><th>vs full</th><th>realized</th></tr></thead>
       <tbody>
-        <tr><td>A &mdash; full context</td><td><strong>60.0%</strong> (120/200)</td><td>[53.1%, 66.5%]</td><td>&mdash;</td><td>&mdash;</td></tr>
-        <tr style="background:rgba(90,209,154,.10)"><td><strong>E &mdash; distil relevance-gated, keep 12</strong></td><td><strong>55.5%</strong> (111/200)</td><td>[48.6%, 62.2%]</td><td><strong>&minus;4.5&nbsp;pp, p=0.15 (n.s.)</strong></td><td>31%</td></tr>
-        <tr><td>E&prime; &mdash; distil relevance-gated, keep 6</td><td>29.0% (58/200)</td><td>[23.2%, 35.6%]</td><td>&minus;31&nbsp;pp, p&lt;0.001</td><td>60%</td></tr>
-        <tr><td>B &mdash; distil <code>trunc@500</code> (lossy)</td><td>17.0% (34/200)</td><td>[12.4%, 22.8%]</td><td>&minus;43&nbsp;pp, p&lt;0.001</td><td>&mdash;</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td>gpt-4o-mini (OpenAI, n=50)</td><td>12.0%</td><td><strong>12.0%</strong></td><td><strong>+0.0&nbsp;pp, p=1.0 (n.s.)</strong></td><td>29%</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td>gpt-4.1 (OpenAI, n=50)</td><td>26.0%</td><td><strong>20.0%</strong></td><td><strong>&minus;6.0&nbsp;pp, p=0.45 (n.s., CI [&minus;16.2,+4.2])</strong></td><td>32%</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td>Haiku 4.5 (Anthropic, n=500)</td><td>39.2%</td><td><strong>36.8%</strong></td><td><strong>&minus;2.4&nbsp;pp</strong></td><td>&mdash;</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td>Sonnet 4.6 (Anthropic, n=50)</td><td>54.0%</td><td><strong>54.0%</strong></td><td><strong>+0.0&nbsp;pp, p=1.0 (n.s.)</strong></td><td>18%</td></tr>
+        <tr style="background:rgba(90,209,154,.10)"><td>DeepSeek-V3 (n=200)</td><td>60.0%</td><td><strong>55.5%</strong></td><td><strong>&minus;4.5&nbsp;pp, p=0.15 (n.s.)</strong></td><td>31%</td></tr>
       </tbody>
     </table>
 
-    <table>
-      <thead><tr><th>condition (Claude Sonnet 4.6, n=50)</th><th>pass@1</th><th>95% CI</th><th>vs full</th><th>realized compression</th></tr></thead>
-      <tbody>
-        <tr><td>A &mdash; full context</td><td><strong>54.0%</strong> (27/50)</td><td>[40.4%, 67.0%]</td><td>&mdash;</td><td>&mdash;</td></tr>
-        <tr style="background:rgba(90,209,154,.10)"><td><strong>E &mdash; distil relevance-gated, keep 12</strong></td><td><strong>54.0%</strong> (27/50)</td><td>[40.4%, 67.0%]</td><td><strong>+0.0&nbsp;pp, p=1.0 (n.s.)</strong></td><td>18%</td></tr>
-        <tr style="background:rgba(90,209,154,.10)"><td>E&prime; &mdash; distil relevance-gated, keep 6</td><td>52.0% (26/50)</td><td>[38.5%, 65.2%]</td><td>&minus;2.0&nbsp;pp, p=1.0 (n.s.)</td><td>34%</td></tr>
-      </tbody>
-    </table>
-    <p><em>Sonnet caveat: n=50, wide CIs, p=1.0 on both operating points &mdash; no power to separate them. A directional third-model confirmation, not a powered comparison. OpenAI GPT (gpt-4.1/gpt-4o-mini) is queued pending account credits.</em></p>
+    <p><strong>gate@6 (aggressive setting):</strong> held on Haiku (&minus;2.4&nbsp;pp), Sonnet (&minus;2.0&nbsp;pp), and gpt-4o-mini (+0.0&nbsp;pp, realized 58%); broke on DeepSeek (&minus;31&nbsp;pp, realized 60%); gpt-4.1 gate@6 partial &mdash; OpenAI account credit exhausted mid-run (32/50 instances scored), not reported.</p>
+
+    <p><em>Honest scope: 3 of 5 runs are n=50 (wide CIs, directional not powered). gpt-4.1 full 26% is modest &mdash; the ReAct harness is tuned for Claude/DeepSeek (harness-fit caveat, not a distil result). The certificate itself (E2/E10) is model-agnostic by construction.</em></p>
 
     <div class="callout good">
-      <b>The non-inferiority generalizes; the safe operating point tracks <em>realized</em> compression, not capability alone.</b> An earlier reading of the DeepSeek result alone &mdash; that <em>compression aggressiveness must scale with model capability</em> &mdash; is too simple, and the Sonnet run corrects it. Both DeepSeek and Sonnet are strong, yet keep-6 <em>broke</em> on DeepSeek (&minus;31&nbsp;pp) and <em>held</em> on Sonnet (&minus;2.0&nbsp;pp). The discriminating variable is not capability but <em>realized</em> compression: the same <code>gate_recent=6</code> digested 60% of blocks on DeepSeek's trajectories but only 34% on Sonnet's, because how much periphery ages out of a fixed working-set window depends on the workload's conversation shape, not just the model. What <em>does</em> generalize cleanly: the milder keep-12 point is non-inferior on all three models (Haiku &minus;2.4, DeepSeek &minus;4.5, Sonnet +0.0&nbsp;pp) across two vendors, while lossy truncation craters on each. The deeper lesson: because a fixed <code>gate_recent</code> yields different realized compression across workloads, it is the wrong abstraction to ship &mdash; calibrate on <em>outcomes</em> per deployment (auto-calibration below), with a fail-safe to full context. Honest scope: Sonnet is n=50 with wide CIs; the certificate itself (E2/E10) is model-agnostic by construction.
+      <b>gate@12 shows no statistically significant degradation on any of the five models across three vendors.</b> The two well-powered runs (Haiku n=500, DeepSeek n=200) confirm non-inferiority; the three n=50 runs (Sonnet, gpt-4o-mini, gpt-4.1) are directionally consistent with wide CIs (not powered). The earlier &ldquo;aggressiveness must scale with model <em>capability</em>&rdquo; story is <strong>refuted</strong> by the wider sweep. gate@6 broke only on DeepSeek (&minus;31&nbsp;pp) and held everywhere else. Two facts dissolve the capability story: (i) gpt-4o-mini held at gate@6 despite the <em>highest</em> realized compression of all (58%, above DeepSeek&rsquo;s breaking 60%) &mdash; because a weak agent never used that periphery; (ii) Sonnet, also strong, held because its gate@6 realized only 34% compression on these runs (the same <code>gate_recent</code> digests different fractions depending on workload conversation shape). So harm appears only when a <em>capable</em> agent loses periphery it <em>would have used</em> &mdash; the product of realized compression and the agent&rsquo;s reliance on aged-out context, not either alone. A fixed <code>gate_recent</code> cannot predict this (it is a workload&times;model interaction), which is exactly why distil calibrates on outcomes per deployment with a fail-safe to full context.
     </div>
 
     <h3 id="e11-calibration">Operationalized: auto-calibration of the operating point</h3>

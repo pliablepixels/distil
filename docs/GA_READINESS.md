@@ -32,7 +32,7 @@ Verified + τ-bench to more domains and models. The design is domain-agnostic; c
 
 | Item | Why it gates full GA | Mitigation today |
 |---|---|---|
-| **Validation breadth** | Task-success is validated on SWE-bench Verified coding agents across **3 models / 2 vendors** (E8 n=500 Haiku; E11 n=200 DeepSeek-V3, n=50 Sonnet 4.6) plus τ-bench (proxy). Still single-domain (coding) and the Sonnet point is small-n; broad multi-domain production traffic is not yet covered. OpenAI GPT (gpt-4.1 / gpt-4o-mini) is queued pending account credits (key valid, quota exhausted). | The certificate machinery is domain-agnostic; broadening is data + a new-domain harness, not redesign. |
+| **Validation breadth** | Task-success is validated on SWE-bench Verified coding agents across **5 models / 3 vendors** (E8 n=500 Haiku; E11 n=200 DeepSeek-V3, n=50 Sonnet 4.6, n=50 gpt-4.1, n=50 gpt-4o-mini) plus τ-bench (proxy). OpenAI runs are now DONE; note gpt-4.1 gate@6 is partial (account credit exhausted mid-run, 32/50 instances) and all three n=50 OpenAI/Sonnet points have wide CIs (directional, not powered). Still single-domain (coding); broad multi-domain production traffic is not yet covered. | The certificate machinery is domain-agnostic; broadening is data + a new-domain harness, not redesign. |
 | **Calibration data requirement** | Auto-calibration needs a small paired full-vs-candidate run on representative traffic before the gate can ship aggressively. | Fail-safe means the *absence* of calibration data degrades to full context (correct, not lossy) rather than to a guessed operating point. |
 
 ### Recently closed (were open)
