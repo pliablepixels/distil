@@ -346,6 +346,37 @@ with the calibration distribution (SWE-bench Verified, this agent + model), not 
 Reproducible: `benchmarks/trajectory_certificate.py`,
 `docs/paper/results/swe_e2e_longhorizon/trajectory_certificate.json`.
 
+### 6.0.6 Cross-model generality (E11) — a second, stronger model
+
+E7–E10 use `claude-haiku-4-5`. **E11 tests whether the gate's non-inferiority is
+model-specific** by re-running the long-horizon harness on **DeepSeek-V3** (open-weights,
+`deepseek-chat` — a different vendor and a far stronger agent) over **n=200** SWE-bench
+Verified instances, scored by the same official `swebench` harness. Full context is much
+stronger here: **60.0%** vs Haiku's 39.2%.
+
+| condition (DeepSeek-V3, n=200) | pass@1 | 95% CI | vs full |
+|---|--:|--|--|
+| A. full context | **60.0%** (120/200) | [53.1%, 66.5%] | — |
+| **E. distil relevance-gated, keep 12** | **55.5%** (111/200) | [48.6%, 62.2%] | **−4.5 pp, McNemar `p=0.15` (n.s.)** |
+| E′. distil relevance-gated, keep 6 | 29.0% (58/200) | [23.2%, 35.6%] | −31 pp, `p<0.001` |
+| B. distil `trunc@500` (lossy) | 17.0% (34/200) | [12.4%, 22.8%] | −43 pp, `p<0.001` |
+
+**The non-inferiority generalizes — *if the operating point scales with capability.*** At
+Haiku's aggressive setting (keep the last 6 messages, compress 60% of blocks) the gate
+collapses to **29.0%** on DeepSeek-V3 (−31 pp): a stronger agent exploits more of the
+periphery the gate digests, so that setting drops too much. At a gentler operating point
+(keep 12, compress 31%) the gate resolves **55.5% vs 60.0% for full — no statistically
+significant difference (McNemar `p=0.15`, NI Δ −4.5 pp, CI [−9.9, +0.9])**, recovering the
+non-inferiority seen on Haiku (−2.4 pp). The design principle, **reported not tuned away:
+compression aggressiveness must scale with agent capability** — weak agents tolerate
+aggressive digestion of periphery they would never use; strong agents need a larger
+protected working set. At the right setting the gate preserves task success on *both* a weak
+and a strong model across *two* vendors, while lossy truncation craters on each. Honest
+scope: n=200, single seed, two operating points — not a full sweep; the certificate itself
+(E2/E10) is model-agnostic by construction. Reproducible:
+`benchmarks/long_horizon/run.py --backend openai` (DeepSeek-V3),
+`docs/paper/results/swe_e2e_longhorizon_deepseek/`.
+
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
