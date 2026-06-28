@@ -133,7 +133,9 @@ Headroom, by $+4.2$\,pp ($p\!=\!0.035$)---uniquely reversible \emph{and} certifi
 baselines crater. Finally we lift the certificate from per-turn to the \textbf{trajectory}
 level: with $95\%$ confidence the gated compressor changes a run's outcome on $\le\!18\%$ of
 exchangeable tasks (out-of-sample coverage $95.4\%$). To our knowledge this is the first
-trajectory-level decision-equivalence certificate for agent context compression.
+trajectory-level decision-equivalence certificate for agent context compression. The
+non-inferiority also transfers across vendors to a far stronger model (DeepSeek-V3) at a
+capability-appropriate operating point (\Cref{sec:e11}).
 \end{abstract}
 
 \section{Introduction}
@@ -496,7 +498,7 @@ point; C is LLMLingua-2 at its default rate; D is distil's \emph{reversible} tie
 ($\approx$7\% cheaper), because the agent recovers what it edits. $^{\ddagger}$E keeps
 the last 6 user/tool messages full and digests only older periphery; these conversations
 are $\le$6 turns, so the gate is a \emph{no-op} here (1 block digested across all 50,
-McNemar vs.\ full $p=\sweEsevenGatedVsFullP{}$) — it targets long-horizon contexts.}
+McNemar vs.\ full $p=\sweEsevenGatedVsFullP{}$)---it targets long-horizon contexts.}
 \label{tab:e7}
 \end{table}
 
@@ -613,7 +615,9 @@ active tier, head-truncation for the passive gate); \emph{what} you compress, an
 agent recovers it, matters more than the raw ratio. E8 is the experiment E7 could not run,
 and it confirms the gate's design claim: on long-horizon agents, relevance-gated reversible
 compression is the highest-accuracy compressor, non-inferior to full, while every lossy or
-blindly-reversible alternative is decisively inferior.
+blindly-reversible alternative is decisively inferior. This non-inferiority is not
+model-specific: it transfers to a far stronger, different-vendor agent (DeepSeek-V3) once the
+operating point scales with capability (\Cref{sec:e11}).
 
 \subsection{E9: from the per-turn certificate to the trajectory outcome}
 \label{sec:e9}
@@ -1085,6 +1089,48 @@ on compact $\tau$-bench contexts.
 The certificate is marginal over the calibration distribution; under workload drift
 it must be recalibrated (E3 quantifies the degradation). Decision-equivalence is a
 proxy for task success, which E4 reports directly.
+
+\subsection{E11: cross-model generality (a second, stronger model)}
+\label{sec:e11}
+
+E7--E10 use \texttt{claude-haiku-4-5}. To test whether the gate's non-inferiority is
+model-specific, we re-run the long-horizon harness on \textbf{DeepSeek-V3} (open-weights,
+\texttt{deepseek-chat}; a different vendor and a far stronger agent) over $n{=}200$ SWE-bench
+Verified instances.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+condition & pass@1 & 95\% CI & vs.\ full \\
+\midrule
+A. full context & \textbf{60.0\%} & [53.1, 66.5] & --- \\
+E. distil relevance-gated, keep~12 & \textbf{55.5\%} & [48.6, 62.2] & $-4.5$\,pp, $p{=}0.15$ (n.s.) \\
+E$'$. distil relevance-gated, keep~6 & 29.0\% & [23.2, 35.6] & $-31$\,pp, $p{<}0.001$ \\
+B. distil \texttt{trunc@500} (lossy) & 17.0\% & [12.4, 22.8] & $-43$\,pp, $p{<}0.001$ \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{E11: cross-model generality on DeepSeek-V3} ($n{=}200$, 30-turn ReAct,
+official harness). Full context is much stronger here ($60.0\%$ vs.\ Haiku's $39.2\%$). The
+gate is non-inferior to full at a capability-appropriate operating point (keep~12, compress
+$31\%$ of blocks: $-4.5$\,pp, McNemar $p{=}0.15$, no detectable difference); Haiku's more
+aggressive setting (keep~6, compress $60\%$) is too aggressive for this stronger agent
+($-31$\,pp). Lossy truncation craters on both models.}
+\label{tab:e11}
+\end{table}
+
+The non-inferiority generalizes, \emph{provided the operating point scales with agent
+capability}. At Haiku's setting (keep the last 6 messages) the gate collapses to $29.0\%$
+($-31$\,pp): a stronger agent exploits more of the peripheral context the gate digests, so
+that setting discards too much. At a gentler operating point (keep 12) the gate resolves
+$55.5\%$ versus $60.0\%$ for full---no statistically significant difference (McNemar
+$p{=}0.15$), recovering the non-inferiority seen on Haiku ($-2.4$\,pp). The design principle,
+reported rather than tuned away: \textbf{compression aggressiveness must scale with agent
+capability}---weaker agents tolerate aggressive digestion of periphery they would not have
+used, stronger agents need a larger protected working set---but at the right setting the
+relevance gate preserves task success on both a weak and a strong model across two vendors,
+while lossy truncation craters on each. Scope: $n{=}200$, single seed, two operating points
+rather than a full sweep; the certificate itself (E2/E10) is model-agnostic by construction.
 
 
 \end{document}

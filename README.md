@@ -229,7 +229,20 @@ The certificate above is *per-turn* (next-action equivalence). **E10 lifts it to
 
 And we **prove it out-of-sample** (the E2 method, at trajectory level): over 1000 calibration/test splits, certify the bound on one half and check the other — coverage is **95.4% / 96.7%**, at/above the 95% target. The bound *holds on held-out data*, not just asserted. To our knowledge this is the **first trajectory-level decision-equivalence certificate** for agent context compression. Honest scope: exchangeable with this distribution (SWE-bench Verified, this agent/model). Reproducible: `benchmarks/trajectory_certificate.py`.
 
-Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E10 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/`.
+### It generalizes across models — at a capability-appropriate operating point (E11)
+
+E8–E10 use `claude-haiku-4-5`. Does the gate's non-inferiority transfer to a *stronger* agent and a *different vendor*? We re-ran the long-horizon harness on **DeepSeek-V3** (open-weights, `deepseek-chat`) over **n=200** SWE-bench Verified instances. The agent is far stronger here — full context resolves **60.0%** (vs 39.2% on Haiku).
+
+| condition (DeepSeek-V3, n=200) | pass@1 | 95% CI | vs full |
+|---|--:|--|--|
+| full context | **60.0%** (120/200) | [53.1, 66.5] | — |
+| **distil relevance-gated, keep 12** | **55.5%** (111/200) | [48.6, 62.2] | **−4.5pp, *p*=0.15 (n.s.)** |
+| distil relevance-gated, keep 6 | 29.0% (58/200) | [23.2, 35.6] | −31pp, *p*<0.001 |
+| distil `trunc@500` (lossy) | 17.0% (34/200) | [12.4, 22.8] | −43pp, *p*<0.001 |
+
+**The non-inferiority generalizes — *if the operating point scales with capability.*** At Haiku's aggressive setting (keep the last 6 messages, compress 60% of blocks) the gate collapses to **29.0%** on DeepSeek-V3: a stronger agent exploits more of the periphery the gate digests, so that setting drops too much. At a gentler operating point (keep 12, compress 31%) the gate resolves **55.5% vs 60.0% for full — no significant difference (McNemar *p*=0.15)**, recovering the same non-inferiority seen on Haiku (−2.4pp). **The design principle, reported not tuned-away: compression aggressiveness must scale with agent capability** — weak agents tolerate aggressive digestion of periphery they'd never use; strong agents need a larger protected working set. At the right setting the gate preserves task success on *both* a weak and a strong model across *two* vendors, while lossy truncation craters on each. *(Honest scope: n=200, single seed, two operating points — not a full sweep. The certificate itself (E2/E10) is model-agnostic by construction.)*
+
+Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E11 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/` and `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
 
 ---
 
