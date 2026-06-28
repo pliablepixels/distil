@@ -307,22 +307,52 @@ def _normalize_tool_calls(structured: list, content: str):
     return out
 
 
-def _post_openai(url: str, body: dict[str, Any], api_key: str) -> dict[str, Any]:
-    """POST ``body`` as JSON to ``url`` using OpenAI auth headers."""
+def _post_openai(
+    url: str, body: dict[str, Any], api_key: str, *, max_retries: int = 6
+) -> dict[str, Any]:
+    """POST ``body`` as JSON to ``url`` using OpenAI auth headers.
+
+    Retries on HTTP 429 (rate limit, incl. TPM ``type: tokens``) with exponential backoff,
+    honoring the ``Retry-After`` header when present. Newly-funded accounts start in a low
+    usage tier whose per-minute token budget a long-horizon full-context request can exceed;
+    a single request that fits the context window then succeeds once the window resets.
+    """
     raw = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=raw, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Length", str(len(raw)))
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        payload = e.read()
+
+    def _build() -> urllib.request.Request:
+        r = urllib.request.Request(url, data=raw, method="POST")
+        r.add_header("Content-Type", "application/json")
+        r.add_header("Authorization", f"Bearer {api_key}")
+        r.add_header("Content-Length", str(len(raw)))
+        return r
+
+    backoff = 5.0
+    for attempt in range(max_retries + 1):
         try:
-            return json.loads(payload)
-        except (ValueError, TypeError):
-            return {"error": {"type": "http_error", "message": payload.decode(errors="replace")}}
+            with urllib.request.urlopen(_build(), timeout=600) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            payload = e.read()
+            if e.code == 429 and attempt < max_retries:
+                retry_after = e.headers.get("Retry-After") if e.headers else None
+                try:
+                    wait = float(retry_after) if retry_after else backoff
+                except (ValueError, TypeError):
+                    wait = backoff
+                wait = min(wait, 60.0)
+                print(
+                    f"[rate-limit 429] attempt {attempt + 1}/{max_retries}, sleeping {wait:.0f}s",
+                    flush=True,
+                )
+                time.sleep(wait)
+                backoff = min(backoff * 2, 60.0)
+                continue
+            try:
+                return json.loads(payload)
+            except (ValueError, TypeError):
+                return {
+                    "error": {"type": "http_error", "message": payload.decode(errors="replace")}
+                }
 
 
 def run_agent_openai(
