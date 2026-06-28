@@ -200,7 +200,12 @@ LongLLMLingua, RECOMP~\cite{recomp}, and selective-context~\cite{selectivecontex
 or summarize the prompt to a relevance/fidelity proxy; soft-prompt and gist-token
 methods~\cite{gist} distill context into learned embeddings. All optimize a surrogate
 (perplexity, recall, embedding similarity); none certifies that the downstream agent
-\emph{decision} is preserved, which is the gap we close.
+\emph{decision} is preserved, which is the gap we close. Closest to our setting, ACON~\cite{acon}
+(ICML 2026) optimizes a compression guideline by failure analysis---mining trajectories where
+full context succeeded but compressed failed---cutting peak tokens $26$--$54\%$; that signal is
+exactly the discordant pair our calibration counts, but ACON uses it to improve a heuristic with
+no behavioral guarantee, where we use it to certify and select (and to monitor drift,
+\Cref{sec:e13}). The two compose: one could certify an ACON-compressed tier with our machinery.
 \paragraph{KV-cache eviction.} StreamingLLM~\cite{streamingllm} and
 H\textsubscript{2}O~\cite{h2o} drop or retain tokens by recency/attention to shrink the
 KV cache at decode time. Our relevance gate shares the recency intuition (protect the
@@ -743,6 +748,10 @@ Efficient Generative Inference of Large Language Models.} NeurIPS 2023.
 World.} Springer, 2005.
 \bibitem{deepagents} LangChain. \emph{Prompt Caching with Deep Agents.} Blog, 2025.
 \url{https://www.langchain.com/blog/deep-agents-prompt-caching}.
+\bibitem{acon} M.~Kang et al. \emph{ACON: Optimizing Context Compression for Long-horizon
+LLM Agents.} ICML, 2026. arXiv:2510.00615.
+\bibitem{wsr} I.~Waudby-Smith, A.~Ramdas. \emph{Estimating means of bounded random variables
+by betting.} J.~R.~Stat.~Soc.~B, 2023. arXiv:2010.09686.
 \end{thebibliography}
 
 \appendix
@@ -1155,8 +1164,8 @@ dollars.
 
 \paragraph{E13: continuous assurance under drift.}
 Because the certificate is valid only under exchangeability, we add an \emph{anytime-valid}
-monitor: a betting e-process for $H_0\!:\text{risk}\le\alpha$ (hedged capital, Waudby-Smith \&
-Ramdas 2023) whose capital is a supermartingale under $H_0$, so by Ville's inequality the
+monitor: a betting e-process for $H_0\!:\text{risk}\le\alpha$ (hedged capital~\cite{wsr})
+whose capital is a supermartingale under $H_0$, so by Ville's inequality the
 false-alarm rate is $\le\delta$ \emph{however often it is inspected}. Live decision-change can
 thus be checked every turn with no multiplicity penalty; crossing $1/\delta$ signals drift
 beyond budget and triggers recalibration or fail-safe fall-back. The same betting bound gives a

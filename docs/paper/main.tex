@@ -211,6 +211,16 @@ or summarize the prompt to a relevance/fidelity proxy; soft-prompt and gist-toke
 methods~\cite{gist} distill context into learned embeddings. All optimize a surrogate
 (perplexity, recall, embedding similarity); none certifies that the downstream agent
 \emph{decision} is preserved, which is the gap we close.
+\paragraph{Long-horizon agent compression.} Closest to our setting, ACON~\cite{acon}
+(ICML 2026) optimizes a natural-language compression guideline by \emph{failure analysis}---it
+mines trajectories where full context succeeded but compressed context failed, then revises the
+guideline to retain the lost information---cutting peak tokens $26$--$54\%$ while improving task
+success. Notably, that ``full-succeeded-but-compressed-failed'' signal is exactly the discordant
+pair our calibration already counts (\Cref{sec:e11}); the difference is that ACON uses it to
+\emph{improve a heuristic compressor} with no behavioral guarantee, whereas we use it to
+\emph{certify and select} an operating point and to drive an anytime-valid drift monitor
+(\Cref{sec:e13}). Our certificate and ACON's guideline optimization are therefore complementary:
+one could certify an ACON-compressed tier with our machinery.
 \paragraph{KV-cache eviction.} StreamingLLM~\cite{streamingllm} and
 H\textsubscript{2}O~\cite{h2o} drop or retain tokens by recency/attention to shrink the
 KV cache at decode time. Our relevance gate shares the recency intuition (protect the
@@ -1197,7 +1207,7 @@ whose end-to-end savings await a live calibration run. None trades the guarantee
 The certificate is valid under exchangeability, so its standing operational risk is silent
 drift: a new model or workload pushes the true decision-change rate above the budget $\alpha$
 the operating point was certified at. We close this with an \emph{anytime-valid} monitor. Using
-the hedged-capital betting construction (Waudby-Smith \& Ramdas, 2023), we run a betting
+the hedged-capital betting construction~\cite{wsr}, we run a betting
 e-process for $H_0\!:\text{risk}\le\alpha$ whose capital is a non-negative supermartingale under
 $H_0$; by Ville's inequality the false-alarm probability is $\le\delta$ \emph{however often the
 stream is inspected}, so live decision-change can be checked after every turn with no
@@ -1272,6 +1282,11 @@ Efficient Generative Inference of Large Language Models.} NeurIPS 2023.
 World.} Springer, 2005.
 \bibitem{deepagents} LangChain. \emph{Prompt Caching with Deep Agents.} Blog, 2025.
 \url{https://www.langchain.com/blog/deep-agents-prompt-caching}.
+\bibitem{acon} M.~Kang, W.-N.~Chen, D.~Han, H.~A.~Inan, L.~Wutschitz, Y.~Chen, R.~Sim,
+S.~Rajmohan. \emph{ACON: Optimizing Context Compression for Long-horizon LLM Agents.}
+ICML, 2026. arXiv:2510.00615.
+\bibitem{wsr} I.~Waudby-Smith, A.~Ramdas. \emph{Estimating means of bounded random variables
+by betting.} J.~R.~Stat.~Soc.~B, 2023. arXiv:2010.09686.
 \end{thebibliography}
 
 \end{document}
