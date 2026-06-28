@@ -5,11 +5,17 @@ agent and trust it unattended" general-availability claim. Updated as items clos
 distil should never *silently* ship a lossy operating point — when it cannot certify safety,
 it falls back to full context.
 
-## Status: GA-track — the capability-dependent operating-point blocker is closed
+## Status: GA-track — every *design* blocker is closed; what remains is empirical breadth
 
 The headline GA risk surfaced by E11 (the safe operating point is capability-dependent, and a
 hand-tuned constant can silently lose 31 pp on a stronger model) is **closed** by
-auto-calibration with a fail-safe default. Remaining items are scoped and tracked below.
+auto-calibration with a fail-safe default. The next two largest items — **drift detection** and
+the **single-grader** caveat — are now closed too (anytime-valid monitor + conservative grader
+ensemble; see "Recently closed"). What remains is not missing machinery but **empirical breadth
+that requires live runs/compute we have not spent**: validating the shipped speculative,
+multi-grader, and RL-policy paths end-to-end, and broadening task-success beyond SWE-bench
+Verified + τ-bench to more domains and models. The design is domain-agnostic; closing these is
+*running it at scale*, not building more. We mark them honestly rather than claim them.
 
 ## Closed
 
