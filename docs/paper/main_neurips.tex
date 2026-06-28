@@ -1153,5 +1153,17 @@ context only when a distribution-free divergence bound fails); and (v)~a \emph{c
 online operating-point search with the same fail-safe default. None trades the guarantee for
 dollars.
 
+\paragraph{E13: continuous assurance under drift.}
+Because the certificate is valid only under exchangeability, we add an \emph{anytime-valid}
+monitor: a betting e-process for $H_0\!:\text{risk}\le\alpha$ (hedged capital, Waudby-Smith \&
+Ramdas 2023) whose capital is a supermartingale under $H_0$, so by Ville's inequality the
+false-alarm rate is $\le\delta$ \emph{however often it is inspected}. Live decision-change can
+thus be checked every turn with no multiplicity penalty; crossing $1/\delta$ signals drift
+beyond budget and triggers recalibration or fail-safe fall-back. The same betting bound gives a
+variance-adaptive anytime-valid certificate for graded losses, and a cross-family grader
+ensemble with conservative ``any-change'' aggregation keeps the measured risk an upper bound
+under a single unfaithful grader. To our knowledge this is the first anytime-valid drift monitor
+for a context-compression decision-equivalence certificate.
+
 
 \end{document}

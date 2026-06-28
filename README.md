@@ -273,6 +273,10 @@ Distil does **not** claim cost-domination — an uncertified lossy method can al
 
 Full details and status: [`docs/GA_READINESS.md`](docs/GA_READINESS.md).
 
+### 🛡️ Continuous assurance under drift
+
+The certificate holds under *exchangeability* — so the standing risk is silent drift. Distil ships an **anytime-valid drift monitor** (`distil/drift.py:DriftMonitor`): a betting e-process for `H0: risk ≤ α` (hedged capital, Waudby-Smith & Ramdas 2023) whose false-alarm probability is ≤ δ **no matter how often you check it** (Ville's inequality). You can watch live decision-change after *every turn* with no multiplicity penalty; when it crosses `1/δ` the live risk has exceeded the certified budget → recalibrate or fall back to full context. Alongside it: the same betting bound gives a variance-adaptive **anytime-valid certificate** for graded losses (`conformal.betting_upper_bound`), and a **cross-family grader ensemble** (`distil/ensemble.py`) with conservative "any-change" aggregation keeps the measured risk an upper bound even if one grader family is unfaithful. To our knowledge this is the **first anytime-valid drift monitor for a context-compression decision-equivalence certificate** — validated for bounded false alarms under continuous peeking + high detection power (`tests/test_drift.py`).
+
 Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E12 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/` and `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
 
 ---

@@ -1191,6 +1191,26 @@ non-inferiority constraint finds the most aggressive safe operating point online
 fail-safe default. (i)--(iii),(v) are shipped and tested; (iv) ships as a tested controller
 whose end-to-end savings await a live calibration run. None trades the guarantee for dollars.
 
+\subsection{E13: continuous assurance under drift}
+\label{sec:e13}
+
+The certificate is valid under exchangeability, so its standing operational risk is silent
+drift: a new model or workload pushes the true decision-change rate above the budget $\alpha$
+the operating point was certified at. We close this with an \emph{anytime-valid} monitor. Using
+the hedged-capital betting construction (Waudby-Smith \& Ramdas, 2023), we run a betting
+e-process for $H_0\!:\text{risk}\le\alpha$ whose capital is a non-negative supermartingale under
+$H_0$; by Ville's inequality the false-alarm probability is $\le\delta$ \emph{however often the
+stream is inspected}, so live decision-change can be checked after every turn with no
+multiplicity penalty. When capital crosses $1/\delta$ the live risk has exceeded the budget with
+confidence $1-\delta$, triggering recalibration or a fail-safe fall-back to full context;
+Monte-Carlo trials confirm bounded false alarms under continuous peeking and high detection
+power. Two further robustness levers ship alongside: the same betting bound supplies a tighter,
+variance-adaptive \emph{anytime-valid} certificate for graded losses, and a \emph{cross-family
+grader ensemble} with conservative ``any-change'' aggregation keeps the measured risk an
+upper bound even if one grader family is unfaithful---removing the single-grader caveat from the
+risk estimate. To our knowledge this is the first anytime-valid drift monitor for a context-
+compression decision-equivalence certificate.
+
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
 carry a distribution-free guarantee validated on real traces. The certificate

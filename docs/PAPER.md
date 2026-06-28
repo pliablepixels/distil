@@ -416,7 +416,30 @@ keep-policy is a research item requiring training data and is not shipped.
 
 Production status and the full GA-readiness ledger: `docs/GA_READINESS.md`.
 
-### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
+### 6.0.8 Continuous assurance under drift (E13)
+
+The certificate is valid only under exchangeability, so the standing operational risk is silent
+drift — a new model or workload pushes the true decision-change rate above the budget α the
+operating point was certified at. Three shipped pieces close it:
+
+- **Anytime-valid drift monitor** (`distil/drift.py:DriftMonitor`). A betting e-process for
+  `H0: risk ≤ α` (hedged capital, Waudby-Smith & Ramdas 2023) whose capital is a non-negative
+  supermartingale under `H0`; by Ville's inequality the false-alarm probability is ≤ δ **however
+  often the stream is inspected**, so live decision-change can be checked after every turn with
+  no multiplicity penalty. Crossing `1/δ` means the live risk exceeds the budget with confidence
+  1−δ → recalibrate or fall back to full context. Validated for bounded false alarms under
+  continuous peeking and high detection power (`tests/test_drift.py`).
+- **Anytime-valid / variance-adaptive certificate** (`distil/conformal.py:betting_upper_bound`).
+  The same betting bound certifies graded losses simultaneously at every t. Honest tradeoff: for
+  one-shot binary losses Bentkus is already near-optimal, so betting is *comparable* there; its
+  edge is continuous monitoring and graded-loss adaptivity (`tests/test_conformal_bounds.py`).
+- **Cross-family grader ensemble** (`distil/ensemble.py:EnsembleGrader`). Grade with several model
+  families; the default "any-change" aggregation is conservative (can only raise measured risk),
+  so the certificate stays valid even if one grader family is unfaithful. Aggregation logic
+  shipped + tested (`tests/test_ensemble.py`); multi-family validation needs a live multi-API run.
+
+To our knowledge this is the first anytime-valid drift monitor for a context-compression
+decision-equivalence certificate.
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 

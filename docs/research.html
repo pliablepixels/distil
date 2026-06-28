@@ -280,6 +280,23 @@
 
     <hr/>
 
+    <!-- E13: continuous assurance under drift -->
+    <h2 id="e13">E13: continuous assurance under drift</h2>
+
+    <p>The certificate is valid under <em>exchangeability</em>, so its standing operational risk is silent drift &mdash; a new model or workload pushes the true decision-change rate above the budget &alpha; the operating point was certified at. Three shipped pieces close it:</p>
+
+    <ul>
+      <li><strong>Anytime-valid drift monitor</strong> (<code>distil/drift.py:DriftMonitor</code>) &mdash; a betting e-process for <code>H0: risk &le; &alpha;</code> (hedged capital, Waudby-Smith &amp; Ramdas 2023) whose capital is a supermartingale under <code>H0</code>; by Ville&rsquo;s inequality the false-alarm probability is &le; &delta; <strong>however often the stream is inspected</strong>. So you can check live decision-change after <em>every turn</em> with no multiplicity penalty; crossing <code>1/&delta;</code> signals drift beyond budget &rarr; recalibrate or fall back to full context. Validated for bounded false alarms under continuous peeking + high detection power (<code>tests/test_drift.py</code>).</li>
+      <li><strong>Anytime-valid, variance-adaptive certificate</strong> (<code>distil/conformal.py:betting_upper_bound</code>) &mdash; the same betting bound certifies graded losses simultaneously at every <em>t</em>. Honest tradeoff: for one-shot binary losses Bentkus is already near-optimal (betting is <em>comparable</em> there); betting&rsquo;s edge is continuous monitoring and graded-loss adaptivity.</li>
+      <li><strong>Cross-family grader ensemble</strong> (<code>distil/ensemble.py:EnsembleGrader</code>) &mdash; grade with multiple model families; the default &ldquo;any-change&rdquo; aggregation is conservative (can only <em>raise</em> measured risk), so the certificate stays valid even if one grader family is unfaithful. Aggregation logic shipped + tested; multi-family validation needs a live multi-API run.</li>
+    </ul>
+
+    <div class="callout good">
+      <b>First of its kind.</b> To our knowledge this is the first <strong>anytime-valid drift monitor</strong> for a context-compression decision-equivalence certificate &mdash; you can watch the guarantee hold (or break) in production, continuously, with a provably bounded false-alarm rate.
+    </div>
+
+    <hr/>
+
     <!-- Feature 1: Certified compression frontier -->
     <h2 id="frontier">Certified compression frontier</h2>
     <p><strong>Module:</strong> <code>distil/eval.py</code> &middot; <strong>Command:</strong> <code>distil eval [--corpus --runner --out]</code></p>

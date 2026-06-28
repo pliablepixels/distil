@@ -26,10 +26,16 @@ auto-calibration with a fail-safe default. Remaining items are scoped and tracke
 
 | Item | Why it gates full GA | Mitigation today |
 |---|---|---|
-| **Drift detection / auto-recalibration** | The certificate and the calibrated operating point are valid under *exchangeability* with the calibration distribution; changing model, agent, or task mix requires re-running `distil calibrate`. Today that is manual. | Documented exchangeability caveat; `distil calibrate` is cheap to re-run; shadow-mode (`distil shadow-stats`) surfaces live divergence. GA needs automatic drift alarms that trigger recalibration. |
 | **Validation breadth** | Task-success is validated on SWE-bench Verified coding agents (E8 n=500 Haiku; E11 n=200 single-seed DeepSeek-V3) and τ-bench. Broad multi-domain production traffic is not yet covered. | The certificate machinery is domain-agnostic; broadening is data, not redesign. |
-| **Single grader family** | Decision-equivalence numbers use one grader model family per task; cross-family ensemble grading is future work. | Reported honestly in-paper; faithfulness diagnostic gates the proxy. |
 | **Calibration data requirement** | Auto-calibration needs a small paired full-vs-candidate run on representative traffic before the gate can ship aggressively. | Fail-safe means the *absence* of calibration data degrades to full context (correct, not lossy) rather than to a guessed operating point. |
+
+### Recently closed (were open)
+
+| Item | How it closed |
+|---|---|
+| **Drift detection / auto-recalibration** | `distil/drift.py:DriftMonitor` — an *anytime-valid* sequential alarm (betting e-process for `H0: risk ≤ α`) that may be checked after every turn with false-alarm probability ≤ δ *no matter how often you peek* (Ville's inequality). Trips when live decision-change exceeds the certified budget → signal to recalibrate or fall back to full context. Validated: bounded false alarms under peeking + high detection power (`tests/test_drift.py`). |
+| **Single grader family** | `distil/ensemble.py:EnsembleGrader` — grade with multiple model families, default **"any"-change** aggregation, which is conservative (can only *raise* measured risk), so the certificate stays valid even if one grader family is unfaithful. Aggregation logic shipped + tested (`tests/test_ensemble.py`); multi-family *validation* still needs a live multi-API run. |
+| **Anytime-valid / tighter certificate** | `distil/conformal.py:betting_upper_bound` — the hedged-capital betting confidence sequence (Waudby-Smith & Ramdas, JRSSB 2023): variance-adaptive and valid simultaneously at every `t`. Coverage + anytime property Monte-Carlo–validated (`tests/test_conformal_bounds.py`). Honest tradeoff: for one-shot binary losses Bentkus is already near-optimal, so betting is *comparable* there; its edge is continuous monitoring and graded-loss adaptivity. |
 
 ## Cost frontier under the motto (advanced techniques)
 
