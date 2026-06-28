@@ -257,7 +257,23 @@ distil calibrate \
 
 On the real E11 data this reproduces the manual choice automatically (selects gate@12, rejects gate@6 on DeepSeek-V3) — validated in `tests/test_calibrate.py`. The relevance gate itself is now a shippable library primitive (`distil/gate.py`), not benchmark-only. **Production status and the GA-readiness ledger: [`docs/GA_READINESS.md`](docs/GA_READINESS.md).**
 
-Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E11 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/` and `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
+## 💸 The cost frontier under the motto
+
+Distil does **not** claim cost-domination — an uncertified lossy method can always be cheaper because it is allowed to change decisions. These levers cut cost *inside* the certified envelope only; they never trade the decision-equivalence guarantee for dollars. "Best in class" holds on the motto's axis (certified decision-equivalence + task success), not raw cost.
+
+| # | Technique | Status | Module |
+|---|---|---|---|
+| 1 | **Cache-monotone gate** — deterministic, append-only digests keep the digested prefix byte-stable across turns so prompt-cache/KV reuse captures it (cache read ≈10× cheaper than fresh input); lossless relative to the plain gate | Shipped + tested | `distil/gate.py:monotone_gate` |
+| 2 | **Graded gate** — per-distance compression tiers crush the far periphery harder while keeping near-periphery at plain fidelity; introduces a graded (non-binary) loss | Shipped + tested | `distil/gate.py:graded_gate` |
+| 3 | **Tighter conformal (empirical-Bernstein, Maurer–Pontil)** — certifies more savings at the same confidence on graded losses (tighter than Hoeffding–Bentkus in the low-variance regime); coverage Monte-Carlo–validated | Shipped + coverage-tested | `distil/conformal.py:empirical_bernstein_bound` / `tight_risk_bound` |
+| 4 | **Speculative expansion** — pay for full context only when a certified divergence trigger fires; escalates to the cheapest threshold whose certified miss rate ≤ α; fail-safe to full context | Framework shipped + tested; end-to-end savings need a live calibration run | `distil/speculative.py` |
+| 5 | **Constrained-bandit operating-point search** — online successive-elimination under the non-inferiority constraint, fail-safe; full constrained-RL keep-policy is a research item | Shipped + tested (RL policy: research) | `distil/calibrate.py:bandit_select_operating_point` |
+
+**Honest caveat on #1:** on content that is *already fully cacheable*, caching alone can be cheaper than any compression (compressing rewrites cached bytes as fresh). The cache-monotone gate's win is over a cache-*hostile* gate, not over no-compression; the gate's primary payoff remains accuracy (E8/E11). **On #3:** for binary decision-change losses, Bentkus is already near-optimal — empirical-Bernstein applies to the graded losses introduced by technique #2.
+
+Full details and status: [`docs/GA_READINESS.md`](docs/GA_READINESS.md).
+
+Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E12 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/` and `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
 
 ---
 

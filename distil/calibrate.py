@@ -25,9 +25,10 @@ Two production guarantees:
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
 
 from distil.certify.stats import Z_95, mcnemar_noninferiority
 
@@ -177,3 +178,131 @@ def calibrate_from_scores(
         losses, gains, n = paired_discordant(base, cand)
         points.append(OperatingPoint(name, gate_recent, losses, gains, n))
     return calibrate_operating_point(points, margin=margin)
+
+
+# --------------------------------------------------------------------------- #
+# Constrained-bandit selection — explore operating points online under the NI constraint
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class BanditResult:
+    selected: str | None
+    selected_gate_recent: int | None
+    margin: float
+    samples_used: int
+    fail_safe: bool
+    arms: tuple[LevelVerdict, ...]
+    rationale: str
+
+    def to_dict(self) -> dict:
+        from dataclasses import asdict
+
+        d = asdict(self)
+        d["arms"] = [asdict(v) for v in self.arms]
+        return d
+
+
+def bandit_select_operating_point(
+    arms: Sequence[tuple[str, int]],
+    sample_fn: Callable[[str, int], int],
+    *,
+    margin: float = 0.05,
+    budget: int = 4000,
+    batch: int = 40,
+    min_samples: int = 30,
+    z: float = Z_95,
+) -> BanditResult:
+    """Pick the most aggressive non-inferior operating point by *online* sampling.
+
+    Where :func:`calibrate_operating_point` needs a full paired run at every candidate up
+    front, this explores them adaptively under a fixed sampling ``budget`` — successive
+    elimination under the non-inferiority constraint. It prunes a candidate as soon as its
+    outcome is decisively inferior (the NI confidence interval's upper bound falls below
+    ``-margin``), so budget concentrates on the aggressive points that might still be safe.
+
+    Args:
+        arms: candidate ``(name, gate_recent)`` operating points (smaller gate_recent = more
+            aggressive).
+        sample_fn: draws one paired outcome for an arm; returns ``-1`` (baseline solved,
+            candidate did not), ``+1`` (candidate solved, baseline did not), or ``0`` (tie).
+            In production this runs one calibration instance under the arm's operating point.
+        margin: tolerated absolute pass-rate drop (proportion).
+        budget: total paired samples across all arms.
+        batch: samples drawn per alive arm per round.
+        min_samples: minimum samples before an arm may be *selected* (avoids early lucky wins).
+
+    Returns the selected arm (most aggressive surviving non-inferior point) or a fail-safe
+    result if none certifies — the same fail-closed default as static calibration.
+
+    This is the shippable, distribution-free core of the operating-point bandit. The full
+    constrained-RL policy (a learned per-turn keep policy) needs training data and is a
+    tracked GA research item (`docs/GA_READINESS.md`), not a shipped default.
+    """
+    state = {
+        name: {"name": name, "gate_recent": gr, "b": 0, "c": 0, "n": 0, "alive": True}
+        for name, gr in arms
+    }
+    used = 0
+    while used < budget and any(s["alive"] for s in state.values()):
+        # Spend on alive arms most-aggressive-first (the ones we'd prefer to certify).
+        alive = sorted((s for s in state.values() if s["alive"]), key=lambda s: s["gate_recent"])
+        for s in alive:
+            for _ in range(batch):
+                if used >= budget:
+                    break
+                r = sample_fn(s["name"], s["gate_recent"])
+                used += 1
+                if r < 0:
+                    s["b"] += 1
+                elif r > 0:
+                    s["c"] += 1
+                s["n"] += 1
+            res = mcnemar_noninferiority(s["b"], s["c"], s["n"], margin, z)
+            if res.ci95_high < -margin:  # decisively inferior — can never be feasible
+                s["alive"] = False
+        # Early stop: the most aggressive alive arm is already certified non-inferior.
+        alive = sorted((s for s in state.values() if s["alive"]), key=lambda s: s["gate_recent"])
+        if alive:
+            top = alive[0]
+            res = mcnemar_noninferiority(top["b"], top["c"], top["n"], margin, z)
+            if res.noninferior and top["n"] >= min_samples:
+                break
+
+    def verdict(s) -> LevelVerdict:
+        res = mcnemar_noninferiority(s["b"], s["c"], s["n"], margin, z)
+        return LevelVerdict(
+            s["name"],
+            s["gate_recent"],
+            res.n,
+            round(res.delta, 4),
+            round(res.ci95_low, 4),
+            round(res.ci95_high, 4),
+            res.noninferior,
+        )
+
+    verdicts = tuple(sorted((verdict(s) for s in state.values()), key=lambda v: v.gate_recent))
+    feasible = [v for v in verdicts if v.noninferior and v.n >= min_samples]
+    if not feasible:
+        return BanditResult(
+            None,
+            None,
+            margin,
+            used,
+            True,
+            verdicts,
+            f"No operating point certified non-inferior within budget={budget} "
+            f"(margin {margin:.0%}); failing safe to full context.",
+        )
+    chosen = feasible[0]  # most aggressive (smallest gate_recent)
+    return BanditResult(
+        chosen.name,
+        chosen.gate_recent,
+        margin,
+        used,
+        False,
+        verdicts,
+        f"Selected {chosen.name} (gate_recent={chosen.gate_recent}) after {used} samples: most "
+        f"aggressive operating point certified non-inferior (delta {chosen.delta:+.1%}, "
+        f"95% CI lower {chosen.ci95_low:+.1%} > -{margin:.0%}).",
+    )

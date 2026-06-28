@@ -388,6 +388,34 @@ recovers the manual choice automatically (selects gate@12, rejects gate@6 on Dee
 `tests/test_calibrate.py`). The relevance gate itself is now a shippable library primitive
 (`distil/gate.py`), not benchmark-only. See `docs/GA_READINESS.md`.
 
+### 6.0.7 The cost frontier under the motto (E12)
+
+Distil does **not** claim cost-domination — an uncertified lossy method can always be cheaper
+because it is allowed to change decisions. The five techniques below cut cost *inside* the
+certified envelope. They never trade the decision-equivalence guarantee for dollars. "Best in
+class" holds on the motto's axis (certified decision-equivalence + task success), not raw cost.
+
+| # | Technique | Status | Module |
+|---|---|---|---|
+| 1 | **Cache-monotone gate** (`distil/gate.py:monotone_gate`) — deterministic, append-only digests keep the digested prefix byte-stable across turns so prompt-cache/KV reuse captures it (cache read ≈10× cheaper than fresh input); lossless relative to the plain gate | Shipped + tested | `tests/test_cost_frontier.py` |
+| 2 | **Graded gate** (`distil/gate.py:graded_gate`) — per-distance compression tiers crush the far periphery harder while keeping near-periphery at plain fidelity; introduces a graded (non-binary) loss | Shipped + tested | — |
+| 3 | **Tighter conformal — empirical-Bernstein, Maurer–Pontil** (`distil/conformal.py:empirical_bernstein_bound` / `tight_risk_bound`) — tighter than Hoeffding–Bentkus in the low-variance regime that graded losses live in; certifies more savings at the same confidence; coverage Monte-Carlo–validated | Shipped + coverage-tested | `tests/test_conformal_bounds.py` |
+| 4 | **Speculative expansion** (`distil/speculative.py`) — pay for full context only when a certified divergence trigger fires; escalation threshold = cheapest whose certified miss rate ≤ α; fail-safe to full context | Framework shipped + tested; end-to-end savings need a live calibration run — **not a shipped default** | — |
+| 5 | **Constrained-bandit operating-point search** (`distil/calibrate.py:bandit_select_operating_point`) — online successive-elimination under the non-inferiority constraint, fail-safe; full constrained-RL keep-policy needs training data | Shipped + tested; RL keep-policy is **research** | — |
+
+**Honest caveats.** On #1 (cache-monotone gate): on content that is *already fully cacheable*,
+caching alone can be cheaper than any compression — compressing rewrites cached bytes as fresh.
+The cache-monotone gate's win is over a cache-*hostile* gate, not over no-compression; the
+gate's primary payoff remains accuracy (E8/E11). On #3 (empirical-Bernstein): for *binary*
+decision-change losses, Bentkus is already near-optimal — EB applies to the graded losses
+introduced by technique #2, which live in the low-variance regime where EB tightens. On #4
+(speculative expansion): the framework is shipped and tested, but end-to-end savings are not
+validated without a live calibration run; this technique is not a shipped default. On #5 (bandit
+search): the successive-elimination wrapper is shipped and tested; the full constrained-RL
+keep-policy is a research item requiring training data and is not shipped.
+
+Production status and the full GA-readiness ledger: `docs/GA_READINESS.md`.
+
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1

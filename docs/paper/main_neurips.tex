@@ -1139,5 +1139,19 @@ and \textbf{fails safe to full context} when none certifies. On the E11 data thi
 manual choice automatically (selects $g{=}12$, rejects $g{=}6$), turning the tuning burden into
 a one-time calibration.
 
+\paragraph{E12: the cost frontier under the motto.}
+We do not claim cost-domination---an uncertified lossy method may always be cheaper because it
+is permitted to change the decision (\Cref{sec:e8}: Headroom is cheaper). Within the certified
+envelope, several levers cut cost without spending the certificate, shipped as primitives:
+(i)~\emph{cache-monotone gating} (deterministic, append-only digests keep the digested prefix
+byte-stable so prompt-cache/KV reuse captures it---lossless, so it cannot change a decision;
+honest caveat: on already-cacheable content, caching alone can beat any compression, so the win
+is over a cache-\emph{hostile} gate); (ii)~\emph{graded gating} (tiered periphery compression,
+a non-binary loss); (iii)~a tighter \emph{empirical-Bernstein} certificate for those graded
+losses (coverage Monte-Carlo--validated); (iv)~\emph{speculative expansion} (escalate to full
+context only when a distribution-free divergence bound fails); and (v)~a \emph{constrained-bandit}
+online operating-point search with the same fail-safe default. None trades the guarantee for
+dollars.
+
 
 \end{document}

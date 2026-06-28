@@ -220,6 +220,66 @@
 
     <hr/>
 
+    <!-- E12: cost frontier under the motto -->
+    <h2 id="e12">E12: the cost frontier under the motto</h2>
+
+    <div class="callout good">
+      <b>No cost-domination claim.</b> An uncertified lossy method can always be cheaper because it is allowed to change decisions. These techniques cut cost <em>inside</em> the certified envelope only &mdash; they never trade the decision-equivalence guarantee for dollars. &ldquo;Best in class&rdquo; holds on the motto&rsquo;s axis (certified decision-equivalence + task success), not raw cost.
+    </div>
+
+    <p>Five techniques are shipped or in-progress; status is reported honestly for each.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Technique</th>
+          <th>Status</th>
+          <th>Where</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Cache-monotone gate</strong> &mdash; deterministic, append-only digests keep the digested prefix byte-stable across turns so prompt-cache/KV reuse captures it; cache read &asymp;10&times; cheaper than fresh input; lossless relative to the plain gate</td>
+          <td>Shipped + tested</td>
+          <td><code>distil/gate.py:monotone_gate</code>; <code>tests/test_cost_frontier.py</code></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Graded gate</strong> &mdash; per-distance compression tiers crush the far periphery harder while keeping near-periphery at plain fidelity; introduces a graded (non-binary) loss</td>
+          <td>Shipped + tested</td>
+          <td><code>distil/gate.py:graded_gate</code>; <code>distil/conformal.py:tight_risk_bound</code></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Tighter conformal (empirical-Bernstein, Maurer&ndash;Pontil)</strong> &mdash; tighter than Hoeffding&ndash;Bentkus in the low-variance regime that graded losses live in; certifies more savings at the same confidence; coverage Monte-Carlo&ndash;validated</td>
+          <td>Shipped + coverage-tested</td>
+          <td><code>distil/conformal.py:empirical_bernstein_bound</code>; <code>tests/test_conformal_bounds.py</code></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Speculative expansion</strong> &mdash; pay for full context only when a certified divergence trigger fires; escalates to the cheapest threshold whose certified miss rate &le; &alpha;; fail-safe to full context</td>
+          <td>Framework shipped + tested; end-to-end savings need a live calibration run &mdash; not a shipped default yet</td>
+          <td><code>distil/speculative.py</code></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Constrained-bandit operating-point search</strong> &mdash; online successive-elimination under the non-inferiority constraint, fail-safe; full constrained-RL keep-policy needs training data</td>
+          <td>Shipped + tested; RL keep-policy is research (not shipped)</td>
+          <td><code>distil/calibrate.py:bandit_select_operating_point</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Honest caveat on #1 (cache-monotone gate).</strong> On content that is <em>already fully cacheable</em>, caching alone can be cheaper than any compression &mdash; compressing rewrites cached bytes as fresh. The cache-monotone gate&rsquo;s win is over a cache-<em>hostile</em> gate, not over no-compression; the gate&rsquo;s primary payoff remains accuracy (E8/E11).</p>
+
+    <p><strong>Honest caveat on #3 (empirical-Bernstein).</strong> For <em>binary</em> decision-change losses, Bentkus is already near-optimal. Empirical-Bernstein applies to the graded losses introduced by the graded gate (#2), which live in the low-variance regime where EB tightens.</p>
+
+    <p>Full details and production status: <a href="GA_READINESS.md"><code>docs/GA_READINESS.md</code></a>.</p>
+
+    <hr/>
+
     <!-- Feature 1: Certified compression frontier -->
     <h2 id="frontier">Certified compression frontier</h2>
     <p><strong>Module:</strong> <code>distil/eval.py</code> &middot; <strong>Command:</strong> <code>distil eval [--corpus --runner --out]</code></p>

@@ -88,6 +88,55 @@ def certified_risk_bound(rhat: float, n: int, delta: float) -> float:
 
 
 # --------------------------------------------------------------------------- #
+# Empirical-Bernstein bound — tighter for GRADED [0,1] losses (low-variance regime)
+# --------------------------------------------------------------------------- #
+
+
+def empirical_bernstein_bound(rhat: float, var: float, n: int, delta: float) -> float:
+    """(1−δ) upper confidence bound on the mean of [0,1] losses (Maurer–Pontil, 2009).
+
+    Uses the *empirical* variance, so it is tighter than Hoeffding exactly in the regime
+    certification lives in — low risk, low variance. For BINARY 0/1 decision-change losses the
+    Bentkus bound (:func:`hb_pvalue`) is already near-optimal, so this is the bound of choice
+    for **graded** losses in [0,1] (e.g. severity-weighted divergence, or the per-message
+    partial losses of the graded gate). Distribution-free and finite-sample.
+
+    Bound: ``rhat + sqrt(2·var·ln(1/δ)/n) + 7·ln(1/δ)/(3(n−1))`` (one-sided upper).
+    """
+    if n <= 1:
+        return 1.0
+    L = math.log(1.0 / delta)
+    return min(1.0, rhat + math.sqrt(2.0 * var * L / n) + 7.0 * L / (3.0 * (n - 1)))
+
+
+def tight_risk_bound(losses: list[float], delta: float, *, method: str = "auto") -> float:
+    """Best valid (1−δ) upper bound on the mean loss, chosen by loss type.
+
+    * ``method="hb"`` — Hoeffding–Bentkus (optimal for binary 0/1 losses).
+    * ``method="eb"`` — empirical-Bernstein (tighter for graded [0,1] losses).
+    * ``method="auto"`` (default) — Bentkus for (near-)binary losses, empirical-Bernstein
+      once the losses are genuinely graded. This is a *type* decision made from the data's
+      support, NOT a peek-and-take-min across families (which would cost a union-bound
+      penalty), so the single returned bound is valid at the full 1−δ.
+    """
+    n = len(losses)
+    if n == 0:
+        return 1.0
+    rhat = sum(losses) / n
+    if method == "hb":
+        return certified_risk_bound(rhat, n, delta)
+    mean = rhat
+    var = sum((x - mean) ** 2 for x in losses) / (n - 1) if n > 1 else 0.0
+    if method == "eb":
+        return empirical_bernstein_bound(rhat, var, n, delta)
+    # auto: binary losses -> HB (Bentkus near-optimal); graded -> EB.
+    is_binary = all(x == 0.0 or x == 1.0 for x in losses)
+    if is_binary:
+        return certified_risk_bound(rhat, n, delta)
+    return empirical_bernstein_bound(rhat, var, n, delta)
+
+
+# --------------------------------------------------------------------------- #
 # Selection procedures
 # --------------------------------------------------------------------------- #
 

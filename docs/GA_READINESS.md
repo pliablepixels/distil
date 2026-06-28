@@ -31,6 +31,28 @@ auto-calibration with a fail-safe default. Remaining items are scoped and tracke
 | **Single grader family** | Decision-equivalence numbers use one grader model family per task; cross-family ensemble grading is future work. | Reported honestly in-paper; faithfulness diagnostic gates the proxy. |
 | **Calibration data requirement** | Auto-calibration needs a small paired full-vs-candidate run on representative traffic before the gate can ship aggressively. | Fail-safe means the *absence* of calibration data degrades to full context (correct, not lossy) rather than to a guessed operating point. |
 
+## Cost frontier under the motto (advanced techniques)
+
+"Best in class" holds on the motto's axis (certified decision-equivalence + task success), not
+on raw cost — an uncertified lossy method can always be cheaper because it is allowed to change
+decisions. Within the certified envelope, these techniques cut cost without spending the
+certificate. Status is honest about shipped-and-validated vs. framework vs. research.
+
+| # | Technique | Status | Where |
+|---|---|---|---|
+| 1 | **Cache-monotone gate** — deterministic, append-only digests so the digested prefix is byte-stable and prompt-cache/KV reuse captures it | **Shipped + tested** | `distil/gate.py:monotone_gate`; `tests/test_cost_frontier.py` |
+| 2 | **Graded gate** — per-distance compression tiers (crush the far periphery harder), certified with the tighter empirical-Bernstein bound | **Shipped + tested** | `distil/gate.py:graded_gate`; `distil/conformal.py:tight_risk_bound` |
+| 3 | **Tighter conformal (empirical-Bernstein)** — certifies more savings at the same confidence on *graded* losses; coverage-validated by Monte-Carlo | **Shipped + coverage-tested** | `distil/conformal.py:empirical_bernstein_bound`; `tests/test_conformal_bounds.py` |
+| 4 | **Speculative expansion** — pay for full context only when a certified divergence trigger fires; controller + certified miss-rate | **Framework shipped + tested; needs a live calibration run for end-to-end savings** | `distil/speculative.py` |
+| 5 | **Constrained-bandit operating-point search** — online successive-elimination under the NI constraint, fail-safe | **Shipped + tested**; full constrained-RL keep-policy is **research** (needs training data) | `distil/calibrate.py:bandit_select_operating_point` |
+
+Honest cost caveat baked into the design and tests: on content that is *already fully
+cacheable*, caching alone can be cheaper than any compression (compressing rewrites cached
+bytes as fresh). The cache-monotone gate's win is over a cache-*hostile* gate; the gate's
+primary payoff stays accuracy (E8/E11). The certificate's tightening (#3) and the
+graded/speculative/bandit machinery cut cost *inside* the certified envelope — they never
+trade the guarantee for dollars.
+
 ## How to calibrate before shipping the gate
 
 ```bash

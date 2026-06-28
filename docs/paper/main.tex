@@ -1161,6 +1161,36 @@ never to silent loss. On the E11 data this procedure recovers the manual choice 
 (it selects $g{=}12$ and rejects $g{=}6$ on DeepSeek-V3). The capability-dependent operating
 point thus becomes a one-time calibration, not a tuning burden.
 
+\subsection{E12: the cost frontier under the motto}
+\label{sec:e12}
+
+A fair question is whether the certified tier can also be made \emph{cheaper}. The motto sets
+a floor: an uncertified lossy method may always be cheaper because it is permitted to change
+the decision, so we do not claim cost-domination (\Cref{sec:e8} is explicit that Headroom is
+cheaper). Within the certified envelope, however, several levers cut cost \emph{without
+spending the certificate}, and we implement them as shippable primitives.
+\textbf{(i)~Cache-monotone gating}: digests are deterministic and the digest boundary advances
+monotonically, so the digested prefix is byte-stable across turns and prompt-cache/KV reuse
+captures it (a cache read is $\approx$10$\times$ cheaper than fresh input). This is lossless
+relative to the plain gate---it changes which bytes are \emph{cached}, not which bytes the
+agent sees---so it cannot change a decision. The honest caveat, which our cost simulator
+confirms: on already-fully-cacheable content, caching alone can beat any compression
+(compressing rewrites cached bytes as fresh), so the cache-monotone win is over a
+cache-\emph{hostile} gate, not over no compression.
+\textbf{(ii)~Graded gating}: rather than a binary keep/digest, the periphery is compressed in
+tiers that crush the distant past harder, which introduces a \emph{graded} (non-binary) loss.
+\textbf{(iii)~A tighter certificate for graded losses}: we add an empirical-Bernstein
+(Maurer--Pontil) upper bound, which is tighter than Hoeffding--Bentkus exactly in the
+low-variance regime graded losses live in, certifying more savings at the same confidence; its
+coverage is Monte-Carlo--validated.
+\textbf{(iv)~Speculative expansion}: a cheap risk score escalates to full context only when a
+distribution-free divergence bound is not met, so cost is mostly-cheap-plus-occasionally-full;
+the escalation threshold is the cheapest one whose certified miss rate is $\le\alpha$.
+\textbf{(v)~Constrained-bandit operating-point search}: successive elimination under the
+non-inferiority constraint finds the most aggressive safe operating point online, with the same
+fail-safe default. (i)--(iii),(v) are shipped and tested; (iv) ships as a tested controller
+whose end-to-end savings await a live calibration run. None trades the guarantee for dollars.
+
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
 carry a distribution-free guarantee validated on real traces. The certificate
