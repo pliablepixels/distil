@@ -1,0 +1,1 @@
+gpt-4.1 gate@6 is PARTIAL: OpenAI balance exhausted mid-run (insufficient_quota on 32/50). full + gate@12 complete.
