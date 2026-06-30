@@ -436,9 +436,11 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             )
         )
         # On a flat-rate subscription there's no per-token bill, so the dollar
-        # figure is notional — show tokens only. Opt in with DISTIL_SUBSCRIPTION=1.
-        sub = os.environ.get("DISTIL_SUBSCRIPTION", "").strip().lower()
-        if sub in ("", "0", "false", "no"):
+        # figure is notional — show tokens only. Auto-detected (Claude OAuth, no
+        # key); override with DISTIL_SUBSCRIPTION=0/1.
+        from .doctor import subscription_mode
+
+        if not subscription_mode():
             parts.append(
                 c(
                     "32",
@@ -451,13 +453,81 @@ def cmd_statusline(args: argparse.Namespace) -> int:
 
             led = ShadowLedger.load()
             if led.samples:
-                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}%"))
+                # decision-equivalence with its sample count, so the confidence
+                # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
+                n = led.samples
+                n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}% ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
         parts.append(c("90", model))
     print(" · ".join(parts))
     return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Diagnose a distil setup: ledger, shadow, proxy round-trip, deps, Claude Code
+    wiring. Exit 1 if any check fails, so it's usable as a CI/setup gate."""
+    import os
+    import sys
+
+    from . import doctor
+
+    use_color = (
+        (not getattr(args, "no_color", False))
+        and sys.stdout.isatty()
+        and os.environ.get("NO_COLOR") is None
+    )
+
+    def c(code: str, t: str) -> str:
+        return f"\033[{code}m{t}\033[0m" if use_color else t
+
+    glyph = {
+        doctor.OK: c("32", "✓"),
+        doctor.WARN: c("33", "⚠"),
+        doctor.INFO: c("36", "ℹ"),
+        doctor.FAIL: c("31", "✗"),
+    }
+
+    checks = doctor.diagnose()
+    print(c("1;38;5;79", "distil doctor") + c("90", "  ·  setup diagnosis") + "\n")
+    counts: dict[str, int] = {}
+    for ch in checks:
+        counts[ch.status] = counts.get(ch.status, 0) + 1
+        print(f"  {glyph.get(ch.status, '?')} {c('1', ch.name)}: {ch.detail}")
+        if ch.hint:
+            print(c("90", f"      → {ch.hint}"))
+
+    n_fail = counts.get(doctor.FAIL, 0)
+    summary = "  ·  ".join(
+        f"{counts[k]} {k}"
+        for k in (doctor.OK, doctor.INFO, doctor.WARN, doctor.FAIL)
+        if counts.get(k)
+    )
+    verdict = "looks healthy" if n_fail == 0 else f"{n_fail} failing — see above"
+    print(
+        "\n  " + c("90", summary) + "  —  " + (c("32", verdict) if not n_fail else c("31", verdict))
+    )
+    return 1 if n_fail else 0
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    """Wire the distil status line into Claude Code settings (idempotent, safe)."""
+    from pathlib import Path
+
+    from .setup import default_settings_path, wire_statusline
+
+    path = Path(args.settings) if args.settings else default_settings_path()
+    status, msg = wire_statusline(path, force=args.force)
+    glyph = {"ok": "✓", "exists": "✓", "conflict": "⚠", "error": "✗"}.get(status, "?")
+    print(f"{glyph} {msg}")
+    if status in ("ok", "exists"):
+        print("\nNext — route an agent through distil so the line fills in:")
+        print("  distil wrap --shadow 0.1 -- claude")
+        print("Verify your setup anytime with:  distil doctor")
+        return 0
+    return 1
 
 
 def cmd_dashboard(args: argparse.Namespace) -> int:
@@ -468,14 +538,10 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     import sys
     import time
 
+    from .doctor import subscription_mode
     from .shadow import ShadowLedger
 
-    subscription = os.environ.get("DISTIL_SUBSCRIPTION", "").strip().lower() not in (
-        "",
-        "0",
-        "false",
-        "no",
-    )
+    subscription = subscription_mode()
     interactive = sys.stdout.isatty() and not args.once
     color = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
@@ -483,17 +549,20 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         s = ledger.summary()
         change_rate: float | None = None
         samples = 0
+        recent: list[int] | None = None
         try:
             led = ShadowLedger.load()
             samples = led.samples
             if samples:
                 change_rate = led.rate()
+                recent = list(led.recent)
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
         return ledger.render_dashboard(
             s,
             change_rate=change_rate,
             samples=samples,
+            recent=recent,
             subscription=subscription,
             color=color,
         )
@@ -1157,6 +1226,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--interval", type=float, default=2.0, help="refresh seconds in live mode (default 2)"
     )
     dash.set_defaults(func=cmd_dashboard)
+
+    dr = sub.add_parser(
+        "doctor", help="diagnose your distil setup (ledger, shadow, proxy round-trip, wiring)"
+    )
+    dr.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    dr.set_defaults(func=cmd_doctor)
+
+    su = sub.add_parser("setup", help="wire the distil status line into Claude Code settings")
+    su.add_argument(
+        "--force", action="store_true", help="replace an existing status line (backed up first)"
+    )
+    su.add_argument("--settings", help="settings.json path (default ~/.claude/settings.json)")
+    su.set_defaults(func=cmd_setup)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"

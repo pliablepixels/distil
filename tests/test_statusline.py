@@ -38,6 +38,7 @@ def test_empty_ledger_shows_hint(monkeypatch, capsys):
 
 
 def test_populated_ledger(monkeypatch, capsys):
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")  # force metered: dollars shown
     s = ledger.LedgerSummary(
         3,
         0.0400,
@@ -185,3 +186,17 @@ def test_render_dashboard_subscription_hides_cost():
     out = ledger.render_dashboard(s, subscription=True, color=False)
     assert "notional" in out
     assert "$10.00 → $5.00" not in out
+
+
+def test_render_dashboard_recent_strip():
+    # The live shadow panel: recent decisions shown as a strip (▰ same / ▱ changed).
+    s = ledger.LedgerSummary(
+        5, 5.0, 1000, {},
+        total_baseline_tokens=2_000_000, total_distil_tokens=1_000_000,
+        total_baseline_dollars=10.0, total_distil_dollars=5.0,
+    )
+    out = ledger.render_dashboard(
+        s, change_rate=0.2, samples=10, recent=[1, 1, 0, 1, 1], color=False
+    )
+    assert "recent" in out
+    assert "▰" in out and "▱" in out  # equivalent + changed marks present
