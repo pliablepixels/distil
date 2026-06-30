@@ -8,10 +8,7 @@
     "email": "chandu1221@gmail.com"
   },
   "homepage": "https://github.com/dshakes/distil",
-  "repository": {
-    "url": "https://github.com/dshakes/distil",
-    "type": "git"
-  },
+  "repository": "https://github.com/dshakes/distil",
   "license": "Apache-2.0",
   "keywords": ["compression", "context", "llm", "tokens", "savings"]
 }
