@@ -3,6 +3,10 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Manual release: lets a maintainer (or CI) cut the release for the version in
+  # pyproject without pushing a tag from a restricted environment. The job creates
+  # the matching tag + GitHub release and publishes to PyPI.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -10,11 +14,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+      - name: Resolve version from pyproject
+        id: ver
+        run: echo "version=$(grep -m1 '^version' pyproject.toml | cut -d'\"' -f2)" >> "$GITHUB_OUTPUT"
       - name: Gate before release
         run: |
           uv run --with pytest python -m pytest -q
@@ -24,13 +33,22 @@ jobs:
         run: uv build
       - name: Build single-file executable
         run: bash scripts/build_pyz.sh
-      - name: Attach artifacts to the GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.whl
-            dist/*.tar.gz
-            dist/distil.pyz
+      - name: Create the GitHub release (+ tag v<version>) and attach artifacts
+        # `gh release create` reliably creates the tag + release + uploads assets on
+        # ANY trigger (including manual workflow_dispatch), unlike action-gh-release
+        # which can no-op on a non-tag ref. Idempotent: if the release already exists,
+        # upload/clobber the assets instead of failing.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="v${{ steps.ver.outputs.version }}"
+          if gh release view "$V" >/dev/null 2>&1; then
+            gh release upload "$V" dist/*.whl dist/*.tar.gz dist/distil.pyz --clobber
+          else
+            gh release create "$V" dist/*.whl dist/*.tar.gz dist/distil.pyz \
+              --target "${{ github.sha }}" --title "$V" \
+              --notes "Release $V — see CHANGELOG.md. Install: pipx install distil-llm (PyPI), or download the wheel/distil.pyz below if PyPI is blocked."
+          fi
       - name: Stage PyPI artifacts (wheel + sdist only)
         run: |
           mkdir -p pypi-dist
@@ -57,6 +75,10 @@ jobs:
           name: pypi-dist
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # tolerate re-running a release for a version already on PyPI (e.g. when
+          # re-cutting only to (re)create the GitHub release) — don't fail the run.
+          skip-existing: true
 
 # ── PyPI trusted publishing setup (one-time, on pypi.org) ──────────────────────
 # 1. Create the project owner account, then add a *pending publisher*:

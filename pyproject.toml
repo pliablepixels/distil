@@ -5,7 +5,12 @@ name = "distil-llm"
 version = "1.7.0.dev0"
 description = "Compression with a quality contract — cache-aware, causally-pruned context compression for agentic runtimes, gated by a statistical non-inferiority test."
 readme = "README.md"
-requires-python = ">=3.11"
+# Python floor is 3.9 — the version macOS still ships as the system `python3`. The
+# package is stdlib-only and uses `from __future__ import annotations`, so it imports
+# and the `distil bench` gate passes on 3.9/3.10/3.11/3.12/3.13 (verified in CI). A
+# higher floor here is what made `pipx install distil-llm` fail with the misleading
+# "Could not find a version ... (from versions: none)" on stock macOS Python.
+requires-python = ">=3.9"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "shakes", email = "chandu1221@gmail.com" }]
@@ -14,6 +19,8 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
