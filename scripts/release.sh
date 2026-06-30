@@ -1,28 +1,40 @@
 #!/usr/bin/env bash
-# Distil release driver — push, tag, publish to PyPI, refresh the Homebrew sha256.
+# Distil release driver — push, tag, and let CI publish; refresh the Homebrew sha256.
 #
-# Outward-facing and mostly irreversible: every network step asks before it runs,
-# and the script fails fast if anything looks off. Run it from the repo root on a
-# clean `main`:
+# PUBLISHING MODEL (industry standard): this repo publishes to PyPI via
+# .github/workflows/release.yml using PyPA Trusted Publishing (OIDC) — there is NO
+# API token anywhere. You push a v* tag; CI gates, builds, attaches GitHub release
+# artifacts, and (when enabled) publishes to PyPI. So this script's job is to push
+# main + the tag; CI does the upload. No twine, no laptop token.
 #
+# ONE-TIME SETUP on pypi.org (per the footer of release.yml), then never again:
+#   1. pypi.org → distil-llm → Publishing → add a Trusted Publisher:
+#        owner dshakes · repo distil · workflow release.yml · environment pypi
+#   2. GitHub → repo → Settings → Variables → set  PUBLISH_TO_PYPI = true
+#      (until set, a tag still ships GitHub artifacts but skips the PyPI upload.)
+#
+# Run from the repo root on a clean `main`:
 #   ./scripts/release.sh
 #
-# Prereqs:
-#   - uv (build) and twine (upload) on PATH        # brew install uv twine
-#   - PyPI credentials: a ~/.pypirc, or TWINE_USERNAME=__token__ TWINE_PASSWORD=pypi-…
-#   - push rights to origin
+# Prereqs: uv on PATH (build/smoke-test) · push rights to origin · gh CLI (optional,
+# to watch the release run). No twine and no PyPI token required.
 #
 # Flags:
-#   --dry-run     print every action, change nothing (no push, no tag, no upload)
-#   --skip-tests  skip the pytest gate (NOT recommended)
+#   --dry-run        print every action, change nothing (no push, no tag)
+#   --skip-tests     skip the pytest gate (NOT recommended)
+#   --local-publish  ALSO upload from this machine via `uv publish` (escape hatch for
+#                    when Trusted Publishing isn't set up; needs UV_PUBLISH_TOKEN).
+#                    Leave OFF if CI publishes — double-upload of a version fails.
 set -euo pipefail
 
 DRY_RUN=0
 SKIP_TESTS=0
+LOCAL_PUBLISH=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --skip-tests) SKIP_TESTS=1 ;;
+    --local-publish) LOCAL_PUBLISH=1 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
 done
@@ -115,28 +127,40 @@ else
 fi
 echo
 
-# ---- tag ---------------------------------------------------------------------
-bold "3/6  Tag $TAG"
+# ---- tag (this is what triggers the release CI) ------------------------------
+bold "3/6  Tag $TAG  →  triggers release.yml (gate, GitHub artifacts, PyPI publish)"
 if confirm "create and push annotated tag $TAG?"; then
   run "git tag -a '$TAG' -m 'Distil $TAG'"
   run "git push origin '$TAG'"
-  ok "$TAG pushed (this triggers the GitHub release tarball + pages deploy)"
+  ok "$TAG pushed — CI is now building + publishing"
 else
-  info "skipped tag — PyPI upload and Homebrew sha256 below need the tag; you can re-run later"
+  info "skipped tag — the PyPI publish and Homebrew sha256 below need the tag; re-run later"
 fi
 echo
 
-# ---- build + publish to PyPI -------------------------------------------------
-bold "4/6  Build + publish to PyPI (distil-llm)"
-if confirm "build sdist+wheel and upload $VERSION to PyPI? (irreversible — a version can't be re-uploaded)"; then
-  command -v twine >/dev/null 2>&1 || die "twine not found (brew install twine), or upload manually with: uv publish"
-  run "rm -rf dist/distil_llm-$VERSION*"
-  run "uv build -o dist"
-  run "twine check dist/distil_llm-$VERSION*"
-  run "twine upload dist/distil_llm-$VERSION*"
-  ok "uploaded distil-llm $VERSION to PyPI"
+# ---- PyPI publish ------------------------------------------------------------
+bold "4/6  PyPI publish (distil-llm $VERSION)"
+if [ "$LOCAL_PUBLISH" -eq 1 ]; then
+  info "--local-publish set: uploading from this machine via uv publish"
+  if confirm "build + uv publish $VERSION now? (irreversible; do NOT also let CI publish the same version)"; then
+    command -v uv >/dev/null 2>&1 || die "uv not found"
+    [ -n "${UV_PUBLISH_TOKEN:-}" ] || die "set UV_PUBLISH_TOKEN=pypi-… (token from pypi.org)"
+    run "rm -rf dist/distil_llm-$VERSION*"
+    run "uv build -o dist"
+    run "uv publish dist/distil_llm-$VERSION*"
+    ok "uploaded distil-llm $VERSION to PyPI"
+  else
+    info "skipped local publish"
+  fi
 else
-  info "skipped PyPI upload"
+  info "Trusted Publishing: the release.yml 'publish-pypi' job uploads via OIDC — no token here."
+  info "It runs only if repo variable PUBLISH_TO_PYPI=true and the PyPI pending publisher exists."
+  if command -v gh >/dev/null 2>&1 && [ "$DRY_RUN" -eq 0 ]; then
+    info "watch it:  gh run watch --repo dshakes/distil \$(gh run list --repo dshakes/distil -w release -L1 --json databaseId -q '.[0].databaseId')"
+    info "verify after:  pip index versions distil-llm   # or check https://pypi.org/p/distil-llm"
+  else
+    info "watch the run at https://github.com/dshakes/distil/actions/workflows/release.yml"
+  fi
 fi
 echo
 
