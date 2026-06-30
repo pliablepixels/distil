@@ -436,9 +436,11 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             )
         )
         # On a flat-rate subscription there's no per-token bill, so the dollar
-        # figure is notional — show tokens only. Opt in with DISTIL_SUBSCRIPTION=1.
-        sub = os.environ.get("DISTIL_SUBSCRIPTION", "").strip().lower()
-        if sub in ("", "0", "false", "no"):
+        # figure is notional — show tokens only. Auto-detected (Claude OAuth, no
+        # key); override with DISTIL_SUBSCRIPTION=0/1.
+        from .doctor import subscription_mode
+
+        if not subscription_mode():
             parts.append(
                 c(
                     "32",
@@ -514,14 +516,10 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     import sys
     import time
 
+    from .doctor import subscription_mode
     from .shadow import ShadowLedger
 
-    subscription = os.environ.get("DISTIL_SUBSCRIPTION", "").strip().lower() not in (
-        "",
-        "0",
-        "false",
-        "no",
-    )
+    subscription = subscription_mode()
     interactive = sys.stdout.isatty() and not args.once
     color = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 

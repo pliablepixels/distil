@@ -38,6 +38,7 @@ def test_empty_ledger_shows_hint(monkeypatch, capsys):
 
 
 def test_populated_ledger(monkeypatch, capsys):
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")  # force metered: dollars shown
     s = ledger.LedgerSummary(
         3,
         0.0400,
