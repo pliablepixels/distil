@@ -530,6 +530,66 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_onboard(args: argparse.Namespace) -> int:
+    """One command: detect the environment, wire the status line, and print a
+    next-steps guide tailored to what's installed (agent, billing, deps)."""
+    import os
+    import sys
+
+    from . import onboard
+    from .setup import default_settings_path, wire_statusline
+
+    use_color = (
+        (not getattr(args, "no_color", False))
+        and sys.stdout.isatty()
+        and os.environ.get("NO_COLOR") is None
+    )
+
+    def c(code: str, t: str) -> str:
+        return f"\033[{code}m{t}\033[0m" if use_color else t
+
+    env = onboard.detect()
+    print(c("1;38;5;79", "distil onboard") + c("90", "  ·  let's get you set up") + "\n")
+
+    agents = ", ".join(label for _, label in env.agents) or "none detected"
+    billing = (
+        "flat-rate subscription (dollars notional)"
+        if env.subscription
+        else "metered / pay-as-you-go"
+    )
+    print(c("90", "Detected"))
+    print(f"  os            {env.os_name}")
+    print(f"  agents        {agents}")
+    print(f"  package mgrs  {', '.join(env.managers) or 'none'}")
+    print(f"  billing       {billing}")
+    print(f"  anthropic ext {'installed' if env.has_anthropic else 'not installed (optional)'}\n")
+
+    if args.dry_run:
+        print(c("90", "dry-run: would wire the status line (distil setup) — skipped\n"))
+    else:
+        status, msg = wire_statusline(default_settings_path(), force=args.force)
+        glyph = {"ok": "✓", "exists": "✓", "conflict": "⚠", "error": "✗"}.get(status, "?")
+        print(c("32" if status in ("ok", "exists") else "33", f"{glyph} {msg}"))
+        if status == "conflict":
+            print(c("90", "  re-run with --force to replace it (your current one is backed up)"))
+        print()
+
+    print(c("1", "Next steps"))
+    for i, (title, cmd, note) in enumerate(onboard.next_steps(env), 1):
+        print(f"  {c('1', str(i) + '.')} {title}")
+        print(f"     {c('36', cmd)}")
+        if note:
+            print(f"     {c('90', note)}")
+    print(
+        "\n"
+        + c("90", "Re-run anytime: ")
+        + c("36", "distil onboard")
+        + c("90", "   ·   diagnose: ")
+        + c("36", "distil doctor")
+    )
+    return 0
+
+
 def cmd_dashboard(args: argparse.Namespace) -> int:
     """Live terminal dashboard of cumulative savings — re-renders on an interval
     until Ctrl-C. Falls back to a single render when stdout isn't a TTY (so it
@@ -1239,6 +1299,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     su.add_argument("--settings", help="settings.json path (default ~/.claude/settings.json)")
     su.set_defaults(func=cmd_setup)
+
+    ob = sub.add_parser("onboard", help="one command: set up distil + a guided next-steps tour")
+    ob.add_argument("--dry-run", action="store_true", help="scan + guide only; change nothing")
+    ob.add_argument(
+        "--force", action="store_true", help="replace an existing status line (backed up first)"
+    )
+    ob.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    ob.set_defaults(func=cmd_onboard)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"

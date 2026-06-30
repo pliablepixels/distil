@@ -138,7 +138,9 @@ pip install distil-llm</pre>
 
     <!-- Use it on your agent -->
     <h2>Use it on your agent <span class="g">— the 30-second path</span></h2>
-    <p>This is what most people actually want. <code>distil wrap</code> launches your coding agent with its API traffic routed through compression — <strong>no config, no code change</strong>.</p>
+    <p><strong>Easiest:</strong> let <code>distil onboard</code> set you up and hand you the exact commands for your environment — it detects your agent and billing, wires the status line, and prints a guided tour:</p>
+    <pre class="term">distil onboard   <span class="d"># one command: detects your setup, wires the status line, guides you</span></pre>
+    <p>Or do it by hand. <code>distil wrap</code> launches your coding agent with its API traffic routed through compression — <strong>no config, no code change</strong>.</p>
     <pre class="term"><span class="d"># Claude Code on a metered API key — saves real $$:</span>
 distil wrap --expand -- claude
 <span class="d"># Claude Code on a Pro/Max subscription — flat-rate, ToS-safe (trims context, not $):</span>

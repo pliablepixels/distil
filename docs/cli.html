@@ -733,6 +733,11 @@ verifiable savings — 3 verified instance(s), 0 rejected
 
     <hr/>
 
+    <h2 id="onboard">distil onboard</h2>
+    <p>One command to set up distil and learn to use it. Detects your environment — OS, package managers, agent CLIs (Claude Code / Codex / Gemini), how distil is installed, the optional <code>anthropic</code> extra, and whether you're on a flat-rate Claude subscription — then wires the savings status line and prints a <strong>next-steps guide tailored to what it found</strong>: how to route the detected agent (subscription-safe vs metered), validate outcomes with <a href="#shadow-stats">shadow mode</a>, watch savings on the <a href="#dashboard">dashboard</a>, run the test gate, and re-verify with <a href="#doctor">distil doctor</a>. <code>--dry-run</code> changes nothing; works on macOS and Windows.</p>
+
+    <hr/>
+
     <h2 id="dashboard">distil dashboard</h2>
     <p>Live terminal dashboard of your cumulative savings — a framed panel with Unicode bars for token-trim and decision-equivalence, original&nbsp;&rarr;&nbsp;compressed tokens and cost, a recent-decisions strip, and per-trajectory bars. Uses the alternate screen (like <code>htop</code>): redraws in place and restores your prompt on exit. <code>--once</code> prints a single frame; <code>--interval</code> sets refresh seconds. On a flat-rate subscription the dollar figures are dropped automatically (<code>DISTIL_SUBSCRIPTION</code> overrides).</p>
 

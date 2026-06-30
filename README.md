@@ -45,11 +45,16 @@ Every agent re-sends its whole context every turn — you pay for all of it, eve
 
 ## 🚀 Use it now
 
-**Claude Code · Codex · Gemini CLI · any agent.** Route your coding agent through Distil — **no config, no code change.** `distil wrap` launches your agent with its API traffic flowing through compression:
+**One command sets you up and tells you what to do next:**
 
 ```bash
 pipx install distil-llm
+distil onboard      # detects your agent + billing, wires the status line, prints a guided tour
+```
 
+`distil onboard` figures out your environment (Claude Code · Codex · Gemini CLI; metered vs subscription) and hands you the exact commands for your setup. Or go straight to wrapping your agent — **no config, no code change:**
+
+```bash
 # Claude Code on a metered API key — saves real $$:
 distil wrap --expand -- claude
 
@@ -215,6 +220,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 
 | Goal | Command |
 |---|---|
+| **Set up + a guided tour (start here)** | `distil onboard` |
 | Diagnose your setup (ledger, shadow, proxy self-test, wiring) | `distil doctor` |
 | Wire the savings status line into Claude Code | `distil setup` |
 | Watch genuine savings accumulate | `distil leaderboard` · live TUI: `distil dashboard` |

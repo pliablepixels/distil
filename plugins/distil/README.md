@@ -64,6 +64,7 @@ keeps your line clean either way.
 
 | Command | What it does |
 |---|---|
+| `/distil-onboard` | Set up distil + a guided, tailored tour of how to use it |
 | `/distil` | Your savings report + how to route more traffic through distil |
 | `/distil-stats` | Full breakdown — orig→compressed tokens, cost, runs, per-trajectory bars |
 | `/distil-shadow` | Decision-equivalence: did compression preserve your agent's next action? |

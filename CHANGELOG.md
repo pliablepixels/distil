@@ -3,6 +3,17 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.3.0 dev
+
+### Added
+- **`distil onboard`** — one command that detects your environment (OS, package
+  managers, agent CLIs, install method, the `anthropic` extra, Claude Code +
+  subscription), wires the savings status line, and prints a **next-steps guide
+  tailored to what it found** — how to route the detected agent (subscription-safe
+  vs metered), validate outcomes with shadow mode, watch savings, run the gate,
+  and re-verify with `distil doctor`. `--dry-run` changes nothing. Cross-platform
+  (macOS / Windows).
+
 ## [1.2.0] — 2026-06-30 — Setup & diagnostics UX
 
 Friction-killers for getting distil running and trusting it.
