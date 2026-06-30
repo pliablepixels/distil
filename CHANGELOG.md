@@ -3,6 +3,22 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.6.1] — 2026-06-30 — Installable on Python 3.9+ (fixes "from versions: none")
+
+### Fixed
+- **`pipx install distil-llm` / `pip install distil-llm` failed with `Could not find
+  a version that satisfies the requirement distil-llm (from versions: none)` on stock
+  macOS.** Root cause: `requires-python` was `>=3.11`, but macOS ships Python 3.9 as
+  the system `python3`, so pip filtered out every release and reported that misleading
+  message. The package is stdlib-only and uses `from __future__ import annotations`,
+  so it already imports and passes the `distil bench` gate on 3.9/3.10 — the floor was
+  simply set too high.
+- **Lowered the floor to Python 3.9** (`requires-python = ">=3.9"`, classifiers added)
+  and aligned `distil doctor`'s version check. CI now runs the full suite + gate on
+  3.9–3.13 so the support claim stays true. Docs/troubleshooting updated.
+  > Reaches users once **1.6.1 is published to PyPI** (the live 1.6.0 still pins
+  > `>=3.11`). Publish by pushing a `v1.6.1` tag.
+
 ## [1.6.0] — 2026-06-30 — Onboard ensures everything
 
 ### Added

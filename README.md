@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
-  <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
+  <img src="https://img.shields.io/badge/python-3.9%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
   <img src="https://img.shields.io/badge/tests-707%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
@@ -211,16 +211,18 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 > ⚠️ **The one gotcha — the name.** The PyPI package is **`distil-llm`** but the command is **`distil`** (the bare name was taken). So `pipx install distil-llm` → run `distil …`. `pip install distil` installs something else.
 
+> 🔧 **Seeing `Could not find a version that satisfies the requirement distil-llm (from versions: none)`?** The package **is** on PyPI — that error means your `pip`/`pipx` is on a Python older than the package's floor, so pip filters every release out. **Distil now supports Python 3.9+** (the version macOS ships), so a current install just works; if you still hit this on a very old Python, let **uv provision one for you**: `uvx --python 3.12 --from distil-llm distil bench` (or `uv tool install --python 3.12 distil-llm`). Check yours with `python3 --version`.
+
 <p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
 
 | Format | Command | Prereq |
 |---|---|---|
-| **Zero install** | `uvx --from distil-llm distil bench` | [uv](https://docs.astral.sh/uv/) |
-| **Isolated CLI** | `pipx install distil-llm` → `distil bench` | Python 3.11+, [pipx](https://pipx.pypa.io/) |
+| **Zero install** | `uvx --from distil-llm distil bench` | [uv](https://docs.astral.sh/uv/) — **auto-provisions Python 3.9+** |
+| **Isolated CLI** | `pipx install distil-llm` → `distil bench` | Python **3.9+** (else `pipx install --python python3.12 distil-llm`) |
 | **Homebrew** | `brew install dshakes/tap/distil` | Homebrew |
 | **Docker** | `docker build -t distil . && docker run distil bench` | Docker |
-| **Single file** | `make pyz` → `python dist/distil.pyz bench` | Python 3.11+ |
-| **In a venv** | `pip install distil-llm` (inside an active virtualenv) | Python 3.11+ |
+| **Single file** | `make pyz` → `python dist/distil.pyz bench` | Python 3.9+ |
+| **In a venv** | `pip install distil-llm` (inside an active virtualenv) | Python 3.9+ |
 
 > The import package and CLI are `distil`; the PyPI distribution is `distil-llm` (the bare name was taken — so `uvx`/`pip` must reference `distil-llm`, not `distil`). Distil is a CLI: install it **isolated** (pipx/uv/brew/Docker), because modern macOS/Linux block system-wide `pip install` ([PEP 668](https://peps.python.org/pep-0668/)). **Node / any language:** point your SDK's `base_url` at `distil proxy`, or use `distil wrap -- <agent>` — no Distil-specific package needed.
 

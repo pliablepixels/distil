@@ -59,12 +59,12 @@ def _check_version() -> Check:
     from . import __version__
 
     py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    ok = sys.version_info >= (3, 11)
+    ok = sys.version_info >= (3, 9)  # must match pyproject requires-python
     return Check(
         "distil",
         OK if ok else FAIL,
         f"{__version__} (Python {py})",
-        "" if ok else "distil needs Python 3.11+",
+        "" if ok else "distil needs Python 3.9+",
     )
 
 

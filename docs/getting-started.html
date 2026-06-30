@@ -83,7 +83,12 @@
     </div>
 
     <div class="callout">
-      <strong>Python 3.11+ required.</strong> Install Distil <em>isolated</em> from your system Python — modern macOS and Linux reject system-wide <code>pip install</code> with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). Every method below is isolated and safe.
+      <strong>Python 3.9+ required.</strong> Install Distil <em>isolated</em> from your system Python — modern macOS and Linux reject system-wide <code>pip install</code> with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). Every method below is isolated and safe.
+    </div>
+
+    <div class="callout">
+      <strong>Hit <code>Could not find a version that satisfies the requirement distil-llm (from versions: none)</code>?</strong>
+      The package <em>is</em> on PyPI — that error means your <code>pip</code>/<code>pipx</code> is on a Python below the package floor. <strong>Distil supports Python 3.9+</strong> (what macOS ships), so a current install just works; on an even older Python, let <strong>uv provision one</strong>: <code>uvx --python 3.12 --from distil-llm distil bench</code> (or <code>uv tool install --python 3.12 distil-llm</code>). Check yours with <code>python3 --version</code>.
     </div>
 
     <div class="grid2">
@@ -96,7 +101,7 @@
       <div class="card">
         <span class="tag">Isolated CLI · recommended</span>
         <h3>pipx</h3>
-        <p>Permanent install in its own venv — PEP&nbsp;668-safe. <strong>Prereq:</strong> Python 3.11+, <a href="https://pipx.pypa.io/">pipx</a> (<code>brew install pipx</code>).</p>
+        <p>Permanent install in its own venv — PEP&nbsp;668-safe. <strong>Prereq:</strong> Python 3.9+, <a href="https://pipx.pypa.io/">pipx</a> (<code>brew install pipx</code>).</p>
         <pre class="term">pipx install distil-llm
 distil certify</pre>
       </div>
@@ -117,7 +122,7 @@ docker run distil bench</pre>
       <div class="card">
         <span class="tag">Single file</span>
         <h3>Zipapp (.pyz)</h3>
-        <p>One portable executable — copy it anywhere. <strong>Prereq:</strong> Python 3.11+ (no install).</p>
+        <p>One portable executable — copy it anywhere. <strong>Prereq:</strong> Python 3.9+ (no install).</p>
         <pre class="term">make pyz
 python dist/distil.pyz bench</pre>
       </div>
@@ -131,7 +136,7 @@ pip install distil-llm</pre>
     </div>
 
     <div class="callout good">
-      <strong>Node / TypeScript / other languages?</strong> Run <code>distil proxy</code> (or <code>distil wrap -- &lt;your-agent&gt;</code>) and point your SDK's <code>baseURL</code> at it. No code changes, any language. The CLI needs Python 3.11+; your app does not.
+      <strong>Node / TypeScript / other languages?</strong> Run <code>distil proxy</code> (or <code>distil wrap -- &lt;your-agent&gt;</code>) and point your SDK's <code>baseURL</code> at it. No code changes, any language. The CLI needs Python 3.9+; your app does not.
     </div>
 
     <hr/>
