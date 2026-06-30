@@ -138,6 +138,7 @@ def build_handler(
     # decision uncompressed too (in the background), and record whether it matched.
     _shadow_sampler = None
     _shadow_ledger = None
+    _shadow_threads: list[threading.Thread] = []
     if shadow_rate and shadow_rate > 0:
         from .shadow import ShadowLedger, ShadowSampler
 
@@ -433,7 +434,14 @@ def build_handler(
                     except Exception:  # noqa: BLE001 — shadow must never affect the request
                         pass
 
-                threading.Thread(target=_shadow_compare, daemon=True).start()
+                # Track the thread so teardown can drain it: a daemon thread is
+                # killed on process exit, which loses the sample on a quick run
+                # (e.g. `claude -p`) or right after the last turn. Prune finished
+                # ones first so the list stays bounded on long sessions.
+                _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
+                _t = threading.Thread(target=_shadow_compare, daemon=True)
+                _shadow_threads.append(_t)
+                _t.start()
             self._relay(status, rhdrs, rbody, extras=extras)
 
         # ----------------------------------------------------------------
@@ -471,7 +479,24 @@ def build_handler(
                 ).encode()
                 self._relay(502, {"Content-Type": "application/json"}, rbody)
 
+    _DistilHandler.shadow_threads = _shadow_threads  # drained on shutdown
     return _DistilHandler
+
+
+def _drain_shadow(handler: type, budget: float = 6.0) -> None:
+    """Let in-flight shadow comparisons finish recording before the proxy exits.
+
+    Shadow runs each sampled decision uncompressed in a background thread; without
+    draining, a quick run (or the last turn before shutdown) loses the sample.
+    Bounded by ``budget`` seconds total so a hung upstream can't block teardown."""
+    import time
+
+    threads = [t for t in getattr(handler, "shadow_threads", []) or [] if t.is_alive()]
+    if not threads:
+        return
+    deadline = time.monotonic() + budget
+    for t in threads:
+        t.join(timeout=max(0.0, deadline - time.monotonic()))
 
 
 # ---------------------------------------------------------------------------
@@ -552,6 +577,7 @@ def serve(
     except KeyboardInterrupt:
         pass
     finally:
+        _drain_shadow(handler)
         if savings is not None:
             savings.flush()  # persist remaining genuine savings on shutdown
         server.server_close()
@@ -629,6 +655,7 @@ def wrap_run(
         code = 130
     finally:
         server.shutdown()
+        _drain_shadow(handler)
         if savings is not None:
             savings.flush()
         server.server_close()

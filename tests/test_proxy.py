@@ -190,3 +190,45 @@ def test_non_compressible_path_forwarded_unchanged(servers: Any) -> None:
     )
     # Body forwarded byte-for-byte (the fake upstream echoes exactly what it received)
     assert echoed == payload, f"Body should be unchanged. Got: {echoed!r}"
+
+
+def test_drain_shadow_waits_for_inflight_thread() -> None:
+    """The shadow-mode fix: a sampled comparison runs in a daemon thread; teardown
+    must drain it so the sample isn't lost when the process exits (e.g. claude -p)."""
+    import threading
+    import time
+
+    from distil.proxy import _drain_shadow
+
+    done: list[int] = []
+
+    def work() -> None:
+        time.sleep(0.2)
+        done.append(1)
+
+    t = threading.Thread(target=work, daemon=True)
+
+    class _H:
+        shadow_threads = [t]
+
+    t.start()
+    _drain_shadow(_H, budget=3.0)
+    assert done == [1]  # drain waited for the in-flight comparison to record
+
+
+def test_drain_shadow_is_bounded_by_budget() -> None:
+    """A hung upstream must not block teardown: drain returns within ~budget."""
+    import threading
+    import time
+
+    from distil.proxy import _drain_shadow
+
+    t = threading.Thread(target=lambda: time.sleep(5), daemon=True)
+
+    class _H:
+        shadow_threads = [t]
+
+    t.start()
+    start = time.monotonic()
+    _drain_shadow(_H, budget=0.3)
+    assert time.monotonic() - start < 2.0  # did not wait the full 5s
