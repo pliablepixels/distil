@@ -14,13 +14,9 @@
 <h3 align="center">The certified context compressor for AI agents.</h3>
 
 <p align="center">
-Every agent re-sends its <em>entire</em> conversation to the model on every single turn — and you pay for all of it, every turn. Compressing that context is easy. Compressing it <strong>without quietly changing what your agent decides to do</strong> is the part every other tool skips.</p>
+Every agent re-sends its whole context every turn — you pay for all of it, every turn. Compressing it is easy; compressing it <strong>without quietly changing what your agent does</strong> is the part everyone skips. Distil ships a <strong>statistical proof</strong> the next action is unchanged — measured on the same runs as the savings, gated in CI — and falls back to full context when it can't certify. <strong>Never silently lossy.</strong></p>
 
-<p align="center">
-<strong>Distil ships a quality contract, not a vibe.</strong> A strategy compresses only as far as a statistical non-inferiority test <em>certifies the agent's next action is unchanged</em> — measured on the <em>same runs</em> as the savings, enforced as a merge gate across 7 domains. On a real <strong>500-instance long-horizon coding agent</strong>, Distil's reversible tier is the <strong>only compressor statistically non-inferior to full context</strong> (−2.4pp, 95% CI [−5.7, +0.9]); every lossy competitor craters. And when it <em>can't</em> certify safety, it falls back to full context — <strong>never silently lossy</strong>.</p>
-
-<p align="center"><sub><b>Honest scope (read this):</b> the contract certifies <b>decision-equivalence on a trajectory corpus</b> — a <em>proxy</em> (the agent's next action), not a guarantee of end-to-end task success. Our own real end-to-end test (<a href="docs/PAPER.md">SWE-bench Verified, E7</a>) shows the proxy <b>does not transfer</b> under <em>aggressive lossy</em> compression — which is exactly why Distil calibrates per deployment and falls back to full context when it can't certify. Treat the headline savings below as proxy/corpus results; see <a href="#-end-to-end-reality-swe-bench-verified-e7">End-to-end reality</a>.</sub>
-</p>
+<p align="center"><sub><b>Honest scope:</b> the certificate is a <b>proxy</b> (next-action equivalence on a trajectory corpus), not end-to-end task success — under <em>aggressive lossy</em> compression it doesn't fully transfer (<a href="#-end-to-end-reality-swe-bench-verified-e7">E7</a>), which is why Distil calibrates per deployment and fails safe.</sub></p>
 
 <p align="center">
   <a href="#-60-second-start">Quickstart</a> ·
@@ -28,6 +24,22 @@ Every agent re-sends its <em>entire</em> conversation to the model on every sing
   <a href="#-install-your-way">Install</a> ·
   <a href="https://dshakes.github.io/distil/getting-started.html"><b>Full Docs →</b></a>
 </p>
+
+---
+
+<h3 align="center">Proof first — not a pitch 📊</h3>
+
+<p align="center"><img src="docs/assets/head-to-head.svg" alt="Distil vs LLMLingua-2 vs Headroom — token savings, decision-change rate, latency" width="100%"/></p>
+
+<table align="center">
+<tr><th>On a real 500-instance long-horizon agent<br/><sub>(SWE-bench Verified, official harness)</sub></th><th>task success</th><th>tied with full context?</th><th>reversible&nbsp;+&nbsp;certified?</th></tr>
+<tr><td><b>Distil</b> (relevance-gated)</td><td align="center"><b>36.8%</b></td><td align="center">✅ <b>only one</b></td><td align="center">✅</td></tr>
+<tr><td>Headroom <sub>(lossy)</sub></td><td align="center">32.6%</td><td align="center">❌ −6.6pp</td><td align="center">❌</td></tr>
+<tr><td>LLMLingua-2 <sub>(lossy)</sub></td><td align="center">2.4%</td><td align="center">❌ −36.8pp</td><td align="center">❌</td></tr>
+<tr><td>no compression <sub>(full)</sub></td><td align="center">39.2%</td><td align="center">—</td><td align="center">—</td></tr>
+</table>
+
+<p align="center"><b>Distil is the only compressor statistically tied with full context</b> — every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-long-horizon-reality-the-gate-where-it-belongs-e8">Full breakdown ↓</a></p>
 
 ---
 
@@ -39,7 +51,7 @@ Every agent re-sends its <em>entire</em> conversation to the model on every sing
 
 **👔 For decision-makers**
 
-Agents re-send their whole context every turn — you pay for it every turn. Distil cuts that **~27% (up to 33% per domain) at a certified-zero *decision-change* rate on our 7-domain trajectory corpus**, and *measures* it: savings and next-action accuracy on the **same runs**, gated in CI. That certificate is a **proxy** (next-action match), not a promise of end-to-end task success — and our real end-to-end test ([E7](#-end-to-end-reality-swe-bench-verified-e7)) shows aggressive *lossy* compression *does* cost task success — but on a real long-horizon agent the *reversible, relevance-gated* tier is the **highest-accuracy compressor and the only one non-inferior to full context** ([E8](#-long-horizon-reality-the-gate-where-it-belongs-e8): 36.8% vs 39.2%, −2.4pp, 95% CI [−5.7, +0.9]; +4.2pp over the best lossy competitor Headroom, *p*=0.035) — and the only one that's reversible *and* certified. So: honest proxy guarantee + a real end-to-end win on *certified* task success, not "trust us" and not "compression is free." (distil isn't the *cheapest* compressor — Headroom is — it's the only *certified* one.)
+You pay to re-send the whole context every turn. Distil cuts it **~27%** at a **certified-zero decision-change rate**, and *proves* it — savings and accuracy on the **same runs**, gated in CI. The only compressor that's **reversible *and* certified**, and the **only one tied with full context** on a real long-horizon agent ([E8](#-long-horizon-reality-the-gate-where-it-belongs-e8)). Not the cheapest — the only *certified* one.
 
 </td>
 <td width="33%" valign="top">
@@ -63,7 +75,7 @@ Compression reframed as **decision-equivalence** and certified with **TOST non-i
 
 ## 💡 The one idea
 
-**You don't need byte-equivalence, you need decision-equivalence.** Byte-lossless compression and high savings are information-theoretically in tension. But an agent only has to take the *same actions* whether or not its context was compressed — and *that* is measurable and certifiable as a **statistical bound on the next-action change rate**. Important caveat we measured ourselves: next-action equivalence is a **proxy**, and on a real multi-turn task (SWE-bench Verified, [E7](#-end-to-end-reality-swe-bench-verified-e7)) it **does not fully transfer to task success** once compression gets aggressive. Distil's honest value is *cache-aware savings inside a proxy-certified safety gate* — with a reversible recovery tier so the model can pull back anything it needs.
+**You don't need byte-equivalence — you need decision-equivalence.** An agent only has to take the *same actions* whether or not its context was compressed, and *that* is measurable and certifiable as a **statistical bound on the next-action change rate**. (The honest caveat, which we measured ourselves: that's a **proxy** — under aggressive *lossy* compression it doesn't fully transfer to task success, [E7](#-end-to-end-reality-swe-bench-verified-e7).) So Distil's value is **cache-aware savings inside a certified safety gate**, with a reversible tier the model can pull detail back from on demand.
 
 ---
 
@@ -98,7 +110,7 @@ data-analysis     data-analysis-sql           18.1%     PASS   FAIL     965
 devops            devops-rollback             25.0%     PASS   FAIL     857
 finance           finance-reconcile           29.1%     PASS   FAIL    1014
 ---------------------------------------------------------------------------
-aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) reversibly; 5761 tokens prunable.
+aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) reversibly; 5761 tokens causally prunable.
 GATE: PASS — every trajectory certified non-inferior; aggressive rejected on all.
 ```
 
@@ -139,8 +151,6 @@ Not reference implementations: the **actual installed packages** (`llmlingua`, `
 | LLMLingua-2 (`llmlingua`, real) | 53.1% | 20.0% | ❌ no | ~1,480 ms |
 | Headroom (`headroom-ai`, real) | 35.3% | 0.0% | ✅ yes | 26 ms |
 | ~~RTK~~ (`rtk-py`) | — | — | excluded¹ | — |
-
-<p align="center"><img src="docs/assets/head-to-head.svg" alt="Live head-to-head" width="100%"/></p>
 
 **Distil is the only method that is simultaneously the most aggressive, fully decision-equivalent, and the lowest-latency** — certified **83.2% savings at a 0% live decision-change rate** (≤5% guaranteed, 95% confidence), ~1,000× faster than the nearest tool. LLMLingua-2 cuts deep but flips **1-in-5** decisions (decision-*unaware*, fails the gate); Headroom is genuinely decision-*safe* but 2.4× less aggressive and loads a ModernBERT scorer. Full methodology, the certified frontier, and the *how-we-certified-and-why-it's-credible* writeup: **[BENCHMARKS.md](BENCHMARKS.md)** · [docs/benchmark](https://dshakes.github.io/distil/benchmark.html). Reproduce (live — **requires `ANTHROPIC_API_KEY`** + a generated corpus, so it is *not* offline-reproducible): `python benchmarks/gen_realworld.py 30 /tmp/c && python benchmarks/derc_live_compare.py`. With no key, the offline `distil bench` / `eval` / `benchmark` numbers reproduce exactly.
 
@@ -223,6 +233,11 @@ Six conditions through the identical agent, scored on **actual test-pass rate** 
 - **Digest mode per tier** (honest ablation): skeleton for the *active* `distil_expand` tier; head-truncation for the *passive* relevance-gated tier — a navigable skeleton *backfires* there (the agent over-trusts it, never re-reads, edits against body-less context: 36.8% → 5.6%). Matching digest to tier behavior is the finding.
 - **Certificate:** skeleton digest is **100% byte-exact reversible**, **0% decision-change with recovery** (E9 also bounds per-turn → trajectory: only ~1.8 of ~27 turns are outcome-determining).
 
+<details>
+<summary><b>📚 The full statistical proof — for skeptics.</b> Trajectory-level certificate (E10), generality across 5 models / 3 vendors (E11), auto-calibration, the cost frontier, and the anytime-valid drift monitor. The headline (E7/E8) is above; this is the depth.</summary>
+
+<br/>
+
 ### The guarantee, lifted to whole runs (E10)
 
 The certificate above is *per-turn* (next-action equivalence). **E10 lifts it to the trajectory level** — a distribution-free, finite-sample guarantee on the unit you actually care about, the whole run:
@@ -285,6 +300,8 @@ Full details and status: [`docs/GA_READINESS.md`](docs/GA_READINESS.md).
 The certificate holds under *exchangeability* — so the standing risk is silent drift. Distil ships an **anytime-valid drift monitor** (`distil/drift.py:DriftMonitor`): a betting e-process for `H0: risk ≤ α` (hedged capital, Waudby-Smith & Ramdas 2023) whose false-alarm probability is ≤ δ **no matter how often you check it** (Ville's inequality). You can watch live decision-change after *every turn* with no multiplicity penalty; when it crosses `1/δ` the live risk has exceeded the certified budget → recalibrate or fall back to full context. Alongside it: the same betting bound gives a variance-adaptive **anytime-valid certificate** for graded losses (`conformal.betting_upper_bound`), and a **cross-family grader ensemble** (`distil/ensemble.py`) with conservative "any-change" aggregation keeps the measured risk an upper bound even if one grader family is unfaithful. To our knowledge this is the **first anytime-valid drift monitor for a context-compression decision-equivalence certificate** — validated for bounded false alarms under continuous peeking + high detection power (`tests/test_drift.py`).
 
 Full methodology, per-instance data, McNemar tests: [`docs/PAPER.md`](docs/PAPER.md) · paper §E8–E12 · committed results (predictions, scores, official harness reports) in `docs/paper/results/swe_e2e_longhorizon/` and `docs/paper/results/swe_e2e_longhorizon_deepseek/`.
+
+</details>
 
 ---
 
@@ -588,6 +605,11 @@ Beyond the offline corpus gate, Distil ships a **decision-equivalence proof harn
 that removes any circularity by grading **real agent traces with a real model** — no
 planted markers, no synthetic oracle.
 
+<details>
+<summary><b>The full experiment ledger (E1–E8) — data sources, graders, and every honest caveat.</b></summary>
+
+<br/>
+
 - **Real data, no HuggingFace needed** — `python benchmarks/fetch_real.py tau --src tau:gpt-4o-airline --out tau.json` pulls real τ-bench trajectories (the tau-bench repo ships them); SWE-bench adapters included.
 - **Experiments**: **E1** savings-vs-decision-change frontier · **E2** *certification coverage* (certify on calibration, verify the realized decision-change rate stays ≤ α on a disjoint held-out split, over many splits — the out-of-sample proof) · **E3** leave-one-domain-out shift · **E4** downstream task-success (proxy) · **E5–E6** real-baseline head-to-head + honest operating-point selection · **E7** *real end-to-end task-success* on SWE-bench Verified with the official harness · **E8** *long-horizon* agent task-success (30-turn ReAct, full 500-instance Verified) where the relevance-gate engages (`benchmarks/prove.py` for E1–E6; `benchmarks/swe_bench_e2e/` for E7; `benchmarks/long_horizon/` for E8).
 - **Real-model graders, three ways** — `--runner claude-cli` (your Claude subscription, no API key), `--runner openai` (vLLM/Ollama/any OpenAI-compatible, free at scale), `--runner anthropic` (forced-tool, structured). Majority-vote; `--expand` measures the reversible tier **with** the recovery loop.
@@ -597,7 +619,27 @@ planted markers, no synthetic oracle.
 - **End-to-end task-success — does the certified operating point survive real execution? (E7, v0.25)** — the first non-proxy test: a real agent (**aider + `claude-sonnet-4-6`**, temp 0, diff edit format) run end-to-end on **SWE-bench Verified (50 instances, seed 1729)** and scored by the **official `swebench` harness**, across three conditions sharing the identical agent. **Full context resolves 52.0% (26/50)**; **distil at its certified `trunc@500` operating point only 16.0% (8/50)**; **LLMLingua-2 26.0% (13/50)**. distil's certified point loses to full context by **36 points (paired McNemar `p<0.001`)** and does **not** beat LLMLingua-2 — at `trunc@500` it strips **86%** of agentic context (vs LLMLingua-2's 48%), so its lower score is partly aggression, not purely method. The honest headline: **the localization decision-equivalence certificate does *not* transfer to end-to-end task success once compression is aggressive** — `trunc@500` was certified at 4.0% decision-change yet collapses pass@1 by 36 points. The contract (decision-equivalence) is right; the certified *rate*, not the chosen compressor, is the contribution. Total spend $33.66; every number traces to [`docs/paper/results/swe_bench_verified_e2e.json`](docs/paper/results/swe_bench_verified_e2e.json). Full writeup: **E7 in the [compiled paper (PDF)](docs/paper/main.pdf)**.
 - **Long-horizon task-success — the gate's proper test (E8, v0.27)** — E7's relevance-gate was a no-op on ≤6-turn localization, so E8 runs the workload it was *designed* for: a custom **30-turn ReAct agent** on the **full 500-instance SWE-bench Verified** set (official harness, `claude-haiku-4-5`, temp 0, mean ~27 turns), **six** conditions through the identical agent. **Full context 39.2% (196/500).** The **relevance-gated reversible** tier is the top compressor at **36.8% (184/500)** — the **only one non-inferior to full** (−2.4pp, 95% CI [−5.7, +0.9]; non-inferior at a 6pp margin) and **+4.2pp over the strongest competitor Headroom** (32.6%, paired McNemar *p*=0.035). The new **content-aware skeleton digest + sticky expansion** lift the active-recovery tier **28.8% → 32.4%** at ~9× fewer fresh tokens (an honest ablation: the same skeleton *regresses* the passive gated tier 36.8%→5.6%, so digest mode is matched to tier). Lossy baselines crater (`trunc@500` 5.6%, LLMLingua-2 2.4%, both *p*<0.001). **distil's win is certified accuracy + guarantees, not raw cost** — Headroom is cheaper but uncertified/lossy; distil's tier is the only reversible **and** certified one (skeleton digest: 100% byte-exact reversible, 0% decision-change with recovery). Every number traces to [`docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json`](docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json). Full writeup: **E8 in the [compiled paper (PDF)](docs/paper/main.pdf)**.
 
+</details>
+
 > **Docs:** [`docs/paper/main.pdf`](docs/paper/main.pdf) (**compiled paper, PDF**) · [`benchmarks/PROVE.md`](benchmarks/PROVE.md) (harness) · [`docs/PAPER_PLAN.md`](docs/PAPER_PLAN.md) (protocol) · [`docs/PAPER.md`](docs/PAPER.md) (findings) · [`docs/paper/`](docs/paper/) (arXiv-ready LaTeX source + TikZ figures) · [`docs/PUBLISHING.md`](docs/PUBLISHING.md) (how to publish — first-timer guide).
+
+---
+
+<h3 align="center">Stop paying to re-send context your agent never reads.</h3>
+
+<p align="center">
+<code>pipx install distil-llm && distil bench</code><br/>
+<sub>certified savings across 7 domains in ~10 seconds — zero API key, zero runtime deps</sub>
+</p>
+
+<p align="center">
+<a href="https://dshakes.github.io/distil/getting-started.html"><b>Get started →</b></a> ·
+<a href="#-works-with-every-sdk">Wire it into your SDK</a> ·
+<a href="docs/PAPER.md">Read the proof</a> ·
+<a href="https://pypi.org/project/distil-llm/">PyPI</a>
+</p>
+
+---
 
 ## 🤝 Contributing
 
