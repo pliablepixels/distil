@@ -373,7 +373,12 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
 
     led = ShadowLedger.load()
     if led.samples == 0:
-        print("No shadow samples yet. Run `distil proxy --shadow 0.05` to sample live traffic.")
+        print(
+            "No shadow samples yet. Start it in one command:\n"
+            "  distil wrap --shadow 0.1 -- claude   "
+            "(or codex/gemini; add --lossless-only on a subscription)\n"
+            "then use your agent normally — samples accumulate as you work."
+        )
         return 0
     change = led.rate()
     print("Shadow-mode live decision-equivalence (real traffic, content-free)\n")
