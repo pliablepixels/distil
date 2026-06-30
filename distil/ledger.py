@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import html as _html
 import json
+import re
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -189,63 +190,74 @@ def render_dashboard(
     subscription: bool = False,
     color: bool = True,
 ) -> str:
-    """A compact, glanceable terminal dashboard of cumulative savings.
+    """A framed, glanceable terminal dashboard of cumulative savings.
 
     Pure function (no I/O) so it's trivially testable; the live loop in the CLI
-    just re-renders it on an interval. ``change_rate`` is the decision-change
-    rate from shadow mode (so equivalence is ``1 - change_rate``)."""
+    re-renders it on an interval inside the alternate screen. ``change_rate`` is
+    the decision-change rate from shadow mode (equivalence is ``1 - change_rate``)."""
+    inner = 54  # visible width inside the frame
 
     def c(code: str, t: str) -> str:
         return f"\033[{code}m{t}\033[0m" if color else t
 
-    out = [c("1;38;5;79", "  distil") + c("90", "  ·  live savings"), ""]
+    def vlen(t: str) -> int:  # visible length, ignoring ANSI colour codes
+        return len(re.sub(r"\033\[[0-9;]*m", "", t))
+
+    def row(content: str = "") -> str:
+        return "│ " + content + " " * max(0, inner - vlen(content)) + " │"
+
+    top = "╭" + "─" * (inner + 2) + "╮"
+    sep = "├" + "─" * (inner + 2) + "┤"
+    bot = "╰" + "─" * (inner + 2) + "╯"
+
+    out = [top, row(c("1;38;5;79", "distil") + c("90", "  ·  live savings")), sep]
 
     if s.runs == 0:
-        out.append(c("90", "  no savings yet — run  ") + c("36", "distil wrap -- <agent>"))
+        out.append(row(c("90", "no savings yet — run ") + c("36", "distil wrap -- <agent>")))
+        out.append(bot)
         return "\n".join(out)
 
     trimmed = (
         0.0 if s.total_baseline_tokens == 0 else 1 - s.total_distil_tokens / s.total_baseline_tokens
     )
-    out.append(f"  tokens          {c('36', _bar(trimmed))}  {trimmed * 100:4.1f}% trimmed")
+    out.append(row(f"{'tokens':<15}{c('36', _bar(trimmed, 18))}  {trimmed * 100:4.1f}% trimmed"))
     out.append(
-        c(
-            "90",
-            f"                  {_human(s.total_baseline_tokens)} → {_human(s.total_distil_tokens)}",
-        )
+        row(c("90", f"{'':<15}{_human(s.total_baseline_tokens)} → {_human(s.total_distil_tokens)}"))
     )
 
     if subscription:
-        out.append(c("90", "  cost            flat-rate subscription — dollars are notional"))
+        out.append(row(f"{'cost':<15}" + c("90", "flat-rate subscription — $ notional")))
     else:
         saved = s.total_baseline_dollars - s.total_distil_dollars
         out.append(
-            f"  cost            ${s.total_baseline_dollars:,.2f} → ${s.total_distil_dollars:,.2f}   "
-            + c("32", f"(${saved:,.2f} saved)")
+            row(
+                f"{'cost':<15}${s.total_baseline_dollars:,.2f} → ${s.total_distil_dollars:,.2f}   "
+                + c("32", f"(${saved:,.2f} saved)")
+            )
         )
 
     if samples and change_rate is not None:
         eq = 1 - change_rate
-        out.append(
-            f"  decision-equiv  {c('35', _bar(eq))}  {eq * 100:5.1f}%  ({samples:,} samples)"
-        )
+        out.append(row(f"{'decision-equiv':<15}{c('35', _bar(eq, 18))}  {eq * 100:4.1f}%"))
+        out.append(row(c("90", f"{'':<15}{samples:,} samples")))
     else:
         out.append(
-            c("90", "  decision-equiv  — no shadow samples yet (")
-            + c("36", "distil proxy --shadow 0.1")
-            + c("90", ")")
+            row(
+                f"{'decision-equiv':<15}" + c("90", "— run ") + c("36", "distil proxy --shadow 0.1")
+            )
         )
 
-    out.append("")
-    out.append(c("90", f"  {s.runs} run{'s' if s.runs != 1 else ''}"))
+    out.append(row())
+    out.append(row(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}")))
 
     if s.by_trajectory:
-        top = sorted(s.by_trajectory.items(), key=lambda kv: kv[1], reverse=True)[:5]
-        mx = max((v for _, v in top), default=0.0) or 1.0
-        out.append("")
-        for name, val in top:
-            label = (name[:17] + "…") if len(name) > 18 else name
+        top5 = sorted(s.by_trajectory.items(), key=lambda kv: kv[1], reverse=True)[:5]
+        mx = max((v for _, v in top5), default=0.0) or 1.0
+        out.append(sep)
+        for name, val in top5:
+            label = (name[:15] + "…") if len(name) > 16 else name
             tail = "" if subscription else f"  ${val:,.2f}"
-            out.append(f"  {label:18} {c('36', _bar(val / mx, 14))}{tail}")
+            out.append(row(f"{label:<17}{c('36', _bar(val / mx, 12))}{tail}"))
 
+    out.append(bot)
     return "\n".join(out)

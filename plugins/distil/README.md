@@ -60,6 +60,23 @@ distil_seg="$(distil statusline 2>/dev/null || true)"
 `distil statusline` prints nothing when distil isn't installed, and `2>/dev/null || true`
 keeps your line clean either way.
 
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/distil` | Your savings report + how to route more traffic through distil |
+| `/distil-stats` | Full breakdown — orig→compressed tokens, cost, runs, per-trajectory bars |
+| `/distil-shadow` | Decision-equivalence: did compression preserve your agent's next action? |
+| `/distil-dashboard` | Open the interactive HTML savings dashboard in your browser |
+
+Want a **live, refreshing view in your terminal**? Run the CLI directly (outside the
+slash-command flow, e.g. in a split pane):
+
+```bash
+distil dashboard            # live TUI — token-trim + decision-equiv bars, Ctrl-C to exit
+distil dashboard --once     # one static frame (pipe-friendly)
+```
+
 ## Actually compress traffic
 
 The status line reflects the local savings ledger. Populate it by routing an agent

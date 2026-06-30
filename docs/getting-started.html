@@ -146,7 +146,9 @@ distil wrap --lossless-only -- claude
 <span class="d"># Codex, Gemini CLI, or any agent — same pattern:</span>
 distil wrap --expand -- codex</pre>
     <p>Then watch genuine, measured savings from <em>your</em> traffic (not estimates):</p>
-    <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger</span></pre>
+    <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger</span>
+distil dashboard            <span class="d"># live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit</span></pre>
+    <p>The <strong>status line</strong> and <code>distil dashboard</code> both honor <code>DISTIL_SUBSCRIPTION=1</code> — on a flat-rate plan the per-token dollar figure is notional, so it's dropped and the token reduction leads. Inside Claude Code, the <code>/distil-stats</code>, <code>/distil-shadow</code>, and <code>/distil-dashboard</code> commands surface the same data on demand.</p>
     <div class="callout">
       <strong>Will it save me money?</strong> Only on <strong>metered / pay-as-you-go</strong> billing (an API key): fewer tokens → fewer dollars. On a <strong>subscription</strong> you're flat-rate, so there's no per-token bill to cut — Distil still trims context and latency. <strong>Honest about coding agents:</strong> on short sessions the win is modest (~7% — the agent re-expands most of what it edits); the real savings land on <strong>long, many-turn sessions</strong> with large context the model never re-reads. Prefer an in-process hook or an org-wide proxy? See <a href="integrations.html">Integrations</a>.
     </div>

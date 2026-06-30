@@ -508,19 +508,22 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
 
     interval = max(0.5, args.interval)
     try:
-        sys.stdout.write("\033[?25l")  # hide cursor
+        # Alternate screen buffer (like htop/less/vim): the dashboard owns a
+        # full screen that redraws in place — no scrollback pollution — and the
+        # user's prompt is restored intact on exit.
+        sys.stdout.write("\033[?1049h\033[?25l")  # enter alt screen + hide cursor
         while True:
-            sys.stdout.write("\033[2J\033[H")  # clear screen + cursor home
+            sys.stdout.write("\033[H\033[2J")  # home + clear (in-place redraw)
             sys.stdout.write(frame())
             sys.stdout.write(
-                f"\n\n  \033[90mrefreshing every {interval:g}s · Ctrl-C to exit\033[0m\n"
+                f"\n\n  \033[90mrefreshing every {interval:g}s · Ctrl-C to exit\033[0m"
             )
             sys.stdout.flush()
             time.sleep(interval)
     except KeyboardInterrupt:
         pass
     finally:
-        sys.stdout.write("\033[?25h\n")  # restore cursor
+        sys.stdout.write("\033[?25h\033[?1049l")  # show cursor + leave alt screen
         sys.stdout.flush()
     return 0
 

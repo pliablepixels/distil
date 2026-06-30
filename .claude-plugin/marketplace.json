@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "distil",
-      "description": "Live token-savings status line + /distil controls for distil context compression",
+      "description": "Live savings status line + terminal dashboard, and /distil · /distil-stats · /distil-shadow · /distil-dashboard commands for distil context compression",
       "source": "./plugins/distil",
       "category": "development",
       "homepage": "https://github.com/dshakes/distil"

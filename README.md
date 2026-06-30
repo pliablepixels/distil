@@ -64,6 +64,7 @@ Then watch genuine savings from **your** traffic — measured, not estimated:
 
 ```bash
 distil leaderboard          # cumulative tokens + $ saved, from the local ledger
+distil dashboard            # live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit
 ```
 
 **Validate it preserved your outcomes.** Compression is only safe if your agent makes the *same decision* it would on full context. `--shadow` proves it on your live traffic: it samples a fraction of requests, runs each one twice (compressed **and** full prompt), and compares the agent's **chosen next action** — the tool call it decides to make, not the prose:
