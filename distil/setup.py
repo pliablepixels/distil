@@ -53,3 +53,174 @@ def wire_statusline(
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return ("ok", f"wired the distil status line into {settings_path}")
+
+
+# ── distil default: route an agent through distil by default ─────────────────
+# Two strategies, both via a single marked block we can add/replace/remove:
+#   A (alias):     wrap the agent command — no daemon, no single point of failure.
+#   B (always-on): a persistent ANTHROPIC_BASE_URL + a managed proxy service —
+#                  universal (every SDK), but the proxy must stay up.
+
+_MARK_START = "# >>> distil (managed) — route your agent through distil >>>"
+_MARK_END = "# <<< distil (managed) <<<"
+
+
+def _is_windows() -> bool:
+    import platform
+
+    return platform.system() == "Windows"
+
+
+def detect_shell() -> tuple[str, Path]:
+    """(shell_name, rc_path) — the file an *interactive* shell actually sources.
+
+    Each machine differs, so this is explicit about conventions and reported back
+    to the user rather than applied blind: zsh→.zshrc, fish→config.fish, bash→.bashrc
+    (interactive; .bash_profile only if that's the one present), PowerShell→$PROFILE,
+    otherwise →.profile."""
+    import os
+
+    home = Path.home()
+    if _is_windows():
+        prof = os.environ.get("PROFILE")
+        return (
+            "powershell",
+            Path(prof)
+            if prof
+            else home / "Documents" / "WindowsPowerShell" / "Microsoft.PowerShell_profile.ps1",
+        )
+    name = os.path.basename(os.environ.get("SHELL", "")).lower()
+    fish_rc = home / ".config" / "fish" / "config.fish"
+
+    def _bash_rc() -> Path:
+        if (home / ".bashrc").exists():
+            return home / ".bashrc"
+        if (home / ".bash_profile").exists():
+            return home / ".bash_profile"
+        return home / ".bashrc"
+
+    # An explicit $SHELL is authoritative — it beats file-existence heuristics.
+    if "fish" in name:
+        return ("fish", fish_rc)
+    if "zsh" in name:
+        return ("zsh", home / ".zshrc")
+    if "bash" in name:
+        return ("bash", _bash_rc())
+    # $SHELL unset/unknown: fall back to whichever rc actually exists.
+    if fish_rc.exists():
+        return ("fish", fish_rc)
+    if (home / ".zshrc").exists():
+        return ("zsh", home / ".zshrc")
+    if (home / ".bashrc").exists() or (home / ".bash_profile").exists():
+        return ("bash", _bash_rc())
+    return (name or "sh", home / ".profile")
+
+
+def default_shell_rc() -> Path:
+    """Back-compat: just the rc path from :func:`detect_shell`."""
+    return detect_shell()[1]
+
+
+def alias_body(agent: str, mode: str, *, shell: str | None = None) -> str:
+    """Strategy A — wrap the agent command on demand (fish/posix share `alias`)."""
+    sh = shell if shell is not None else ("powershell" if _is_windows() else "")
+    if sh == "powershell":
+        return f"function {agent} {{ distil wrap --{mode} -- {agent} @args }}"
+    return f"alias {agent}='distil wrap --{mode} -- {agent}'"
+
+
+def env_body(port: int, *, shell: str | None = None) -> str:
+    """Strategy B — point every SDK at the always-on proxy (shell-specific syntax)."""
+    sh = shell if shell is not None else ("powershell" if _is_windows() else "")
+    if sh == "powershell":
+        return f'$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:{port}"'
+    if sh == "fish":
+        return f"set -gx ANTHROPIC_BASE_URL http://127.0.0.1:{port}"
+    return f"export ANTHROPIC_BASE_URL=http://127.0.0.1:{port}"
+
+
+def write_managed(rc: Path, body: str) -> tuple[str, str]:
+    """Install/update the single managed block in ``rc`` (backs up before changing).
+
+    Returns (status, message): ``ok`` | ``updated`` | ``exists``."""
+    import re
+
+    block = f"{_MARK_START}\n{body}\n{_MARK_END}\n"
+    text = rc.read_text(encoding="utf-8") if rc.exists() else ""
+    if _MARK_START in text:
+        new = re.sub(
+            re.escape(_MARK_START) + r".*?" + re.escape(_MARK_END) + r"\n?", block, text, flags=re.S
+        )
+        if new == text:
+            return ("exists", f"already configured in {rc}")
+        rc.with_name(rc.name + ".bak").write_text(text, encoding="utf-8")
+        rc.write_text(new, encoding="utf-8")
+        return ("updated", f"updated the distil default in {rc}")
+    rc.parent.mkdir(parents=True, exist_ok=True)
+    if rc.exists():
+        rc.with_name(rc.name + ".bak").write_text(text, encoding="utf-8")
+    sep = "" if (not text or text.endswith("\n")) else "\n"
+    rc.write_text(text + sep + "\n" + block, encoding="utf-8")
+    return ("ok", f"configured the distil default in {rc}")
+
+
+def remove_managed(rc: Path) -> tuple[str, str]:
+    """Remove the managed block from ``rc`` (idempotent)."""
+    import re
+
+    if not rc.exists():
+        return ("absent", f"nothing to remove ({rc} doesn't exist)")
+    text = rc.read_text(encoding="utf-8")
+    if _MARK_START not in text:
+        return ("absent", f"distil default not found in {rc}")
+    new = re.sub(
+        r"\n?" + re.escape(_MARK_START) + r".*?" + re.escape(_MARK_END) + r"\n?",
+        "\n",
+        text,
+        flags=re.S,
+    )
+    rc.with_name(rc.name + ".bak").write_text(text, encoding="utf-8")
+    rc.write_text(new, encoding="utf-8")
+    return ("ok", f"removed the distil default from {rc}")
+
+
+def service_spec(port: int, mode: str) -> tuple[Path | None, str | None, str | None]:
+    """Always-on proxy service for this platform: (path, file_content, load_command).
+
+    Returns (None, None, None) on an unsupported platform."""
+    import platform
+    import shutil
+
+    home = Path.home()
+    distil = shutil.which("distil") or "distil"
+    sysname = platform.system()
+    if sysname == "Darwin":
+        path = home / "Library" / "LaunchAgents" / "com.distil.proxy.plist"
+        content = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+            '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+            '<plist version="1.0"><dict>\n'
+            "  <key>Label</key><string>com.distil.proxy</string>\n"
+            "  <key>ProgramArguments</key><array>\n"
+            f"    <string>{distil}</string><string>proxy</string>"
+            f"<string>--{mode}</string><string>--port</string><string>{port}</string>\n"
+            "  </array>\n"
+            "  <key>RunAtLoad</key><true/>\n"
+            "  <key>KeepAlive</key><true/>\n"
+            "</dict></plist>\n"
+        )
+        load = f"launchctl unload '{path}' 2>/dev/null; launchctl load '{path}'"
+        return path, content, load
+    if sysname == "Linux":
+        path = home / ".config" / "systemd" / "user" / "distil-proxy.service"
+        content = (
+            "[Unit]\nDescription=distil compression proxy\nAfter=network-online.target\n\n"
+            f"[Service]\nExecStart={distil} proxy --{mode} --port {port}\nRestart=always\n\n"
+            "[Install]\nWantedBy=default.target\n"
+        )
+        load = (
+            "systemctl --user daemon-reload && systemctl --user enable --now distil-proxy.service"
+        )
+        return path, content, load
+    return (None, None, None)

@@ -738,6 +738,11 @@ verifiable savings — 3 verified instance(s), 0 rejected
 
     <hr/>
 
+    <h2 id="default">distil default</h2>
+    <p>Make distil the default for your agent so you don't type <code>distil wrap</code> every session. Writes a single <strong>managed, marked, backed-up, idempotent</strong> block to the shell rc distil detects for <em>this</em> machine — zsh (<code>.zshrc</code>), bash (<code>.bashrc</code>/<code>.bash_profile</code>), fish (<code>config.fish</code>), or PowerShell (<code>$PROFILE</code>) — using the correct syntax for each (alias / function / <code>export</code> / <code>set&nbsp;-gx</code>). An explicit <code>$SHELL</code> wins over file-existence guesses, and the command <strong>prints what it detected</strong> (shell, rc, agent, mode) rather than acting blind. <code>--always-on</code> instead installs a persistent proxy service (launchd / systemd) plus <code>ANTHROPIC_BASE_URL</code> so <em>every</em> base-URL-honoring SDK routes through distil — universal, but a daemon you keep alive and a single point of failure if it's down. <code>--undo</code> removes whichever is installed; <code>--agent</code>, <code>--mode</code>, <code>--rc</code> override the detected defaults. <a href="#onboard">distil onboard</a> offers it interactively.</p>
+
+    <hr/>
+
     <h2 id="dashboard">distil dashboard</h2>
     <p>Live terminal dashboard of your cumulative savings — a framed panel with Unicode bars for token-trim and decision-equivalence, original&nbsp;&rarr;&nbsp;compressed tokens and cost, a recent-decisions strip, and per-trajectory bars. Uses the alternate screen (like <code>htop</code>): redraws in place and restores your prompt on exit. <code>--once</code> prints a single frame; <code>--interval</code> sets refresh seconds. On a flat-rate subscription the dollar figures are dropped automatically (<code>DISTIL_SUBSCRIPTION</code> overrides).</p>
 

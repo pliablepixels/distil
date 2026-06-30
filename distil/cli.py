@@ -629,7 +629,23 @@ def cmd_onboard(args: argparse.Namespace) -> int:
             print(f"     {c('90', note)}")
     print()
 
-    # Smart finish: offer to run the first step right now (route the agent).
+    # Highest-leverage finish: make distil the persistent default (no per-session wrap).
+    if env.agents and ask("Make distil the default for your agent — no per-session wrap?"):
+        print()
+        cmd_default(
+            argparse.Namespace(
+                rc=None,
+                agent=None,
+                mode=None,
+                port=8788,
+                undo=False,
+                always_on=False,
+                no_start=False,
+            )
+        )
+        print()
+
+    # Or just route the agent once, right now.
     if env.agents:
         first_cmd = steps[0][1]
         if ask(f"Start now — run step 1?  ({first_cmd})"):
@@ -642,6 +658,82 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         + c("90", "   ·   for agents: ")
         + c("36", "distil onboard --json")
     )
+    return 0
+
+
+def cmd_default(args: argparse.Namespace) -> int:
+    """Make distil the default for your agent — no per-session `distil wrap`.
+
+    Default (A): a managed shell alias that wraps the agent. ``--always-on`` (B):
+    a persistent proxy service + ANTHROPIC_BASE_URL so every SDK routes through it.
+    ``--undo`` removes whichever is installed."""
+    import subprocess
+    from pathlib import Path
+
+    from . import onboard
+    from .setup import (
+        alias_body,
+        detect_shell,
+        env_body,
+        remove_managed,
+        service_spec,
+        write_managed,
+    )
+
+    shell, detected_rc = detect_shell()
+    rc = Path(args.rc) if args.rc else detected_rc
+    env = onboard.detect()
+    agent = args.agent or (env.agents[0][0] if env.agents else "claude")
+    mode = args.mode or ("lossless-only" if env.subscription else "expand")
+    # Transparency over magic: each machine differs, so show what was detected.
+    print(f"detected: shell={shell}  rc={rc}  agent={agent}  mode={mode}")
+    if not rc.exists() and not args.undo:
+        print(f"  note: {rc} doesn't exist yet — it'll be created. If your shell reads a")
+        print("  different file, pass --rc <path>.")
+
+    if args.undo:
+        st, msg = remove_managed(rc)
+        print(("✓ " if st in ("ok", "absent") else "✗ ") + msg)
+        path, _, _ = service_spec(args.port, mode)
+        if path is not None and path.exists():
+            try:
+                path.unlink()
+                print(f"✓ removed proxy service {path}")
+            except OSError:
+                pass
+        print(f"  open a new terminal (or: source {rc}) to finish")
+        return 0
+
+    if args.always_on:
+        path, content, load = service_spec(args.port, mode)
+        if path is None:
+            print(
+                "✗ always-on service isn't supported on this platform yet — drop --always-on "
+                "for the alias, or run `distil proxy` yourself."
+            )
+            return 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        print(f"✓ wrote proxy service → {path}")
+        _st, msg = write_managed(rc, env_body(args.port, shell=shell))
+        print(f"✓ {msg}  (ANTHROPIC_BASE_URL → http://127.0.0.1:{args.port})")
+        if load and not args.no_start:
+            ok = subprocess.run(load, shell=True).returncode == 0
+            print("  ✓ proxy service running" if ok else f"  ⚠ start it manually: {load}")
+        print(
+            f"\nEvery base-URL-honoring tool now routes through distil. Reload your shell (source {rc})."
+        )
+        print(
+            "Heads-up: a persistent ANTHROPIC_BASE_URL is a single point of failure — if the proxy"
+        )
+        print("is down, clients can't reach the API. Undo: distil default --always-on --undo")
+        return 0
+
+    st, msg = write_managed(rc, alias_body(agent, mode, shell=shell))
+    glyph = {"ok": "✓", "updated": "✓", "exists": "✓"}.get(st, "⚠")
+    print(f"{glyph} {msg}")
+    print(f"  `{agent}` now routes through distil (--{mode}). Reload your shell (source {rc}).")
+    print("  Undo anytime: distil default --undo")
     return 0
 
 
@@ -1377,6 +1469,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ob.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     ob.set_defaults(func=cmd_onboard)
+
+    de = sub.add_parser(
+        "default", help="make distil the default for your agent (no per-session wrap)"
+    )
+    de.add_argument(
+        "--always-on",
+        action="store_true",
+        help="strategy B: persistent proxy service + ANTHROPIC_BASE_URL (covers every SDK)",
+    )
+    de.add_argument("--agent", help="agent command to wrap (default: detected, e.g. claude)")
+    de.add_argument(
+        "--mode",
+        choices=("lossless-only", "expand", "verbatim", "safe"),
+        help="wrap/proxy mode (default: lossless-only on a subscription, else expand)",
+    )
+    de.add_argument(
+        "--port", type=int, default=8788, help="proxy port for --always-on (default 8788)"
+    )
+    de.add_argument(
+        "--no-start", action="store_true", help="--always-on: write the service but don't start it"
+    )
+    de.add_argument("--undo", action="store_true", help="remove the distil default")
+    de.add_argument("--rc", help="shell rc/profile path (default: auto-detected)")
+    de.set_defaults(func=cmd_default)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"
