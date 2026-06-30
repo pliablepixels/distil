@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased] — 1.4.0 dev
+## [1.4.0] — 2026-06-30 — Make distil the default
 
 ### Added
 - **`distil default` — make distil the default for your agent, no per-session
