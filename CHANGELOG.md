@@ -3,6 +3,29 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.4.0 dev
+
+### Added
+- **`distil default` — make distil the default for your agent, no per-session
+  `distil wrap`.** Writes a single managed (marked, backed-up, idempotent) block
+  to the shell rc that distil actually detects for *this* machine — zsh (`.zshrc`),
+  bash (`.bashrc`/`.bash_profile`), fish (`config.fish`), or PowerShell (`$PROFILE`)
+  — using the right syntax for each (alias / function / `export` / `set -gx`). An
+  explicit `$SHELL` wins over file-existence guesses, and the command **reports
+  what it detected** rather than acting blind. `--always-on` installs a persistent
+  proxy service (launchd / systemd) + `ANTHROPIC_BASE_URL` so *every* SDK routes
+  through distil (with an honest single-point-of-failure caveat); `--undo` removes
+  whichever is installed. `distil onboard` now offers it interactively.
+- **`distil onboard` is now upgrade-aware and agent-ready.** It checks PyPI
+  (offline-safe) and, if a newer release exists, shows the exact upgrade command
+  for your install method (pipx/uv/pip) — `--upgrade` runs it. New
+  **`distil onboard --json`** emits the full environment + version status +
+  recommendations as structured data so an agent can reason over it.
+- **Intelligent `/distil-onboard` skill** — rather than a static installer, the
+  Claude Code command now senses via `--json`, assesses *your* situation
+  (upgrade, which agent, billing reality, gaps), and guides you through setup +
+  validation conversationally, asking and adapting rather than ticking boxes.
+
 ## [1.3.0] — 2026-06-30 — One-command onboarding
 
 ### Added

@@ -30,9 +30,13 @@ class Env:
     has_anthropic: bool = False
     has_api_key: bool = False
     subscription: bool = False
+    installed_version: str = ""
+    method: str = "pip"  # how distil is installed: pipx | uv | uvx | pip
 
 
 def detect() -> Env:
+    from . import __version__
+
     return Env(
         os_name=platform.system() or "unknown",
         managers=[m for m in _MANAGERS if shutil.which(m)],
@@ -40,7 +44,66 @@ def detect() -> Env:
         has_anthropic=importlib.util.find_spec("anthropic") is not None,
         has_api_key=bool(os.environ.get("ANTHROPIC_API_KEY")),
         subscription=subscription_mode(),
+        installed_version=__version__,
+        method=install_method(),
     )
+
+
+def install_method() -> str:
+    """How the running distil is installed — drives the right upgrade command."""
+    from . import __file__ as pkg_file
+
+    p = (pkg_file or "").replace(os.sep, "/").lower()
+    if "/pipx/" in p:
+        return "pipx"
+    if "/uv/tools/" in p:
+        return "uv"
+    if "/uv/" in p or "/.cache/uv/" in p:
+        return "uvx"  # ephemeral run — nothing persistent to upgrade
+    return "pip"
+
+
+def upgrade_command(method: str) -> str:
+    return {
+        "pipx": "pipx upgrade distil-llm",
+        "uv": "uv tool upgrade distil-llm",
+        "uvx": "uvx --from distil-llm@latest distil onboard   # uvx runs the latest each time",
+        "pip": "pip install --upgrade distil-llm",
+    }.get(method, "pip install --upgrade distil-llm")
+
+
+def latest_pypi_version(timeout: float = 2.5) -> str | None:
+    """Latest distil-llm version on PyPI, or None if offline / the check fails."""
+    import json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(
+            "https://pypi.org/pypi/distil-llm/json", timeout=timeout
+        ) as resp:
+            return json.load(resp)["info"]["version"]
+    except Exception:  # noqa: BLE001 — offline / DNS / timeout: just skip the check
+        return None
+
+
+def _ver_tuple(s: str) -> tuple[tuple[int, ...], bool]:
+    import re
+
+    nums = re.findall(r"\d+", s.split("+")[0])[:3]
+    base = tuple(int(n) for n in nums) + (0,) * (3 - len(nums))
+    is_pre = bool(re.search(r"(dev|rc|a|b)\d*", s))
+    return base, is_pre
+
+
+def is_outdated(installed: str, latest: str | None) -> bool:
+    """True if a newer *released* version than ``installed`` is available."""
+    if not latest:
+        return False
+    bi, pre_i = _ver_tuple(installed)
+    bl, _pre_l = _ver_tuple(latest)
+    if bi != bl:
+        return bi < bl
+    return pre_i  # same base number, but ours is a pre-release of it → older
 
 
 def best_install_command(managers: list[str]) -> str:
@@ -125,3 +188,29 @@ def next_steps(env: Env) -> list[tuple[str, str, str]]:
             )
         )
     return steps
+
+
+def report(env: Env, latest: str | None) -> dict:
+    """A structured snapshot for an agent to reason over (`distil onboard --json`).
+
+    Pure facts + recommendations — no actions taken. The intelligence (deciding,
+    asking, running steps) lives in the agent/skill that consumes this."""
+    outdated = is_outdated(env.installed_version, latest)
+    return {
+        "os": env.os_name,
+        "agents": [c for c, _ in env.agents],
+        "primary_agent": env.agents[0][0] if env.agents else None,
+        "package_managers": env.managers,
+        "billing": "subscription" if env.subscription else "metered",
+        "installed_version": env.installed_version,
+        "latest_version": latest,
+        "upgrade_available": outdated,
+        "install_method": env.method,
+        "upgrade_command": upgrade_command(env.method) if outdated else None,
+        "anthropic_extra": env.has_anthropic,
+        "api_key": env.has_api_key,
+        "best_install_command": best_install_command(env.managers),
+        "next_steps": [
+            {"title": t, "command": cmd, "note": n} for t, cmd, n in next_steps(env)
+        ],
+    }

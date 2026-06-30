@@ -531,24 +531,47 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def cmd_onboard(args: argparse.Namespace) -> int:
-    """One command: detect the environment, wire the status line, and print a
-    next-steps guide tailored to what's installed (agent, billing, deps)."""
+    """Sense the environment and either emit it as JSON (for an agent to reason
+    over) or render a setup + guided tour. The intelligence belongs in the agent
+    that reads ``--json``; this command is the sensor + safe actuator."""
+    import json as _json
     import os
+    import subprocess
     import sys
 
     from . import onboard
     from .setup import default_settings_path, wire_statusline
 
-    use_color = (
-        (not getattr(args, "no_color", False))
-        and sys.stdout.isatty()
-        and os.environ.get("NO_COLOR") is None
-    )
+    env = onboard.detect()
+    latest = None if args.offline else onboard.latest_pypi_version()
+    outdated = onboard.is_outdated(env.installed_version, latest)
+
+    if args.json:
+        print(_json.dumps(onboard.report(env, latest), indent=2))
+        return 0
+
+    use_color = (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
     def c(code: str, t: str) -> str:
         return f"\033[{code}m{t}\033[0m" if use_color else t
 
-    env = onboard.detect()
+    # Interactive by default — onboard offers to do the next step. Falls back to a
+    # static guide only when it can't prompt (piped / CI) or you opt out.
+    interactive = (
+        sys.stdin.isatty() and sys.stdout.isatty() and not args.no_interactive and not args.dry_run
+    )
+
+    def ask(q: str) -> bool:
+        if args.yes:
+            return True
+        if not interactive:
+            return False
+        try:
+            return input(c("1", q) + c("90", " [y/N] ")).strip().lower() in ("y", "yes")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return False
+
     print(c("1;38;5;79", "distil onboard") + c("90", "  ·  let's get you set up") + "\n")
 
     agents = ", ".join(label for _, label in env.agents) or "none detected"
@@ -557,12 +580,35 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         if env.subscription
         else "metered / pay-as-you-go"
     )
+    ver = env.installed_version
+    if latest:
+        ver += "  →  " + (f"{latest} available" if outdated else "up to date")
     print(c("90", "Detected"))
     print(f"  os            {env.os_name}")
+    print(f"  distil        {ver}")
     print(f"  agents        {agents}")
     print(f"  package mgrs  {', '.join(env.managers) or 'none'}")
     print(f"  billing       {billing}")
     print(f"  anthropic ext {'installed' if env.has_anthropic else 'not installed (optional)'}\n")
+
+    if outdated:
+        cmd = onboard.upgrade_command(env.method)
+        runnable = env.method in ("pipx", "uv", "pip")
+        print(c("33", f"⬆ newer distil available ({env.installed_version} → {latest})"))
+        if runnable and (args.upgrade or ask(f"  Upgrade now?  ({cmd})")):
+            print(c("33", f"  upgrading via {env.method} …"))
+            ok = subprocess.run(cmd.split()).returncode == 0
+            print(
+                c(
+                    "32" if ok else "31",
+                    "  "
+                    + ("done — re-run distil onboard to use it" if ok else f"failed; run: {cmd}"),
+                )
+            )
+            if ok:
+                return 0
+        else:
+            print(c("36", f"  {cmd}") + c("90", "   ·   or: distil onboard --upgrade") + "\n")
 
     if args.dry_run:
         print(c("90", "dry-run: would wire the status line (distil setup) — skipped\n"))
@@ -574,19 +620,120 @@ def cmd_onboard(args: argparse.Namespace) -> int:
             print(c("90", "  re-run with --force to replace it (your current one is backed up)"))
         print()
 
+    steps = onboard.next_steps(env)
     print(c("1", "Next steps"))
-    for i, (title, cmd, note) in enumerate(onboard.next_steps(env), 1):
+    for i, (title, cmd, note) in enumerate(steps, 1):
         print(f"  {c('1', str(i) + '.')} {title}")
         print(f"     {c('36', cmd)}")
         if note:
             print(f"     {c('90', note)}")
+    print()
+
+    # Highest-leverage finish: make distil the persistent default (no per-session wrap).
+    if env.agents and ask("Make distil the default for your agent — no per-session wrap?"):
+        print()
+        cmd_default(
+            argparse.Namespace(
+                rc=None,
+                agent=None,
+                mode=None,
+                port=8788,
+                undo=False,
+                always_on=False,
+                no_start=False,
+            )
+        )
+        print()
+
+    # Or just route the agent once, right now.
+    if env.agents:
+        first_cmd = steps[0][1]
+        if ask(f"Start now — run step 1?  ({first_cmd})"):
+            print()
+            return subprocess.run(first_cmd.split()).returncode
+
     print(
-        "\n"
-        + c("90", "Re-run anytime: ")
+        c("90", "Re-run anytime: ")
         + c("36", "distil onboard")
-        + c("90", "   ·   diagnose: ")
-        + c("36", "distil doctor")
+        + c("90", "   ·   for agents: ")
+        + c("36", "distil onboard --json")
     )
+    return 0
+
+
+def cmd_default(args: argparse.Namespace) -> int:
+    """Make distil the default for your agent — no per-session `distil wrap`.
+
+    Default (A): a managed shell alias that wraps the agent. ``--always-on`` (B):
+    a persistent proxy service + ANTHROPIC_BASE_URL so every SDK routes through it.
+    ``--undo`` removes whichever is installed."""
+    import subprocess
+    from pathlib import Path
+
+    from . import onboard
+    from .setup import (
+        alias_body,
+        detect_shell,
+        env_body,
+        remove_managed,
+        service_spec,
+        write_managed,
+    )
+
+    shell, detected_rc = detect_shell()
+    rc = Path(args.rc) if args.rc else detected_rc
+    env = onboard.detect()
+    agent = args.agent or (env.agents[0][0] if env.agents else "claude")
+    mode = args.mode or ("lossless-only" if env.subscription else "expand")
+    # Transparency over magic: each machine differs, so show what was detected.
+    print(f"detected: shell={shell}  rc={rc}  agent={agent}  mode={mode}")
+    if not rc.exists() and not args.undo:
+        print(f"  note: {rc} doesn't exist yet — it'll be created. If your shell reads a")
+        print("  different file, pass --rc <path>.")
+
+    if args.undo:
+        st, msg = remove_managed(rc)
+        print(("✓ " if st in ("ok", "absent") else "✗ ") + msg)
+        path, _, _ = service_spec(args.port, mode)
+        if path is not None and path.exists():
+            try:
+                path.unlink()
+                print(f"✓ removed proxy service {path}")
+            except OSError:
+                pass
+        print(f"  open a new terminal (or: source {rc}) to finish")
+        return 0
+
+    if args.always_on:
+        path, content, load = service_spec(args.port, mode)
+        if path is None:
+            print(
+                "✗ always-on service isn't supported on this platform yet — drop --always-on "
+                "for the alias, or run `distil proxy` yourself."
+            )
+            return 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        print(f"✓ wrote proxy service → {path}")
+        _st, msg = write_managed(rc, env_body(args.port, shell=shell))
+        print(f"✓ {msg}  (ANTHROPIC_BASE_URL → http://127.0.0.1:{args.port})")
+        if load and not args.no_start:
+            ok = subprocess.run(load, shell=True).returncode == 0
+            print("  ✓ proxy service running" if ok else f"  ⚠ start it manually: {load}")
+        print(
+            f"\nEvery base-URL-honoring tool now routes through distil. Reload your shell (source {rc})."
+        )
+        print(
+            "Heads-up: a persistent ANTHROPIC_BASE_URL is a single point of failure — if the proxy"
+        )
+        print("is down, clients can't reach the API. Undo: distil default --always-on --undo")
+        return 0
+
+    st, msg = write_managed(rc, alias_body(agent, mode, shell=shell))
+    glyph = {"ok": "✓", "updated": "✓", "exists": "✓"}.get(st, "⚠")
+    print(f"{glyph} {msg}")
+    print(f"  `{agent}` now routes through distil (--{mode}). Reload your shell (source {rc}).")
+    print("  Undo anytime: distil default --undo")
     return 0
 
 
@@ -1305,8 +1452,47 @@ def build_parser() -> argparse.ArgumentParser:
     ob.add_argument(
         "--force", action="store_true", help="replace an existing status line (backed up first)"
     )
+    ob.add_argument(
+        "--json",
+        action="store_true",
+        help="emit the environment + recommendations as JSON (no actions)",
+    )
+    ob.add_argument(
+        "--upgrade", action="store_true", help="upgrade distil if a newer version is available"
+    )
+    ob.add_argument("--offline", action="store_true", help="skip the PyPI version check")
+    ob.add_argument(
+        "--yes", "-y", action="store_true", help="auto-confirm prompts (upgrade, launch the agent)"
+    )
+    ob.add_argument(
+        "--no-interactive", action="store_true", help="never prompt; just print the guide"
+    )
     ob.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     ob.set_defaults(func=cmd_onboard)
+
+    de = sub.add_parser(
+        "default", help="make distil the default for your agent (no per-session wrap)"
+    )
+    de.add_argument(
+        "--always-on",
+        action="store_true",
+        help="strategy B: persistent proxy service + ANTHROPIC_BASE_URL (covers every SDK)",
+    )
+    de.add_argument("--agent", help="agent command to wrap (default: detected, e.g. claude)")
+    de.add_argument(
+        "--mode",
+        choices=("lossless-only", "expand", "verbatim", "safe"),
+        help="wrap/proxy mode (default: lossless-only on a subscription, else expand)",
+    )
+    de.add_argument(
+        "--port", type=int, default=8788, help="proxy port for --always-on (default 8788)"
+    )
+    de.add_argument(
+        "--no-start", action="store_true", help="--always-on: write the service but don't start it"
+    )
+    de.add_argument("--undo", action="store_true", help="remove the distil default")
+    de.add_argument("--rc", help="shell rc/profile path (default: auto-detected)")
+    de.set_defaults(func=cmd_default)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"

@@ -65,6 +65,18 @@ distil wrap --lossless-only -- claude
 distil wrap --expand -- codex
 ```
 
+**Tired of typing `distil wrap` every time?** Make it the default — once:
+
+```bash
+distil default            # adds a managed shell alias so `claude` always routes through distil
+distil default --undo     # remove it anytime (backed up before any change)
+```
+
+It detects your shell (zsh / bash / fish / PowerShell) and billing mode, writes the
+right line to the rc file your shell actually reads, and **tells you what it detected**.
+Want every SDK covered (not just the agent you type)? `distil default --always-on`
+runs a persistent proxy service — powerful, but it's a daemon you keep alive.
+
 Then watch genuine savings from **your** traffic — measured, not estimated:
 
 ```bash
@@ -221,6 +233,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 | Goal | Command |
 |---|---|
 | **Set up + a guided tour (start here)** | `distil onboard` |
+| Make distil the default (no per-session `wrap`) | `distil default` · undo: `distil default --undo` |
 | Diagnose your setup (ledger, shadow, proxy self-test, wiring) | `distil doctor` |
 | Wire the savings status line into Claude Code | `distil setup` |
 | Watch genuine savings accumulate | `distil leaderboard` · live TUI: `distil dashboard` |
