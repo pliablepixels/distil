@@ -213,6 +213,15 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 > 🔧 **Seeing `Could not find a version that satisfies the requirement distil-llm (from versions: none)`?** The package **is** on PyPI — that error means your `pip`/`pipx` is on a Python older than the package's floor, so pip filters every release out. **Distil now supports Python 3.9+** (the version macOS ships), so a current install just works; if you still hit this on a very old Python, let **uv provision one for you**: `uvx --python 3.12 --from distil-llm distil bench` (or `uv tool install --python 3.12 distil-llm`). Check yours with `python3 --version`.
 
+> 🔧 **Got an *old* version (e.g. `0.25.1`) instead of the latest?** Public PyPI always serves the newest (`pip index versions distil-llm` lists them). If you got an older one, your `pip`/`pipx` is **not resolving against public PyPI** — almost always a **stale internal mirror** (Artifactory / CodeArtifact / Nexus that hasn't synced the latest yet — common right after a release) or a **`<1.0` version pin** in a constraints file / `pip.conf`. Diagnose and fix:
+> ```bash
+> pip index versions distil-llm     # stops at an old version? → your index/mirror is stale
+> pip config list ; env | grep -i pip   # look for an index-url or PIP_CONSTRAINT pin
+> # unblock now — force public PyPI:
+> pipx install --pip-args="--index-url https://pypi.org/simple/" distil-llm
+> # (or, if you must use the mirror, ask your platform team to sync distil-llm; it exists upstream)
+> ```
+
 <p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
 
 | Format | Command | Prereq |

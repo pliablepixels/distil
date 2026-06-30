@@ -91,6 +91,13 @@
       The package <em>is</em> on PyPI — that error means your <code>pip</code>/<code>pipx</code> is on a Python below the package floor. <strong>Distil supports Python 3.9+</strong> (what macOS ships), so a current install just works; on an even older Python, let <strong>uv provision one</strong>: <code>uvx --python 3.12 --from distil-llm distil bench</code> (or <code>uv tool install --python 3.12 distil-llm</code>). Check yours with <code>python3 --version</code>.
     </div>
 
+    <div class="callout">
+      <strong>Got an <em>old</em> version (e.g. <code>0.25.1</code>) instead of the latest?</strong>
+      Run <code>pip index versions distil-llm</code> — if the list stops short of the <a href="https://pypi.org/project/distil-llm/">PyPI latest</a> (or has gaps), your <code>pip</code>/<code>pipx</code> is resolving against a <strong>private/mirror index</strong> (Artifactory / CodeArtifact / Nexus) that hasn't synced the newest releases, or a <code>&lt;1.0</code> pin in a constraints file. Unblock now by forcing public PyPI:
+      <pre class="term">pipx install --pip-args="--index-url https://pypi.org/simple/" distil-llm</pre>
+      Or install a specific version (a pull-through mirror will fetch it on demand): <code>pipx install "distil-llm==1.6.2"</code>. To keep using the mirror, ask your platform team to sync <code>distil-llm</code> — it exists upstream. Check config with <code>pip config list</code> and <code>env | grep -i pip</code>.
+    </div>
+
     <div class="grid2">
       <div class="card">
         <span class="tag">Zero install · recommended</span>
