@@ -3,9 +3,9 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased] — 1.2.0 dev — setup & diagnostics UX
+## [1.2.0] — 2026-06-30 — Setup & diagnostics UX
 
-Friction-killers for getting distil running and trusting it, on the `next` line.
+Friction-killers for getting distil running and trusting it.
 
 ### Added
 - **`distil doctor`** — one command diagnoses a setup end-to-end: distil/Python
