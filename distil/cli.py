@@ -388,15 +388,6 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
     return 0
 
 
-def _humanize_tokens(n: int) -> str:
-    """Compact human form: 14417 -> '14.4K', 1_200_000 -> '1.2M'."""
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.1f}K"
-    return str(n)
-
-
 def cmd_statusline(args: argparse.Namespace) -> int:
     """Render a compact one-line savings status for the Claude Code status line.
 
@@ -435,8 +426,8 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         parts.append(
             c(
                 "36",
-                f"{_humanize_tokens(s.total_baseline_tokens)}→"
-                f"{_humanize_tokens(s.total_distil_tokens)} tok",
+                f"{ledger._human(s.total_baseline_tokens)}→"
+                f"{ledger._human(s.total_distil_tokens)} tok",
             )
         )
         # On a flat-rate subscription there's no per-token bill, so the dollar

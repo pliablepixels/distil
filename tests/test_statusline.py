@@ -13,14 +13,14 @@ from pathlib import Path
 
 
 from distil import ledger
-from distil.cli import _humanize_tokens, cmd_statusline
+from distil.cli import cmd_statusline
 
 
 def test_humanize_tokens():
-    assert _humanize_tokens(0) == "0"
-    assert _humanize_tokens(999) == "999"
-    assert _humanize_tokens(14_417) == "14.4K"
-    assert _humanize_tokens(1_200_000) == "1.2M"
+    assert ledger._human(0) == "0"
+    assert ledger._human(999) == "999"
+    assert ledger._human(14_417) == "14.4K"
+    assert ledger._human(1_200_000) == "1.2M"
 
 
 def _run(monkeypatch, capsys, summary, stdin="{}", no_color=True):

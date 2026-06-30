@@ -6,7 +6,6 @@ cumulative tokens and dollars saved across an agent fleet over time.
 
 Community aggregation (a shared leaderboard) is a deliberate OPT-IN: it would
 mean network egress of your run metadata, so this module never sends anything.
-The `share=` seam is where an explicit, consented uploader would plug in.
 """
 
 from __future__ import annotations
@@ -41,10 +40,6 @@ class SavingsRecord:
     def tokens_saved(self) -> int:
         return self.baseline_input_tokens - self.distil_input_tokens
 
-    @property
-    def pct_saved(self) -> float:
-        return (self.dollars_saved / self.baseline_dollars * 100) if self.baseline_dollars else 0.0
-
 
 def record(
     *,
@@ -57,7 +52,6 @@ def record(
     distil_input_tokens: int,
     tokenizer: str = "heuristic",
     path: Path = DEFAULT_PATH,
-    share: bool = False,  # opt-in network egress; intentionally unimplemented
 ) -> SavingsRecord:
     rec = SavingsRecord(
         trajectory_id,
@@ -161,9 +155,6 @@ td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{
 <table><thead><tr><th>source</th><th style="text-align:right">$ saved</th></tr></thead><tbody>{rows}</tbody></table>
 <p class="foot">{note} Share verifiably across instances with <code>distil federated-leaderboard</code>.</p>
 </div></body></html>"""
-
-
-_SPARK = "▁▂▃▄▅▆▇█"
 
 
 def _human(n: float) -> str:
