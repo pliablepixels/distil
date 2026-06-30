@@ -733,6 +733,31 @@ verifiable savings — 3 verified instance(s), 0 rejected
 
     <hr/>
 
+    <h2 id="dashboard">distil dashboard</h2>
+    <p>Live terminal dashboard of your cumulative savings — a framed panel with Unicode bars for token-trim and decision-equivalence, original&nbsp;&rarr;&nbsp;compressed tokens and cost, a recent-decisions strip, and per-trajectory bars. Uses the alternate screen (like <code>htop</code>): redraws in place and restores your prompt on exit. <code>--once</code> prints a single frame; <code>--interval</code> sets refresh seconds. On a flat-rate subscription the dollar figures are dropped automatically (<code>DISTIL_SUBSCRIPTION</code> overrides).</p>
+
+    <hr/>
+
+    <h2 id="statusline">distil statusline</h2>
+    <p>One compact line for the Claude Code status bar: <code>distil &middot; &lt;orig&gt;&rarr;&lt;compressed&gt; tok &middot; $a&rarr;$b &middot; N runs &middot; eq 99.5% (n)</code>. Reads the local ledger and, when shadow has samples, the live decision-equivalence rate. Auto-detects a flat-rate subscription and drops the notional dollar segment. Wire it with <a href="#setup">distil setup</a> or the <a href="https://github.com/dshakes/distil/tree/main/plugins/distil">plugin</a>.</p>
+
+    <hr/>
+
+    <h2 id="shadow-stats">distil shadow-stats</h2>
+    <p>Report the live decision-equivalence measured by shadow mode on real traffic: the percentage of sampled requests where the agent's chosen next action was identical with vs without compression, and how many samples that's based on. Start sampling with <code>distil wrap --shadow 0.1 -- claude</code>.</p>
+
+    <hr/>
+
+    <h2 id="doctor">distil doctor</h2>
+    <p>Diagnose a distil setup end-to-end: distil/Python version, the savings ledger (subscription-aware), shadow-validation status, an in-process proxy round-trip self-test (proves the proxy machinery works with no network), the optional <code>anthropic</code> extra and API key, and — for Claude Code — status-line wiring and subscription detection. Exits non-zero if any check fails, so it doubles as a setup gate.</p>
+
+    <hr/>
+
+    <h2 id="setup">distil setup</h2>
+    <p>Wire the distil savings status line into Claude Code's <code>settings.json</code> in one step. Idempotent (no-op if already wired), never clobbers an existing status line without <code>--force</code> (which backs it up first), and preserves all other settings.</p>
+
+    <hr/>
+
     <h2>Full CI gate</h2>
     <pre class="term"><span class="d">$ make gate</span>
 <span class="d"># Runs: tests + corpus non-inferiority (distil bench) + byte-fidelity (distil verify)</span>

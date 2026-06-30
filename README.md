@@ -215,12 +215,17 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 
 | Goal | Command |
 |---|---|
-| Watch genuine savings accumulate | `distil leaderboard` (or the live `distil gateway` dashboard) |
-| Live decision-equivalence on real traffic | `distil proxy --shadow 0.05` → `distil shadow-stats` |
+| Diagnose your setup (ledger, shadow, proxy self-test, wiring) | `distil doctor` |
+| Wire the savings status line into Claude Code | `distil setup` |
+| Watch genuine savings accumulate | `distil leaderboard` · live TUI: `distil dashboard` |
+| Live decision-equivalence on real traffic | `distil wrap --shadow 0.1 -- claude` → `distil shadow-stats` |
 | Certify on *your* domain | `distil ingest --input prod.jsonl --out ./mycorpus` → `distil conformal --corpus ./mycorpus` |
 | Recover digested detail from any agent (MCP) | `distil mcp` |
-| Live savings in your Claude Code status line | the [`plugins/distil`](plugins/distil) plugin → `distil statusline` |
 | Self-improving keep policy | `distil learn` / `distil online` |
+
+> On a flat-rate **Claude subscription** the dollar figures are notional — the status line and
+> `distil dashboard` auto-detect it and show the token reduction only (override with
+> `DISTIL_SUBSCRIPTION=0/1`).
 
 Rule of thumb: **subscription/interactive → `--lossless-only` (+`--verbatim`)** · **PAYG/autonomous → default digest (+`--expand`)** · **coding re-reads → add `--session-delta`**.
 
