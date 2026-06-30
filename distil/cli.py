@@ -508,6 +508,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 1 if n_fail else 0
 
 
+def cmd_setup(args: argparse.Namespace) -> int:
+    """Wire the distil status line into Claude Code settings (idempotent, safe)."""
+    from pathlib import Path
+
+    from .setup import default_settings_path, wire_statusline
+
+    path = Path(args.settings) if args.settings else default_settings_path()
+    status, msg = wire_statusline(path, force=args.force)
+    glyph = {"ok": "✓", "exists": "✓", "conflict": "⚠", "error": "✗"}.get(status, "?")
+    print(f"{glyph} {msg}")
+    if status in ("ok", "exists"):
+        print("\nNext — route an agent through distil so the line fills in:")
+        print("  distil wrap --shadow 0.1 -- claude")
+        print("Verify your setup anytime with:  distil doctor")
+        return 0
+    return 1
+
+
 def cmd_dashboard(args: argparse.Namespace) -> int:
     """Live terminal dashboard of cumulative savings — re-renders on an interval
     until Ctrl-C. Falls back to a single render when stdout isn't a TTY (so it
@@ -1207,6 +1225,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dr.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     dr.set_defaults(func=cmd_doctor)
+
+    su = sub.add_parser("setup", help="wire the distil status line into Claude Code settings")
+    su.add_argument(
+        "--force", action="store_true", help="replace an existing status line (backed up first)"
+    )
+    su.add_argument("--settings", help="settings.json path (default ~/.claude/settings.json)")
+    su.set_defaults(func=cmd_setup)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"
