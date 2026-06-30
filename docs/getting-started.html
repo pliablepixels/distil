@@ -134,21 +134,6 @@ pip install distil-llm</pre>
       <strong>Node / TypeScript / other languages?</strong> Run <code>distil proxy</code> (or <code>distil wrap -- &lt;your-agent&gt;</code>) and point your SDK's <code>baseURL</code> at it. No code changes, any language. The CLI needs Python 3.11+; your app does not.
     </div>
 
-    <h3>Quickstart: wrap your agent</h3>
-    <p><strong>Claude Code · Codex · Gemini CLI · any agent.</strong> Route your coding agent through Distil — <strong>no config, no code change.</strong> <code>distil wrap</code> launches your agent with its API traffic flowing through compression:</p>
-    <pre class="term">pipx install distil-llm
-
-<span class="d"># Claude Code on a metered API key — saves real $$:</span>
-distil wrap --expand -- claude
-
-<span class="d"># Claude Code on a Pro/Max subscription — flat-rate, ToS-safe (trims context, not $):</span>
-distil wrap --lossless-only -- claude
-
-<span class="d"># Codex, Gemini CLI, or any agent — same pattern:</span>
-distil wrap --expand -- codex</pre>
-    <p>Then watch genuine savings from <em>your</em> traffic — measured, not estimated:</p>
-    <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger</span></pre>
-
     <hr/>
 
     <!-- Use it on your agent -->
