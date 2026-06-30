@@ -49,3 +49,33 @@ def test_guide_always_includes_shadow_and_doctor() -> None:
     cmds = [cmd for _, cmd, _ in onboard.next_steps(env)]
     assert any("--shadow 0.1" in c for c in cmds)
     assert any(c.strip() == "distil doctor" for c in cmds)
+
+
+def test_cmd_onboard_wires_statusline_and_prints_guide(tmp_path, monkeypatch, capsys):
+    import argparse
+    import json
+
+    import distil.cli as cli
+    import distil.setup as setup_mod
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
+    rc = cli.cmd_onboard(argparse.Namespace(dry_run=False, force=False, no_color=True))
+    assert rc == 0
+    assert "distil" in json.loads(settings.read_text())["statusLine"]["command"]
+    out = capsys.readouterr().out
+    assert "Next steps" in out and "distil doctor" in out
+
+
+def test_cmd_onboard_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
+    import argparse
+
+    import distil.cli as cli
+    import distil.setup as setup_mod
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
+    rc = cli.cmd_onboard(argparse.Namespace(dry_run=True, force=False, no_color=True))
+    assert rc == 0
+    assert not settings.exists()  # dry-run wrote nothing
+    assert "Next steps" in capsys.readouterr().out
