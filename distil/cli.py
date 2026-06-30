@@ -591,6 +591,34 @@ def cmd_onboard(args: argparse.Namespace) -> int:
     print(f"  billing       {billing}")
     print(f"  anthropic ext {'installed' if env.has_anthropic else 'not installed (optional)'}\n")
 
+    # Running ephemerally (uvx) — distil isn't on PATH, so every step below would need
+    # the uvx prefix. Offer to make it permanent first; that's the real one-command path.
+    if env.method == "uvx":
+        install_cmd = onboard.best_install_command(env.managers)
+        print(c("33", "↓ running ephemerally (uvx) — distil isn't installed permanently yet"))
+        if ask(f"  Install distil permanently now?  ({install_cmd})"):
+            ok = subprocess.run(install_cmd, shell=True).returncode == 0
+            print(
+                c(
+                    "32" if ok else "31",
+                    "  "
+                    + (
+                        "installed — future `distil …` commands just work"
+                        if ok
+                        else f"failed; run it yourself: {install_cmd}"
+                    ),
+                )
+            )
+        else:
+            print(
+                c("36", f"  {install_cmd}")
+                + c(
+                    "90",
+                    "   ·   without it, the steps below need the `uvx --from distil-llm` prefix",
+                )
+            )
+        print()
+
     if outdated:
         cmd = onboard.upgrade_command(env.method)
         runnable = env.method in ("pipx", "uv", "pip")
