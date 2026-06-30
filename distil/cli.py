@@ -460,6 +460,52 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Diagnose a distil setup: ledger, shadow, proxy round-trip, deps, Claude Code
+    wiring. Exit 1 if any check fails, so it's usable as a CI/setup gate."""
+    import os
+    import sys
+
+    from . import doctor
+
+    use_color = (
+        (not getattr(args, "no_color", False))
+        and sys.stdout.isatty()
+        and os.environ.get("NO_COLOR") is None
+    )
+
+    def c(code: str, t: str) -> str:
+        return f"\033[{code}m{t}\033[0m" if use_color else t
+
+    glyph = {
+        doctor.OK: c("32", "✓"),
+        doctor.WARN: c("33", "⚠"),
+        doctor.INFO: c("36", "ℹ"),
+        doctor.FAIL: c("31", "✗"),
+    }
+
+    checks = doctor.diagnose()
+    print(c("1;38;5;79", "distil doctor") + c("90", "  ·  setup diagnosis") + "\n")
+    counts: dict[str, int] = {}
+    for ch in checks:
+        counts[ch.status] = counts.get(ch.status, 0) + 1
+        print(f"  {glyph.get(ch.status, '?')} {c('1', ch.name)}: {ch.detail}")
+        if ch.hint:
+            print(c("90", f"      → {ch.hint}"))
+
+    n_fail = counts.get(doctor.FAIL, 0)
+    summary = "  ·  ".join(
+        f"{counts[k]} {k}"
+        for k in (doctor.OK, doctor.INFO, doctor.WARN, doctor.FAIL)
+        if counts.get(k)
+    )
+    verdict = "looks healthy" if n_fail == 0 else f"{n_fail} failing — see above"
+    print(
+        "\n  " + c("90", summary) + "  —  " + (c("32", verdict) if not n_fail else c("31", verdict))
+    )
+    return 1 if n_fail else 0
+
+
 def cmd_dashboard(args: argparse.Namespace) -> int:
     """Live terminal dashboard of cumulative savings — re-renders on an interval
     until Ctrl-C. Falls back to a single render when stdout isn't a TTY (so it
@@ -1157,6 +1203,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--interval", type=float, default=2.0, help="refresh seconds in live mode (default 2)"
     )
     dash.set_defaults(func=cmd_dashboard)
+
+    dr = sub.add_parser(
+        "doctor", help="diagnose your distil setup (ledger, shadow, proxy round-trip, wiring)"
+    )
+    dr.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    dr.set_defaults(func=cmd_doctor)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"
