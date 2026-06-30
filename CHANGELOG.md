@@ -3,6 +3,15 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.6.2] — 2026-06-30 — Consistent version reporting
+
+### Fixed
+- **`distil --version` (and `distil doctor`) reported `1.6.0` on the 1.6.1 release.**
+  The version lived in two places and only `pyproject` was bumped, so the published
+  wheel's `__version__` lagged. Now single-sourced: `distil.__version__` reads the
+  installed distribution metadata (`importlib.metadata`), so the CLI can never drift
+  from the published package again. 1.6.2 carries the same Python 3.9+ fix as 1.6.1.
+
 ## [1.6.1] — 2026-06-30 — Installable on Python 3.9+ (fixes "from versions: none")
 
 ### Fixed
