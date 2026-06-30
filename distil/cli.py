@@ -453,7 +453,11 @@ def cmd_statusline(args: argparse.Namespace) -> int:
 
             led = ShadowLedger.load()
             if led.samples:
-                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}%"))
+                # decision-equivalence with its sample count, so the confidence
+                # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
+                n = led.samples
+                n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}% ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
