@@ -3,6 +3,8 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.7.0 dev
+
 ## [1.6.0] — 2026-06-30 — Onboard ensures everything
 
 ### Added
