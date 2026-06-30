@@ -3,6 +3,18 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.5.0 dev
+
+### Added
+- **`distil offboard` — remove distil's footprint, the inverse of `onboard`.**
+  Undoes the shell default (alias/env block), stops + removes the always-on proxy
+  service, and unwires the status line from Claude Code settings — asking before
+  each (non-interactive without `--yes` removes nothing). Your savings ledger is
+  **kept** unless you pass `--purge`. It can't uninstall the running package
+  itself, so it prints the exact uninstall command for how distil was installed
+  (pipx/uv/pip). `distil default --undo` now also **stops** a running proxy service
+  (launchctl/systemctl), not just deletes its definition file.
+
 ## [1.4.0] — 2026-06-30 — Make distil the default
 
 ### Added

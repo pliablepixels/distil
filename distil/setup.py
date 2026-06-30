@@ -55,6 +55,35 @@ def wire_statusline(
     return ("ok", f"wired the distil status line into {settings_path}")
 
 
+def unwire_statusline(settings_path: Path) -> tuple[str, str]:
+    """Remove the distil status line from ``settings_path`` (the inverse of
+    :func:`wire_statusline`). Only touches a status line that is distil's — a
+    foreign one is left untouched. Backs up before changing. Returns ``(status,
+    message)``: ``ok`` | ``absent`` | ``foreign`` | ``error``."""
+    if not settings_path.exists():
+        return ("absent", f"no settings file at {settings_path}")
+    try:
+        data = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return ("error", f"{settings_path} is not valid JSON ({exc})")
+    if not isinstance(data, dict):
+        return ("error", f"{settings_path} is not a JSON object")
+
+    sl = data.get("statusLine")
+    cmd = sl.get("command", "") if isinstance(sl, dict) else ""
+    if "distil" not in (cmd or ""):
+        if sl is None:
+            return ("absent", "no distil status line to remove")
+        return ("foreign", f"status line is {cmd!r}, not distil — left as-is")
+
+    settings_path.with_name(settings_path.name + ".bak").write_text(
+        settings_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    del data["statusLine"]
+    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return ("ok", f"removed the distil status line from {settings_path}")
+
+
 # ── distil default: route an agent through distil by default ─────────────────
 # Two strategies, both via a single marked block we can add/replace/remove:
 #   A (alias):     wrap the agent command — no daemon, no single point of failure.
@@ -224,3 +253,19 @@ def service_spec(port: int, mode: str) -> tuple[Path | None, str | None, str | N
         )
         return path, content, load
     return (None, None, None)
+
+
+def service_unload_cmd() -> str | None:
+    """Command to stop/unload the always-on proxy service on this platform, or None.
+
+    Used by both ``distil default --undo`` and ``distil offboard`` so the running
+    service is stopped — not just its definition file removed."""
+    import platform
+
+    sysname = platform.system()
+    if sysname == "Darwin":
+        path = Path.home() / "Library" / "LaunchAgents" / "com.distil.proxy.plist"
+        return f"launchctl unload '{path}' 2>/dev/null"
+    if sysname == "Linux":
+        return "systemctl --user disable --now distil-proxy.service 2>/dev/null"
+    return None

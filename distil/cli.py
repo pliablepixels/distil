@@ -677,6 +677,7 @@ def cmd_default(args: argparse.Namespace) -> int:
         env_body,
         remove_managed,
         service_spec,
+        service_unload_cmd,
         write_managed,
     )
 
@@ -696,6 +697,9 @@ def cmd_default(args: argparse.Namespace) -> int:
         print(("✓ " if st in ("ok", "absent") else "✗ ") + msg)
         path, _, _ = service_spec(args.port, mode)
         if path is not None and path.exists():
+            unload = service_unload_cmd()
+            if unload:  # stop the running service before deleting its definition
+                subprocess.run(unload, shell=True)
             try:
                 path.unlink()
                 print(f"✓ removed proxy service {path}")
@@ -734,6 +738,85 @@ def cmd_default(args: argparse.Namespace) -> int:
     print(f"{glyph} {msg}")
     print(f"  `{agent}` now routes through distil (--{mode}). Reload your shell (source {rc}).")
     print("  Undo anytime: distil default --undo")
+    return 0
+
+
+def cmd_offboard(args: argparse.Namespace) -> int:
+    """Remove distil's footprint — the inverse of `distil onboard`.
+
+    Undoes the shell default (alias/env), the always-on proxy service, and the
+    status-line wiring, asking before each. Keeps your savings ledger unless
+    ``--purge``. Can't uninstall the package itself (it's the running process), so
+    it prints the right uninstall command for how distil was installed."""
+    import os
+    import shutil
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from . import onboard
+    from .setup import (
+        default_settings_path,
+        detect_shell,
+        remove_managed,
+        service_spec,
+        service_unload_cmd,
+        unwire_statusline,
+    )
+
+    interactive = sys.stdin.isatty() and sys.stdout.isatty() and not args.no_interactive
+
+    def ask(q: str) -> bool:
+        if args.yes:
+            return True
+        if not interactive:  # destructive: do nothing we weren't clearly told to
+            print(f"  · skipped (not interactive — re-run with --yes): {q}")
+            return False
+        try:
+            return input(q + " [y/N] ").strip().lower() in ("y", "yes")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return False
+
+    shell, rc = detect_shell()
+    env = onboard.detect()
+    print("distil offboard — remove distil's footprint\n")
+
+    # 1 · shell default (alias / env block)
+    if rc.exists() and "distil (managed)" in rc.read_text(encoding="utf-8", errors="ignore"):
+        if ask(f"Remove the distil default from {rc}?"):
+            st, msg = remove_managed(rc)
+            print(("✓ " if st in ("ok", "absent") else "✗ ") + msg)
+
+    # 2 · always-on proxy service
+    path, _, _ = service_spec(8788, "lossless-only")
+    if path is not None and path.exists() and ask(f"Stop + remove the proxy service {path}?"):
+        unload = service_unload_cmd()
+        if unload:
+            subprocess.run(unload, shell=True)
+        try:
+            path.unlink()
+            print(f"✓ removed proxy service {path}")
+        except OSError as exc:
+            print(f"✗ couldn't remove {path}: {exc}")
+
+    # 3 · status-line wiring
+    sp = default_settings_path()
+    if sp.exists() and ask(f"Unwire the distil status line from {sp}?"):
+        st, msg = unwire_statusline(sp)
+        print(("✓ " if st in ("ok", "absent", "foreign") else "✗ ") + msg)
+
+    # 4 · local data (opt-in; it's the user's measured savings history)
+    home = Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil")))
+    if home.exists():
+        if args.purge and ask(f"Delete your savings ledger + shadow data at {home}? Irreversible."):
+            shutil.rmtree(home, ignore_errors=True)
+            print(f"✓ deleted {home}")
+        elif not args.purge:
+            print(f"  kept your savings data at {home}  (delete it with: distil offboard --purge)")
+
+    # 5 · the package itself — we can't remove the process we're running in
+    print(f"\nFinally, uninstall the package:\n  {onboard.uninstall_command(env.method)}")
     return 0
 
 
@@ -1493,6 +1576,16 @@ def build_parser() -> argparse.ArgumentParser:
     de.add_argument("--undo", action="store_true", help="remove the distil default")
     de.add_argument("--rc", help="shell rc/profile path (default: auto-detected)")
     de.set_defaults(func=cmd_default)
+
+    of = sub.add_parser(
+        "offboard", help="remove distil's footprint (alias, proxy service, status line)"
+    )
+    of.add_argument(
+        "--purge", action="store_true", help="also delete your local savings ledger + shadow data"
+    )
+    of.add_argument("--yes", "-y", action="store_true", help="remove everything without prompting")
+    of.add_argument("--no-interactive", action="store_true", help="never prompt (report only)")
+    of.set_defaults(func=cmd_offboard)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"
