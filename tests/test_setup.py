@@ -184,19 +184,20 @@ def test_cmd_default_always_on_writes_service_and_env(tmp_path, monkeypatch, cap
     monkeypatch.setattr(
         setup, "service_spec", lambda port, mode: (svc, f"PLIST {port} --{mode}", "true")
     )
-    # --no-start means we never shell out; assert subprocess is not invoked anyway.
+    # Record shell-outs so we can assert install is silent but undo stops the service.
     import subprocess
 
-    monkeypatch.setattr(
-        subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no-start"))
-    )
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a))
     rc = tmp_path / ".zshrc"
     assert cli.cmd_default(_default_args(tmp_path, always_on=True, mode="lossless-only")) == 0
     assert svc.exists() and "8788" in svc.read_text()
     assert "export ANTHROPIC_BASE_URL=http://127.0.0.1:8788" in rc.read_text()
+    assert calls == []  # --no-start never shells out
 
-    # undo cleans up both the rc block and the service file
+    # undo stops the running service (one shell-out) and cleans up rc + file
     assert cli.cmd_default(_default_args(tmp_path, undo=True)) == 0
+    assert calls  # unload was invoked
     assert not svc.exists()
     assert "ANTHROPIC_BASE_URL" not in rc.read_text()
 
@@ -208,3 +209,112 @@ def test_cmd_default_always_on_unsupported_platform(tmp_path, monkeypatch, capsy
     rc = cli.cmd_default(_default_args(tmp_path, always_on=True))
     assert rc == 1  # graceful, non-zero
     assert "isn't supported" in capsys.readouterr().out
+
+
+# ── distil offboard: unwire status line + remove footprint ──
+
+
+def test_unwire_statusline_removes_only_distils(tmp_path) -> None:
+    import json as _json
+
+    from distil.setup import unwire_statusline, wire_statusline
+
+    sp = tmp_path / "settings.json"
+    # foreign status line is preserved
+    sp.write_text(
+        _json.dumps({"statusLine": {"type": "command", "command": "mine.sh"}, "model": "opus"})
+    )
+    assert unwire_statusline(sp)[0] == "foreign"
+    assert "mine.sh" in sp.read_text()
+
+    # distil status line is removed, other settings preserved, backup made
+    wire_statusline(sp, force=True)
+    assert "distil" in sp.read_text()
+    st, _ = unwire_statusline(sp)
+    assert st == "ok"
+    data = _json.loads(sp.read_text())
+    assert "statusLine" not in data and data["model"] == "opus"
+    assert (tmp_path / "settings.json.bak").exists()
+
+    # idempotent: nothing left to remove
+    assert unwire_statusline(sp)[0] == "absent"
+
+
+def test_unwire_statusline_absent_and_bad(tmp_path) -> None:
+    from distil.setup import unwire_statusline
+
+    assert unwire_statusline(tmp_path / "nope.json")[0] == "absent"
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    assert unwire_statusline(bad)[0] == "error"
+
+
+def test_service_unload_cmd_per_platform(monkeypatch) -> None:
+    from distil.setup import service_unload_cmd
+
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    assert "launchctl unload" in service_unload_cmd()
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    assert "systemctl --user disable" in service_unload_cmd()
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+    assert service_unload_cmd() is None
+
+
+def _offboard_args(**over):
+    import argparse
+
+    base = dict(purge=False, yes=True, no_interactive=False)
+    base.update(over)
+    return argparse.Namespace(**base)
+
+
+def test_cmd_offboard_removes_footprint_keeps_data(tmp_path, monkeypatch, capsys) -> None:
+    from distil import cli, setup
+
+    rc = tmp_path / ".zshrc"
+    setup.write_managed(rc, setup.alias_body("claude", "lossless-only", shell="zsh"))
+    settings = tmp_path / "settings.json"
+    setup.wire_statusline(settings)
+    data = tmp_path / ".distil"
+    data.mkdir()
+    (data / "savings.jsonl").write_text("{}\n")
+
+    monkeypatch.setattr(setup, "detect_shell", lambda: ("zsh", rc))
+    monkeypatch.setattr(setup, "default_settings_path", lambda: settings)
+    monkeypatch.setattr(setup, "service_spec", lambda p, m: (None, None, None))
+    monkeypatch.setenv("DISTIL_HOME", str(data))
+
+    assert cli.cmd_offboard(_offboard_args(purge=False)) == 0
+    assert "distil" not in rc.read_text()  # alias gone
+    assert "statusLine" not in settings.read_text()  # unwired
+    assert data.exists()  # ledger kept without --purge
+    out = capsys.readouterr().out
+    assert "uninstall" in out  # tells you how to finish
+
+
+def test_cmd_offboard_purge_deletes_data(tmp_path, monkeypatch) -> None:
+    from distil import cli, setup
+
+    monkeypatch.setattr(setup, "detect_shell", lambda: ("zsh", tmp_path / ".zshrc"))
+    monkeypatch.setattr(setup, "default_settings_path", lambda: tmp_path / "settings.json")
+    monkeypatch.setattr(setup, "service_spec", lambda p, m: (None, None, None))
+    data = tmp_path / ".distil"
+    data.mkdir()
+    (data / "savings.jsonl").write_text("{}\n")
+    monkeypatch.setenv("DISTIL_HOME", str(data))
+    assert cli.cmd_offboard(_offboard_args(purge=True)) == 0
+    assert not data.exists()  # --purge removed it
+
+
+def test_cmd_offboard_non_interactive_is_safe(tmp_path, monkeypatch, capsys) -> None:
+    # Not interactive and no --yes → must NOT delete anything.
+    from distil import cli, setup
+
+    rc = tmp_path / ".zshrc"
+    setup.write_managed(rc, setup.alias_body("claude", "expand", shell="zsh"))
+    monkeypatch.setattr(setup, "detect_shell", lambda: ("zsh", rc))
+    monkeypatch.setattr(setup, "default_settings_path", lambda: tmp_path / "settings.json")
+    monkeypatch.setattr(setup, "service_spec", lambda p, m: (None, None, None))
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    assert cli.cmd_offboard(_offboard_args(yes=False, no_interactive=True)) == 0
+    assert "distil" in rc.read_text()  # untouched — safe

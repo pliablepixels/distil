@@ -234,6 +234,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 |---|---|
 | **Set up + a guided tour (start here)** | `distil onboard` |
 | Make distil the default (no per-session `wrap`) | `distil default` · undo: `distil default --undo` |
+| Remove distil's footprint (before uninstalling) | `distil offboard` · also clear data: `distil offboard --purge` |
 | Diagnose your setup (ledger, shadow, proxy self-test, wiring) | `distil doctor` |
 | Wire the savings status line into Claude Code | `distil setup` |
 | Watch genuine savings accumulate | `distil leaderboard` · live TUI: `distil dashboard` |

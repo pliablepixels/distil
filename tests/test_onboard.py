@@ -166,3 +166,12 @@ def test_cmd_onboard_yes_runs_first_step(tmp_path, monkeypatch, capsys) -> None:
     )
     assert rc == 0
     assert "wrap" in " ".join(ran["cmd"])  # --yes launched the route command (step 1)
+
+
+def test_uninstall_command_per_method() -> None:
+    from distil.onboard import uninstall_command
+
+    assert uninstall_command("pipx") == "pipx uninstall distil-llm"
+    assert uninstall_command("uv") == "uv tool uninstall distil-llm"
+    assert "uninstall" in uninstall_command("pip")
+    assert uninstall_command("uvx").startswith("#")  # ephemeral — nothing to remove

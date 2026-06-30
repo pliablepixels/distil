@@ -72,6 +72,16 @@ def upgrade_command(method: str) -> str:
     }.get(method, "pip install --upgrade distil-llm")
 
 
+def uninstall_command(method: str) -> str:
+    """How to uninstall distil for the way it was installed (used by offboard)."""
+    return {
+        "pipx": "pipx uninstall distil-llm",
+        "uv": "uv tool uninstall distil-llm",
+        "uvx": "# uvx runs ephemerally — nothing persistent to uninstall",
+        "pip": "pip uninstall distil-llm",
+    }.get(method, "pip uninstall distil-llm")
+
+
 def latest_pypi_version(timeout: float = 2.5) -> str | None:
     """Latest distil-llm version on PyPI, or None if offline / the check fails."""
     import json
@@ -210,7 +220,5 @@ def report(env: Env, latest: str | None) -> dict:
         "anthropic_extra": env.has_anthropic,
         "api_key": env.has_api_key,
         "best_install_command": best_install_command(env.managers),
-        "next_steps": [
-            {"title": t, "command": cmd, "note": n} for t, cmd, n in next_steps(env)
-        ],
+        "next_steps": [{"title": t, "command": cmd, "note": n} for t, cmd, n in next_steps(env)],
     }

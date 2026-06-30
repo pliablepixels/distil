@@ -743,6 +743,11 @@ verifiable savings — 3 verified instance(s), 0 rejected
 
     <hr/>
 
+    <h2 id="offboard">distil offboard</h2>
+    <p>Remove distil's footprint — the inverse of <a href="#onboard">distil onboard</a>. Undoes the shell default (the <a href="#default">distil default</a> alias/env block), stops and removes the always-on proxy service, and unwires the status line from Claude Code settings — <strong>asking before each</strong> (non-interactive without <code>--yes</code> removes nothing). Your savings ledger and shadow data are <strong>kept</strong> unless you pass <code>--purge</code>. It can't uninstall the running package itself, so it prints the exact uninstall command for how distil was installed (pipx / uv / pip). A foreign status line (one you set yourself) is left untouched.</p>
+
+    <hr/>
+
     <h2 id="dashboard">distil dashboard</h2>
     <p>Live terminal dashboard of your cumulative savings — a framed panel with Unicode bars for token-trim and decision-equivalence, original&nbsp;&rarr;&nbsp;compressed tokens and cost, a recent-decisions strip, and per-trajectory bars. Uses the alternate screen (like <code>htop</code>): redraws in place and restores your prompt on exit. <code>--once</code> prints a single frame; <code>--interval</code> sets refresh seconds. On a flat-rate subscription the dollar figures are dropped automatically (<code>DISTIL_SUBSCRIPTION</code> overrides).</p>
 
