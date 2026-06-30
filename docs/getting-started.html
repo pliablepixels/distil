@@ -70,10 +70,20 @@
 
     <!-- Install -->
     <h2>Install</h2>
-    <p>Distil ships as a PyPI package (<code>distil-llm</code>) with a <strong>stdlib-only core — zero runtime dependencies</strong>. The corpus is bundled in every distribution. Pick the format that fits your workflow.</p>
+    <p>Distil ships as a PyPI package (<code>distil-llm</code>) with a <strong>stdlib-only core — zero runtime dependencies</strong>. The corpus is bundled in every distribution.</p>
+
+    <div class="callout good">
+      <strong>Just want it now?</strong> One command:
+      <pre class="term" style="margin:.6em 0 .4em">pipx install distil-llm   <span class="d"># then: distil bench</span></pre>
+      No pipx? Zero-install with <a href="https://docs.astral.sh/uv/">uv</a>: <code>uvx --from distil-llm distil bench</code>. Everything else below is an alternative, not a requirement.
+    </div>
 
     <div class="callout">
-      <strong>Python 3.11+ required.</strong> Install Distil <em>isolated</em> from your system Python — modern macOS and Linux reject system-wide <code>pip install</code> with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). All methods below are safe.
+      <strong>The one gotcha — the name.</strong> The package is <code>distil-llm</code> but the command is <code>distil</code> (the bare <code>distil</code> name was taken on PyPI). So it's <code>pipx install distil-llm</code> → run <code>distil …</code>. <code>pipx install distil</code> installs the wrong thing.
+    </div>
+
+    <div class="callout">
+      <strong>Python 3.11+ required.</strong> Install Distil <em>isolated</em> from your system Python — modern macOS and Linux reject system-wide <code>pip install</code> with <code>error: externally-managed-environment</code> (<a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a>). Every method below is isolated and safe.
     </div>
 
     <div class="grid2">
@@ -154,7 +164,7 @@ data-analysis     data-analysis-sql          18.1%     <span class="g">PASS</spa
 devops            devops-rollback            25.0%     <span class="g">PASS</span>   <span class="w">FAIL</span>     857
 finance           finance-reconcile          29.1%     <span class="g">PASS</span>   <span class="w">FAIL</span>    1014
 ---------------------------------------------------------------------------
-aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) losslessly; 5761 tokens prunable.
+aggregate: distil cuts $0.14212 -> $0.10402 (26.8% cheaper) reversibly; 5761 tokens causally prunable.
 
 GATE: <span class="g">PASS</span> — every trajectory certified non-inferior; aggressive rejected on all.</pre>
 
@@ -201,7 +211,7 @@ client = wrap(anthropic.Anthropic())
 
 <span class="d"># Works exactly like the original client</span>
 response = client.messages.create(
-    model=<span class="g">"claude-opus-4-5"</span>,
+    model=<span class="g">"claude-opus-4-8"</span>,
     max_tokens=1024,
     system=<span class="g">"You are a helpful assistant."</span>,
     messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Analyse this log output…"</span>}],

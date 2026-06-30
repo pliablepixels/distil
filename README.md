@@ -369,6 +369,10 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 ## 📦 Install your way
 
+**New here? One command:** `pipx install distil-llm`, then `distil bench`. No pipx? Zero-install: `uvx --from distil-llm distil bench`. Everything below is an *alternative*, not a requirement.
+
+> ⚠️ **The one gotcha — the name.** The PyPI package is **`distil-llm`** but the command is **`distil`** (the bare name was taken). So `pipx install distil-llm` → run `distil …`. `pip install distil` installs something else.
+
 <p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
 
 | Format | Command | Prereq |
