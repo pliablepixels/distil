@@ -149,8 +149,11 @@
     real <a href="research.html#e7">SWE-bench Verified test (E7)</a> shows it does
     <b>not</b> transfer once compression gets aggressive. We publish that. <a href="research.html#e8">E8</a> (500-instance long-horizon, 5 conditions) shows
     relevance-gated reversible compression is <b>the only condition non-inferior to full context</b> (&minus;2.4&nbsp;pp, 95% CI [&minus;5.7, +0.9]; McNemar p=0.19), beats Headroom by +4.2&nbsp;pp (p=0.035), and beats LLMLingua-2 by 34&nbsp;points (36.8% vs 2.4% pass@1) despite removing nearly identical context fractions. We publish that too. <a href="research.html#e10"><b>E10</b></a> closes the loop with a trajectory-level certificate (the first of its kind): with 95% confidence, the gated compressor costs a solvable task on &le;11.4% of exchangeable runs — certified and proven out-of-sample. <a href="research.html#e11"><b>E11</b></a> extends this across <b>5 models / 3 vendors</b> (OpenAI, Anthropic, DeepSeek): the relevance gate shows no statistically significant degradation at gate@12 on any of them, and the safe aggressive point tracks <i>realized compression × the agent's reliance on aged-out context</i> — a workload×model interaction, not raw capability — which is why the operating point must be <b>auto-calibrated per deployment</b>, fail-safe to full context.</p>
+  <p class="sub" style="font-size:13.5px;margin-top:16px">Route Claude Code — or any agent — through it, no code change:<br>
+    <code>pipx install distil-llm &amp;&amp; distil wrap --expand -- claude</code></p>
   <div class="cta">
-    <a class="btn primary" href="#how">See how it works</a>
+    <a class="btn primary" href="getting-started.html">Get started →</a>
+    <a class="btn ghost" href="#how">How it works</a>
     <a class="btn ghost" href="#proof">Read the proof</a>
   </div>
 

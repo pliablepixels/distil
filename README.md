@@ -19,7 +19,7 @@ Every agent re-sends its whole context every turn — you pay for all of it, eve
 <p align="center"><sub><b>Honest scope:</b> the certificate is a <b>proxy</b> (next-action equivalence on a trajectory corpus), not end-to-end task success — under <em>aggressive lossy</em> compression it doesn't fully transfer (<a href="#-end-to-end-reality-swe-bench-verified-e7">E7</a>), which is why Distil calibrates per deployment and fails safe.</sub></p>
 
 <p align="center">
-  <a href="#-60-second-start">Quickstart</a> ·
+  <a href="#-use-it-now">Use it</a> ·
   <a href="#-works-with-every-sdk">Integrations</a> ·
   <a href="#-install-your-way">Install</a> ·
   <a href="https://dshakes.github.io/distil/getting-started.html"><b>Full Docs →</b></a>
@@ -40,6 +40,33 @@ Every agent re-sends its whole context every turn — you pay for all of it, eve
 </table>
 
 <p align="center"><b>Distil is the only compressor statistically tied with full context</b> — every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-long-horizon-reality-the-gate-where-it-belongs-e8">Full breakdown ↓</a></p>
+
+---
+
+## 🚀 Use it now
+
+**Claude Code · Codex · Gemini CLI · any agent.** Route your coding agent through Distil — **no config, no code change.** `distil wrap` launches your agent with its API traffic flowing through compression:
+
+```bash
+pipx install distil-llm
+
+# Claude Code on a metered API key — saves real $$:
+distil wrap --expand -- claude
+
+# Claude Code on a Pro/Max subscription — flat-rate, ToS-safe (trims context, not $):
+distil wrap --lossless-only -- claude
+
+# Codex, Gemini CLI, or any agent — same pattern:
+distil wrap --expand -- codex
+```
+
+Then watch genuine savings from **your** traffic — measured, not estimated:
+
+```bash
+distil leaderboard          # cumulative tokens + $ saved, from the local ledger
+```
+
+> **Will it actually save me money?** Only on **metered / pay-as-you-go** billing (an API key): fewer tokens → fewer dollars. On a **subscription** you're flat-rate, so there's no per-token bill to cut — Distil still trims context and latency. **Honest about coding agents:** on short sessions the win is *modest* (~7% — the agent re-expands most of what it edits, [E7](#-end-to-end-reality-swe-bench-verified-e7)); the real savings land on **long, many-turn sessions** with large context the model never re-reads. Want an in-process hook or an org-wide proxy instead? See [Works with every SDK](#-works-with-every-sdk).
 
 ---
 
@@ -93,7 +120,9 @@ This is the structural advantage: **compress more, lose nothing, and get better 
 
 ---
 
-## ⚡ 60-second start
+## ⚡ Prove the numbers yourself — no API key
+
+Don't take the table above on faith. `distil bench` re-certifies savings *and* decision-equivalence on a bundled 7-domain corpus, offline, in seconds — the same gate that runs in CI:
 
 ```bash
 uvx --from distil-llm distil bench   # certify savings + quality across 7 domains, in seconds
