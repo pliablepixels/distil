@@ -70,8 +70,8 @@ distil dashboard            # live terminal TUI — token-trim + decision-equiv 
 **Validate it preserved your outcomes.** Compression is only safe if your agent makes the *same decision* it would on full context. `--shadow` proves it on your live traffic: it samples a fraction of requests, runs each one twice (compressed **and** full prompt), and compares the agent's **chosen next action** — the tool call it decides to make, not the prose:
 
 ```bash
-distil proxy --shadow 0.1 --upstream <api>   # shadow 10% of live requests
-distil shadow-stats                          # live decision-equivalence rate
+distil wrap --shadow 0.1 -- claude   # one command: wraps your agent + shadows 10% of requests
+distil shadow-stats                  # live decision-equivalence rate (or /distil-shadow)
 ```
 
 Honest scope: this is **next-action equivalence — a proxy**, not end-to-end task success ([E7](#-the-proof) shows it doesn't fully transfer under aggressive *lossy* compression). Watch the rate, keep the gate conservative; Distil fails safe to full context.

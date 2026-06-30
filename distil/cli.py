@@ -549,6 +549,7 @@ def cmd_wrap(args: argparse.Namespace) -> int:
         env_var=args.env_var,
         expand=args.expand,
         session_delta=args.session_delta,
+        shadow_rate=args.shadow,
     )
 
 
@@ -1215,6 +1216,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="cache-delta coding: cross-turn dedup + cross-version delta (re-reads after "
         "edits sent as a diff), cache-monotonic and reversible",
+    )
+    wr.add_argument(
+        "--shadow",
+        type=float,
+        default=0.0,
+        metavar="RATE",
+        help="shadow-mode live decision-equivalence: sample this fraction (e.g. 0.1) "
+        "and also run it uncompressed to measure the decision-change rate "
+        "(distil shadow-stats)",
     )
     wr.add_argument(
         "command",

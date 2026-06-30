@@ -570,6 +570,7 @@ def wrap_run(
     env_var: str = "ANTHROPIC_BASE_URL",
     expand: bool = False,
     session_delta: bool = False,
+    shadow_rate: float = 0.0,
 ) -> int:
     """Run *command* with its API base URL transparently pointed at a Distil proxy.
 
@@ -596,6 +597,7 @@ def wrap_run(
         savings=savings,
         expand=expand,
         session_delta=session_delta,
+        shadow_rate=shadow_rate,
     )
     server = ThreadingHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
     base = f"http://{host}:{server.server_address[1]}"
@@ -611,6 +613,11 @@ def wrap_run(
         print("  → verbatim (Tier-0 only, no digest)")
     if savings is not None:
         print("  → recording genuine savings → distil leaderboard")
+    if shadow_rate and shadow_rate > 0:
+        print(
+            f"  → shadow-mode live decision-equivalence: sampling "
+            f"{shadow_rate * 100:.0f}% (distil shadow-stats)"
+        )
 
     code = 0
     try:
