@@ -60,7 +60,7 @@ def test_cmd_onboard_wires_statusline_and_prints_guide(tmp_path, monkeypatch, ca
 
     settings = tmp_path / "settings.json"
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
-    rc = cli.cmd_onboard(argparse.Namespace(dry_run=False, force=False, no_color=True))
+    rc = cli.cmd_onboard(argparse.Namespace(dry_run=False, force=False, no_color=True, json=False, offline=True, upgrade=False))
     assert rc == 0
     assert "distil" in json.loads(settings.read_text())["statusLine"]["command"]
     out = capsys.readouterr().out
@@ -75,7 +75,57 @@ def test_cmd_onboard_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
 
     settings = tmp_path / "settings.json"
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
-    rc = cli.cmd_onboard(argparse.Namespace(dry_run=True, force=False, no_color=True))
+    rc = cli.cmd_onboard(argparse.Namespace(dry_run=True, force=False, no_color=True, json=False, offline=True, upgrade=False))
     assert rc == 0
     assert not settings.exists()  # dry-run wrote nothing
     assert "Next steps" in capsys.readouterr().out
+
+
+def test_is_outdated_semantics() -> None:
+    assert onboard.is_outdated("1.2.0", "1.3.0") is True
+    assert onboard.is_outdated("1.3.0", "1.3.0") is False
+    assert onboard.is_outdated("1.4.0.dev0", "1.3.0") is False  # dev build is ahead of release
+    assert onboard.is_outdated("1.3.0.dev0", "1.3.0") is True   # pre-release of the release → upgrade
+    assert onboard.is_outdated("1.3.0", None) is False          # offline / check failed
+
+
+def test_upgrade_command_per_method() -> None:
+    assert onboard.upgrade_command("pipx") == "pipx upgrade distil-llm"
+    assert "uv tool upgrade" in onboard.upgrade_command("uv")
+    assert "pip install --upgrade" in onboard.upgrade_command("pip")
+
+
+def test_report_is_agent_ready() -> None:
+    env = Env(
+        os_name="Darwin",
+        agents=[("claude", "Claude Code")],
+        installed_version="1.2.0",
+        method="pipx",
+        subscription=True,
+    )
+    r = onboard.report(env, "1.3.0")
+    assert r["upgrade_available"] is True
+    assert r["upgrade_command"] == "pipx upgrade distil-llm"
+    assert r["primary_agent"] == "claude"
+    assert r["billing"] == "subscription"
+    assert r["next_steps"] and all({"title", "command", "note"} <= s.keys() for s in r["next_steps"])
+
+
+def test_cmd_onboard_json_is_pure(tmp_path, monkeypatch, capsys) -> None:
+    import argparse
+    import json
+
+    import distil.cli as cli
+    import distil.onboard as ob
+    import distil.setup as setup_mod
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
+    monkeypatch.setattr(ob, "latest_pypi_version", lambda *a, **k: "9.9.9")  # no real network
+    rc = cli.cmd_onboard(
+        argparse.Namespace(json=True, offline=False, dry_run=False, force=False, upgrade=False, no_color=True)
+    )
+    assert rc == 0
+    assert not settings.exists()  # --json takes no actions
+    data = json.loads(capsys.readouterr().out)
+    assert data["upgrade_available"] is True  # installed < 9.9.9

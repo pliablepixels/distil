@@ -531,24 +531,30 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def cmd_onboard(args: argparse.Namespace) -> int:
-    """One command: detect the environment, wire the status line, and print a
-    next-steps guide tailored to what's installed (agent, billing, deps)."""
+    """Sense the environment and either emit it as JSON (for an agent to reason
+    over) or render a setup + guided tour. The intelligence belongs in the agent
+    that reads ``--json``; this command is the sensor + safe actuator."""
+    import json as _json
     import os
+    import subprocess
     import sys
 
     from . import onboard
     from .setup import default_settings_path, wire_statusline
 
-    use_color = (
-        (not getattr(args, "no_color", False))
-        and sys.stdout.isatty()
-        and os.environ.get("NO_COLOR") is None
-    )
+    env = onboard.detect()
+    latest = None if args.offline else onboard.latest_pypi_version()
+    outdated = onboard.is_outdated(env.installed_version, latest)
+
+    if args.json:
+        print(_json.dumps(onboard.report(env, latest), indent=2))
+        return 0
+
+    use_color = (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
     def c(code: str, t: str) -> str:
         return f"\033[{code}m{t}\033[0m" if use_color else t
 
-    env = onboard.detect()
     print(c("1;38;5;79", "distil onboard") + c("90", "  ·  let's get you set up") + "\n")
 
     agents = ", ".join(label for _, label in env.agents) or "none detected"
@@ -557,12 +563,35 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         if env.subscription
         else "metered / pay-as-you-go"
     )
+    ver = env.installed_version
+    if latest:
+        ver += "  →  " + (f"{latest} available" if outdated else "up to date")
     print(c("90", "Detected"))
     print(f"  os            {env.os_name}")
+    print(f"  distil        {ver}")
     print(f"  agents        {agents}")
     print(f"  package mgrs  {', '.join(env.managers) or 'none'}")
     print(f"  billing       {billing}")
     print(f"  anthropic ext {'installed' if env.has_anthropic else 'not installed (optional)'}\n")
+
+    if outdated:
+        cmd = onboard.upgrade_command(env.method)
+        if args.upgrade and env.method in ("pipx", "uv", "pip"):
+            print(c("33", f"⬆ upgrading distil via {env.method} …"))
+            rc = subprocess.run(cmd.split()).returncode
+            ok = rc == 0
+            print(
+                c(
+                    "32" if ok else "31",
+                    "  " + ("done — re-run distil onboard" if ok else "upgrade failed"),
+                )
+                + c("90", f"   ({cmd})")
+            )
+            if ok:
+                return 0
+        else:
+            print(c("33", f"⬆ newer distil available ({env.installed_version} → {latest})"))
+            print(c("36", f"  {cmd}") + c("90", "   ·   or: distil onboard --upgrade") + "\n")
 
     if args.dry_run:
         print(c("90", "dry-run: would wire the status line (distil setup) — skipped\n"))
@@ -584,8 +613,8 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         "\n"
         + c("90", "Re-run anytime: ")
         + c("36", "distil onboard")
-        + c("90", "   ·   diagnose: ")
-        + c("36", "distil doctor")
+        + c("90", "   ·   for agents: ")
+        + c("36", "distil onboard --json")
     )
     return 0
 
@@ -1305,6 +1334,15 @@ def build_parser() -> argparse.ArgumentParser:
     ob.add_argument(
         "--force", action="store_true", help="replace an existing status line (backed up first)"
     )
+    ob.add_argument(
+        "--json",
+        action="store_true",
+        help="emit the environment + recommendations as JSON (no actions)",
+    )
+    ob.add_argument(
+        "--upgrade", action="store_true", help="upgrade distil if a newer version is available"
+    )
+    ob.add_argument("--offline", action="store_true", help="skip the PyPI version check")
     ob.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     ob.set_defaults(func=cmd_onboard)
 

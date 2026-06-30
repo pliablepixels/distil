@@ -3,6 +3,19 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.4.0 dev
+
+### Added
+- **`distil onboard` is now upgrade-aware and agent-ready.** It checks PyPI
+  (offline-safe) and, if a newer release exists, shows the exact upgrade command
+  for your install method (pipx/uv/pip) — `--upgrade` runs it. New
+  **`distil onboard --json`** emits the full environment + version status +
+  recommendations as structured data so an agent can reason over it.
+- **Intelligent `/distil-onboard` skill** — rather than a static installer, the
+  Claude Code command now senses via `--json`, assesses *your* situation
+  (upgrade, which agent, billing reality, gaps), and guides you through setup +
+  validation conversationally, asking and adapting rather than ticking boxes.
+
 ## [1.3.0] — 2026-06-30 — One-command onboarding
 
 ### Added
