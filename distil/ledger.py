@@ -178,6 +178,7 @@ def render_dashboard(
     *,
     change_rate: float | None = None,
     samples: int = 0,
+    recent: list[int] | None = None,
     subscription: bool = False,
     color: bool = True,
 ) -> str:
@@ -231,6 +232,10 @@ def render_dashboard(
         eq = 1 - change_rate
         out.append(row(f"{'decision-equiv':<15}{c('35', _bar(eq, 18))}  {eq * 100:4.1f}%"))
         out.append(row(c("90", f"{'':<15}{samples:,} samples")))
+        if recent:
+            # Most-recent decisions, newest on the right: ▰ same action, ▱ changed.
+            marks = "".join(c("32", "▰") if v else c("31", "▱") for v in recent[-24:])
+            out.append(row(f"{'recent':<15}{marks}"))
     else:
         out.append(
             row(f"{'decision-equiv':<15}" + c("90", "— run ") + c("36", "distil wrap --shadow 0.1"))

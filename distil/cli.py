@@ -549,17 +549,20 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         s = ledger.summary()
         change_rate: float | None = None
         samples = 0
+        recent: list[int] | None = None
         try:
             led = ShadowLedger.load()
             samples = led.samples
             if samples:
                 change_rate = led.rate()
+                recent = list(led.recent)
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
         return ledger.render_dashboard(
             s,
             change_rate=change_rate,
             samples=samples,
+            recent=recent,
             subscription=subscription,
             color=color,
         )
