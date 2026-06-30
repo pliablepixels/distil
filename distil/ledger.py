@@ -80,7 +80,12 @@ class LedgerSummary:
     runs: int
     total_dollars_saved: float
     total_tokens_saved: int
-    by_trajectory: dict[str, float]  # id -> dollars saved
+    by_trajectory: dict[str, float]
+    # Absolute totals (not just the delta), so callers can show orig -> compressed.
+    total_baseline_tokens: int = 0
+    total_distil_tokens: int = 0
+    total_baseline_dollars: float = 0.0
+    total_distil_dollars: float = 0.0  # id -> dollars saved
 
 
 def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
@@ -89,6 +94,10 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
     runs = 0
     dollars = 0.0
     tokens = 0
+    base_tok = 0
+    dist_tok = 0
+    base_usd = 0.0
+    dist_usd = 0.0
     by_traj: dict[str, float] = {}
     for line in path.read_text().splitlines():
         if not line.strip():
@@ -98,8 +107,12 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
         saved = d["baseline_dollars"] - d["distil_dollars"]
         dollars += saved
         tokens += d["baseline_input_tokens"] - d["distil_input_tokens"]
+        base_tok += d["baseline_input_tokens"]
+        dist_tok += d["distil_input_tokens"]
+        base_usd += d["baseline_dollars"]
+        dist_usd += d["distil_dollars"]
         by_traj[d["trajectory_id"]] = by_traj.get(d["trajectory_id"], 0.0) + saved
-    return LedgerSummary(runs, dollars, tokens, by_traj)
+    return LedgerSummary(runs, dollars, tokens, by_traj, base_tok, dist_tok, base_usd, dist_usd)
 
 
 def render_html(s: LedgerSummary) -> str:

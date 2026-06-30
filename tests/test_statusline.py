@@ -38,12 +38,41 @@ def test_empty_ledger_shows_hint(monkeypatch, capsys):
 
 
 def test_populated_ledger(monkeypatch, capsys):
-    s = ledger.LedgerSummary(3, 0.0400, 21_600, {"live-proxy": 0.04})
+    s = ledger.LedgerSummary(
+        3,
+        0.0400,
+        21_600,
+        {"live-proxy": 0.04},
+        total_baseline_tokens=50_000,
+        total_distil_tokens=28_400,
+        total_baseline_dollars=0.10,
+        total_distil_dollars=0.06,
+    )
     rc, out = _run(monkeypatch, capsys, s)
     assert rc == 0
-    assert "21.6K tok" in out
-    assert "$0.0400" in out
+    assert "50.0K→28.4K tok" in out  # orig → compressed, not just the delta
+    assert "$0.10→$0.06" in out
     assert "3 runs" in out
+
+
+def test_subscription_hides_notional_dollars(monkeypatch, capsys):
+    # On a flat-rate subscription the dollar figure is notional, so it's hidden;
+    # the orig -> compressed token reduction (the real win) still shows.
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "1")
+    s = ledger.LedgerSummary(
+        3,
+        0.04,
+        21_600,
+        {},
+        total_baseline_tokens=50_000,
+        total_distil_tokens=28_400,
+        total_baseline_dollars=0.10,
+        total_distil_dollars=0.06,
+    )
+    rc, out = _run(monkeypatch, capsys, s)
+    assert rc == 0
+    assert "50.0K→28.4K tok" in out
+    assert "$" not in out
 
 
 def test_singular_run(monkeypatch, capsys):

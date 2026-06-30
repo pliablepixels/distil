@@ -432,8 +432,23 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     if s is None or s.runs == 0:
         parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
     else:
-        parts.append(c("36", f"{_humanize_tokens(s.total_tokens_saved)} tok"))
-        parts.append(c("32", f"${s.total_dollars_saved:,.4f}"))
+        parts.append(
+            c(
+                "36",
+                f"{_humanize_tokens(s.total_baseline_tokens)}→"
+                f"{_humanize_tokens(s.total_distil_tokens)} tok",
+            )
+        )
+        # On a flat-rate subscription there's no per-token bill, so the dollar
+        # figure is notional — show tokens only. Opt in with DISTIL_SUBSCRIPTION=1.
+        sub = os.environ.get("DISTIL_SUBSCRIPTION", "").strip().lower()
+        if sub in ("", "0", "false", "no"):
+            parts.append(
+                c(
+                    "32",
+                    f"${s.total_baseline_dollars:,.2f}→${s.total_distil_dollars:,.2f}",
+                )
+            )
         parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
         try:
             from .shadow import ShadowLedger
