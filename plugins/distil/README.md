@@ -17,7 +17,9 @@ A live token-savings **status line** and a **`/distil`** command for
 /plugin install distil@distil
 ```
 
-This gives you the **`/distil`** command (savings report + setup help).
+This gives you the **`/distil`** command (savings report + setup help) and the
+**`distil-setup` skill** — ask Claude Code to "set up distil" or "route my agent
+through distil" and it installs the CLI and wires your agent/SDK through compression.
 
 ## Enable the live savings status line
 

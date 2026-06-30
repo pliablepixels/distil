@@ -15,4 +15,4 @@ This package demonstrates the two highest-leverage techniques end-to-end:
      non-inferiority gate (distil.certify.stats).
 """
 
-__version__ = "0.25.1"
+__version__ = "1.0.0"

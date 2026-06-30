@@ -3,6 +3,70 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.0.0] — 2026-06-29 — General Availability
+
+**1.0 / GA.** The compression engine, the proxy/SDK integrations, and the
+decision-equivalence certificate machinery are production-grade, API-stable, and
+covered by **658 tests** with a zero-dependency stdlib core. This release folds in the
+cross-model, cost-frontier, and continuous-assurance work that landed after 0.28.0 and
+declares a stable public surface.
+
+**What "1.0 / GA" means (and what it doesn't).** It is a commitment to a stable API and
+to the contract that protects you — *certify decision-equivalence, or fall back to full
+context; never silently lossy*. It is **not** a claim that aggressive compression is safe
+on every agent untuned: E7/E11 show the opposite, which is precisely why the operating
+point is **auto-calibrated per deployment and fail-safe**. Honest scope, unchanged: the
+guarantee is distribution-free and finite-sample, **conditional on exchangeability** with
+your calibration distribution. See [`docs/GA_READINESS.md`](docs/GA_READINESS.md) for the
+full ledger of what is closed and what remains empirical breadth.
+
+### Added — cross-model generality (E11)
+- **Validated across 5 models / 3 vendors.** The long-horizon harness (30-turn ReAct,
+  SWE-bench Verified) now reports gpt-4o-mini and gpt-4.1 (OpenAI), Sonnet 4.6 (Anthropic),
+  Haiku 4.5 (Anthropic, n=500), and DeepSeek-V3 (n=200). **gate@12 shows no statistically
+  significant degradation on any of the five models.** The two well-powered runs (Haiku
+  n=500, DeepSeek n=200) confirm non-inferiority; the three n=50 runs are directionally
+  consistent with wide CIs (honestly marked as not powered).
+- **Corrected finding.** An earlier reading of DeepSeek alone ("aggressiveness must scale
+  with model capability") is **refuted** by the wider sweep: harm appears only as the
+  product of *realized compression × the agent's reliance on aged-out context* — a
+  workload×model interaction, not raw capability. A fixed `gate_recent` cannot predict it,
+  which is why you must calibrate on outcomes per deployment.
+- **OpenAI 429 handling** — retry on TPM rate-limits with backoff + `Retry-After`.
+
+### Added — auto-calibration, productionized (closes the headline GA risk)
+- `distil calibrate` selects the most aggressive working-set size whose task-success loss
+  is non-inferior to full context (paired McNemar), and **fails safe to full context** if
+  none certifies — the operating-point analogue of the certificate. Reproduces the manual
+  E11 choice automatically (selects gate@12, rejects gate@6 on DeepSeek). `distil/calibrate.py`,
+  `tests/test_calibrate.py`. The relevance gate is now a shippable library primitive
+  (`distil/gate.py`: `working_set_indices`, `gate_fraction`), not benchmark-only.
+
+### Added — cost frontier under the motto (E12)
+- **Cache-monotone gate** (`gate.py:monotone_gate`) — deterministic append-only digests so
+  the digested prefix is byte-stable and prompt-cache/KV reuse captures it.
+- **Graded gate** (`gate.py:graded_gate`) — per-distance compression tiers, certified with
+  the tighter empirical-Bernstein (Maurer–Pontil) bound (`conformal.py`).
+- **Speculative expansion** (`speculative.py`) and **constrained-bandit operating-point
+  search** (`calibrate.py:bandit_select_operating_point`) — fail-safe, shipped + tested.
+  All levers cut cost *inside* the certified envelope; they never trade the guarantee for
+  dollars.
+
+### Added — continuous assurance under drift (E13)
+- **Anytime-valid drift monitor** (`drift.py:DriftMonitor`) — a betting e-process for
+  `H0: risk ≤ α` (Waudby-Smith & Ramdas 2023) you may check after *every* turn with
+  false-alarm probability ≤ δ regardless of how often you peek (Ville's inequality). Trips
+  when live decision-change exceeds the certified budget → recalibrate or fall back.
+- **Cross-family grader ensemble** (`ensemble.py:EnsembleGrader`) — conservative "any-change"
+  aggregation keeps measured risk an upper bound even if one grader family is unfaithful.
+- **Anytime-valid certificate** for graded losses (`conformal.py:betting_upper_bound`).
+
+### Changed
+- Package version reconciled to **1.0.0** (`pyproject.toml`, `distil/__init__.py`,
+  `CITATION.cff`); PyPI classifier → **Production/Stable**.
+- Docs/site test counts corrected to 658; the landing page's E11 narrative updated to the
+  corrected (5-model) finding.
+
 ## [0.28.0] — 2026-06-26
 
 E10: trajectory-level decision-equivalence certificate — the first distribution-free,
