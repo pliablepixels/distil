@@ -44,6 +44,18 @@ distil · 1.2M tok · $3.4120 · 128 runs · eq 99.5%
 has samples). With no savings yet it shows a hint instead. Requires `distil`
 on `PATH` or `uvx` available.
 
+### Already have a status line?
+
+Don't replace it — add distil as one more segment. In your existing status-line script:
+
+```bash
+distil_seg="$(distil statusline 2>/dev/null || true)"
+[ -n "$distil_seg" ] && out="${out}  ·  ${distil_seg}"
+```
+
+`distil statusline` prints nothing when distil isn't installed, and `2>/dev/null || true`
+keeps your line clean either way.
+
 ## Actually compress traffic
 
 The status line reflects the local savings ledger. Populate it by routing an agent

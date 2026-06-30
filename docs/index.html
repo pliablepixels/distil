@@ -132,8 +132,8 @@
   <div class="logo">Dist<b>il</b></div>
   <span class="pill">compression with a quality contract</span>
   <div class="links">
-    <a href="#how">How</a><a href="#proof">Proof</a><a href="benchmark.html">Benchmark</a><a href="#domains">Domains</a>
-    <a href="#install">Install</a><a href="token-economics.html">Learn</a><a href="getting-started.html">Docs</a><a href="#honest">Honesty</a>
+    <a href="#how">How</a><a href="#proof">Proof</a><a href="#domains">Domains</a><a href="#install">Install</a><a href="#honest">Honesty</a>
+    <a href="benchmark.html">Benchmark</a><a href="token-economics.html">Learn</a><a href="getting-started.html">Docs</a>
     <a href="https://github.com/dshakes/distil">GitHub →</a>
   </div>
 </div></nav>
@@ -145,10 +145,13 @@
     gated by a statistical non-inferiority test on the agent's <b>next action</b> (a proxy).
     <b>Same potency, less volume.</b></p>
   <p class="sub" style="font-size:13px;opacity:.85">Honest scope: the certificate covers
-    <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success — our
-    real <a href="research.html#e7">SWE-bench Verified test (E7)</a> shows it does
-    <b>not</b> transfer once compression gets aggressive. We publish that. <a href="research.html#e8">E8</a> (500-instance long-horizon, 5 conditions) shows
-    relevance-gated reversible compression is <b>the only condition non-inferior to full context</b> (&minus;2.4&nbsp;pp, 95% CI [&minus;5.7, +0.9]; McNemar p=0.19), beats Headroom by +4.2&nbsp;pp (p=0.035), and beats LLMLingua-2 by 34&nbsp;points (36.8% vs 2.4% pass@1) despite removing nearly identical context fractions. We publish that too. <a href="research.html#e10"><b>E10</b></a> closes the loop with a trajectory-level certificate (the first of its kind): with 95% confidence, the gated compressor costs a solvable task on &le;11.4% of exchangeable runs — certified and proven out-of-sample. <a href="research.html#e11"><b>E11</b></a> extends this across <b>5 models / 3 vendors</b> (OpenAI, Anthropic, DeepSeek): the relevance gate shows no statistically significant degradation at gate@12 on any of them, and the safe aggressive point tracks <i>realized compression × the agent's reliance on aged-out context</i> — a workload×model interaction, not raw capability — which is why the operating point must be <b>auto-calibrated per deployment</b>, fail-safe to full context.</p>
+    <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success. On
+    <a href="research.html#e7">real SWE-bench Verified (E7)</a> the proxy <b>does not transfer</b>
+    once compression gets aggressive — we publish that. Relevance-gated reversible compression is the
+    <b>only condition non-inferior to full context</b>
+    (<a href="research.html#e8">E8</a>: &minus;2.4&nbsp;pp, 95% CI [&minus;5.7,&nbsp;+0.9]), and a
+    trajectory-level certificate bounds the cost at <b>&le;11.4% of exchangeable runs</b>, holding across
+    <b>5 models / 3 vendors</b>. <a href="research.html#e10">Full evidence, CIs and ablations &rarr;</a></p>
   <p class="sub" style="font-size:13.5px;margin-top:16px">Route Claude Code — or any agent — through it, no code change:<br>
     <code>pipx install distil-llm &amp;&amp; distil wrap --expand -- claude</code></p>
   <div class="cta">
