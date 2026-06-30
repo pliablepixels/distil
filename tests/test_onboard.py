@@ -175,3 +175,43 @@ def test_uninstall_command_per_method() -> None:
     assert uninstall_command("uv") == "uv tool uninstall distil-llm"
     assert "uninstall" in uninstall_command("pip")
     assert uninstall_command("uvx").startswith("#")  # ephemeral — nothing to remove
+
+
+def test_cmd_onboard_ephemeral_offers_permanent_install(tmp_path, monkeypatch, capsys) -> None:
+    """Run via uvx (method='uvx') → onboard must offer to install distil permanently,
+    since nothing is on PATH. All side-effects sandboxed to tmp_path."""
+    import argparse
+    import subprocess
+
+    from distil import cli, onboard
+    from distil import setup as setup_mod
+
+    env = onboard.Env(
+        os_name="Darwin",
+        managers=["pipx", "uv"],
+        agents=[("claude", "Claude Code")],
+        subscription=True,
+        installed_version="1.5.0",
+        method="uvx",
+    )
+    calls: list = []
+    monkeypatch.setattr(onboard, "detect", lambda: env)
+    monkeypatch.setattr(onboard, "latest_pypi_version", lambda *a, **k: None)
+    monkeypatch.setattr(setup_mod, "default_settings_path", lambda: tmp_path / "settings.json")
+    monkeypatch.setattr(setup_mod, "detect_shell", lambda: ("zsh", tmp_path / ".zshrc"))
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append(a[0]) or _rc0())
+
+    cli.cmd_onboard(
+        argparse.Namespace(
+            dry_run=False, force=False, no_color=True, json=False,
+            offline=True, upgrade=False, yes=True, no_interactive=False,
+        )
+    )
+    assert any("pipx install distil-llm" in str(c) for c in calls)  # bootstrapped itself
+    assert "running ephemerally" in capsys.readouterr().out
+
+
+def _rc0():
+    import argparse
+
+    return argparse.Namespace(returncode=0)

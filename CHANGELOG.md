@@ -5,6 +5,14 @@ All notable changes to Distil are documented here. Format loosely follows
 
 ## [Unreleased] — 1.6.0 dev
 
+### Added
+- **`distil onboard` now ensures you have everything — including a permanent
+  install.** When run ephemerally (e.g. `uvx --from distil-llm distil onboard`),
+  distil isn't on PATH, so onboard detects that and **offers to install distil
+  permanently first** (pipx/uv/brew, per your machine) before wiring the status
+  line and routing your agent. Makes `uvx --from distil-llm distil onboard` a true
+  one-command setup. Intelligent by default — no flag to opt in.
+
 ## [1.5.0] — 2026-06-30 — Clean teardown
 
 ### Added
