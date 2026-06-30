@@ -56,6 +56,15 @@
   var entries = [];
   heads.forEach(function (h) {
     if (!h.id) h.id = slug(h.textContent) || "section";
+    // Clickable "#" ref link on the header itself (deep-link any section).
+    if (!h.querySelector(".hanchor")) {
+      var ha = document.createElement("a");
+      ha.className = "hanchor";
+      ha.href = "#" + h.id;
+      ha.textContent = "#";
+      ha.setAttribute("aria-label", "Link to this section");
+      h.appendChild(ha);
+    }
     var a = document.createElement("a");
     a.href = "#" + h.id;
     a.textContent = h.textContent.replace(/#/g, "").trim();
