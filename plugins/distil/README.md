@@ -37,12 +37,16 @@ Add this to your `~/.claude/settings.json` (the plugin ships the script):
 It renders, e.g.:
 
 ```
-distil · 1.2M tok · $3.4120 · 128 runs · eq 99.5%
+distil · 1.2M→0.5M tok · $3.41→$1.40 · eq 99.5% · 128 runs
 ```
 
-(tokens saved · dollars saved · runs · live decision-equivalence when shadow-mode
-has samples). With no savings yet it shows a hint instead. Requires `distil`
-on `PATH` or `uvx` available.
+(original → compressed tokens · original → compressed cost · decision-equivalence
+when shadow-mode has samples · runs). With no savings yet it shows a hint instead.
+Requires `distil` on `PATH` or `uvx` available.
+
+**On a flat-rate subscription** (Claude Pro/Max) the per-token dollar figure is
+notional — set `DISTIL_SUBSCRIPTION=1` in your environment to drop the cost and
+show the token reduction only.
 
 ### Already have a status line?
 
