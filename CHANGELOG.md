@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased] — 1.3.0 dev
+## [1.3.0] — 2026-06-30 — One-command onboarding
 
 ### Added
 - **`distil onboard`** — one command that detects your environment (OS, package
