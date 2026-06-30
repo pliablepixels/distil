@@ -70,53 +70,15 @@ distil leaderboard          # cumulative tokens + $ saved, from the local ledger
 
 ---
 
-## 🧭 Pick your lens
+## 💡 Why Distil is different
 
-<table>
-<tr>
-<td width="33%" valign="top">
+**You don't need byte-equivalence — you need decision-equivalence.** An agent only has to take the *same actions* whether or not its context was compressed — and *that* is measurable, certifiable, and compatible with aggressive compression. (Honest caveat we measured ourselves: it's a **proxy**; under aggressive *lossy* compression it doesn't fully transfer to task success — [E7](#-end-to-end-reality-swe-bench-verified-e7).)
 
-**👔 For decision-makers**
+- **Certified, not estimated.** A strategy ships only if a non-inferiority test certifies the next action is unchanged — savings and accuracy on the *same runs*, gated in CI. When it can't certify, it falls back to full context.
+- **Reversible, not lossy.** Every other compressor *destroys* detail. Distil digests behind a content handle, keeps the original locally, and hands the agent a `distil_expand` tool to pull back exactly what it needs — so you can compress fearlessly.
+- **It compounds.** Every expansion is a label that the content mattered; logged (numbers only), it teaches a policy to stop digesting what your agents keep recovering — only ever getting *more* conservative.
 
-You pay to re-send the whole context every turn. Distil cuts it **~27%** at a **certified-zero decision-change rate**, and *proves* it — savings and accuracy on the **same runs**, gated in CI. The only compressor that's **reversible *and* certified**, and the **only one tied with full context** on a real long-horizon agent ([E8](#-long-horizon-reality-the-gate-where-it-belongs-e8)). Not the cheapest — the only *certified* one.
-
-</td>
-<td width="33%" valign="top">
-
-**🛠️ For developers**
-
-`pipx install distil-llm` (or `uvx --from distil-llm distil …`), point your client's `base_url` at the proxy, done — **no code change, any language or SDK**. Or `wrap(client)` in-process. **Reversible by default** — every digest is byte-recoverable on demand; **lossless byte-in-context** with `--verbatim`.
-
-</td>
-<td width="33%" valign="top">
-
-**🔬 For researchers**
-
-Compression reframed as **decision-equivalence** and certified with **TOST non-inferiority** + bootstrap CIs over a multi-domain trajectory corpus. Causal ablation discovers what's safe to drop. Reproducible, zero-dep.
-
-</td>
-</tr>
-</table>
-
----
-
-## 💡 The one idea
-
-**You don't need byte-equivalence — you need decision-equivalence.** An agent only has to take the *same actions* whether or not its context was compressed, and *that* is measurable and certifiable as a **statistical bound on the next-action change rate**. (The honest caveat, which we measured ourselves: that's a **proxy** — under aggressive *lossy* compression it doesn't fully transfer to task success, [E7](#-end-to-end-reality-swe-bench-verified-e7).) So Distil's value is **cache-aware savings inside a certified safety gate**, with a reversible tier the model can pull detail back from on demand.
-
----
-
-## 🔑 Distil's structural edge — recoverable compression
-
-Every other compressor — summarizers, extractive pruners, structural crushers — is **lossy**: once it crushes a tool output, the detail is *gone*. Distil **digests behind a content handle and keeps the original locally**, then hands the agent a `distil_expand` tool. Run with `distil proxy --expand` (or `distil wrap --expand`) and:
-
-- **The model pulls back exactly the detail it needs, on demand** — Distil resolves the handle from the local store and re-queries, *transparently*. Your agent code never changes; it just gets the right answer.
-- **So you can compress fearlessly.** The dangerous failure mode of lossy compression — "it dropped something load-bearing" — is gone, because the safety net is the model recovering the detail itself.
-- **Every expansion is a label.** A `distil_expand` call is ground truth that the digested content *mattered*. Logged (numbers only, never content), these feed a learned policy (`distil learn` shows it) that stops digesting the content *signatures* your agents keep expanding — keeping them byte-exact instead. It only ever makes Distil **more** conservative, so it's never-regressing by construction.
-
-This is the structural advantage: **compress more, lose nothing, and get better the more you use it.** Recoverable compression is uncommon among the lossy tools in this space — and the learning loop compounds on top of it.
-
-> **The three fidelity tiers, precisely:** **lossless** = the model sees content *byte-identical in-context* (Tier-0 / `--verbatim`); **reversible** = content is *digested but byte-recoverable on demand* via the local store / `distil_expand` (the default — like a zip you unpack only when needed); **lossy** = dropped irrecoverably (every other tool). **All three distil modes are certified decision-equivalent**; only distil offers the reversible tier, and only distil certifies it.
+> **Three fidelity tiers:** **lossless** (byte-identical in-context, `--verbatim`) · **reversible** (digested but byte-recoverable on demand — the default) · **lossy** (gone — every other tool). All three Distil modes are certified decision-equivalent; only Distil offers, and certifies, the reversible tier.
 
 ---
 
@@ -151,9 +113,12 @@ GATE: PASS — every trajectory certified non-inferior; aggressive rejected on a
 > distil certify --strategy aggressive   # VERDICT: FAIL  (mean diff −1.0, blocked)
 > ```
 
-### The certified compression frontier — `distil eval`
+<details>
+<summary><b>The certified compression frontier</b> (<code>distil eval</code>) — a savings-vs-quality curve where every point carries its certification verdict. The artifact no competitor publishes.</summary>
 
-The artifact no competitor publishes: a savings-vs-quality curve where **every point carries its certification verdict**. It locates the cliff past which lossy compression drops decisions — and shows distil sitting safely inside it. Reproducible offline; run `--runner anthropic` over your ingested traces for live task-accuracy.
+<br/>
+
+It locates the cliff past which lossy compression drops decisions — and shows distil sitting safely inside it. Reproducible offline; run `--runner anthropic` over your ingested traces for live task-accuracy.
 
 ```
 level                   savings   equiv  certified  curve
@@ -164,9 +129,11 @@ truncate@700              20.0%     36%        ✘ —    ████
 truncate@300              41.3%      0%        ✘ —    █████████
 --------------------------------------------------------------------------
 distil: 8.4% token savings @ 100% decision-equivalence — certified.
-(this is the bundled-corpus, cache-aware-only operating point; the varied-corpus
- certified savings are much higher — see the Benchmark section below.)
+(bundled-corpus, cache-aware-only operating point; varied-corpus certified savings
+ are much higher — see the Benchmark below.)
 ```
+
+</details>
 
 ---
 
@@ -434,41 +401,20 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 ---
 
-## 🚀 Use it on your workflow — recipes
+## 🧰 Cheat-sheet
 
-Pick the row that matches you. Every command is real; see them work with `distil leaderboard` (genuine savings) and the `x-distil-*` response headers.
+Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with-every-sdk). Beyond that:
 
-**Coding agents (Claude Code · Codex · Gemini CLI)** — wrap the agent; its traffic routes through compression with zero code change:
-```bash
-distil wrap --lossless-only -- claude         # subscription/OAuth-safe (ToS-safe, no tool injection)
-distil wrap --lossless-only --verbatim -- claude   # interactive: model sees content un-digested
-distil wrap --expand -- claude                # PAYG: aggressive digest, model recovers detail on demand
-distil wrap --session-delta -- claude         # cache-delta: re-reads after edits sent as a diff
-```
-
-**Any SDK app (non-coding: chatbots, RAG, agents, batch)** — point `base_url` at the proxy, or compress in-process:
-```bash
-distil proxy                                                   # Anthropic / OpenAI-compatible
-distil proxy --upstream https://generativelanguage.googleapis.com   # Google Gemini
-```
-```python
-client = anthropic.Anthropic(base_url="http://127.0.0.1:8788")   # any base_url SDK, any language
-# or in-process, no sidecar:
-from distil.integrations import litellm as distil_litellm
-distil_litellm.completion(model="claude-opus-4-8", messages=[...])
-```
-
-**See it, prove it, and get more out of it:**
 | Goal | Command |
 |---|---|
 | Watch genuine savings accumulate | `distil leaderboard` (or the live `distil gateway` dashboard) |
 | Live decision-equivalence on real traffic | `distil proxy --shadow 0.05` → `distil shadow-stats` |
 | Certify on *your* domain | `distil ingest --input prod.jsonl --out ./mycorpus` → `distil conformal --corpus ./mycorpus` |
-| Let agents recover digested detail (MCP) | `distil mcp` (exposes `distil_compress`/`distil_expand`/`distil_savings`) |
-| Live savings in your Claude Code status line | install the [`plugins/distil`](plugins/distil) plugin → `distil statusline` |
-| Self-improving keep policy | `distil learn` / `distil online` (flywheel; only ever gets more conservative) |
+| Recover digested detail from any agent (MCP) | `distil mcp` |
+| Live savings in your Claude Code status line | the [`plugins/distil`](plugins/distil) plugin → `distil statusline` |
+| Self-improving keep policy | `distil learn` / `distil online` |
 
-Rule of thumb: **subscription/interactive → `--lossless-only` (+`--verbatim`)**; **PAYG/autonomous → default digest (+`--expand`)**; **coding sessions with re-reads → add `--session-delta`**.
+Rule of thumb: **subscription/interactive → `--lossless-only` (+`--verbatim`)** · **PAYG/autonomous → default digest (+`--expand`)** · **coding re-reads → add `--session-delta`**.
 
 ---
 
@@ -522,6 +468,11 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 
 ## 🧩 What's inside (real implementations, no stubs)
 
+<details>
+<summary><b>40+ shipped capabilities</b> — the cache-aware engine, causal pruning, the certificate, proxy + adapters, MCP, framework hooks, learned keep-models, Rust core. Click to expand.</summary>
+
+<br/>
+
 | Capability | Module | Loss profile |
 |---|---|---|
 | Cache-aware priced cost engine | `compress/cache_aware.py` | — |
@@ -558,6 +509,8 @@ It calibrates a ladder of compression levels against your traffic, measures the 
 | **Verifiable federated telemetry** — signed, content-free savings + verdict | `telemetry.py`, `distil federated-leaderboard` | tamper-evident |
 | **Async high-concurrency proxy** | `aproxy.py`, `distil proxy --async` | `[async]` extra |
 | **Rust hot-path core** + pure-Python parity fallback | `rust/distil-core`, `distil/native.py` | opt-in speed |
+
+</details>
 
 **Full docs:** [Getting started](https://dshakes.github.io/distil/getting-started.html) · [Concepts](https://dshakes.github.io/distil/concepts.html) · [Techniques](https://dshakes.github.io/distil/techniques.html) · [CLI](https://dshakes.github.io/distil/cli.html) · [Output & I/O](https://dshakes.github.io/distil/output.html) · [Architecture](https://dshakes.github.io/distil/architecture.html) · [Integrations](https://dshakes.github.io/distil/integrations.html) · [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) · [FAQ](https://dshakes.github.io/distil/faq.html)
 
@@ -598,9 +551,14 @@ What we **did** adopt from that space — because it survives the gate — is on
 
 ## 🎯 Both sides of the bill — input *and* output
 
-<p align="center"><img src="docs/assets/io.svg" alt="compress both input and output tokens" width="100%"/></p>
+Distil compresses **input/context** (Tier-0/1, cache stabilization, causal pruning, proxy + adapter — comprehensive) **and output** too.
 
-**Input/context** (Tier-0/1, cache stabilization, causal pruning, proxy + adapter) — comprehensive.
+<details>
+<summary>Output mechanisms (generation shaping + reversible re-entry digest), performance, and running the gate on your own traffic.</summary>
+
+<br/>
+
+<p align="center"><img src="docs/assets/io.svg" alt="compress both input and output tokens" width="100%"/></p>
 
 **Output** — two real mechanisms (`distil/output.py`):
 - **Generation-side shaping** — a gated `role:"system"` verbosity directive (`distil proxy --shape-output light|aggressive`) so the model *emits* fewer tokens. Lossy by nature, so it's **PAYG-only** and **measured**: `distil output-savings` reports the token cut **and** the rate the answer survived, with a bootstrap CI.
@@ -618,6 +576,8 @@ $ distil bench --corpus ./mycorpus --savings-only
 ```
 
 **Performance** (`distil perf`, stdlib, single core): ~25,000 distil-compressions/sec; the in-process adapter compresses a request in **~0.006 ms** (p50).
+
+</details>
 
 ### Honest limits
 - **Production keep-model weights.** A logistic model (96.4%/0.98) ships built-in; the transformer is a real adapter + pipeline with a *demo* checkpoint on the [v0.1.0 release](https://github.com/dshakes/distil/releases/tag/v0.1.0) — retrain on your traces (`distil train-transformer`).
