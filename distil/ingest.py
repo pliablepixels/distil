@@ -350,6 +350,8 @@ def ingest_file(
     The trajectory id is derived from the file stem.
     """
     p = Path(path)
+    if not p.exists():
+        raise SystemExit(f"distil ingest: input file not found: {path}")
     suffix = p.suffix.lower()
     traj_id = p.stem
 

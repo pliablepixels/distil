@@ -45,10 +45,35 @@ class AnthropicRunner:
 
     def _ensure_client(self) -> object:
         if self._client is None:
-            from anthropic import Anthropic
-
-            self._client = Anthropic()
+            try:
+                from anthropic import Anthropic
+            except ModuleNotFoundError:
+                raise SystemExit(
+                    "distil: the 'anthropic' package is needed for --runner anthropic "
+                    "(live grading).\n"
+                    "  install it:  pipx inject distil-llm anthropic   "
+                    "(or: pip install anthropic)"
+                ) from None
+            try:
+                self._client = Anthropic()
+            except Exception as exc:  # noqa: BLE001 — missing/invalid key, etc.
+                raise SystemExit(
+                    f"distil: could not initialise the Anthropic client — {exc}\n"
+                    "  set your key:  export ANTHROPIC_API_KEY=sk-ant-..."
+                ) from None
         return self._client
+
+    def _create(self, **kw: object) -> object:
+        """Make a Messages API call, turning any failure (missing key, network,
+        rate-limit) into a clean message instead of a raw traceback. SystemExit
+        from _ensure_client (no package / no client) passes straight through."""
+        try:
+            return self._ensure_client().messages.create(**kw)  # type: ignore[attr-defined]
+        except Exception as exc:  # noqa: BLE001 — auth / network / rate-limit
+            raise SystemExit(
+                f"distil: the Anthropic API call failed — {exc}\n"
+                "  set your key:  export ANTHROPIC_API_KEY=sk-ant-..."
+            ) from None
 
     def decide(self, blocks: list[Block]) -> str:
         if self.samples == 1:
@@ -72,8 +97,7 @@ class AnthropicRunner:
         ]
         user = "\n\n".join(f"[{b.kind.value}] {b.text}" for b in rest)
 
-        client = self._ensure_client()
-        resp = client.messages.create(  # type: ignore[attr-defined]
+        resp = self._create(
             model=self.model,
             max_tokens=self.max_tokens,
             system="\n\n".join(system_parts) or "You are an autonomous agent.",
@@ -94,8 +118,7 @@ class AnthropicRunner:
     def _raw(self, system: str, user: str) -> str:
         """Free-form text completion (no forced tool) — used by the expand loop, which
         needs the model to choose between requesting an expansion and committing."""
-        client = self._ensure_client()
-        resp = client.messages.create(  # type: ignore[attr-defined]
+        resp = self._create(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system,

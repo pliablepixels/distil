@@ -54,9 +54,21 @@ class AnthropicTokenizer:
 
     def _ensure_client(self) -> object:
         if self._client is None:
-            from anthropic import Anthropic  # lazy: keep the core dependency-free
-
-            self._client = Anthropic()
+            try:
+                from anthropic import Anthropic  # lazy: keep the core dependency-free
+            except ModuleNotFoundError:
+                raise SystemExit(
+                    "distil: the 'anthropic' package is needed for --tokenizer anthropic.\n"
+                    "  install it:  pipx inject distil-llm anthropic   "
+                    "(or: pip install anthropic)"
+                ) from None
+            try:
+                self._client = Anthropic()
+            except Exception as exc:  # noqa: BLE001 — missing/invalid key, etc.
+                raise SystemExit(
+                    f"distil: could not initialise the Anthropic client — {exc}\n"
+                    "  set your key:  export ANTHROPIC_API_KEY=sk-ant-..."
+                ) from None
         return self._client
 
     def count(self, text: str) -> int:
@@ -65,10 +77,17 @@ class AnthropicTokenizer:
         if text in self._cache:
             return self._cache[text]
         client = self._ensure_client()
-        resp = client.messages.count_tokens(  # type: ignore[attr-defined]
-            model=self.model,
-            messages=[{"role": "user", "content": text}],
-        )
+        try:
+            resp = client.messages.count_tokens(  # type: ignore[attr-defined]
+                model=self.model,
+                messages=[{"role": "user", "content": text}],
+            )
+        except Exception as exc:  # noqa: BLE001 — missing key, network, rate-limit, etc.
+            raise SystemExit(
+                f"distil: the Anthropic token count call failed — {exc}\n"
+                "  set your key:  export ANTHROPIC_API_KEY=sk-ant-...   "
+                "(the offline default needs no key: drop --tokenizer anthropic)"
+            ) from None
         self._cache[text] = resp.input_tokens
         return resp.input_tokens
 
