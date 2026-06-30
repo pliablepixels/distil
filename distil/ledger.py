@@ -233,9 +233,7 @@ def render_dashboard(
         out.append(row(c("90", f"{'':<15}{samples:,} samples")))
     else:
         out.append(
-            row(
-                f"{'decision-equiv':<15}" + c("90", "— run ") + c("36", "distil proxy --shadow 0.1")
-            )
+            row(f"{'decision-equiv':<15}" + c("90", "— run ") + c("36", "distil wrap --shadow 0.1"))
         )
 
     out.append(row())
