@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-658%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-707%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -207,7 +207,7 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 ## 📦 Install your way
 
-**New here? One command:** `pipx install distil-llm`, then `distil bench`. No pipx? Zero-install: `uvx --from distil-llm distil bench`. Everything below is an *alternative*, not a requirement.
+**New here?** `pipx install distil-llm`, then `distil onboard` — it sets you up and guides you (see [Use it now](#-use-it-now)). Want to see it prove itself first instead? `distil bench` runs the certified gate in ~10s, no API key. The matrix below is for picking an *install format* — everything in it is an alternative, not a requirement.
 
 > ⚠️ **The one gotcha — the name.** The PyPI package is **`distil-llm`** but the command is **`distil`** (the bare name was taken). So `pipx install distil-llm` → run `distil …`. `pip install distil` installs something else.
 

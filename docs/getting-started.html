@@ -64,7 +64,7 @@
   <main class="content">
 
     <h1>Getting <span class="g">Started</span></h1>
-    <p class="lead">Install in one command, route your coding agent (Claude Code, Codex, Gemini CLI) through Distil with <code>distil wrap</code> — no code change — and watch genuine savings on your real traffic. Prefer to kick the tyres first? <code>distil bench</code> certifies the numbers offline with no API key.</p>
+    <p class="lead">Install, then run <code>distil onboard</code> — one command that detects your agent (Claude Code, Codex, Gemini CLI) and billing, wires the savings status line, and hands you the exact next steps. No code change. Prefer to kick the tyres first? <code>distil bench</code> certifies the numbers offline with no API key.</p>
 
     <hr/>
 
@@ -73,9 +73,10 @@
     <p>Distil ships as a PyPI package (<code>distil-llm</code>) with a <strong>stdlib-only core — zero runtime dependencies</strong>. The corpus is bundled in every distribution.</p>
 
     <div class="callout good">
-      <strong>Just want it now?</strong> One command:
-      <pre class="term" style="margin:.6em 0 .4em">pipx install distil-llm   <span class="d"># then: distil bench</span></pre>
-      No pipx? Zero-install with <a href="https://docs.astral.sh/uv/">uv</a>: <code>uvx --from distil-llm distil bench</code>. Everything else below is an alternative, not a requirement.
+      <strong>Just want it now?</strong> Two commands and you're set up:
+      <pre class="term" style="margin:.6em 0 .4em">pipx install distil-llm
+distil onboard   <span class="d"># detects your agent + billing, wires the status line, guides you</span></pre>
+      No pipx? Zero-install with <a href="https://docs.astral.sh/uv/">uv</a>: <code>uvx --from distil-llm distil onboard</code>. Just want to see it prove itself first? <code>distil bench</code> runs the certified gate in ~10s with no API key. Everything else below is an alternative, not a requirement.
     </div>
 
     <div class="callout">
