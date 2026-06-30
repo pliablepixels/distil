@@ -152,6 +152,11 @@ distil wrap --expand -- codex</pre>
 distil dashboard            <span class="d"># live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit</span>
 distil doctor               <span class="d"># diagnose your setup: ledger, shadow, proxy self-test, wiring</span></pre>
     <p>Wire the status line in one step with <code>distil setup</code>. The <strong>status line</strong> and <code>distil dashboard</code> auto-detect a flat-rate <strong>Claude subscription</strong> — the per-token dollar figure is notional, so it's dropped and the token reduction leads (override with <code>DISTIL_SUBSCRIPTION=0/1</code>). Inside Claude Code, <code>/distil-stats</code>, <code>/distil-shadow</code>, <code>/distil-dashboard</code>, and <code>/distil-doctor</code> surface this on demand.</p>
+    <p>Tired of typing <code>distil wrap</code> each session? Make it the default — once:</p>
+    <pre class="term">distil default              <span class="d"># managed shell alias so `claude` always routes through distil</span>
+distil default --always-on  <span class="d"># or a persistent proxy service covering every SDK</span>
+distil offboard             <span class="d"># later: remove distil's footprint (alias, service, status line) before uninstalling</span></pre>
+    <p><code>distil default</code> detects your shell (zsh / bash / fish / PowerShell) and billing mode, writes the right line to the rc file your shell actually reads, and <strong>tells you what it detected</strong>; <code>distil default --undo</code> reverses it. <code>distil offboard</code> is the clean inverse of onboarding — it undoes each piece (asking first), keeps your savings ledger unless <code>--purge</code>, and prints the right uninstall command. See the <a href="cli.html#default">CLI reference</a> for both.</p>
     <div class="callout">
       <strong>Will it save me money?</strong> Only on <strong>metered / pay-as-you-go</strong> billing (an API key): fewer tokens → fewer dollars. On a <strong>subscription</strong> you're flat-rate, so there's no per-token bill to cut — Distil still trims context and latency. <strong>Honest about coding agents:</strong> on short sessions the win is modest (~7% — the agent re-expands most of what it edits); the real savings land on <strong>long, many-turn sessions</strong> with large context the model never re-reads. Prefer an in-process hook or an org-wide proxy? See <a href="integrations.html">Integrations</a>.
     </div>
@@ -285,6 +290,9 @@ distil_litellm.completion(model=<span class="g">"claude-opus-4-8"</span>, messag
     <table>
       <thead><tr><th>Goal</th><th>Command</th></tr></thead>
       <tbody>
+        <tr><td>Set up + a guided tour (start here)</td><td><code>distil onboard</code></td></tr>
+        <tr><td>Make distil the default (no per-session <code>wrap</code>)</td><td><code>distil default</code> · undo <code>distil default --undo</code></td></tr>
+        <tr><td>Remove distil's footprint (before uninstalling)</td><td><code>distil offboard</code> · clear data <code>distil offboard --purge</code></td></tr>
         <tr><td>Diagnose your setup (ledger, shadow, proxy self-test, wiring)</td><td><code>distil doctor</code></td></tr>
         <tr><td>Wire the savings status line into Claude Code</td><td><code>distil setup</code></td></tr>
         <tr><td>Watch genuine savings accumulate</td><td><code>distil leaderboard</code> · live TUI <code>distil dashboard</code></td></tr>

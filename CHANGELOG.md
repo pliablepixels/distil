@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased] — 1.5.0 dev
+## [1.5.0] — 2026-06-30 — Clean teardown
 
 ### Added
 - **`distil offboard` — remove distil's footprint, the inverse of `onboard`.**
