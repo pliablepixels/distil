@@ -68,6 +68,7 @@ keeps your line clean either way.
 | `/distil-stats` | Full breakdown — orig→compressed tokens, cost, runs, per-trajectory bars |
 | `/distil-shadow` | Decision-equivalence: did compression preserve your agent's next action? |
 | `/distil-dashboard` | Open the interactive HTML savings dashboard in your browser |
+| `/distil-doctor` | Diagnose your setup — ledger, shadow validation, proxy round-trip, wiring |
 
 Want a **live, refreshing view in your terminal**? Run the CLI directly (outside the
 slash-command flow, e.g. in a split pane):

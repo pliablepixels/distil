@@ -3,6 +3,29 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.2.0 dev — setup & diagnostics UX
+
+Friction-killers for getting distil running and trusting it, on the `next` line.
+
+### Added
+- **`distil doctor`** — one command diagnoses a setup end-to-end: distil/Python
+  version, savings ledger (subscription-aware), shadow-validation status, an
+  **in-process proxy round-trip self-test** (proves the proxy machinery works with
+  no network), the optional `anthropic` extra + API key, and Claude Code
+  status-line wiring + subscription detection. Exits non-zero on any failure.
+- **`distil setup`** — wire the savings status line into Claude Code's
+  `settings.json` in one command: idempotent, never clobbers an existing line
+  without `--force` (backs it up), preserves all other settings.
+- **Subscription auto-detect** — the status line and dashboard now drop the
+  notional dollar figure automatically on a Claude OAuth subscription (no more
+  manual `DISTIL_SUBSCRIPTION=1`; the env var still overrides).
+- **Status line** shows the shadow **sample count** next to `eq%`
+  (`eq 99.5% (1.2k)`) so the confidence is visible.
+- **Dashboard** gains a **live recent-decisions strip** under decision-equivalence
+  (▰ same next action · ▱ changed), refreshing with the panel.
+- Verified **multi-provider shadow** — decision discrimination tested for
+  Anthropic / OpenAI / Gemini response shapes.
+
 ## [1.1.0] — 2026-06-30 — Hardening + live-validation UX
 
 Post-GA hardening of the 1.0 line, validated end-to-end across every command.
