@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import argparse
 import io
+import subprocess
+import sys
+from pathlib import Path
+
 
 from distil import ledger
 from distil.cli import _humanize_tokens, cmd_statusline
@@ -65,3 +69,55 @@ def test_color_codes_present_by_default(monkeypatch, capsys):
     s = ledger.LedgerSummary(1, 0.01, 100, {})
     _rc, out = _run(monkeypatch, capsys, s, no_color=False)
     assert "\033[" in out
+
+
+_REPO = Path(__file__).resolve().parent.parent
+
+
+def test_main_statusline_flushes_and_hard_exits(monkeypatch, capsys):
+    """The fix's mechanism, version-independently: main(["statusline"]) delivers
+    its line, then hard-exits via os._exit so the interpreter's shutdown flush
+    can never fault on a pipe the consumer already closed. We patch os._exit
+    (which would otherwise kill the test runner) to observe the call."""
+    import os
+
+    import pytest
+
+    import distil.cli as cli
+
+    exited = {}
+
+    def fake_exit(code):
+        exited["code"] = code
+        raise SystemExit(code)
+
+    monkeypatch.setattr(os, "_exit", fake_exit)
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    monkeypatch.setattr(ledger, "summary", lambda *a, **k: ledger.LedgerSummary(1, 0.01, 100, {}))
+
+    with pytest.raises(SystemExit):
+        cli.main(["statusline"])
+
+    assert exited.get("code") == 0
+    assert "distil" in capsys.readouterr().out
+
+
+def test_no_broken_pipe_when_reader_closes_early(tmp_path):
+    """End-to-end: invoke distil the way its console-script does — a .py run as
+    __main__ that imports the package — with the reader closing the pipe early.
+    No BrokenPipeError may reach stderr. (The `-m` form does NOT reproduce this;
+    it only manifests on Python 3.13+, so on older interpreters this is a smoke
+    test that must simply stay clean.)"""
+    wrapper = tmp_path / "run.py"
+    wrapper.write_text("import sys\nfrom distil.cli import main\nsys.exit(main())\n")
+    for _ in range(8):
+        proc = subprocess.run(
+            f"{sys.executable} {wrapper} statusline | true",
+            shell=True,
+            cwd=_REPO,
+            input="{}",
+            text=True,
+            stderr=subprocess.PIPE,
+        )
+        assert "BrokenPipeError" not in proc.stderr, proc.stderr
+        assert "Broken pipe" not in proc.stderr, proc.stderr

@@ -1186,8 +1186,38 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import os
+    import sys
+
+    # Restore the default SIGPIPE disposition so a write to a pipe whose reader
+    # has already left fails fast rather than becoming a Python exception. No
+    # SIGPIPE on Windows -> harmless to skip.
+    try:
+        import signal
+
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except (ImportError, AttributeError, ValueError):
+        pass
+
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        rc = args.func(args)
+    except BrokenPipeError:
+        rc = 0
+
+    # The status line is piped to a consumer (Claude Code) that may close the
+    # pipe the instant it has our one line. Flush under guard, then hard-exit so
+    # the interpreter's own shutdown flush can't fault on the closed pipe and
+    # print "Exception ignored while flushing sys.stdout: BrokenPipeError".
+    # Scoped to statusline: every other command returns normally and keeps its
+    # atexit cleanup. Unit tests call cmd_statusline directly, never main().
+    if getattr(args, "func", None) is cmd_statusline:
+        try:
+            sys.stdout.flush()
+        except (BrokenPipeError, OSError):
+            pass
+        os._exit(rc if isinstance(rc, int) else 0)
+    return rc
 
 
 if __name__ == "__main__":
