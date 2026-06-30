@@ -3,6 +3,41 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.1.0] — 2026-06-30 — Hardening + live-validation UX
+
+Post-GA hardening of the 1.0 line, validated end-to-end across every command.
+Zero-dependency stdlib core; **665 tests**.
+
+### Fixed
+- **Status line `BrokenPipeError`** — on Python 3.13+, when the status-line
+  consumer (e.g. Claude Code) read the line and closed the pipe, the interpreter's
+  shutdown flush faulted with a traceback. The `statusline` path now flushes under
+  guard and exits cleanly; verified 0/40 on the real binary.
+- **Shadow-mode dropped samples** — each sampled decision ran in a daemon thread
+  that was killed on proxy teardown (quick runs / last turn), so
+  `distil wrap --shadow` could show 0 samples despite live traffic. In-flight
+  comparison threads are now drained (bounded) on shutdown.
+- **Raw tracebacks → actionable messages** — `--tokenizer/--runner anthropic`
+  (missing `anthropic` extra or API key) and `distil ingest --input <bad-path>`
+  now fail with a clear, single-line message instead of a Python traceback.
+- **Claude Code plugin manifest** — `repository` must be a string URL (was an
+  object), which blocked installation.
+
+### Added
+- **`distil dashboard`** — a live, zero-dependency terminal TUI: alternate-screen
+  framed panel with Unicode bars for token-trim and decision-equivalence,
+  original → compressed tokens/cost, and per-trajectory bars.
+- **`distil wrap --shadow RATE`** — one-command live decision-equivalence: wraps
+  the agent, starts the proxy, sets the base URL, and shadow-samples — no second
+  terminal, no manual env var.
+- **Status line** now shows **original → compressed** tokens and cost, surfaces
+  live decision-equivalence (`eq N%`) when shadow has samples, and drops the
+  notional dollar figure on flat-rate subscriptions (`DISTIL_SUBSCRIPTION=1`).
+- **Plugin commands** — `/distil-stats`, `/distil-shadow`, `/distil-dashboard`
+  alongside `/distil`.
+- **Docs** — README and the docs site document `--shadow` outcome validation, the
+  dashboard, subscription mode, and the one-command shadow flow.
+
 ## [1.0.0] — 2026-06-29 — General Availability
 
 **1.0 / GA.** The compression engine, the proxy/SDK integrations, and the
