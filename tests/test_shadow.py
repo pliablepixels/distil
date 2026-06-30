@@ -238,3 +238,29 @@ def test_edit_equivalence_holds_across_streaming():
         '"delta":{"type":"input_json_delta","partial_json":"{\\"path\\": \\"x.py\\", \\"new_str\\": \\"def f():\\\\n    return 1\\"}"}}\n\n'
     )
     assert decision_signature_from_body(sse) == nonstream
+
+
+def test_shadow_discriminates_changed_decision_cross_provider():
+    """Shadow must flag a *changed* next action (not just confirm matches) for
+    every provider's response shape — the basis of cross-provider validation."""
+    # OpenAI — same tool, different target argument → changed
+    oa_a = {"choices": [{"message": {"tool_calls": [
+        {"function": {"name": "edit", "arguments": '{"path":"a.py"}'}}]}}]}
+    oa_b = {"choices": [{"message": {"tool_calls": [
+        {"function": {"name": "edit", "arguments": '{"path":"b.py"}'}}]}}]}
+    assert compare_decisions(oa_a, oa_a) is True
+    assert compare_decisions(oa_a, oa_b) is False
+
+    # Gemini — different function name → changed
+    gm_a = {"candidates": [{"content": {"parts": [
+        {"functionCall": {"name": "read", "args": {"f": "x"}}}]}}]}
+    gm_b = {"candidates": [{"content": {"parts": [
+        {"functionCall": {"name": "write", "args": {"f": "x"}}}]}}]}
+    assert compare_decisions(gm_a, gm_a) is True
+    assert compare_decisions(gm_a, gm_b) is False
+
+    # Anthropic — different tool input → changed
+    an_a = {"content": [{"type": "tool_use", "name": "bash", "input": {"cmd": "ls"}}]}
+    an_b = {"content": [{"type": "tool_use", "name": "bash", "input": {"cmd": "rm"}}]}
+    assert compare_decisions(an_a, an_a) is True
+    assert compare_decisions(an_a, an_b) is False
