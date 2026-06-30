@@ -162,6 +162,13 @@ pipx install 'distil-llm[live]'
 distil savings --tokenizer anthropic
 distil certify --runner anthropic</pre>
 
+    <h3>Validate it preserved your outcomes</h3>
+    <p>Compression is only safe if your agent makes <em>the same decision</em> it would have on full context. <code>--shadow</code> proves that on your live traffic: it samples a fraction of requests and runs each one <strong>twice — once compressed, once with the full prompt</strong> — then compares the <strong>agent's chosen next action</strong> (the tool call it decides to make), not the prose. The two are <em>decision-equivalent</em> when those signatures match.</p>
+    <pre class="term">distil proxy --shadow 0.1 --upstream &lt;api&gt;   <span class="d"># shadow 10% of live requests</span>
+distil shadow-stats                          <span class="d"># live decision-equivalence rate</span></pre>
+    <p>The rate also shows in the <a href="deploy-security.html">status line</a> once shadow has samples — read it as <em>“of the requests I checked, N% produced the identical next action with vs without compression.”</em> Start at <code>0.1</code>; if equivalence holds high, dial compression up — if it dips, back off. Distil fails safe to full context.</p>
+    <p style="font-size:13px;opacity:.85"><strong>Honest scope:</strong> this certifies <strong>next-action equivalence — a proxy</strong>, not end-to-end task success. On <a href="research.html#e7">real SWE-bench Verified (E7)</a> the proxy does not fully transfer once compression gets aggressive — which is exactly why you monitor the live rate and keep the gate conservative.</p>
+
     <hr/>
 
     <!-- 60-second quickstart -->

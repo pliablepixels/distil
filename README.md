@@ -66,6 +66,15 @@ Then watch genuine savings from **your** traffic — measured, not estimated:
 distil leaderboard          # cumulative tokens + $ saved, from the local ledger
 ```
 
+**Validate it preserved your outcomes.** Compression is only safe if your agent makes the *same decision* it would on full context. `--shadow` proves it on your live traffic: it samples a fraction of requests, runs each one twice (compressed **and** full prompt), and compares the agent's **chosen next action** — the tool call it decides to make, not the prose:
+
+```bash
+distil proxy --shadow 0.1 --upstream <api>   # shadow 10% of live requests
+distil shadow-stats                          # live decision-equivalence rate
+```
+
+Honest scope: this is **next-action equivalence — a proxy**, not end-to-end task success ([E7](#-the-proof) shows it doesn't fully transfer under aggressive *lossy* compression). Watch the rate, keep the gate conservative; Distil fails safe to full context.
+
 > **Will it actually save me money?** Only on **metered / pay-as-you-go** billing (an API key): fewer tokens → fewer dollars. On a **subscription** you're flat-rate, so there's no per-token bill to cut — Distil still trims context and latency. **Honest about coding agents:** on short sessions the win is *modest* (~7% — the agent re-expands most of what it edits, [E7](#-the-proof)); the real savings land on **long, many-turn sessions** with large context the model never re-reads. Want an in-process hook or an org-wide proxy instead? See [Works with every SDK](#-works-with-every-sdk).
 
 ---
