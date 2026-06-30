@@ -60,7 +60,7 @@ def test_cmd_onboard_wires_statusline_and_prints_guide(tmp_path, monkeypatch, ca
 
     settings = tmp_path / "settings.json"
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
-    rc = cli.cmd_onboard(argparse.Namespace(dry_run=False, force=False, no_color=True, json=False, offline=True, upgrade=False))
+    rc = cli.cmd_onboard(argparse.Namespace(dry_run=False, force=False, no_color=True, json=False, offline=True, upgrade=False, yes=False, no_interactive=True))
     assert rc == 0
     assert "distil" in json.loads(settings.read_text())["statusLine"]["command"]
     out = capsys.readouterr().out
@@ -75,7 +75,7 @@ def test_cmd_onboard_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
 
     settings = tmp_path / "settings.json"
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
-    rc = cli.cmd_onboard(argparse.Namespace(dry_run=True, force=False, no_color=True, json=False, offline=True, upgrade=False))
+    rc = cli.cmd_onboard(argparse.Namespace(dry_run=True, force=False, no_color=True, json=False, offline=True, upgrade=False, yes=False, no_interactive=True))
     assert rc == 0
     assert not settings.exists()  # dry-run wrote nothing
     assert "Next steps" in capsys.readouterr().out
@@ -129,3 +129,40 @@ def test_cmd_onboard_json_is_pure(tmp_path, monkeypatch, capsys) -> None:
     assert not settings.exists()  # --json takes no actions
     data = json.loads(capsys.readouterr().out)
     assert data["upgrade_available"] is True  # installed < 9.9.9
+
+
+def test_cmd_onboard_yes_runs_first_step(tmp_path, monkeypatch, capsys) -> None:
+    import argparse
+    import subprocess
+
+    import distil.cli as cli
+    import distil.onboard as ob
+    import distil.setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "default_settings_path", lambda: tmp_path / "s.json")
+    monkeypatch.setattr(
+        ob,
+        "detect",
+        lambda: ob.Env(
+            os_name="Darwin", agents=[("claude", "Claude Code")], installed_version="1.4.0", method="pipx"
+        ),
+    )
+    monkeypatch.setattr(ob, "latest_pypi_version", lambda *a, **k: None)  # up to date
+    ran = {}
+
+    class _R:
+        returncode = 0
+
+    def fake_run(cmd, *a, **k):
+        ran["cmd"] = cmd
+        return _R()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    rc = cli.cmd_onboard(
+        argparse.Namespace(
+            json=False, offline=False, dry_run=False, force=False, upgrade=False,
+            no_color=True, yes=True, no_interactive=False,
+        )
+    )
+    assert rc == 0
+    assert "wrap" in " ".join(ran["cmd"])  # --yes launched the route command (step 1)

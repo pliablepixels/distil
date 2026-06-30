@@ -555,6 +555,23 @@ def cmd_onboard(args: argparse.Namespace) -> int:
     def c(code: str, t: str) -> str:
         return f"\033[{code}m{t}\033[0m" if use_color else t
 
+    # Interactive by default — onboard offers to do the next step. Falls back to a
+    # static guide only when it can't prompt (piped / CI) or you opt out.
+    interactive = (
+        sys.stdin.isatty() and sys.stdout.isatty() and not args.no_interactive and not args.dry_run
+    )
+
+    def ask(q: str) -> bool:
+        if args.yes:
+            return True
+        if not interactive:
+            return False
+        try:
+            return input(c("1", q) + c("90", " [y/N] ")).strip().lower() in ("y", "yes")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return False
+
     print(c("1;38;5;79", "distil onboard") + c("90", "  ·  let's get you set up") + "\n")
 
     agents = ", ".join(label for _, label in env.agents) or "none detected"
@@ -576,21 +593,21 @@ def cmd_onboard(args: argparse.Namespace) -> int:
 
     if outdated:
         cmd = onboard.upgrade_command(env.method)
-        if args.upgrade and env.method in ("pipx", "uv", "pip"):
-            print(c("33", f"⬆ upgrading distil via {env.method} …"))
-            rc = subprocess.run(cmd.split()).returncode
-            ok = rc == 0
+        runnable = env.method in ("pipx", "uv", "pip")
+        print(c("33", f"⬆ newer distil available ({env.installed_version} → {latest})"))
+        if runnable and (args.upgrade or ask(f"  Upgrade now?  ({cmd})")):
+            print(c("33", f"  upgrading via {env.method} …"))
+            ok = subprocess.run(cmd.split()).returncode == 0
             print(
                 c(
                     "32" if ok else "31",
-                    "  " + ("done — re-run distil onboard" if ok else "upgrade failed"),
+                    "  "
+                    + ("done — re-run distil onboard to use it" if ok else f"failed; run: {cmd}"),
                 )
-                + c("90", f"   ({cmd})")
             )
             if ok:
                 return 0
         else:
-            print(c("33", f"⬆ newer distil available ({env.installed_version} → {latest})"))
             print(c("36", f"  {cmd}") + c("90", "   ·   or: distil onboard --upgrade") + "\n")
 
     if args.dry_run:
@@ -603,15 +620,24 @@ def cmd_onboard(args: argparse.Namespace) -> int:
             print(c("90", "  re-run with --force to replace it (your current one is backed up)"))
         print()
 
+    steps = onboard.next_steps(env)
     print(c("1", "Next steps"))
-    for i, (title, cmd, note) in enumerate(onboard.next_steps(env), 1):
+    for i, (title, cmd, note) in enumerate(steps, 1):
         print(f"  {c('1', str(i) + '.')} {title}")
         print(f"     {c('36', cmd)}")
         if note:
             print(f"     {c('90', note)}")
+    print()
+
+    # Smart finish: offer to run the first step right now (route the agent).
+    if env.agents:
+        first_cmd = steps[0][1]
+        if ask(f"Start now — run step 1?  ({first_cmd})"):
+            print()
+            return subprocess.run(first_cmd.split()).returncode
+
     print(
-        "\n"
-        + c("90", "Re-run anytime: ")
+        c("90", "Re-run anytime: ")
         + c("36", "distil onboard")
         + c("90", "   ·   for agents: ")
         + c("36", "distil onboard --json")
@@ -1343,6 +1369,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--upgrade", action="store_true", help="upgrade distil if a newer version is available"
     )
     ob.add_argument("--offline", action="store_true", help="skip the PyPI version check")
+    ob.add_argument(
+        "--yes", "-y", action="store_true", help="auto-confirm prompts (upgrade, launch the agent)"
+    )
+    ob.add_argument(
+        "--no-interactive", action="store_true", help="never prompt; just print the guide"
+    )
     ob.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     ob.set_defaults(func=cmd_onboard)
 
