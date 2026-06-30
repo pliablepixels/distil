@@ -464,6 +464,67 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """Live terminal dashboard of cumulative savings — re-renders on an interval
+    until Ctrl-C. Falls back to a single render when stdout isn't a TTY (so it
+    pipes/redirects cleanly)."""
+    import os
+    import sys
+    import time
+
+    from .shadow import ShadowLedger
+
+    subscription = os.environ.get("DISTIL_SUBSCRIPTION", "").strip().lower() not in (
+        "",
+        "0",
+        "false",
+        "no",
+    )
+    interactive = sys.stdout.isatty() and not args.once
+    color = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+    def frame() -> str:
+        s = ledger.summary()
+        change_rate: float | None = None
+        samples = 0
+        try:
+            led = ShadowLedger.load()
+            samples = led.samples
+            if samples:
+                change_rate = led.rate()
+        except Exception:  # noqa: BLE001 — shadow stats are best-effort
+            pass
+        return ledger.render_dashboard(
+            s,
+            change_rate=change_rate,
+            samples=samples,
+            subscription=subscription,
+            color=color,
+        )
+
+    if not interactive:
+        print(frame())
+        return 0
+
+    interval = max(0.5, args.interval)
+    try:
+        sys.stdout.write("\033[?25l")  # hide cursor
+        while True:
+            sys.stdout.write("\033[2J\033[H")  # clear screen + cursor home
+            sys.stdout.write(frame())
+            sys.stdout.write(
+                f"\n\n  \033[90mrefreshing every {interval:g}s · Ctrl-C to exit\033[0m\n"
+            )
+            sys.stdout.flush()
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write("\033[?25h\n")  # restore cursor
+        sys.stdout.flush()
+    return 0
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     """Run the zero-dependency distil MCP server over stdio (compress/expand/savings)."""
     from .mcp_server import serve
@@ -1087,6 +1148,15 @@ def build_parser() -> argparse.ArgumentParser:
         "shadow-stats", help="show live decision-equivalence measured by shadow mode"
     )
     ss.set_defaults(func=cmd_shadow_stats)
+
+    dash = sub.add_parser(
+        "dashboard", help="live terminal dashboard of your savings (Ctrl-C to exit)"
+    )
+    dash.add_argument("--once", action="store_true", help="render once and exit (no live refresh)")
+    dash.add_argument(
+        "--interval", type=float, default=2.0, help="refresh seconds in live mode (default 2)"
+    )
+    dash.set_defaults(func=cmd_dashboard)
 
     sl = sub.add_parser(
         "statusline", help="compact savings status line (for the Claude Code plugin)"

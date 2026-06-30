@@ -80,12 +80,12 @@ class LedgerSummary:
     runs: int
     total_dollars_saved: float
     total_tokens_saved: int
-    by_trajectory: dict[str, float]
+    by_trajectory: dict[str, float]  # id -> dollars saved
     # Absolute totals (not just the delta), so callers can show orig -> compressed.
     total_baseline_tokens: int = 0
     total_distil_tokens: int = 0
     total_baseline_dollars: float = 0.0
-    total_distil_dollars: float = 0.0  # id -> dollars saved
+    total_distil_dollars: float = 0.0
 
 
 def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
@@ -160,3 +160,92 @@ td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{
 <table><thead><tr><th>source</th><th style="text-align:right">$ saved</th></tr></thead><tbody>{rows}</tbody></table>
 <p class="foot">{note} Share verifiably across instances with <code>distil federated-leaderboard</code>.</p>
 </div></body></html>"""
+
+
+_SPARK = "▁▂▃▄▅▆▇█"
+
+
+def _human(n: float) -> str:
+    """Compact human count: 1_234_567 -> '1.2M'."""
+    n = float(n)
+    for div, suf in ((1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if abs(n) >= div:
+            return f"{n / div:.1f}{suf}"
+    return f"{n:.0f}"
+
+
+def _bar(frac: float, width: int = 22) -> str:
+    """A Unicode progress bar for ``frac`` in [0, 1]."""
+    frac = 0.0 if frac < 0 else 1.0 if frac > 1 else frac
+    n = round(frac * width)
+    return "█" * n + "░" * (width - n)
+
+
+def render_dashboard(
+    s: LedgerSummary,
+    *,
+    change_rate: float | None = None,
+    samples: int = 0,
+    subscription: bool = False,
+    color: bool = True,
+) -> str:
+    """A compact, glanceable terminal dashboard of cumulative savings.
+
+    Pure function (no I/O) so it's trivially testable; the live loop in the CLI
+    just re-renders it on an interval. ``change_rate`` is the decision-change
+    rate from shadow mode (so equivalence is ``1 - change_rate``)."""
+
+    def c(code: str, t: str) -> str:
+        return f"\033[{code}m{t}\033[0m" if color else t
+
+    out = [c("1;38;5;79", "  distil") + c("90", "  ·  live savings"), ""]
+
+    if s.runs == 0:
+        out.append(c("90", "  no savings yet — run  ") + c("36", "distil wrap -- <agent>"))
+        return "\n".join(out)
+
+    trimmed = (
+        0.0 if s.total_baseline_tokens == 0 else 1 - s.total_distil_tokens / s.total_baseline_tokens
+    )
+    out.append(f"  tokens          {c('36', _bar(trimmed))}  {trimmed * 100:4.1f}% trimmed")
+    out.append(
+        c(
+            "90",
+            f"                  {_human(s.total_baseline_tokens)} → {_human(s.total_distil_tokens)}",
+        )
+    )
+
+    if subscription:
+        out.append(c("90", "  cost            flat-rate subscription — dollars are notional"))
+    else:
+        saved = s.total_baseline_dollars - s.total_distil_dollars
+        out.append(
+            f"  cost            ${s.total_baseline_dollars:,.2f} → ${s.total_distil_dollars:,.2f}   "
+            + c("32", f"(${saved:,.2f} saved)")
+        )
+
+    if samples and change_rate is not None:
+        eq = 1 - change_rate
+        out.append(
+            f"  decision-equiv  {c('35', _bar(eq))}  {eq * 100:5.1f}%  ({samples:,} samples)"
+        )
+    else:
+        out.append(
+            c("90", "  decision-equiv  — no shadow samples yet (")
+            + c("36", "distil proxy --shadow 0.1")
+            + c("90", ")")
+        )
+
+    out.append("")
+    out.append(c("90", f"  {s.runs} run{'s' if s.runs != 1 else ''}"))
+
+    if s.by_trajectory:
+        top = sorted(s.by_trajectory.items(), key=lambda kv: kv[1], reverse=True)[:5]
+        mx = max((v for _, v in top), default=0.0) or 1.0
+        out.append("")
+        for name, val in top:
+            label = (name[:17] + "…") if len(name) > 18 else name
+            tail = "" if subscription else f"  ${val:,.2f}"
+            out.append(f"  {label:18} {c('36', _bar(val / mx, 14))}{tail}")
+
+    return "\n".join(out)

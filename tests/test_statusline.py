@@ -150,3 +150,38 @@ def test_no_broken_pipe_when_reader_closes_early(tmp_path):
         )
         assert "BrokenPipeError" not in proc.stderr, proc.stderr
         assert "Broken pipe" not in proc.stderr, proc.stderr
+
+
+def test_render_dashboard_shows_orig_and_compressed():
+    s = ledger.LedgerSummary(
+        2,
+        5.0,
+        1_000_000,
+        {"live-proxy": 5.0},
+        total_baseline_tokens=2_000_000,
+        total_distil_tokens=1_000_000,
+        total_baseline_dollars=10.0,
+        total_distil_dollars=5.0,
+    )
+    out = ledger.render_dashboard(s, change_rate=0.01, samples=200, color=False)
+    assert "2.0M → 1.0M" in out  # orig -> compressed tokens
+    assert "50.0% trimmed" in out
+    assert "$10.00 → $5.00" in out
+    assert "99.0%" in out  # decision-equivalence = 1 - change_rate
+    assert "200 samples" in out
+
+
+def test_render_dashboard_subscription_hides_cost():
+    s = ledger.LedgerSummary(
+        1,
+        5.0,
+        1_000_000,
+        {},
+        total_baseline_tokens=2_000_000,
+        total_distil_tokens=1_000_000,
+        total_baseline_dollars=10.0,
+        total_distil_dollars=5.0,
+    )
+    out = ledger.render_dashboard(s, subscription=True, color=False)
+    assert "notional" in out
+    assert "$10.00 → $5.00" not in out
