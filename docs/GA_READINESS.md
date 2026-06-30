@@ -5,7 +5,17 @@ agent and trust it unattended" general-availability claim. Updated as items clos
 distil should never *silently* ship a lossy operating point — when it cannot certify safety,
 it falls back to full context.
 
-## Status: GA-track — every *design* blocker is closed; what remains is empirical breadth
+## Status: 1.0 GA — the engine, integrations, and certificate machinery are production-grade and API-stable
+
+**What "1.0 / GA" means here (and what it does not).** The compression engine, the proxy/SDK
+integrations, and the decision-equivalence certificate machinery are production-grade,
+API-stable, and covered by 658 tests with a zero-dependency stdlib core. The guarantee is
+**honestly scoped**: decision-equivalence is certified *distribution-free and finite-sample*,
+**conditional on exchangeability** with your calibration distribution — and when distil cannot
+certify safety it **falls back to full context**, never silently shipping a lossy operating
+point. 1.0 is a commitment to a stable surface and a never-silently-lossy contract; it is **not**
+a claim that aggressive compression is safe on every agent untuned (E7/E11 show the opposite —
+that is exactly why calibration is mandatory and fail-safe).
 
 The headline GA risk surfaced by E11 (the safe operating point is capability-dependent, and a
 hand-tuned constant can silently lose 31 pp on a stronger model) is **closed** by
@@ -15,7 +25,8 @@ ensemble; see "Recently closed"). What remains is not missing machinery but **em
 that requires live runs/compute we have not spent**: validating the shipped speculative,
 multi-grader, and RL-policy paths end-to-end, and broadening task-success beyond SWE-bench
 Verified + τ-bench to more domains and models. The design is domain-agnostic; closing these is
-*running it at scale*, not building more. We mark them honestly rather than claim them.
+*running it at scale*, not building more. We mark them honestly rather than claim them — and we
+ship 1.0 because the contract that protects you (certify-or-fall-back) is itself complete.
 
 ## Closed
 
@@ -25,7 +36,7 @@ Verified + τ-bench to more domains and models. The design is domain-agnostic; c
 | **Operating point is auto-calibrated to agent capability** | `distil/calibrate.py` selects the most aggressive `gate_recent` still non-inferior to full; `distil calibrate` CLI; validated on real E11 data (selects gate@12, rejects gate@6) in `tests/test_calibrate.py` |
 | **Fail-safe default (never silently lossy)** | If no operating point certifies non-inferior, calibration returns `fail_safe` → caller keeps full context (`test_fail_safe_when_nothing_certifies`, `test_real_e11_strict_margin_fails_safe`) |
 | **Cross-model generality demonstrated** | E11: non-inferiority transfers to DeepSeek-V3 (different vendor, far stronger) at a capability-appropriate point |
-| **Engineering maturity** | v0.25.x, 633 tests, full CI (ci/pages/paper-build/release), zero-dependency stdlib core, packaged (`distil` entrypoint) |
+| **Engineering maturity** | v1.0.0, 658 tests, full CI (ci/pages/paper-build/release), zero-dependency stdlib core, packaged (`distil` entrypoint) |
 | **Per-turn + trajectory certificates, validated out-of-sample** | E2 (coverage 96.6–100%), E10 (trajectory, coverage 95.4/96.7%) |
 
 ## Open (tracked GA items)

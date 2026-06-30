@@ -6,18 +6,20 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-532%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-658%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
 
-<h3 align="center">Cut LLM agent token costs — with a statistical <em>decision-equivalence</em> contract, measured on the same runs.</h3>
+<h3 align="center">The certified context compressor for AI agents.</h3>
 
 <p align="center">
-Most context compressors ship a token-savings <em>estimate</em>.<br/>
-<strong>Distil ships a quality contract:</strong> a strategy compresses only as far as a statistical non-inferiority test certifies the agent's <em>next action</em> is unchanged — across 7 domains, as a CI gate.</p>
+Every agent re-sends its <em>entire</em> conversation to the model on every single turn — and you pay for all of it, every turn. Compressing that context is easy. Compressing it <strong>without quietly changing what your agent decides to do</strong> is the part every other tool skips.</p>
 
-<p align="center"><sub><b>Honest scope (read this):</b> the contract certifies <b>decision-equivalence on a trajectory corpus</b> — a <em>proxy</em> (the agent's next action), not a guarantee of end-to-end task success. Our own real end-to-end test (<a href="docs/PAPER.md">SWE-bench Verified, E7</a>) shows the proxy <b>does not transfer</b> to task success under <em>aggressive</em> compression. Treat the savings numbers below as proxy/corpus results; see <a href="#-end-to-end-reality-swe-bench-verified-e7">End-to-end reality</a>.</sub>
+<p align="center">
+<strong>Distil ships a quality contract, not a vibe.</strong> A strategy compresses only as far as a statistical non-inferiority test <em>certifies the agent's next action is unchanged</em> — measured on the <em>same runs</em> as the savings, enforced as a merge gate across 7 domains. On a real <strong>500-instance long-horizon coding agent</strong>, Distil's reversible tier is the <strong>only compressor statistically non-inferior to full context</strong> (−2.4pp, 95% CI [−5.7, +0.9]); every lossy competitor craters. And when it <em>can't</em> certify safety, it falls back to full context — <strong>never silently lossy</strong>.</p>
+
+<p align="center"><sub><b>Honest scope (read this):</b> the contract certifies <b>decision-equivalence on a trajectory corpus</b> — a <em>proxy</em> (the agent's next action), not a guarantee of end-to-end task success. Our own real end-to-end test (<a href="docs/PAPER.md">SWE-bench Verified, E7</a>) shows the proxy <b>does not transfer</b> under <em>aggressive lossy</em> compression — which is exactly why Distil calibrates per deployment and falls back to full context when it can't certify. Treat the headline savings below as proxy/corpus results; see <a href="#-end-to-end-reality-swe-bench-verified-e7">End-to-end reality</a>.</sub>
 </p>
 
 <p align="center">
@@ -318,7 +320,7 @@ For periodic certification under drift: `distil ingest` your captured traffic �
 
 **Enforce it once, org-wide.** Run `distil proxy` as a sidecar and set `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` in managed settings or container env — every client (Claude Code via `ANTHROPIC_BASE_URL`, Codex, any SDK) routes through it with **zero per-developer change**. **Google Gemini** is supported too (point `--upstream` at `generativelanguage.googleapis.com`): the proxy compresses the `generateContent` shape (`contents` / `parts` / `functionResponse`) reversibly, and shadow-mode works for it.
 
-**Claude Code plugin.** A plugin ([`plugins/distil`](plugins/distil)) adds a live **savings status line** and a **`/distil`** command:
+**Claude Code plugin.** A plugin ([`plugins/distil`](plugins/distil)) adds a live **savings status line**, a **`/distil`** command, and a **`distil-setup` skill** (ask Claude Code to "set up distil" and it installs + routes your agent through compression):
 
 ```
 /plugin marketplace add dshakes/distil
@@ -366,6 +368,10 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 ---
 
 ## 📦 Install your way
+
+**New here? One command:** `pipx install distil-llm`, then `distil bench`. No pipx? Zero-install: `uvx --from distil-llm distil bench`. Everything below is an *alternative*, not a requirement.
+
+> ⚠️ **The one gotcha — the name.** The PyPI package is **`distil-llm`** but the command is **`distil`** (the bare name was taken). So `pipx install distil-llm` → run `distil …`. `pip install distil` installs something else.
 
 <p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
 
