@@ -182,8 +182,20 @@ def digest_block(text: str, restore: dict[str, str]) -> str:
     # docs/paper/results/swe_e2e_longhorizon/skeleton_ablation/.
     import os
 
-    if os.environ.get("DISTIL_DIGEST_MODE", "skeleton") == "head":
+    mode = os.environ.get("DISTIL_DIGEST_MODE", "skeleton")
+    if mode == "head":
         body = text[:DIGEST_HEAD]
+    elif mode == "surprise":
+        # v1.7.0 surprise-preserving digest ("lost if surprise", arXiv 2412.17483):
+        # head-truncation drops the TAIL of tracebacks — the assertion/anomaly that
+        # decides the next action. Keep the head plus any anomaly lines beyond it,
+        # bounded so the digest stays a digest.
+        from distil.compress.salience import surprise_lines
+
+        body = text[:DIGEST_HEAD]
+        kept = [ln for ln in surprise_lines(text[DIGEST_HEAD:]) if ln.strip()][:40]
+        if kept:
+            body += "\n<<distil-kept anomaly lines>>\n" + "\n".join(kept)
     else:
         body = smart_digest(text, head=DIGEST_HEAD, tail=DIGEST_TAIL)
     if len(body) >= len(text):  # digest not smaller (tiny/odd block) — keep head only
@@ -206,9 +218,13 @@ COMPRESSORS: dict[str, Compressor | None] = {
     # selected via ProxyState.expand (+ ProxyState.gate_recent for the gated variant).
     "distil_expand": None,
     "distil_gated": None,
+    # v1.7.0: the relevance gate + surprise-preserving digest (E12 ablation).
+    "distil_gated_surprise": None,
 }
 EXPAND_CONDITION = "distil_expand"
 GATED_CONDITION = "distil_gated"
+GATED_SURPRISE_CONDITION = "distil_gated_surprise"
+GATED_CONDITIONS = frozenset({GATED_CONDITION, GATED_SURPRISE_CONDITION})
 # distil_gated: keep the last N user/tool messages (working set) full, digest older
 # periphery. Tunable via DISTIL_E7_GATE_RECENT — on short conversations (<= N user/tool
 # turns, e.g. focused SWE-localization) the gate is a no-op (everything is "recent"); its
@@ -665,8 +681,8 @@ if __name__ == "__main__":
         compressor=COMPRESSORS[args.condition],
         capture_path=args.capture,
         accounting_path=args.accounting,
-        expand=(args.condition in (EXPAND_CONDITION, GATED_CONDITION)),
-        gate_recent=(GATE_RECENT if args.condition == GATED_CONDITION else None),
+        expand=(args.condition == EXPAND_CONDITION or args.condition in GATED_CONDITIONS),
+        gate_recent=(GATE_RECENT if args.condition in GATED_CONDITIONS else None),
     )
     print(f"distil-e7 proxy: condition={args.condition} on {args.host}:{httpd.server_address[1]}")
     try:

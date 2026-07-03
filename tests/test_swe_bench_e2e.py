@@ -355,3 +355,26 @@ def test_openai_proxy_sticky_expansion():
         {"messages": msgs}, None, CompressStats(), digest_restore={}, expanded={_handle(block)}
     )
     assert out["messages"][0]["content"][0]["text"] == block  # sticky: kept full
+
+
+def test_surprise_digest_keeps_anomaly_tail(monkeypatch):
+    """v1.7.0 condition: head-truncation drops a traceback's tail — the assertion
+    that decides the next action. The surprise digest must keep it."""
+    from benchmarks.swe_bench_e2e.compress_proxy import digest_block
+
+    text = (
+        "\n".join(f"log line {i}: routine output" for i in range(80))
+        + "\nTraceback (most recent call last):\n"
+        + '  File "app.py", line 9, in f\n'
+        + "AssertionError: expected 200 got 500\n"
+    )
+    restore: dict[str, str] = {}
+    monkeypatch.setenv("DISTIL_DIGEST_MODE", "head")
+    head_out = digest_block(text, restore)
+    assert "AssertionError" not in head_out  # the failure mode, demonstrated
+
+    monkeypatch.setenv("DISTIL_DIGEST_MODE", "surprise")
+    surprise_out = digest_block(text, restore)
+    assert "AssertionError: expected 200 got 500" in surprise_out  # the fix
+    assert len(surprise_out) < len(text)  # still a digest
+    assert "distil_expand" in surprise_out or "distil-digest" in surprise_out  # reversible
