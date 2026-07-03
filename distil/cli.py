@@ -516,13 +516,13 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             led = ShadowLedger.load()
             if led.samples:
                 # decision-equivalence with its sample count, so the confidence
-                # is visible at a glance (eq 99.5% over 1.0k shadowed requests),
-                # colored by health: green >=99%, yellow >=95%, red below — the
-                # at-a-glance "is compression still trustworthy?" signal.
+                # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
+                # Healthy stays in the calm brand hue — color is an ALARM, not
+                # decoration: yellow when eq slips under 99%, red under 95%.
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
                 eq = 1 - led.rate()
-                hue = "32" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
+                hue = "35" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
                 parts.append(c(hue, f"eq {eq * 100:.1f}% ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
