@@ -109,7 +109,7 @@ class RuntimeSavings:
                     distil_dollars=after * per_tok,
                     baseline_input_tokens=before,
                     distil_input_tokens=after,
-                    path=self.ledger_path or ledger.DEFAULT_PATH,
+                    path=self.ledger_path or ledger.default_path(),
                 )
             self.requests = 0
             self.tokens_before = 0

@@ -111,7 +111,7 @@ def cmd_savings(args: argparse.Namespace) -> int:
             distil_input_tokens=d.total_input_tokens,
         )
         print(
-            f"\nrecorded to {ledger.DEFAULT_PATH}: "
+            f"\nrecorded to {ledger.default_path()}: "
             f"${rec.dollars_saved:.5f} / {rec.tokens_saved} tokens saved this run."
         )
     return 0
@@ -139,7 +139,7 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         Path(args.html).write_text(ledger.render_html(s))
         print(f"your savings page → {args.html}")
         return 0
-    print(f"distil savings ledger — {ledger.DEFAULT_PATH}\n")
+    print(f"distil savings ledger — {ledger.default_path()}\n")
     if s.runs == 0:
         print("no genuine savings recorded yet.")
         print("run `distil proxy` (records real traffic) or `distil savings --record`.")

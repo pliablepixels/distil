@@ -242,7 +242,7 @@ def _check_pricing_catalog() -> Check:
     the headline number until the catalog is updated."""
     from . import ledger, pricing
 
-    path = ledger.DEFAULT_PATH
+    path = ledger.default_path()
     unknown: set[str] = set()
     try:
         for line in path.read_text().splitlines():

@@ -17,7 +17,16 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-DEFAULT_PATH = Path.home() / ".distil" / "savings.jsonl"
+def default_path() -> Path:
+    """The ledger path, honoring ``DISTIL_HOME`` at call time (configurable
+    deployments; isolated tests) — same contract as shadow/learn state."""
+    import os
+
+    return Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil"))) / "savings.jsonl"
+
+
+# Back-compat eager constant; runtime paths resolve via default_path().
+DEFAULT_PATH = default_path()
 
 
 @dataclass
@@ -51,7 +60,7 @@ def record(
     baseline_input_tokens: int,
     distil_input_tokens: int,
     tokenizer: str = "heuristic",
-    path: Path = DEFAULT_PATH,
+    path: Path | None = None,
 ) -> SavingsRecord:
     rec = SavingsRecord(
         trajectory_id,
@@ -64,6 +73,7 @@ def record(
         tokenizer,
         time.time(),
     )
+    path = path or default_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as f:
         f.write(json.dumps(asdict(rec)) + "\n")
@@ -86,9 +96,10 @@ class LedgerSummary:
     tokenizers: frozenset[str] = frozenset()
 
 
-def summary(path: Path = DEFAULT_PATH, *, since: float | None = None) -> LedgerSummary:
+def summary(path: Path | None = None, *, since: float | None = None) -> LedgerSummary:
     """Roll up the ledger; ``since`` (unix ts) restricts to recent records so
     callers can show a fresh window (today / this session) next to lifetime."""
+    path = path or default_path()
     if not path.exists():
         return LedgerSummary(0, 0.0, 0, {})
     runs = 0
