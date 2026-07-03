@@ -478,14 +478,18 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     except Exception:  # noqa: BLE001 — a status line must never error out
         s = None
 
+    # Built for COMPOSITE statuslines (users append this segment to their own):
+    # every character earns its place. Grammar:
+    #   live session:  distil · ▼75.0K −62% [$0.31] · Σ27.0M
+    #   idle:          distil · Σ27.0M saved −50% [$96.10]
+    # ▼/−% = tokens saved and trim rate of the ACTIVE scope; Σ = lifetime saved.
+    # Dropped by design: orig→compressed pair (derivable), run counts, and any
+    # eq% under 25 shadow samples — "eq 100.0% (1)" is noise wearing a number.
+    # Full breakdown: distil stats / dashboard.
     parts = [c("38;5;79", "distil")]
     if s is None or s.runs == 0:
         parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
     else:
-        # SESSION-FIRST: what this wrapped agent saved right now is the number a
-        # developer acts on; lifetime is context, compressed to one Σ figure
-        # (full breakdown: distil stats / dashboard). "This session" = the most
-        # recently active proxy process, shown while it's fresh (<4h idle).
         from .doctor import subscription_mode
 
         metered = not subscription_mode()
@@ -498,48 +502,35 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 sess = ledger.summary(session=sid)
                 if sess.runs and sess.total_baseline_tokens:
                     trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
-                    seg = (
-                        f"sess {ledger._human(sess.total_baseline_tokens)}→"
-                        f"{ledger._human(sess.total_distil_tokens)} −{trimmed * 100:.0f}%"
-                    )
-                    parts.append(c("36", seg))
+                    seg = f"▼{ledger._human(sess.total_tokens_saved)} −{trimmed * 100:.0f}%"
                     if metered and sess.total_dollars_saved > 0:
-                        parts.append(c("32", f"${sess.total_dollars_saved:,.2f}"))
+                        seg += f" ${sess.total_dollars_saved:,.2f}"
+                    parts.append(c("36", seg))
+                    parts.append(c("90", f"Σ{ledger._human(s.total_tokens_saved)}"))
                     shown_session = True
         except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
-        if shown_session:
-            # Lifetime as one glanceable figure (tokens saved all-time).
-            life = f"Σ {ledger._human(s.total_tokens_saved)} saved"
-            if metered:
-                life += f" (${s.total_dollars_saved:,.2f})"
-            parts.append(c("90", life))
-        else:
-            # No live session — fall back to the lifetime view.
-            tok = (
-                f"{ledger._human(s.total_baseline_tokens)}→"
-                f"{ledger._human(s.total_distil_tokens)} tok"
+        if not shown_session:
+            trimmed = (
+                1 - s.total_distil_tokens / s.total_baseline_tokens
+                if s.total_baseline_tokens
+                else 0.0
             )
-            if s.total_baseline_tokens:
-                trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
-                tok += f" −{trimmed * 100:.0f}%"
-            parts.append(c("36", tok))
+            seg = f"Σ{ledger._human(s.total_tokens_saved)} saved −{trimmed * 100:.0f}%"
             if metered:
-                saved = s.total_baseline_dollars - s.total_distil_dollars
-                parts.append(c("32", f"${saved:,.2f} saved"))
-            parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
+                seg += f" ${s.total_dollars_saved:,.2f}"
+            parts.append(c("36", seg))
         try:
             from .shadow import ShadowLedger
 
             led = ShadowLedger.load()
-            if led.samples:
-                # decision-equivalence with its sample count, so the confidence
-                # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
-                # Healthy stays in the calm brand hue — color is an ALARM, not
-                # decoration: yellow when eq slips under 99%, red under 95%.
+            # Only claim an equivalence rate once there is evidence behind it —
+            # a percentage over a handful of samples is noise wearing a number.
+            if led.samples >= 25:
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
                 eq = 1 - led.rate()
+                # Calm brand hue when healthy; color is an ALARM, not decoration.
                 hue = "35" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
                 parts.append(c(hue, f"eq {eq * 100:.1f}% ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort

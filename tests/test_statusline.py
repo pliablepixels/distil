@@ -51,10 +51,11 @@ def test_populated_ledger(monkeypatch, capsys):
     )
     rc, out = _run(monkeypatch, capsys, s)
     assert rc == 0
-    assert "50.0K→28.4K tok" in out  # orig → compressed, not just the delta
+    # compact composite-statusline grammar: lifetime = one Σ figure + trim + $
+    assert "Σ21.6K saved" in out
     assert "−43%" in out  # percent trimmed, the glanceable number
-    assert "$0.04 saved" in out  # single delta, not two figures to subtract
-    assert "3 runs" in out
+    assert "$0.04" in out
+    assert "runs" not in out  # run counts live in `distil stats`, not the line
 
 
 def test_subscription_hides_notional_dollars(monkeypatch, capsys):
@@ -73,7 +74,7 @@ def test_subscription_hides_notional_dollars(monkeypatch, capsys):
     )
     rc, out = _run(monkeypatch, capsys, s)
     assert rc == 0
-    assert "50.0K→28.4K tok" in out
+    assert "Σ21.6K saved" in out
     assert "$" not in out
 
 
@@ -103,10 +104,12 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
         assert f"{code}eq " in out, out
 
 
-def test_singular_run(monkeypatch, capsys):
+def test_run_counts_not_in_line(monkeypatch, capsys):
+    # run counts moved to `distil stats` — the composite line stays compact
     s = ledger.LedgerSummary(1, 0.01, 500, {"x": 0.01})
     _rc, out = _run(monkeypatch, capsys, s)
-    assert "1 run" in out and "1 runs" not in out
+    assert "run" not in out
+    assert out.startswith("distil")
 
 
 def test_model_name_from_stdin(monkeypatch, capsys):
@@ -259,8 +262,8 @@ def test_session_first_when_live_session(monkeypatch, capsys, tmp_path):
     rc = cmd_statusline(argparse.Namespace(no_color=True))
     out = capsys.readouterr().out.strip()
     assert rc == 0
-    assert "sess 100.0K→40.0K −60%" in out  # THIS session only
-    assert "Σ 180.0K saved" in out  # lifetime, one figure
+    assert "▼60.0K −60%" in out  # THIS session's saved tokens + trim
+    assert "Σ180.0K" in out  # lifetime, one figure
     assert "$0.30" in out  # session dollars, not lifetime
 
 
@@ -283,5 +286,18 @@ def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
     cmd_statusline(argparse.Namespace(no_color=True))
     out = capsys.readouterr().out.strip()
-    assert "50.0K→25.0K tok −50%" in out
-    assert "sess" not in out
+    assert "Σ25.0K saved −50%" in out
+    assert "▼" not in out  # no live-session segment
+
+
+def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
+    """eq 100.0% over 1 sample is noise wearing a number — suppressed until 25."""
+    import distil.shadow as shadow
+
+    s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
+    led = shadow.ShadowLedger()
+    led.samples = 1
+    led.recent.append(1)
+    monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
+    _rc, out = _run(monkeypatch, capsys, s)
+    assert "eq" not in out
