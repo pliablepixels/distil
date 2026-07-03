@@ -46,6 +46,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -182,6 +183,22 @@ response = litellm.completion(
     api_key=<span class="g">"sk-ant-…"</span>,
     messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Hello!"</span>}],
 )</pre>
+
+    <h4 style="margin:14px 0 6px;font-size:14px;color:#9aa1b3;">Running the standalone LiteLLM Proxy instead?</h4>
+    <p>Same mechanism, one YAML field: point each model's <code>api_base</code> at <code>distil proxy</code> and every request routed through the LiteLLM Proxy is compressed transparently, with no change to callers.</p>
+    <pre class="term"><span class="d"># Terminal 1 — distil sits in front of the real upstream</span>
+distil proxy --port 8788 --upstream https://api.anthropic.com
+
+<span class="d"># config.yaml — Terminal 2</span>
+model_list:
+  - model_name: claude-opus-4-5
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_base: <span class="g">http://127.0.0.1:8788</span>
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+<span class="d"># Terminal 2 — start the LiteLLM Proxy against that config</span>
+litellm --config config.yaml</pre>
 
     <h3>Vercel AI SDK (TypeScript)</h3>
     <pre class="term"><span class="c">import</span> { createAnthropic } <span class="c">from</span> <span class="g">"@ai-sdk/anthropic"</span>;

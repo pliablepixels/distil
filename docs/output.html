@@ -43,6 +43,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -94,7 +95,7 @@
     <p>Two mechanisms work together, with different fidelity guarantees:</p>
 
     <h3>Generation-side shaping (<code>--shape-output</code>)</h3>
-    <p>Before forwarding the request, the proxy injects a <code>role:"system"</code> directive instructing the model to be concise. Two modes:</p>
+    <p>Before forwarding the request, the proxy injects a verbosity-control directive instructing the model to be concise — routed the way each provider actually accepts it. The Anthropic Messages API rejects a <code>role:"system"</code> entry inside <code>messages</code> (400), so there the directive is appended to the top-level <code>system</code> field instead; the OpenAI chat shape takes an appended <code>role:"system"</code> message. Two verbosity modes:</p>
 
     <ul>
       <li><strong><code>light</code></strong> — trims preamble and padding. Typical reduction: 20–35%.</li>

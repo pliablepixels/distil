@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
 
-<h3 align="center">The certified context compressor for AI agents.</h3>
+<h3 align="center">The most tokens you can save without losing outcomes — and the only compressor that can prove the second half.</h3>
 
 <p align="center">
 Every agent re-sends its whole context every turn — you pay for all of it, every turn. Compressing it is easy; compressing it <strong>without quietly changing what your agent does</strong> is the part everyone skips. Distil ships a <strong>statistical proof</strong> the next action is unchanged — measured on the same runs as the savings, gated in CI — and falls back to full context when it can't certify. <strong>Never silently lossy.</strong></p>

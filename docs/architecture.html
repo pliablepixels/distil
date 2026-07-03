@@ -43,6 +43,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -400,7 +401,8 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
         <tr><td><code>compress/stabilize.py</code></td><td>Schema canonicalization + volatile-field extraction</td></tr>
         <tr><td><code>compress/tier0.py</code></td><td>Tier-0 lossless transforms (JSON minify, run-length collapse)</td></tr>
         <tr><td><code>compress/tier1.py</code></td><td>Tier-1 reversible digest + content handle embedding</td></tr>
-        <tr><td><code>compress/salience.py</code></td><td>Model-free salience protection (pre-gate safety net)</td></tr>
+        <tr><td><code>compress/salience.py</code></td><td>Model-free salience protection (pre-gate safety net) + surprise-preserving retention</td></tr>
+        <tr><td><code>compress/guideline.py</code></td><td>Outcome-guided compression policy — protects content classes whose digestion co-occurs with trajectory-level regressions</td></tr>
         <tr><td><code>compress/strategies.py</code></td><td>Strategy registry + reject-if-bigger invariant</td></tr>
         <tr><td><code>replay/ablation.py</code></td><td>Causal/counterfactual pruning discovery engine</td></tr>
         <tr><td><code>replay/runner.py</code></td><td>Agent runner protocol + deterministic stand-in</td></tr>
@@ -408,6 +410,7 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
         <tr><td><code>certify/stats.py</code></td><td>TOST non-inferiority (hand-rolled Student-t)</td></tr>
         <tr><td><code>certify/gate.py</code></td><td>Gate: replay + TOST → verdict</td></tr>
         <tr><td><code>certify/holdout.py</code></td><td>Holdout A/B savings with bootstrap CI</td></tr>
+        <tr><td><code>certify/trajectory_risk.py</code></td><td>Trajectory-level certificate (<code>distil certify-trajectories</code>) — CRC/Learn-Then-Test on matched full/compressed task outcomes, plus the drift monitor</td></tr>
         <tr><td><code>conformal.py</code></td><td>Conformal DERC certificate (Learn-Then-Test / CRC, Hoeffding–Bentkus)</td></tr>
         <tr><td><code>fidelity.py</code></td><td>Byte-fidelity invariants (reversibility + append-only)</td></tr>
         <tr><td><code>policy.py</code></td><td>Auth-mode gating (PAYG vs subscription)</td></tr>
@@ -415,6 +418,7 @@ FIDELITY: <span class="g">PASS</span> — Tier-0/1 byte-reversible and history a
         <tr><td><code>corpus.py</code></td><td>Multi-domain corpus loader + structural validation</td></tr>
         <tr><td><code>adapters/anthropic.py</code></td><td>In-process drop-in adapter (wrap + cache-control)</td></tr>
         <tr><td><code>proxy.py</code></td><td>HTTP proxy for framework-agnostic adoption</td></tr>
+        <tr><td><code>streamrelay.py</code></td><td>Chunk-by-chunk SSE relay (TTFT-preserving) shared by the proxy, async proxy, and gateway</td></tr>
         <tr><td><code>codec/learned.py</code></td><td>Logistic-regression keep classifier (zero deps, ships in wheel)</td></tr>
         <tr><td><code>codec/keep_model.py</code></td><td>SalienceKeepModel — deterministic heuristic baseline</td></tr>
         <tr><td><code>gist.py</code></td><td>Content-addressed gist caching for tool schemas</td></tr>
