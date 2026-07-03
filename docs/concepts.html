@@ -204,6 +204,40 @@ VERDICT: <span class="w">FAIL</span>  (NOT certified — would degrade quality)<
 
     <hr/>
 
+    <h2 id="trajectory-certificate">The trajectory-level certificate</h2>
+
+    <p>DERC certifies the <em>step</em> — that the next action is unchanged. Distil's own <a href="research.html#e7">E7 experiment</a>, and the 2024–26 agent-compression literature (e.g. arXiv <a href="https://arxiv.org/abs/2412.17483" target="_blank" rel="noopener">2412.17483</a>, <a href="https://arxiv.org/abs/2510.00615" target="_blank" rel="noopener">2510.00615</a>), shows why that is not the whole story: a statistically valid per-step certificate can pass while end-to-end task success collapses, because per-step fidelity metrics systematically overpredict multi-step success. Certifying next-action equivalence and implying task fidelity is a category error.</p>
+
+    <p><code>distil certify-trajectories</code> certifies the invariant that actually transfers: run your eval suite twice — full context and compressed — on the same tasks, and get a distribution-free bound on how many <em>solvable</em> tasks compression may cost you, using Conformal Risk Control and Learn-Then-Test (Angelopoulos et al., arXiv <a href="https://arxiv.org/abs/2208.02814" target="_blank" rel="noopener">2208.02814</a>) on the matched full/compressed outcomes.</p>
+
+    <pre class="term"><span class="d">$ distil certify-trajectories outcomes.jsonl --alpha 0.05 --delta 0.05</span>
+<span class="d"># each line: {"task_id": "...", "full_success": true, "compressed_success": true}</span>
+distil trajectory-risk certificate
+
+  matched trajectories : 200
+  observed degradation : 0.50%
+  risk bound (1-&delta;)     : 3.20%
+  certified (&alpha;=0.05, &delta;=0.05) : <span class="g">True</span>
+
+  With confidence 95%, compression degrades at most 5.0% of tasks the full
+  context would have solved (observed 0.50% over 200 matched trajectories).</pre>
+
+    <div class="callout warn">
+      <b>Honest scope — the assumptions ship inside the certificate, not as fine print.</b>
+      <ul>
+        <li><strong>Exchangeability.</strong> The bound holds for future trajectories exchangeable with the calibration set. Agent workloads drift; pair the certificate with the built-in anytime-valid <strong>drift monitor</strong> and recalibrate when it alarms — a static certificate silently loses coverage under shift.</li>
+        <li><strong>The loss is the task outcome you measured.</strong> <code>compressed_success</code> should come from a real end-to-end evaluation (test suite passed, task rubric met), not a proxy metric — proxies are exactly the failure this certificate exists to fix.</li>
+        <li><strong>No adaptivity.</strong> Trajectories used to tune the compressor must not be reused as calibration data — that breaks exchangeability a second way. Keep a held-out calibration stream.</li>
+      </ul>
+      Below <code>min_n=20</code> matched trajectories the command refuses to certify rather than overclaim — a certificate from a handful of samples is noise dressed up as a guarantee.
+    </div>
+
+    <p>Matched failures also feed the <strong>outcome-guided compression policy</strong> (always on): when a task the full context solved fails under compression, the content classes digested in that trajectory are suspects, and classes whose digestion keeps co-occurring with regressions get protected — kept byte-exact, automatically. Evidence is stored as content-free signatures (<code>json:l</code>, <code>error:m</code>), never content, so it composes with the <a href="techniques.html#the-learning-flywheel-self-improving">expand flywheel</a> without adding new state to reason about. Like that flywheel, it is never-regressing by construction: it can only make Distil more conservative, never less accurate.</p>
+
+    <p>See <a href="cli.html#certify-trajectories">CLI Reference &rarr; <code>distil certify-trajectories</code></a> for the full flag reference.</p>
+
+    <hr/>
+
     <h2>3. Cache misses — not size — dominate agent cost</h2>
 
     <p>This is the insight most context compressors miss entirely, and it is where Distil's biggest wins come from.</p>

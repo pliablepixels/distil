@@ -210,7 +210,8 @@ distil gateway listening on http://127.0.0.1:8789
     --port 8789 \
     --upstream https://api.anthropic.com \
     --pricing claude-opus-4-8 \
-    --lossless-only</pre>
+    --lossless-only \
+    --admin-token "$DISTIL_GATEWAY_TOKEN"</pre>
 
     <h3>Flags</h3>
     <table>
@@ -222,20 +223,22 @@ distil gateway listening on http://127.0.0.1:8789
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key from the catalog; used for per-tenant dollar accounting in the dashboard.</td></tr>
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Message content is byte-stable. Interactive-safe, lower savings.</td></tr>
+        <tr><td><code>--admin-token</code></td><td>unset (env <code>DISTIL_GATEWAY_TOKEN</code>)</td><td>Bearer token required for <code>/distil/stats</code> and <code>/distil/dashboard</code>. On a non-loopback bind, these routes are disabled entirely without it.</td></tr>
+        <tr><td><code>--trust-tenant-header</code></td><td>off</td><td>Honor the client-supplied <code>x-distil-tenant</code> header for accounting. Off by default — tenant identity comes from the credential hash.</td></tr>
       </tbody>
     </table>
 
     <h3>Per-tenant accounting</h3>
-    <p>Every compressible request (<code>POST /v1/messages</code>, <code>/v1/chat/completions</code>, <code>/v1/responses</code>) is attributed to a tenant and its token counts are accumulated in-memory. Tenant identification priority:</p>
+    <p>Every compressible request (<code>POST /v1/messages</code>, <code>/v1/chat/completions</code>, <code>/v1/responses</code>) is attributed to a tenant and its token counts are accumulated in-memory. Tenant identity comes from the <strong>authenticated credential</strong> by default, not from anything a client can set on the wire:</p>
 
     <ol>
-      <li><strong><code>x-distil-tenant</code> header</strong> — explicit label set by the caller (e.g. <code>"team-search"</code>, <code>"team-checkout"</code>).</li>
-      <li><strong>Anonymized key hash</strong> — if no explicit label, the gateway derives a stable 8-hex ID from <code>sha256(x-api-key or authorization)</code>, prefixed <code>anon-</code>. The raw key is never stored or logged — only the truncated hash.</li>
+      <li><strong>Anonymized key hash</strong> — the gateway derives a stable 8-hex ID from <code>sha256(x-api-key or authorization)</code>, prefixed <code>anon-</code>. The raw key is never stored or logged — only the truncated hash.</li>
       <li><strong><code>"default"</code></strong> — used when no credential is present at all.</li>
+      <li><strong><code>x-distil-tenant</code> header</strong> — honored <em>only</em> when the operator opts in with <code>--trust-tenant-header</code>, for deployments where an upstream gateway they control sets it. Off by default, because a client-writable header would otherwise let any caller book its traffic under another tenant's accounting line.</li>
     </ol>
 
     <div class="callout good">
-      <b>No raw key ever stored or logged.</b> The <code>tenant_of()</code> function hashes the credential with SHA-256 and keeps only the first 8 hex characters. API keys cannot be reconstructed from the recorded tenant IDs.
+      <b>No raw key ever stored or logged, and tenant identity isn't client-spoofable by default.</b> <code>tenant_of()</code> hashes the credential with SHA-256 and keeps only the first 8 hex characters; a client-supplied tenant label is only trusted when the operator explicitly enables <code>--trust-tenant-header</code>.
     </div>
 
     <h3>Management endpoints</h3>
@@ -252,6 +255,20 @@ distil gateway listening on http://127.0.0.1:8789
         <p>Self-contained dark HTML page that auto-refreshes every 5 seconds. Served inline — no CDN or external assets. Shows per-tenant requests, tokens saved, dollars saved, and compression rate.</p>
       </div>
     </div>
+
+    <p>Both endpoints are gated by <code>_admin_authorized()</code>: open with no restriction on a loopback bind and no token configured (single-operator local use); everywhere else — including any non-loopback bind — a valid <code>Authorization: Bearer &lt;admin-token&gt;</code> is required, or the route replies <code>403</code>/<code>401</code> rather than serving per-tenant usage data to the network.</p>
+
+    <pre class="term"><span class="d"># Non-loopback bind without a token: /distil/* is refused, not silently open</span>
+<span class="d">$ distil gateway --host 0.0.0.0 --port 8789 --upstream https://api.anthropic.com</span>
+distil gateway listening on http://0.0.0.0:8789
+  dashboard: http://0.0.0.0:8789/distil/dashboard
+  ! non-loopback bind without --admin-token: /distil/* routes are disabled
+  → upstream: https://api.anthropic.com
+
+<span class="d"># Require the token explicitly</span>
+<span class="d">$ distil gateway --host 0.0.0.0 --admin-token "$(openssl rand -hex 24)" \</span>
+    --upstream https://api.anthropic.com
+<span class="d">$ curl -H "Authorization: Bearer &lt;token&gt;" http://gateway-host:8789/distil/stats</span></pre>
 
     <pre class="term"><span class="d">$ curl -s http://127.0.0.1:8789/distil/stats | python3 -m json.tool</span>
 {
@@ -288,6 +305,38 @@ distil gateway listening on http://127.0.0.1:8789
     <div class="callout">
       <b>All other paths pass through unchanged.</b> The gateway adds management endpoints at <code>/distil/*</code> and compresses <code>POST /v1/messages</code>-family paths. Every other path and HTTP method is forwarded to the upstream transparently, with the same hop-by-hop header stripping and SSRF protection as the basic proxy.
     </div>
+
+    <hr/>
+
+    <h2 id="streaming">Streaming and upstream timeouts</h2>
+
+    <p><strong>Module:</strong> <code>distil/streamrelay.py</code> · used by the sync proxy, the gateway, and (via aiohttp) the async proxy.</p>
+
+    <p>SSE responses are relayed <strong>chunk-by-chunk</strong> as the upstream produces them, not buffered start-to-finish. Buffering would turn time-to-first-token into time-to-last-token — exactly the latency an interactive agent session can't absorb. <code>stream_upstream()</code> reads with <code>resp.read1()</code> (return as soon as any bytes arrive, never wait for a full chunk to accumulate) and writes each chunk straight to the client, re-emitting <code>Transfer-Encoding: chunked</code> framing when the upstream declares no <code>Content-Length</code>. The complete body is still assembled in memory as it streams, so post-hoc, content-free accounting (shadow-mode decision comparison, token-saved headers) runs exactly as it does on a buffered response.</p>
+
+    <div class="callout good">
+      <b>TTFT is preserved through every entry point.</b> The proxy, the async proxy, and the gateway all route streamed responses through the same relay — there is no code path where fronting an agent through Distil turns a live-typing stream into a wait-for-everything response.
+    </div>
+
+    <p>Upstream timeouts are configurable via <code>DISTIL_UPSTREAM_TIMEOUT</code> (seconds, default <code>600</code>) — read by both the sync proxy/gateway (<code>urllib</code> socket timeout) and the async proxy (aiohttp <code>sock_read</code> timeout). A timed-out or unreachable upstream maps to an HTTP <strong>504</strong> before any bytes are sent to the client; once streaming has begun, a mid-stream failure closes the connection rather than appending an invalid error body to a partially-delivered response — there is no valid way to retrofit an error onto bytes the client already received.</p>
+
+    <pre class="term"><span class="d"># Give a slow upstream more room before the proxy gives up</span>
+<span class="d">$ DISTIL_UPSTREAM_TIMEOUT=120 distil proxy --upstream https://api.anthropic.com</span></pre>
+
+    <hr/>
+
+    <h2 id="mcp-store">MCP server local store</h2>
+
+    <p><strong>Module:</strong> <code>distil/mcp_server.py</code> · <strong>Command:</strong> <code>distil mcp</code></p>
+
+    <p>The MCP server's <code>distil_expand</code> tool needs the original text behind a handle to survive across process restarts, so it persists to <code>$DISTIL_HOME/mcp_store.json</code> (default <code>~/.distil/mcp_store.json</code>) — the one place in Distil where plaintext tool-output content is written to disk rather than kept in-process only. Two hardening measures apply because of that:</p>
+
+    <ul>
+      <li><strong>Owner-only permissions.</strong> The file is <code>chmod 0600</code> on every write — unreadable by any other local user.</li>
+      <li><strong>Bounded size.</strong> The store is capped at 512 entries; oldest handles age out FIFO, so it cannot grow without limit across long-running sessions.</li>
+    </ul>
+
+    <p>Writes are atomic (write-temp-then-replace) and best-effort — a store write failure never crashes a tool call. If your deployment cannot accept plaintext-at-rest content at all, don't run <code>distil mcp</code>; use the proxy or an in-process adapter instead, where digested originals never leave memory.</p>
 
     <hr/>
 
@@ -408,6 +457,22 @@ rust</pre>
         <tr>
           <td>API key exposure in gateway logs</td>
           <td>Gateway derives tenant ID via <code>sha256(key)[:8]</code>; raw key never stored, never logged, not reconstructable.</td>
+        </tr>
+        <tr>
+          <td>Tenant accounting spoofed via a client header</td>
+          <td>Tenant identity comes from the credential hash by default; the client-writable <code>x-distil-tenant</code> header is ignored unless the operator opts in with <code>--trust-tenant-header</code>.</td>
+        </tr>
+        <tr>
+          <td>Per-tenant usage data read by unauthenticated network callers</td>
+          <td><code>/distil/stats</code> and <code>/distil/dashboard</code> require a bearer <code>--admin-token</code> on any non-loopback bind; without one, those routes are refused rather than served openly.</td>
+        </tr>
+        <tr>
+          <td>Hung upstream connection / connection stuck open</td>
+          <td>Requests time out per <code>DISTIL_UPSTREAM_TIMEOUT</code> (default 600s) and map to a <code>504</code>, on the sync proxy/gateway and the async proxy alike.</td>
+        </tr>
+        <tr>
+          <td>MCP local store readable by other local users, or growing unbounded</td>
+          <td><code>mcp_store.json</code> is <code>chmod 0600</code> on every write and FIFO-bounded to 512 entries.</td>
         </tr>
       </tbody>
     </table>
