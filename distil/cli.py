@@ -120,6 +120,21 @@ def cmd_savings(args: argparse.Namespace) -> int:
 
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     s = ledger.summary()
+    if getattr(args, "badge", False):
+        # A shields.io badge of YOUR measured savings — paste it in a README or
+        # a tweet. The number comes from the local ledger (genuine, content-free);
+        # markdown includes a link to the project so the badge explains itself.
+        import urllib.parse
+
+        label = urllib.parse.quote("distil saved")
+        value = urllib.parse.quote(
+            f"{ledger._human(s.total_tokens_saved)} tokens"
+            + (f" (${s.total_dollars_saved:,.2f})" if s.total_dollars_saved >= 0.01 else "")
+        )
+        url = f"https://img.shields.io/badge/{label}-{value}-5ad1c9"
+        print(url)
+        print(f"\nmarkdown:\n[![distil savings]({url})](https://github.com/dshakes/distil)")
+        return 0
     if getattr(args, "json", False):
         from dataclasses import asdict
 
@@ -1472,6 +1487,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lb.add_argument("--html", help="render your savings as a self-contained HTML page")
     lb.add_argument("--json", action="store_true", help="machine-readable output")
+    lb.add_argument(
+        "--badge",
+        action="store_true",
+        help="print a shields.io badge URL + markdown of your measured savings",
+    )
     lb.set_defaults(func=cmd_leaderboard)
 
     pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #4)")
