@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased] — 1.7.0 dev
+## [1.7.0] — 2026-07-03 — The trajectory-level certificate, true streaming, trust-critical savings fixes
 
 ### Added
 - **Trajectory-level risk certificate** (`distil certify-trajectories`,
