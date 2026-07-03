@@ -16,11 +16,13 @@ GitHub release artifacts, and publishes to PyPI.
 
 ## Cutting a release
 
-Work is version-stamped in the repo, so bump first if needed (must agree across all three):
+The version is single-sourced from the installed package's metadata
+(`importlib.metadata`, backed by `pyproject.toml`'s `version`) — `distil/__init__.py`'s
+`__version__` is only a dev-mode fallback for running from a source checkout with
+nothing installed, and doesn't need to be kept in sync. Bump before a release:
 
 - `pyproject.toml` → `version`
-- `distil/__init__.py` → `__version__`
-- `CITATION.cff` → `version`
+- `CITATION.cff` → `version` and `date-released`
 - add a `## [X.Y.Z]` section to `CHANGELOG.md`
 
 Then, from a clean `main`:

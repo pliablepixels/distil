@@ -36,3 +36,11 @@ docs/paper/results/swe_e2e/sample_500_full.json
 /distil-lh-*.json
 docs/paper/main.log
 docs/paper/*.log
+
+# Raw per-instance prediction dumps — too large to commit, see
+# docs/paper/results/README.md for how to get them.
+docs/paper/results/**/predictions/*.jsonl
+docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json
+
+# local alt-venvs (swebench etc.)
+.venv*/
