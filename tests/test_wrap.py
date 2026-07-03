@@ -49,7 +49,8 @@ def test_wrap_runs_child_through_proxy_and_records_savings(tmp_path, monkeypatch
     upstream = _start_echo_upstream()
     up_url = f"http://127.0.0.1:{upstream.server_address[1]}"
     led = tmp_path / "savings.jsonl"
-    monkeypatch.setattr(ledger, "DEFAULT_PATH", led)  # RuntimeSavings flushes here
+    # RuntimeSavings flushes to ledger.default_path(), which honors DISTIL_HOME
+    monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
     try:
         code = proxy.wrap_run([sys.executable, "-c", _CHILD], upstream=up_url, record=True)
         assert code == 0  # child saw ANTHROPIC_BASE_URL, routed through, saw savings>0

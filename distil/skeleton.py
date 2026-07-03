@@ -59,20 +59,25 @@ def _function_body_ranges(tree: ast.AST) -> list[tuple[int, int, int, str | None
 
     def visit(node: ast.AST, in_function: bool) -> None:
         for child in ast.iter_child_nodes(node):
-            is_func = isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
-            if is_func and not in_function:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and not in_function:
                 body = child.body
                 doc = _docstring_first_line(child)
                 # Body starts after the signature (and after the docstring, if kept).
                 first_stmt = body[1] if (doc and len(body) > 1) else body[0]
                 start = first_stmt.lineno
                 end = child.end_lineno or start
-                if end >= start:  # only elide if there is a body to elide
+                # Elide only when the body starts BELOW the signature line —
+                # a one-liner (`def f(): pass`) shares its line with the def,
+                # and eliding it would erase the signature itself.
+                if end >= start > child.lineno:
                     ranges.append((start, end, first_stmt.col_offset, doc))
                 # Descend with in_function=True so closures inside are not double-counted.
                 visit(child, True)
             else:
-                visit(child, is_func or in_function)
+                visit(
+                    child,
+                    in_function or isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)),
+                )
 
     visit(tree, False)
     return ranges

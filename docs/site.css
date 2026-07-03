@@ -38,7 +38,7 @@
 
 /* ── Reset & base ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   background:
     radial-gradient(1100px 560px at 82% -8%, #19143a 0%, transparent 58%),
@@ -178,6 +178,7 @@ code {
   font: 12.5px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
   background: rgba(139,123,255,.08); border: 1px solid var(--line2);
   border-radius: 6px; padding: 1.5px 6px; color: var(--acc2);
+  overflow-wrap: anywhere;
 }
 
 /* ── Code blocks ───────────────────────────────────────────────────── */

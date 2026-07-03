@@ -52,7 +52,8 @@ def test_populated_ledger(monkeypatch, capsys):
     rc, out = _run(monkeypatch, capsys, s)
     assert rc == 0
     assert "50.0K→28.4K tok" in out  # orig → compressed, not just the delta
-    assert "$0.10→$0.06" in out
+    assert "−43%" in out  # percent trimmed, the glanceable number
+    assert "$0.04 saved" in out  # single delta, not two figures to subtract
     assert "3 runs" in out
 
 
@@ -74,6 +75,32 @@ def test_subscription_hides_notional_dollars(monkeypatch, capsys):
     assert rc == 0
     assert "50.0K→28.4K tok" in out
     assert "$" not in out
+
+
+def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
+    """eq% is colored by health: green >=99%, yellow >=95%, red below."""
+    import distil.shadow as shadow
+
+    s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
+
+    def led_with(changes: int, samples: int = 100):
+        led = shadow.ShadowLedger()
+        for i in range(samples):
+            led.samples += 1
+            eq = i >= changes
+            if not eq:
+                led.changes += 1
+            led.recent.append(1 if eq else 0)
+        return led
+
+    # healthy = calm brand magenta (color is an alarm, not decoration);
+    # yellow under 99%, red under 95%
+    for changes, code in ((0, "\033[35m"), (3, "\033[33m"), (10, "\033[31m")):
+        monkeypatch.setattr(
+            shadow.ShadowLedger, "load", classmethod(lambda cls, *a, _l=led_with(changes), **k: _l)
+        )
+        _rc, out = _run(monkeypatch, capsys, s, no_color=False)
+        assert f"{code}eq " in out, out
 
 
 def test_singular_run(monkeypatch, capsys):
@@ -191,9 +218,14 @@ def test_render_dashboard_subscription_hides_cost():
 def test_render_dashboard_recent_strip():
     # The live shadow panel: recent decisions shown as a strip (▰ same / ▱ changed).
     s = ledger.LedgerSummary(
-        5, 5.0, 1000, {},
-        total_baseline_tokens=2_000_000, total_distil_tokens=1_000_000,
-        total_baseline_dollars=10.0, total_distil_dollars=5.0,
+        5,
+        5.0,
+        1000,
+        {},
+        total_baseline_tokens=2_000_000,
+        total_distil_tokens=1_000_000,
+        total_baseline_dollars=10.0,
+        total_distil_dollars=5.0,
     )
     out = ledger.render_dashboard(
         s, change_rate=0.2, samples=10, recent=[1, 1, 0, 1, 1], color=False

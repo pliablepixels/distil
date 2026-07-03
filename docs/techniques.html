@@ -139,12 +139,13 @@ distil (cache-aware lossless)          0.01019         <span class="g">33.1%</sp
 
     <p>Lossless compression is safe by construction, but it is also blind — it will happily drop the one line that carries the agent's decision if that line happens to be compressible. Salience protection is a model-free guard that runs before any content reduction and marks lines that must survive regardless of savings pressure.</p>
 
-    <p>Three signals combine, all computed from the text alone (no external model call, no learned weights):</p>
+    <p>Four signals combine, all computed from the text alone (no external model call, no learned weights):</p>
 
     <ul>
-      <li><strong>Pattern matching</strong> — decision markers (<code>DECISION:</code>), error keywords, structured-data signals (key:value, pipe tables, digit-dense lines).</li>
-      <li><strong>Entropy scoring</strong> — high-entropy lines carry information-dense content (IDs, hashes, addresses) and are protected regardless of keyword matches.</li>
-      <li><strong>Cross-reference detection</strong> — a line referenced elsewhere in the context (an ID that reappears, a filename cited later) is treated as load-bearing even if it looks inert in isolation.</li>
+      <li><strong>Pattern matching</strong> — known identifier shapes (UUID, git SHA, <code>PREFIX-NNN</code>, email, IPv4, semver, file paths).</li>
+      <li><strong>Entropy scoring</strong> — high-entropy mixed-alnum tokens carry information-dense content (novel ID formats no fixed pattern anticipates) and are protected regardless of keyword matches.</li>
+      <li><strong>Cross-reference detection</strong> — a token referenced in two or more blocks is an anchor the agent navigates by, treated as load-bearing even if it looks inert in isolation.</li>
+      <li><strong>Surprise</strong> (<code>surprise_lines</code>) — error/failure/timeout/anomaly lines and unified-diff changed lines, over-retained regardless of the other three signals because a lossy compressor drops the incongruent detail first, and that detail is what decides the next action.</li>
     </ul>
 
     <p>Protection is line-aware: the guard operates on individual lines, not blocks, so it can preserve a single critical row inside an otherwise-compressible table. The cost is a small savings reduction — roughly 2.4 percentage points on the benchmark corpus — in exchange for a structural guarantee.</p>
@@ -440,6 +441,10 @@ score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span 
     <p><strong>Module:</strong> <code>distil/learn.py</code> &middot; <code>distil learn</code></p>
 
     <p>This is what makes recoverable compression compound. Every <code>distil_expand</code> call is ground truth that a digested block was load-bearing. Distil tallies these by a coarse, <strong>content-free signature</strong> (content class × size bucket, e.g. <code>json:l</code> — never the content itself) and learns which signatures your agents keep expanding. Those it stops digesting, keeping them byte-exact. Because the policy only ever makes Distil <em>more</em> conservative, it is <strong>never-regressing by construction</strong> — it can reduce savings on an expand-prone signature, never reduce decision-equivalence — so it needs no gate to be safe. The stats live locally (atomic writes, content-free); inspect the learned policy with <code>distil learn</code>. The more your agents run, the better the fit to <em>your</em> workload.</p>
+
+    <p><strong>Module:</strong> <code>distil/compress/guideline.py</code> &middot; a second flywheel learns from the coarser signal that actually matters at the task level: the <strong>trajectory outcome</strong>. Every matched full/compressed run fed to <code>distil certify-trajectories</code> is evidence — when a task the full context solved fails under compression, the content-free signatures digested in that run are suspects; signatures whose digestion keeps co-occurring with regressions get protected, kept byte-exact, automatically. It is never-regressing by the same construction as the expand flywheel above, just driven by end-to-end task success instead of a per-step expand request. See <a href="concepts.html#trajectory-certificate">Concepts &rarr; The trajectory-level certificate</a>.</p>
+
+    <p>Salience protection (<a href="#salience-protection">above</a>) composes a fourth signal on top of pattern/entropy/reference: <strong>surprise</strong>. Error, failure, timeout, and anomaly lines — plus unified-diff changed lines — are over-retained regardless of the other three signals, because under a tight token budget a lossy compressor drops the incongruent detail first, and in an agent trajectory the incongruent detail (the error, the unexpected state) is precisely what decides the next action.</p>
 
     <div class="site-footer">
       Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>

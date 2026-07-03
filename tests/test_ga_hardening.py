@@ -70,10 +70,15 @@ def test_compress_messages_survives_malformed_blocks():
 def test_gateway_tenant_sanitized_and_dashboard_escaped():
     from distil import gateway
 
-    assert gateway.tenant_of({"x-distil-tenant": "acme-prod"}) == "acme-prod"
+    # client-writable header is ignored unless the operator opts in
+    assert gateway.tenant_of({"x-distil-tenant": "acme-prod"}) == "default"
+    trust = {"trust_tenant_header": True}
+    assert gateway.tenant_of({"x-distil-tenant": "acme-prod"}, **trust) == "acme-prod"
     # injection / overlong labels are rejected (fall through), never trusted as-is
-    assert gateway.tenant_of({"x-distil-tenant": "<script>alert(1)</script>"}) == "default"
-    assert gateway.tenant_of({"x-distil-tenant": "x" * 999, "x-api-key": "k"}).startswith("anon-")
+    assert gateway.tenant_of({"x-distil-tenant": "<script>alert(1)</script>"}, **trust) == "default"
+    assert gateway.tenant_of({"x-distil-tenant": "x" * 999, "x-api-key": "k"}, **trust).startswith(
+        "anon-"
+    )
     snap = {
         "tenants": [
             {

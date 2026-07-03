@@ -42,8 +42,6 @@ _MIN_CHARS = 400
 _NEAR_DUP_RATIO = 0.5
 # How many recent large blocks to consider as delta bases (bounds latency).
 _MAX_BASES = 12
-# Bound the per-session delivered-block memory.
-_MAX_DELIVERED = 256
 
 
 def _handle(text: str) -> str:
@@ -67,18 +65,10 @@ def _msg_hash(msg: Any) -> str:
 
 @dataclass
 class DeltaSession:
-    """Memory of large blocks already delivered in a session + the prior prefix."""
+    """Per-session memory of the prior turn's message-hash prefix (content-free)."""
 
-    delivered: OrderedDict[str, str] = field(default_factory=OrderedDict)  # handle -> text
     prev_msg_hashes: list[str] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
-
-    def remember(self, text: str) -> None:
-        h = _handle(text)
-        self.delivered[h] = text
-        self.delivered.move_to_end(h)
-        while len(self.delivered) > _MAX_DELIVERED:
-            self.delivered.popitem(last=False)
 
 
 _SESSIONS: OrderedDict[str, DeltaSession] = OrderedDict()
@@ -203,11 +193,11 @@ def _encode_block(
     # 1) Exact re-send → back-reference.
     if h in prior:
         store._record(h, text)
-        marker = _exact_marker(h, nlines)
-        if len(marker) < len(text):
+        exact = _exact_marker(h, nlines)
+        if len(exact) < len(text):
             stats.exact_refs += 1
-            stats.tokens_saved += max(0, _tok.count(text) - _tok.count(marker))
-            return marker
+            stats.tokens_saved += max(0, _tok.count(text) - _tok.count(exact))
+            return exact
         return text
 
     # 2) Near-duplicate (e.g. a file re-read after an edit) → reference + delta.

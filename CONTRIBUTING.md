@@ -12,7 +12,7 @@ non-negotiable rule, and it *is* the project's thesis:
 git clone https://github.com/dshakes/distil && cd distil
 make test     # full test suite (stdlib-only; uv handles the env)
 make gate     # tests + corpus non-inferiority gate + byte-fidelity gate
-make lint     # ruff
+make lint     # ruff (enforced in CI — a PR won't merge with lint errors)
 ```
 
 No runtime dependencies are allowed in the core. Optional features go behind an

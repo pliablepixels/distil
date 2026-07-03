@@ -6,7 +6,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.9%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-707%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-711%20passing-5ad19a" alt="tests"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
@@ -16,7 +16,7 @@
 <p align="center">
 Every agent re-sends its whole context every turn — you pay for all of it, every turn. Compressing it is easy; compressing it <strong>without quietly changing what your agent does</strong> is the part everyone skips. Distil ships a <strong>statistical proof</strong> the next action is unchanged — measured on the same runs as the savings, gated in CI — and falls back to full context when it can't certify. <strong>Never silently lossy.</strong></p>
 
-<p align="center"><sub><b>Honest scope:</b> the certificate is a <b>proxy</b> (next-action equivalence on a trajectory corpus), not end-to-end task success — under <em>aggressive lossy</em> compression it doesn't fully transfer (<a href="#-the-proof">E7</a>), which is why Distil calibrates per deployment and fails safe.</sub></p>
+<p align="center"><sub><b>Honest scope:</b> the per-request certificate is a <b>proxy</b> (next-action equivalence) — under <em>aggressive lossy</em> compression it doesn't fully transfer to task success (<a href="#-the-proof">E7</a>). That's why Distil also certifies the level that matters: <a href="#-the-trajectory-level-certificate"><code>distil certify-trajectories</code></a> bounds <b>end-to-end task degradation</b> on matched runs, and Distil calibrates per deployment and fails safe.</sub></p>
 
 <p align="center">
   <a href="#-use-it-now">Use it</a> ·
@@ -102,8 +102,10 @@ Honest scope: this is **next-action equivalence — a proxy**, not end-to-end ta
 **You don't need byte-equivalence — you need decision-equivalence.** An agent only has to take the *same actions* whether or not its context was compressed — and *that* is measurable, certifiable, and compatible with aggressive compression. (Honest caveat we measured ourselves: it's a **proxy**; under aggressive *lossy* compression it doesn't fully transfer to task success — [E7](#-the-proof).)
 
 - **Certified, not estimated.** A strategy ships only if a non-inferiority test certifies the next action is unchanged — savings and accuracy on the *same runs*, gated in CI. When it can't certify, it falls back to full context.
+- **Certified at the level that matters, too.** `distil certify-trajectories` bounds **end-to-end task degradation** over matched full/compressed runs (Conformal Risk Control — the certificate target our own E7 experiment showed per-step metrics can't stand in for). No other compressor certifies either level.
 - **Reversible, not lossy.** Every other compressor *destroys* detail. Distil digests behind a content handle, keeps the original locally, and hands the agent a `distil_expand` tool to pull back exactly what it needs — so you can compress fearlessly.
-- **It compounds.** Every expansion is a label that the content mattered; logged (numbers only), it teaches a policy to stop digesting what your agents keep recovering — only ever getting *more* conservative.
+- **It compounds — on outcomes.** Every expansion is a label that content mattered, and every matched trajectory outcome teaches the policy which content classes break tasks when digested (never content, only signatures). Both flywheels only ever make compression *more* conservative.
+- **Streams like it isn't there.** SSE responses relay chunk-by-chunk — time-to-first-token is preserved through the proxy, async proxy, and gateway.
 
 > **Three fidelity tiers:** **lossless** (byte-identical in-context, `--verbatim`) · **reversible** (digested but byte-recoverable on demand — the default) · **lossy** (gone — every other tool). All three Distil modes are certified decision-equivalent; only Distil offers, and certifies, the reversible tier.
 
@@ -298,6 +300,19 @@ distil conformal --corpus ./mycorpus --alpha 0.05 --delta 0.05
 ```
 
 It's **conformal risk control** (Learn-Then-Test / CRC — distribution-free, finite-sample), not a heuristic threshold. The one load-bearing caveat: the guarantee requires **exchangeability** (calibration traffic ≈ live traffic) and is **marginal** over that distribution — recalibrate on drift. Full theory + citations: [Concepts](https://dshakes.github.io/distil/concepts.html) · [`docs/PAPER.md`](docs/PAPER.md).
+
+### 🏔 The trajectory-level certificate
+
+DERC certifies the *step*; this certifies the *task*. Our E7 experiment — and the 2024–26 agent-compression literature — shows per-step fidelity can pass while end-to-end success collapses, so distil also certifies the level users actually feel: run your eval suite twice (full context vs compressed), feed the matched outcomes in, and get a distribution-free bound on **how many solvable tasks compression may cost you**:
+
+```bash
+distil certify-trajectories outcomes.jsonl --alpha 0.05 --delta 0.05
+# each line: {"task_id": "...", "full_success": true, "compressed_success": true}
+# → With confidence 95%, compression degrades at most 5.0% of tasks the full
+#   context would have solved (observed 0.5% over 200 matched trajectories).
+```
+
+It refuses to certify on small samples, states its exchangeability assumptions in the certificate itself, and ships an anytime-valid **drift monitor** (`trajectory_risk.drift_monitor`) that tells you when live traffic has shifted enough that the certificate is stale. Matched failures also feed the **outcome-guided policy** (`distil.compress.guideline`): content classes that break tasks when digested get protected byte-exact, automatically.
 
 ## 🧩 What's inside
 

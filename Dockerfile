@@ -17,6 +17,8 @@ WORKDIR /app
 COPY --from=build /dist/*.whl /tmp/
 COPY corpus ./corpus
 RUN pip install --no-cache-dir /tmp/*.whl && rm -rf /tmp/*.whl
+RUN useradd --system --create-home --uid 1000 distil && chown -R distil:distil /app
+USER distil
 ENV DISTIL_CORPUS=/app/corpus
 ENTRYPOINT ["distil"]
 CMD ["bench"]

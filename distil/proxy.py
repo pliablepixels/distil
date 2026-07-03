@@ -21,6 +21,8 @@ Or as a module::
 from __future__ import annotations
 
 import json
+import os
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -54,6 +56,26 @@ _HOP_BY_HOP = frozenset(
         "upgrade",
     }
 )
+
+
+# Upstream socket timeout (seconds). Generous — LLM generations run minutes —
+# but finite, so a wedged upstream can never pin a worker thread forever.
+_UPSTREAM_TIMEOUT = float(os.environ.get("DISTIL_UPSTREAM_TIMEOUT", "600"))
+
+
+def _is_timeout(exc: urllib.error.URLError) -> bool:
+    return isinstance(exc.reason, (socket.timeout, TimeoutError))
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Relay 3xx instead of following: auto-following would re-send the
+    client's credentials to whatever host the upstream redirect names."""
+
+    def redirect_request(self, *a, **k):  # noqa: ANN002, ANN003
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +112,16 @@ def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> 
     return max(0, _count_messages(before) - _count_messages(after))
 
 
+def _model_from_path(path: str) -> str | None:
+    """Extract the model id from a Gemini-style URL (``.../models/<id>:action``)."""
+    marker = "/models/"
+    idx = path.find(marker)
+    if idx < 0:
+        return None
+    tail = path[idx + len(marker) :]
+    return tail.split(":", 1)[0].split("/", 1)[0] or None
+
+
 # ---------------------------------------------------------------------------
 # Handler factory
 # ---------------------------------------------------------------------------
@@ -102,7 +134,7 @@ def build_handler(
     verbatim: bool = False,
     shape_output: str = "off",
     savings: Any = None,
-    flush_every: int = 50,
+    flush_every: int = 10,
     expand: bool = False,
     shadow_rate: float = 0.0,
     session_delta: bool = False,
@@ -127,12 +159,22 @@ def build_handler(
     # Learning flywheel state (loaded once when expand is on): the learned
     # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
     _learn_stats = None
-    _learn_keep = None
+    _expand_keep = None
     if expand:
         from .learn import ExpandStats, keep_predicate
 
         _learn_stats = ExpandStats.load()
-        _learn_keep = keep_predicate(_learn_stats)
+        _expand_keep = keep_predicate(_learn_stats)
+
+    # Outcome-guided policy (always on — never-regressing by construction):
+    # content classes whose digestion co-occurred with END-TO-END task
+    # regressions are kept byte-exact. See distil.compress.guideline.
+    from .compress.guideline import OutcomeStats
+
+    _outcome_keep = OutcomeStats.load().keep_predicate()
+
+    def _learn_keep(text: str) -> bool:
+        return _outcome_keep(text) or (_expand_keep is not None and _expand_keep(text))
 
     # Shadow-mode live decision-equivalence: sample a fraction of requests, run the
     # decision uncompressed too (in the background), and record whether it matched.
@@ -146,6 +188,10 @@ def build_handler(
         _shadow_ledger = ShadowLedger()
 
     class _DistilHandler(BaseHTTPRequestHandler):
+        # HTTP/1.1 so streamed responses can use chunked transfer framing
+        # (every non-streaming response still carries an exact Content-Length).
+        protocol_version = "HTTP/1.1"
+
         # ----------------------------------------------------------------
         # Silence request logs — quiet by design
         # ----------------------------------------------------------------
@@ -187,9 +233,18 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def _read_body(self) -> bytes | None:
-            """Read the request body, or None if Content-Length is malformed/oversized."""
+            """Read the request body; on a malformed/oversized/chunked request,
+            send the error response itself and return None (caller just returns)."""
+            if not self.headers.get("Content-Length") and "chunked" in (
+                self.headers.get("Transfer-Encoding") or ""
+            ):
+                # A chunked body would otherwise be read as empty and silently
+                # dropped — fail loudly instead (LLM SDKs always send a length).
+                self._reject(411, "chunked request bodies are not supported; send Content-Length")
+                return None
             length = parse_content_length(self.headers.get("Content-Length"))
             if length is None:
+                self._reject(413, "request body too large or malformed Content-Length")
                 return None
             return self.rfile.read(length) if length else b""
 
@@ -197,10 +252,16 @@ def build_handler(
             body = json.dumps({"error": message}).encode()
             self._relay(code, {"Content-Type": "application/json"}, body)
 
-        def _client_headers(self) -> dict[str, str]:
+        def _client_headers(self, *, identity: bool = False) -> dict[str, str]:
             """Client headers with hop-by-hop stripped (Content-Length excluded
-            so we can recompute it after compression)."""
-            return {k: v for k, v in self.headers.items() if k.lower() not in _HOP_BY_HOP}
+            so we can recompute it after compression). ``identity=True`` also
+            drops Accept-Encoding: on compressible paths a gzip upstream body
+            would silently defeat the expand loop and shadow decision parsing
+            (both read the response), so those requests ask for identity."""
+            out = {k: v for k, v in self.headers.items() if k.lower() not in _HOP_BY_HOP}
+            if identity:
+                out = {k: v for k, v in out.items() if k.lower() != "accept-encoding"}
+            return out
 
         def _relay(
             self,
@@ -242,7 +303,7 @@ def build_handler(
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with _OPENER.open(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     return resp.status, rhdrs, rbody
@@ -251,10 +312,14 @@ def build_handler(
                 rhdrs = {k: v for k, v in exc.headers.items() if k.lower() not in _HOP_BY_HOP}
                 return exc.code, rhdrs, rbody
             except urllib.error.URLError as exc:
+                status = 504 if _is_timeout(exc) else 502
                 rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
+                    {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
                 ).encode()
-                return 502, {"Content-Type": "application/json"}, rbody
+                return status, {"Content-Type": "application/json"}, rbody
+            except TimeoutError:
+                rbody = b'{"error":"upstream timed out"}'
+                return 504, {"Content-Type": "application/json"}, rbody
 
         # ----------------------------------------------------------------
         # Compression path
@@ -266,9 +331,8 @@ def build_handler(
                 return
             raw = self._read_body()
             if raw is None:
-                self._reject(413, "request body too large or malformed Content-Length")
-                return
-            headers = self._client_headers()
+                return  # _read_body already sent the error response
+            headers = self._client_headers(identity=True)
             extras: dict[str, str] = {}
             store: Any = None  # RestoreStore once messages are compressed (for expand)
 
@@ -339,16 +403,17 @@ def build_handler(
                     from .expand import inject_expand_tool
 
                     body = inject_expand_tool(body)
-                # Accumulate GENUINE savings from real traffic into the ledger.
+                # Accumulate GENUINE savings from real traffic into the ledger,
+                # priced per the model THIS request names (agents mix models).
                 if savings is not None:
-                    savings.record(before_tok, after_tok)
-                    if savings.requests >= flush_every:
-                        savings.flush()
+                    savings.record(before_tok, after_tok, model=body.get("model"))
+                    savings.maybe_flush(every=flush_every)
                 # Output compression: gated by lossless_only (only on PAYG-style).
                 if shape_output != "off" and not lossless_only:
                     from .output import shape_request
 
-                    body = shape_request(body, level=shape_output, allow=True)
+                    _shape = "anthropic" if strip_query(self.path) == "/v1/messages" else "openai"
+                    body = shape_request(body, level=shape_output, allow=True, shape=_shape)
                     extras["x-distil-output-shaping"] = shape_output
 
             elif "contents" in body and isinstance(body["contents"], list):
@@ -376,11 +441,42 @@ def build_handler(
                     "x-distil-tokens-saved": str(saved),
                 }
                 if savings is not None:
-                    savings.record(before_tok, after_tok)
-                    if savings.requests >= flush_every:
-                        savings.flush()
+                    # Gemini requests carry the model in the URL path, not the body.
+                    savings.record(before_tok, after_tok, model=_model_from_path(self.path))
+                    savings.maybe_flush(every=flush_every)
 
             new_raw = json.dumps(body).encode()
+
+            # Decide shadow sampling BEFORE relaying so the marker header can be
+            # sent on the streaming path too (headers go out before the body).
+            shadow_sampled = _shadow_sampler is not None and _shadow_sampler.should_sample()
+            if shadow_sampled:
+                extras["x-distil-shadow"] = "sampled"
+
+            # Streaming pass-through: when the client asked for a streamed
+            # response, relay upstream bytes as they arrive — time-to-first-token
+            # is preserved. The expand loop needs the complete response (it may
+            # re-query before answering), so expand-eligible requests stay on
+            # the buffered path.
+            want_stream = bool(body.get("stream")) or ":streamGenerateContent" in self.path
+            if want_stream and not (expand and getattr(store, "handles", None)):
+                from .streamrelay import stream_upstream
+
+                rbody_opt = stream_upstream(
+                    self,
+                    _upstream + self.path,
+                    new_raw,
+                    headers,
+                    timeout=_UPSTREAM_TIMEOUT,
+                    hop_by_hop=_HOP_BY_HOP,
+                    extras=extras,
+                )
+                if _learn_stats is not None:
+                    _learn_stats.save()
+                if shadow_sampled and rbody_opt:
+                    self._spawn_shadow(raw, headers, rbody_opt)
+                return
+
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
 
             # Transparent expand loop: resolve any distil_expand tool calls against
@@ -414,35 +510,39 @@ def build_handler(
             # Shadow-mode: on a sampled request, re-run the decision UNCOMPRESSED in
             # the background and record whether it matched — a live decision-change
             # signal on real traffic. Never blocks the client's response.
-            if _shadow_sampler is not None and _shadow_sampler.should_sample():
-                extras["x-distil-shadow"] = "sampled"
-                # Capture the real (compressed) response body — JSON or SSE stream.
-                _compressed_body = rbody
-                _orig_raw, _hdrs = raw, headers
-
-                def _shadow_compare() -> None:
-                    try:
-                        from .shadow import decision_signature_from_body
-
-                        _s, _h, orig_rbody = self._post_upstream(self.path, _orig_raw, _hdrs)
-                        # decision_signature_from_body handles both JSON and streamed
-                        # (SSE / chunk-array) bodies, so this works for Claude Code /
-                        # Codex / Gemini sessions, which stream their responses.
-                        comp_sig = decision_signature_from_body(_compressed_body)
-                        orig_sig = decision_signature_from_body(orig_rbody)
-                        _shadow_ledger.record(comp_sig == orig_sig)
-                    except Exception:  # noqa: BLE001 — shadow must never affect the request
-                        pass
-
-                # Track the thread so teardown can drain it: a daemon thread is
-                # killed on process exit, which loses the sample on a quick run
-                # (e.g. `claude -p`) or right after the last turn. Prune finished
-                # ones first so the list stays bounded on long sessions.
-                _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
-                _t = threading.Thread(target=_shadow_compare, daemon=True)
-                _shadow_threads.append(_t)
-                _t.start()
+            if shadow_sampled:
+                self._spawn_shadow(raw, headers, rbody)
             self._relay(status, rhdrs, rbody, extras=extras)
+
+        def _spawn_shadow(
+            self, orig_raw: bytes, headers: dict[str, str], compressed: bytes
+        ) -> None:
+            """Re-run the request uncompressed in the background and record whether
+            the agent's decision matched. Never blocks the client's response."""
+
+            def _shadow_compare() -> None:
+                try:
+                    from .shadow import decision_signature_from_body
+
+                    _s, _h, orig_rbody = self._post_upstream(self.path, orig_raw, headers)
+                    # decision_signature_from_body handles both JSON and streamed
+                    # (SSE / chunk-array) bodies, so this works for Claude Code /
+                    # Codex / Gemini sessions, which stream their responses.
+                    comp_sig = decision_signature_from_body(compressed)
+                    orig_sig = decision_signature_from_body(orig_rbody)
+                    if _shadow_ledger is not None:
+                        _shadow_ledger.record(comp_sig == orig_sig)
+                except Exception:  # noqa: BLE001 — shadow must never affect the request
+                    pass
+
+            # Track the thread so teardown can drain it: a daemon thread is
+            # killed on process exit, which loses the sample on a quick run
+            # (e.g. `claude -p`) or right after the last turn. Prune finished
+            # ones first so the list stays bounded on long sessions.
+            _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
+            _t = threading.Thread(target=_shadow_compare, daemon=True)
+            _shadow_threads.append(_t)
+            _t.start()
 
         # ----------------------------------------------------------------
         # Transparent passthrough (unchanged body, any verb)
@@ -454,33 +554,42 @@ def build_handler(
                 return
             raw = self._read_body()
             if raw is None:
-                self._reject(413, "request body too large or malformed Content-Length")
-                return
-            headers = self._client_headers()
-            url = _upstream + self.path
-            req = urllib.request.Request(
-                url,
-                data=raw or None,
-                headers={**headers, **({"Content-Length": str(len(raw))} if raw else {})},
-                method=self.command,
-            )
-            try:
-                with urllib.request.urlopen(req) as resp:
-                    rbody = resp.read()
-                    rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
-                    self._relay(resp.status, rhdrs, rbody)
-            except urllib.error.HTTPError as exc:
-                rbody = exc.read() if exc.fp else b'{"error":"upstream error"}'
-                rhdrs = {k: v for k, v in exc.headers.items() if k.lower() not in _HOP_BY_HOP}
-                self._relay(exc.code, rhdrs, rbody)
-            except urllib.error.URLError as exc:
-                rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
-                ).encode()
-                self._relay(502, {"Content-Type": "application/json"}, rbody)
+                return  # _read_body already sent the error response
+            from .streamrelay import stream_upstream
 
-    _DistilHandler.shadow_threads = _shadow_threads  # drained on shutdown
+            stream_upstream(
+                self,
+                _upstream + self.path,
+                raw or None,
+                self._client_headers(),
+                method=self.command,
+                timeout=_UPSTREAM_TIMEOUT,
+                hop_by_hop=_HOP_BY_HOP,
+            )
+
+    _DistilHandler.shadow_threads = _shadow_threads  # type: ignore[attr-defined]  # drained on shutdown
     return _DistilHandler
+
+
+def _install_sigterm_flush(proc_holder: list | None = None) -> None:
+    """Turn SIGTERM into KeyboardInterrupt so the caller's ``finally`` block
+    (savings flush, shadow drain) runs on a plain ``kill`` instead of dropping
+    up to a flush-window of recorded savings. Forwards the signal to a wrapped
+    child process first, if one is registered in *proc_holder*."""
+    import signal
+
+    def _on_term(signum: int, frame: object) -> None:  # noqa: ARG001
+        if proc_holder:
+            try:
+                proc_holder[0].terminate()
+            except Exception:  # noqa: BLE001 — best-effort child shutdown
+                pass
+        raise KeyboardInterrupt
+
+    try:
+        signal.signal(signal.SIGTERM, _on_term)
+    except ValueError:
+        pass  # not the main thread (embedded use) — finally-blocks still cover Ctrl+C
 
 
 def _drain_shadow(handler: type, budget: float = 6.0) -> None:
@@ -572,6 +681,7 @@ def serve(
         print(f"  → output shaping: {shape_output}")
     if savings is not None:
         print("  → recording genuine savings → distil leaderboard")
+    _install_sigterm_flush()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -606,7 +716,6 @@ def wrap_run(
     runs the command to completion, then tears the proxy down — flushing genuine
     savings to the local ledger. Returns the child process's exit code.
     """
-    import os
     import subprocess
     import sys
 
@@ -646,8 +755,12 @@ def wrap_run(
         )
 
     code = 0
+    proc_holder: list = []
+    _install_sigterm_flush(proc_holder)
     try:
-        code = subprocess.run(command, env=child_env).returncode
+        proc = subprocess.Popen(command, env=child_env)
+        proc_holder.append(proc)
+        code = proc.wait()
     except FileNotFoundError:
         print(f"distil wrap: command not found: {command[0]}", file=sys.stderr)
         code = 127
@@ -657,7 +770,7 @@ def wrap_run(
         server.shutdown()
         _drain_shadow(handler)
         if savings is not None:
-            savings.flush()
+            savings.flush()  # SIGTERM lands here too — no savings are ever dropped
         server.server_close()
     return code
 

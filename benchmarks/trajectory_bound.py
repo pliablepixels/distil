@@ -60,13 +60,21 @@ def _resolved_ids(condition: str) -> set[str]:
     return set(json.loads(rep.read_text())["resolved_ids"])
 
 
-def _turns(condition: str) -> list[int]:
+def _instance_turns(condition: str) -> dict[str, int]:
+    """Per-instance turn counts. Prefers the raw prediction dump; falls back to
+    the committed compact summary (`trajectory_bound_inputs.json`) — the raw
+    per-instance dumps are distributed via release artifacts, not git (see
+    docs/paper/results/README.md)."""
     path = LH / "predictions" / f"{condition}.jsonl"
-    return [
-        json.loads(line)["_run"].get("turns", 0)
-        for line in path.read_text().splitlines()
-        if line.strip()
-    ]
+    if path.exists():
+        out: dict[str, int] = {}
+        for line in path.read_text().splitlines():
+            if line.strip():
+                d = json.loads(line)
+                out[d["instance_id"]] = d.get("_run", {}).get("turns", 0)
+        return out
+    summary = json.loads((LH / "trajectory_bound_inputs.json").read_text())
+    return dict(summary["conditions"][condition])
 
 
 def analyze(
@@ -75,19 +83,10 @@ def analyze(
     reference: str = "full",
 ) -> dict[str, float]:
     """Compose the per-turn certificate to a trajectory statement and fit ``k`` from E8."""
-    mean_turns = st.mean(_turns(candidate))
+    cand_turns = _instance_turns(candidate)
+    mean_turns = st.mean(cand_turns.values())
     rc, rr = _resolved_ids(candidate), _resolved_ids(reference)
-    cand_ids = {
-        json.loads(line)["instance_id"]
-        for line in (LH / "predictions" / f"{candidate}.jsonl").read_text().splitlines()
-        if line.strip()
-    }
-    ref_ids = {
-        json.loads(line)["instance_id"]
-        for line in (LH / "predictions" / f"{reference}.jsonl").read_text().splitlines()
-        if line.strip()
-    }
-    ids = cand_ids & ref_ids
+    ids = set(cand_turns) & set(_instance_turns(reference))
     diverged = sum(1 for i in ids if (i in rr) != (i in rc))
     d = diverged / len(ids)
 

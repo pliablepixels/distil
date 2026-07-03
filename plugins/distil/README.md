@@ -37,11 +37,13 @@ Add this to your `~/.claude/settings.json` (the plugin ships the script):
 It renders, e.g.:
 
 ```
-distil · 1.2M→0.5M tok · $3.41→$1.40 · eq 99.5% · 128 runs
+distil · 1.2M→0.5M tok −58% · $2.01 saved · 128 runs · eq 99.5% (1.2k)
 ```
 
-(original → compressed tokens · original → compressed cost · decision-equivalence
-when shadow-mode has samples · runs). With no savings yet it shows a hint instead.
+(original → compressed tokens with the percent trimmed · dollars saved ·
+runs · decision-equivalence with its shadow-sample count when shadow mode has
+samples — green ≥99%, yellow ≥95%, red below). With no savings yet it shows a
+hint instead.
 Requires `distil` on `PATH` or `uvx` available.
 
 **On a flat-rate subscription** (Claude Pro/Max) the per-token dollar figure is

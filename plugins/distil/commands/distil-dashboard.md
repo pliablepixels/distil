@@ -3,7 +3,8 @@ description: Open the interactive HTML savings dashboard in your browser
 allowed-tools: Bash(distil *), Bash(uvx *), Bash(open *), Bash(xdg-open *)
 ---
 
-Generate distil's self-contained HTML dashboard and open it in the user's browser.
+Generate distil's self-contained HTML savings page and open it in the user's browser.
+(Note: this is the shareable HTML page; the live terminal TUI is `distil dashboard` — mention it if the user wants live-updating numbers instead.)
 
 1. Render it (the path uses the system temp dir):
    ```bash

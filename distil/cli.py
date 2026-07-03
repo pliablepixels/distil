@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from typing import Any
 from pathlib import Path
 
 from . import __version__, ledger, pricing, tokenizer
@@ -62,7 +63,7 @@ def cmd_savings(args: argparse.Namespace) -> int:
     tok = tokenizer.resolve(args.tokenizer, model=price.name)
     out_t = args.output_tokens_per_turn
 
-    runs = {
+    runs: dict[str, dict[str, Any]] = {
         "baseline (no cache, no compress)": dict(strategy="none", caching=False),
         "cache only": dict(strategy="none", caching=True),
         "naive compress + cache": dict(strategy="naive", caching=True),
@@ -111,7 +112,7 @@ def cmd_savings(args: argparse.Namespace) -> int:
             distil_input_tokens=d.total_input_tokens,
         )
         print(
-            f"\nrecorded to {ledger.DEFAULT_PATH}: "
+            f"\nrecorded to {ledger.default_path()}: "
             f"${rec.dollars_saved:.5f} / {rec.tokens_saved} tokens saved this run."
         )
     return 0
@@ -119,24 +120,62 @@ def cmd_savings(args: argparse.Namespace) -> int:
 
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     s = ledger.summary()
+    if getattr(args, "json", False):
+        from dataclasses import asdict
+
+        d = asdict(s)
+        d["tokenizers"] = sorted(s.tokenizers)
+        try:
+            from .shadow import ShadowLedger
+
+            led = ShadowLedger.load()
+            if led.samples:
+                d["decision_equivalence"] = 1 - led.rate()
+                d["shadow_samples"] = led.samples
+        except Exception:  # noqa: BLE001 — shadow stats are best-effort
+            pass
+        print(json.dumps(d, indent=2))
+        return 0
     if args.html:
         Path(args.html).write_text(ledger.render_html(s))
         print(f"your savings page → {args.html}")
         return 0
-    print(f"distil savings ledger — {ledger.DEFAULT_PATH}\n")
+    print(f"distil savings ledger — {ledger.default_path()}\n")
     if s.runs == 0:
         print("no genuine savings recorded yet.")
         print("run `distil proxy` (records real traffic) or `distil savings --record`.")
         return 0
     live = s.by_trajectory.get("live-proxy", 0.0)
     print(f"runs recorded:        {s.runs}")
+    if s.total_baseline_tokens:
+        trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
+        print(
+            f"tokens:               {s.total_baseline_tokens:,} → "
+            f"{s.total_distil_tokens:,}  (−{trimmed * 100:.1f}%)"
+        )
     print(f"total tokens saved:   {s.total_tokens_saved:,}")
     print(f"total dollars saved:  ${s.total_dollars_saved:.5f}")
+    try:
+        from .shadow import ShadowLedger
+
+        led = ShadowLedger.load()
+        if led.samples:
+            print(
+                f"decision-equivalence: {(1 - led.rate()) * 100:.1f}% "
+                f"({led.samples:,} shadowed requests)"
+            )
+    except Exception:  # noqa: BLE001 — shadow stats are best-effort
+        pass
     if live:
         print(f"  of which genuine live traffic (live-proxy): ${live:.5f}")
     print("\nby source:")
     for tid, saved in sorted(s.by_trajectory.items(), key=lambda kv: -kv[1]):
         print(f"  {tid:<28} ${saved:.5f}")
+    if "heuristic" in s.tokenizers:
+        print(
+            "\n(token counts ≈ heuristic tokenizer — directionally accurate, "
+            "not billing-grade; dollars are a conservative floor.)"
+        )
     print(
         "\n(local-first; export a page with --html, or share verifiably with "
         "`distil federated-leaderboard`.)"
@@ -338,15 +377,17 @@ def cmd_holdout(args: argparse.Namespace) -> int:
 def cmd_proxy(args: argparse.Namespace) -> int:
     """Drop-in provider proxy: point any base_url-honoring client at it."""
     if args.use_async:
-        from .aproxy import serve  # high-concurrency (needs distil-llm[async])
+        from .aproxy import serve as aserve  # high-concurrency (needs distil-llm[async])
 
-        serve(
+        aserve(
             host=args.host,
             port=args.port,
             upstream=args.upstream,
             lossless_only=args.lossless_only,
             verbatim=args.verbatim,
             shape_output=args.shape_output,
+            record=not args.no_record,
+            pricing_model=args.pricing,
         )
     else:
         from .proxy import serve
@@ -372,6 +413,19 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
     from .shadow import ShadowLedger
 
     led = ShadowLedger.load()
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {
+                    "samples": led.samples,
+                    "changes": led.changes,
+                    "decision_change_rate": led.rate(),
+                    "decision_equivalence": 1 - led.rate(),
+                },
+                indent=2,
+            )
+        )
+        return 0
     if led.samples == 0:
         print(
             "No shadow samples yet. Start it in one command:\n"
@@ -428,25 +482,34 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     if s is None or s.runs == 0:
         parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
     else:
-        parts.append(
-            c(
-                "36",
-                f"{ledger._human(s.total_baseline_tokens)}→"
-                f"{ledger._human(s.total_distil_tokens)} tok",
-            )
-        )
+        tok = f"{ledger._human(s.total_baseline_tokens)}→{ledger._human(s.total_distil_tokens)} tok"
+        # The percent trimmed is the single most glanceable savings number —
+        # lead with it rather than making the user do the division.
+        if s.total_baseline_tokens:
+            trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
+            tok += f" −{trimmed * 100:.0f}%"
+        parts.append(c("36", tok))
         # On a flat-rate subscription there's no per-token bill, so the dollar
         # figure is notional — show tokens only. Auto-detected (Claude OAuth, no
         # key); override with DISTIL_SUBSCRIPTION=0/1.
         from .doctor import subscription_mode
 
         if not subscription_mode():
-            parts.append(
-                c(
-                    "32",
-                    f"${s.total_baseline_dollars:,.2f}→${s.total_distil_dollars:,.2f}",
-                )
+            saved = s.total_baseline_dollars - s.total_distil_dollars
+            parts.append(c("32", f"${saved:,.2f} saved"))
+        # Freshness: today's savings next to lifetime, so an active session
+        # shows movement instead of a static all-time number.
+        try:
+            import time as _time
+
+            midnight = _time.mktime(
+                _time.struct_time(_time.localtime()[:3] + (0, 0, 0) + _time.localtime()[6:])
             )
+            today = ledger.summary(since=midnight)
+            if 0 < today.total_tokens_saved < s.total_tokens_saved:
+                parts.append(c("36", f"today {ledger._human(today.total_tokens_saved)}"))
+        except Exception:  # noqa: BLE001 — freshness is best-effort
+            pass
         parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
         try:
             from .shadow import ShadowLedger
@@ -455,9 +518,13 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             if led.samples:
                 # decision-equivalence with its sample count, so the confidence
                 # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
+                # Healthy stays in the calm brand hue — color is an ALARM, not
+                # decoration: yellow when eq slips under 99%, red under 95%.
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
-                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}% ({n_str})"))
+                eq = 1 - led.rate()
+                hue = "35" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
+                parts.append(c(hue, f"eq {eq * 100:.1f}% ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
@@ -491,6 +558,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     }
 
     checks = doctor.diagnose()
+    if getattr(args, "json", False):
+        from dataclasses import asdict
+
+        payload = {
+            "checks": [asdict(ch) for ch in checks],
+            "ok": all(ch.status != doctor.FAIL for ch in checks),
+        }
+        print(json.dumps(payload, indent=2))
+        return 0 if payload["ok"] else 1
     print(c("1;38;5;79", "distil doctor") + c("90", "  ·  setup diagnosis") + "\n")
     counts: dict[str, int] = {}
     for ch in checks:
@@ -744,6 +820,9 @@ def cmd_default(args: argparse.Namespace) -> int:
                 "for the alias, or run `distil proxy` yourself."
             )
             return 1
+        if content is None:
+            print("✗ could not render the service file for this platform")
+            return 1
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         print(f"✓ wrote proxy service → {path}")
@@ -945,6 +1024,44 @@ def cmd_wrap(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_certify_trajectories(args: argparse.Namespace) -> int:
+    """Trajectory-level risk certificate: bound END-TO-END task degradation.
+
+    Reads a JSONL of matched runs (one object per task:
+    {"task_id": ..., "full_success": bool, "compressed_success": bool}) and
+    certifies P(degradation risk <= alpha) >= 1-delta — the invariant that
+    actually transfers to task success, unlike per-step next-action equivalence.
+    """
+    from .certify.trajectory_risk import TrajectoryOutcome, certify_trajectory_risk
+
+    outcomes: list = []
+    for line in Path(args.outcomes).read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        d = json.loads(line)
+        outcomes.append(
+            TrajectoryOutcome(
+                task_id=str(d.get("task_id", len(outcomes))),
+                full_success=bool(d["full_success"]),
+                compressed_success=bool(d["compressed_success"]),
+            )
+        )
+    cert = certify_trajectory_risk(outcomes, alpha=args.alpha, delta=args.delta)
+    if args.json:
+        from dataclasses import asdict
+
+        print(json.dumps({**asdict(cert), "statement": cert.statement}, indent=2))
+    else:
+        print("distil trajectory-risk certificate\n")
+        print(f"  matched trajectories : {cert.n}")
+        print(f"  observed degradation : {cert.empirical_risk * 100:.2f}%")
+        print(f"  risk bound (1-δ)     : {cert.risk_bound * 100:.2f}%")
+        print(f"  certified (α={cert.alpha}, δ={cert.delta}) : {cert.certified}")
+        print(f"\n  {cert.statement}")
+    return 0 if cert.certified else 1
+
+
 def cmd_gateway(args: argparse.Namespace) -> int:
     """Managed multi-tenant gateway with a live per-tenant savings dashboard."""
     from .gateway import serve_gateway
@@ -956,6 +1073,8 @@ def cmd_gateway(args: argparse.Namespace) -> int:
         pricing_model=args.pricing,
         lossless_only=args.lossless_only,
         verbatim=args.verbatim,
+        admin_token=args.admin_token,
+        trust_tenant_header=args.trust_tenant_header,
     )
     return 0
 
@@ -1072,7 +1191,7 @@ def cmd_conformal(args: argparse.Namespace) -> int:
     agent's decision-change rate at a user-chosen risk level."""
     from .conformal import calibrate
 
-    runner = None
+    runner: Any = None
     if args.runner == "anthropic":
         from .replay.anthropic_runner import AnthropicRunner
 
@@ -1197,7 +1316,7 @@ def cmd_frontier(args: argparse.Namespace) -> int:
     from .compress.adaptive import frontier
     from .replay.runner import DeterministicRunner
 
-    runner = DeterministicRunner()
+    runner: Any = DeterministicRunner()
     if args.runner == "anthropic":
         from .replay.anthropic_runner import AnthropicRunner
 
@@ -1281,10 +1400,34 @@ def cmd_federated(args: argparse.Namespace) -> int:
     return 0
 
 
+_HELP_EPILOG = """\
+everyday commands:
+  onboard, doctor, setup, offboard    guided install / health-check / wiring
+  wrap, proxy, gateway                route agent traffic through compression
+  stats (leaderboard), dashboard,     your genuine savings + live equivalence
+  shadow-stats, statusline
+  expand                              recover any digested content by handle
+
+analysis & tuning:
+  compress, savings, bench, prune, sweep, calibrate, adaptive
+
+research / CI internals:
+  verify, holdout, conformal, gate, frontier, eval, online, corpus,
+  train-transformer, federated-leaderboard
+
+`distil <command> --help` shows each command's flags.
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="distil", description="Compression with a quality contract.")
+    p = argparse.ArgumentParser(
+        prog="distil",
+        description="Compression with a quality contract.",
+        epilog=_HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--version", action="version", version=f"distil {__version__}")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="<command>")
 
     def add_traj(sp: argparse.ArgumentParser) -> None:
         sp.add_argument(
@@ -1314,8 +1457,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.set_defaults(func=cmd_savings)
 
-    lb = sub.add_parser("leaderboard", help="your genuine cumulative savings (local ledger)")
+    lb = sub.add_parser(
+        "leaderboard",
+        aliases=["stats"],
+        help="your genuine cumulative savings (local ledger)",
+    )
     lb.add_argument("--html", help="render your savings as a self-contained HTML page")
+    lb.add_argument("--json", action="store_true", help="machine-readable output")
     lb.set_defaults(func=cmd_leaderboard)
 
     pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #4)")
@@ -1534,6 +1682,7 @@ def build_parser() -> argparse.ArgumentParser:
     ss = sub.add_parser(
         "shadow-stats", help="show live decision-equivalence measured by shadow mode"
     )
+    ss.add_argument("--json", action="store_true", help="machine-readable output")
     ss.set_defaults(func=cmd_shadow_stats)
 
     dash = sub.add_parser(
@@ -1549,6 +1698,7 @@ def build_parser() -> argparse.ArgumentParser:
         "doctor", help="diagnose your distil setup (ledger, shadow, proxy round-trip, wiring)"
     )
     dr.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    dr.add_argument("--json", action="store_true", help="machine-readable output (CI-gateable)")
     dr.set_defaults(func=cmd_doctor)
 
     su = sub.add_parser("setup", help="wire the distil status line into Claude Code settings")
@@ -1711,6 +1861,19 @@ def build_parser() -> argparse.ArgumentParser:
     fl.add_argument("--html", help="write a self-contained leaderboard HTML here")
     fl.set_defaults(func=cmd_federated)
 
+    ct = sub.add_parser(
+        "certify-trajectories",
+        help="trajectory-level risk certificate: bound end-to-end task degradation",
+    )
+    ct.add_argument(
+        "outcomes",
+        help="JSONL of matched runs: {task_id, full_success, compressed_success} per line",
+    )
+    ct.add_argument("--alpha", type=float, default=0.05, help="max degradation risk to certify")
+    ct.add_argument("--delta", type=float, default=0.05, help="confidence budget (1-δ)")
+    ct.add_argument("--json", action="store_true", help="machine-readable output")
+    ct.set_defaults(func=cmd_certify_trajectories)
+
     gw = sub.add_parser("gateway", help="managed multi-tenant gateway + live savings dashboard")
     gw.add_argument("--host", default="127.0.0.1")
     gw.add_argument("--port", type=int, default=8789)
@@ -1721,6 +1884,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbatim",
         action="store_true",
         help="skip the Tier-1 digest (Tier-0 only) for all tenants — lower savings",
+    )
+    gw.add_argument(
+        "--admin-token",
+        default=None,
+        help="bearer token for /distil/stats and /distil/dashboard "
+        "(required on non-loopback binds; env: DISTIL_GATEWAY_TOKEN)",
+    )
+    gw.add_argument(
+        "--trust-tenant-header",
+        action="store_true",
+        help="honor client-supplied x-distil-tenant for accounting (default: "
+        "tenant is derived from the credential, never a client header)",
     )
     gw.set_defaults(func=cmd_gateway)
 

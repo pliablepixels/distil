@@ -17,7 +17,16 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-DEFAULT_PATH = Path.home() / ".distil" / "savings.jsonl"
+def default_path() -> Path:
+    """The ledger path, honoring ``DISTIL_HOME`` at call time (configurable
+    deployments; isolated tests) — same contract as shadow/learn state."""
+    import os
+
+    return Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil"))) / "savings.jsonl"
+
+
+# Back-compat eager constant; runtime paths resolve via default_path().
+DEFAULT_PATH = default_path()
 
 
 @dataclass
@@ -51,7 +60,7 @@ def record(
     baseline_input_tokens: int,
     distil_input_tokens: int,
     tokenizer: str = "heuristic",
-    path: Path = DEFAULT_PATH,
+    path: Path | None = None,
 ) -> SavingsRecord:
     rec = SavingsRecord(
         trajectory_id,
@@ -64,6 +73,7 @@ def record(
         tokenizer,
         time.time(),
     )
+    path = path or default_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as f:
         f.write(json.dumps(asdict(rec)) + "\n")
@@ -81,9 +91,15 @@ class LedgerSummary:
     total_distil_tokens: int = 0
     total_baseline_dollars: float = 0.0
     total_distil_dollars: float = 0.0
+    # Which tokenizers produced the counts — so callers can caveat heuristic
+    # (non-billing-grade) numbers instead of presenting them as exact.
+    tokenizers: frozenset[str] = frozenset()
 
 
-def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
+def summary(path: Path | None = None, *, since: float | None = None) -> LedgerSummary:
+    """Roll up the ledger; ``since`` (unix ts) restricts to recent records so
+    callers can show a fresh window (today / this session) next to lifetime."""
+    path = path or default_path()
     if not path.exists():
         return LedgerSummary(0, 0.0, 0, {})
     runs = 0
@@ -94,11 +110,15 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
     base_usd = 0.0
     dist_usd = 0.0
     by_traj: dict[str, float] = {}
+    toks: set[str] = set()
     for line in path.read_text().splitlines():
         if not line.strip():
             continue
         d = json.loads(line)
+        if since is not None and d.get("ts", 0.0) < since:
+            continue
         runs += 1
+        toks.add(d.get("tokenizer", "heuristic"))
         saved = d["baseline_dollars"] - d["distil_dollars"]
         dollars += saved
         tokens += d["baseline_input_tokens"] - d["distil_input_tokens"]
@@ -107,7 +127,9 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
         base_usd += d["baseline_dollars"]
         dist_usd += d["distil_dollars"]
         by_traj[d["trajectory_id"]] = by_traj.get(d["trajectory_id"], 0.0) + saved
-    return LedgerSummary(runs, dollars, tokens, by_traj, base_tok, dist_tok, base_usd, dist_usd)
+    return LedgerSummary(
+        runs, dollars, tokens, by_traj, base_tok, dist_tok, base_usd, dist_usd, frozenset(toks)
+    )
 
 
 def render_html(s: LedgerSummary) -> str:

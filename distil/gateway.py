@@ -19,8 +19,10 @@ Or from the module::
 from __future__ import annotations
 
 import hashlib
+import hmac
 import html
 import json
+import os
 import re
 import threading
 import urllib.error
@@ -35,6 +37,7 @@ from .adapters.gemini import count_tokens as _gemini_count
 from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
+from .proxy import _OPENER, _UPSTREAM_TIMEOUT
 from .tokenizer import DEFAULT as _tokenizer
 
 # Safe tenant label: bounded length, no markup / control characters.
@@ -156,22 +159,25 @@ class GatewayState:
 # ---------------------------------------------------------------------------
 
 
-def tenant_of(headers: Any) -> str:
+def tenant_of(headers: Any, *, trust_tenant_header: bool = False) -> str:
     """Derive a tenant identifier from request headers.
 
-    Priority:
-    1. ``x-distil-tenant`` — explicit tenant label set by the caller.
-    2. Stable anonymous id: sha256(x-api-key or authorization)[:8], prefixed ``anon-``.
-    3. ``"default"`` — no credential supplied at all.
+    Tenant identity comes from the AUTHENTICATED credential (a stable
+    ``anon-<sha256(key)[:8]>`` id), never from a client-writable header: any
+    caller could otherwise send ``x-distil-tenant: acme-corp`` and book its
+    traffic under another tenant's accounting line. The explicit header is
+    honored only when the operator opts in (``trust_tenant_header=True`` /
+    ``--trust-tenant-header``) for deployments where an upstream gateway they
+    control sets it.
     """
-    explicit = headers.get("x-distil-tenant")
-    if explicit:
-        label = explicit.strip()
-        # Only accept a bounded, safe label; an unsafe value (injection attempt,
-        # control chars, overlong) falls through to the credential-derived id
-        # rather than being trusted into accounting or rendered into the dashboard.
-        if _TENANT_RE.match(label):
-            return label
+    if trust_tenant_header:
+        explicit = headers.get("x-distil-tenant")
+        if explicit:
+            label = explicit.strip()
+            # Bounded, safe labels only; anything else falls through to the
+            # credential-derived id rather than entering accounting/dashboard.
+            if _TENANT_RE.match(label):
+                return label
 
     for header in ("x-api-key", "authorization"):
         val = headers.get(header)
@@ -418,6 +424,9 @@ def build_gateway_handler(
     *,
     lossless_only: bool = False,
     verbatim: bool = False,
+    admin_token: str | None = None,
+    loopback: bool = True,
+    trust_tenant_header: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     """Return a BaseHTTPRequestHandler subclass for the multi-tenant gateway.
 
@@ -433,11 +442,25 @@ def build_gateway_handler(
         Policy mode (no tool injection). The reversible digest still runs.
     verbatim:
         When *True*, skip the Tier-1 digest (Tier-0 only) — interactive-safe.
+    admin_token:
+        When set, ``/distil/stats`` and ``/distil/dashboard`` require
+        ``Authorization: Bearer <token>``. When unset AND the server is bound
+        to a non-loopback interface, those routes are refused (403): per-tenant
+        usage metadata must not be readable by anyone on the network.
+    loopback:
+        Whether the server is bound to a loopback interface (set by
+        ``serve_gateway`` from the bind host).
+    trust_tenant_header:
+        Honor the client-supplied ``x-distil-tenant`` header for accounting.
+        Off by default — tenant identity comes from the credential hash.
     """
 
     _upstream = upstream.rstrip("/")
 
     class _GatewayHandler(BaseHTTPRequestHandler):
+        # HTTP/1.1 so streamed responses can use chunked transfer framing.
+        protocol_version = "HTTP/1.1"
+
         # ----------------------------------------------------------------
         # Silence request logs
         # ----------------------------------------------------------------
@@ -451,11 +474,32 @@ def build_gateway_handler(
 
         def do_GET(self) -> None:  # noqa: N802
             if self.path == "/distil/stats":
-                self._handle_stats()
+                if self._admin_authorized():
+                    self._handle_stats()
             elif self.path == "/distil/dashboard":
-                self._handle_dashboard()
+                if self._admin_authorized():
+                    self._handle_dashboard()
             else:
                 self._passthrough()
+
+        def _admin_authorized(self) -> bool:
+            """Gate the management endpoints. Open on loopback with no token
+            configured (local single-operator use); everything else needs the
+            bearer token — replies with the error itself when unauthorized."""
+            if admin_token:
+                supplied = self.headers.get("Authorization", "")
+                if hmac.compare_digest(supplied, f"Bearer {admin_token}"):
+                    return True
+                self._reject(401, "invalid or missing admin token")
+                return False
+            if loopback:
+                return True
+            self._reject(
+                403,
+                "management endpoints are disabled on non-loopback binds "
+                "unless --admin-token is set",
+            )
+            return False
 
         def do_POST(self) -> None:  # noqa: N802
             # Strip query string for path matching
@@ -515,7 +559,7 @@ def build_gateway_handler(
                 self._reject(413, "request body too large or malformed Content-Length")
                 return
             headers = self._client_headers()
-            tenant = tenant_of(self.headers)
+            tenant = tenant_of(self.headers, trust_tenant_header=trust_tenant_header)
 
             try:
                 body: dict[str, Any] = json.loads(raw)
@@ -525,7 +569,12 @@ def build_gateway_handler(
                 self._relay(status, rhdrs, rbody)
                 return
 
-            extras: dict[str, str] = {"x-distil-tenant": tenant}
+            # Echo the tenant label back only when it's an operator-trusted
+            # explicit label — an anon-<hash> is a stable credential-derived
+            # correlator that shouldn't ride response headers.
+            extras: dict[str, str] = {}
+            if not tenant.startswith("anon-"):
+                extras["x-distil-tenant"] = tenant
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
@@ -556,6 +605,20 @@ def build_gateway_handler(
                 extras["x-distil-tokens-saved"] = str(tokens_saved)
 
             new_raw = json.dumps(body).encode()
+            # Streamed requests relay incrementally — TTFT preserved per tenant.
+            if bool(body.get("stream")) or ":streamGenerateContent" in self.path:
+                from .streamrelay import stream_upstream
+
+                stream_upstream(
+                    self,
+                    _upstream + self.path,
+                    new_raw,
+                    headers,
+                    timeout=_UPSTREAM_TIMEOUT,
+                    hop_by_hop=_HOP_BY_HOP,
+                    extras=extras,
+                )
+                return
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
             self._relay(status, rhdrs, rbody, extras=extras)
 
@@ -580,7 +643,7 @@ def build_gateway_handler(
                 method=self.command,
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with _OPENER.open(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     self._relay(resp.status, rhdrs, rbody)
@@ -590,9 +653,13 @@ def build_gateway_handler(
                 self._relay(exc.code, rhdrs, rbody)
             except urllib.error.URLError as exc:
                 rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
+                    {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
                 ).encode()
                 self._relay(502, {"Content-Type": "application/json"}, rbody)
+            except TimeoutError:
+                self._relay(
+                    504, {"Content-Type": "application/json"}, b'{"error":"upstream timed out"}'
+                )
 
         # ----------------------------------------------------------------
         # Shared helpers
@@ -650,7 +717,7 @@ def build_gateway_handler(
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with _OPENER.open(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     return resp.status, rhdrs, rbody
@@ -660,9 +727,11 @@ def build_gateway_handler(
                 return exc.code, rhdrs, rbody
             except urllib.error.URLError as exc:
                 rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
+                    {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
                 ).encode()
                 return 502, {"Content-Type": "application/json"}, rbody
+            except TimeoutError:
+                return 504, {"Content-Type": "application/json"}, b'{"error":"upstream timed out"}'
 
     return _GatewayHandler
 
@@ -680,6 +749,8 @@ def serve_gateway(
     pricing_model: str = "claude-opus-4-8",
     lossless_only: bool = False,
     verbatim: bool = False,
+    admin_token: str | None = None,
+    trust_tenant_header: bool = False,
 ) -> None:
     """Run a blocking ThreadingHTTPServer gateway.
 
@@ -691,15 +762,30 @@ def serve_gateway(
     pricing_model:  Model key from ``distil.pricing.CATALOG`` for dollar accounting.
     lossless_only:  Policy mode (no tool injection); the reversible digest still runs.
     verbatim:       When *True*, skip the Tier-1 digest (Tier-0 only) — interactive-safe.
+    admin_token:    Bearer token required for /distil/stats and /distil/dashboard.
+                    Mandatory for those routes on non-loopback binds.
+    trust_tenant_header:
+                    Honor the client-supplied x-distil-tenant header (off by
+                    default; tenant identity comes from the credential hash).
     """
     price = pricing_get(pricing_model)
     state = GatewayState(price)
+    loopback = host in ("127.0.0.1", "::1", "localhost")
     handler = build_gateway_handler(
-        upstream, state, price, lossless_only=lossless_only, verbatim=verbatim
+        upstream,
+        state,
+        price,
+        lossless_only=lossless_only,
+        verbatim=verbatim,
+        admin_token=admin_token or os.environ.get("DISTIL_GATEWAY_TOKEN") or None,
+        loopback=loopback,
+        trust_tenant_header=trust_tenant_header,
     )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"distil gateway listening on http://{host}:{port}")
     print(f"  dashboard: http://{host}:{port}/distil/dashboard")
+    if not loopback and not (admin_token or os.environ.get("DISTIL_GATEWAY_TOKEN")):
+        print("  ! non-loopback bind without --admin-token: /distil/* routes are disabled")
     print(f"  → upstream: {upstream}")
     try:
         server.serve_forever()

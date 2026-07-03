@@ -225,6 +225,14 @@ distil bench   --tokenizer anthropic</pre>
 
     <hr/>
 
+    <h2>"Does distil break streaming?"</h2>
+
+    <p>No. SSE responses are relayed <strong>chunk-by-chunk</strong> as the upstream produces them — the proxy, the async proxy, and the gateway all route through the same relay (<code>distil/streamrelay.py</code>), so time-to-first-token is preserved through Distil the same as a direct connection. Nothing is buffered start-to-finish before it reaches the client.</p>
+
+    <p>Content-free accounting is teed off that same stream rather than requiring a separate buffered pass: the complete body is assembled in memory as it streams by, so token-saved headers and shadow-mode decision comparison run exactly as they would on a non-streaming response. A slow or unreachable upstream is bounded by <code>DISTIL_UPSTREAM_TIMEOUT</code> (default 600s) and maps to a <code>504</code> — see <a href="deploy-security.html#streaming">Deploy &amp; Security &rarr; Streaming and upstream timeouts</a>.</p>
+
+    <hr/>
+
     <h2>"Can I contribute a new compression strategy?"</h2>
 
     <p>Yes — PRs are welcome. The rule is simple: <strong>a new strategy must pass <code>make gate</code></strong> (non-inferior on every corpus domain, byte-reversible on Tier-0/1 operations). No green gate, no merge. See <a href="https://github.com/dshakes/distil/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a> for details.</p>

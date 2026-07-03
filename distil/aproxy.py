@@ -20,6 +20,7 @@ Or build the app yourself::
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from .adapters.anthropic import compress_messages
@@ -56,32 +57,35 @@ _HOP_BY_HOP = frozenset(
 # ---------------------------------------------------------------------------
 
 
+def _count_msgs(msgs: list[dict[str, Any]]) -> int:
+    """Heuristic token count of a messages list (mirrors proxy._count_messages)."""
+    total = 0
+    for msg in msgs:
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            total += _tokenizer.count(content)
+        elif isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                for key in ("text", "content"):
+                    val = block.get(key)
+                    if isinstance(val, str):
+                        total += _tokenizer.count(val)
+                    elif isinstance(val, list):
+                        for sub in val:
+                            if isinstance(sub, dict):
+                                sv = sub.get("text", "")
+                                if isinstance(sv, str):
+                                    total += _tokenizer.count(sv)
+    return total
+
+
 def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> int:
     """Rough estimate of tokens saved via the default heuristic tokeniser."""
+    return max(0, _count_msgs(before) - _count_msgs(after))
 
-    def _count(msgs: list[dict[str, Any]]) -> int:
-        total = 0
-        for msg in msgs:
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                total += _tokenizer.count(content)
-            elif isinstance(content, list):
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    for key in ("text", "content"):
-                        val = block.get(key)
-                        if isinstance(val, str):
-                            total += _tokenizer.count(val)
-                        elif isinstance(val, list):
-                            for sub in val:
-                                if isinstance(sub, dict):
-                                    sv = sub.get("text", "")
-                                    if isinstance(sv, str):
-                                        total += _tokenizer.count(sv)
-        return total
 
-    return max(0, _count(before) - _count(after))
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +109,7 @@ def make_app(
     lossless_only: bool = False,
     verbatim: bool = False,
     shape_output: str = "off",
+    savings: Any = None,
 ) -> Any:
     """Build and return an ``aiohttp.web.Application``.
 
@@ -134,6 +139,13 @@ def make_app(
 
     _upstream = upstream.rstrip("/")
 
+    # Generous but finite: connect fails fast; sock_read is an INACTIVITY timeout
+    # (resets on every chunk), so long generations stream freely while a wedged
+    # upstream can never hold a request open forever.
+    _timeout = aiohttp.ClientTimeout(
+        total=None, connect=30, sock_read=float(os.environ.get("DISTIL_UPSTREAM_TIMEOUT", "600"))
+    )
+
     # Typed key avoids NotAppKeyWarning and provides a stable reference for handlers.
     _client_key: web.AppKey[aiohttp.ClientSession] = web.AppKey("client", aiohttp.ClientSession)
 
@@ -149,6 +161,51 @@ def make_app(
 
     async def _on_cleanup(app: web.Application) -> None:
         await app[_client_key].close()
+        if savings is not None:
+            savings.flush()  # persist remaining genuine savings on shutdown
+
+    # -----------------------------------------------------------------------
+    # Incremental relay: stream upstream bytes to the client as they arrive
+    # (time-to-first-token preserved; never buffer a whole SSE generation).
+    # -----------------------------------------------------------------------
+
+    async def _relay_streaming(
+        request: web.Request,
+        method: str,
+        url: str,
+        data: bytes | None,
+        headers: dict[str, str],
+        extras: dict[str, str] | None = None,
+    ) -> web.StreamResponse:
+        client: aiohttp.ClientSession = request.app[_client_key]
+        try:
+            # allow_redirects=False: relay 3xx instead of re-sending the client's
+            # credentials to whatever host the upstream redirect names.
+            resp_cm = client.request(
+                method, url, data=data, headers=headers, timeout=_timeout, allow_redirects=False
+            )
+            resp = await resp_cm.__aenter__()
+        except aiohttp.ServerTimeoutError:
+            return web.json_response({"error": "upstream timed out"}, status=504)
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            return web.json_response(
+                {"error": "upstream connection failed", "detail": str(exc)[:200]}, status=502
+            )
+        try:
+            resp_headers = _filter_headers(resp.headers)
+            if extras:
+                resp_headers.update(extras)
+            sr = web.StreamResponse(status=resp.status, headers=resp_headers)
+            await sr.prepare(request)
+            try:
+                async for chunk in resp.content.iter_any():
+                    await sr.write(chunk)
+            except (aiohttp.ClientError, TimeoutError, ConnectionResetError):
+                pass  # mid-stream failure: headers are out; close what we have
+            await sr.write_eof()
+            return sr
+        finally:
+            await resp_cm.__aexit__(None, None, None)
 
     # -----------------------------------------------------------------------
     # Compression handler
@@ -181,8 +238,13 @@ def make_app(
                 if shape_output != "off" and not lossless_only:
                     from .output import shape_request
 
-                    body = shape_request(body, level=shape_output, allow=True)
+                    _shape = "anthropic" if request.path == "/v1/messages" else "openai"
+                    body = shape_request(body, level=shape_output, allow=True, shape=_shape)
                     extras["x-distil-output-shaping"] = shape_output
+                if savings is not None:
+                    before = _count_msgs(original)
+                    savings.record(before, before - saved, model=body.get("model"))
+                    savings.maybe_flush()
 
             elif "contents" in body and isinstance(body["contents"], list):
                 # Gemini generateContent shape (reversible content compression).
@@ -196,6 +258,9 @@ def make_app(
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
                 }
+                if savings is not None:
+                    savings.record(before_tok, before_tok - saved, model=None)
+                    savings.maybe_flush()
 
             body_bytes = json.dumps(body).encode()
 
@@ -203,28 +268,14 @@ def make_app(
         if request.query_string:
             url = f"{url}?{request.query_string}"
 
-        client: aiohttp.ClientSession = request.app[_client_key]
-        try:
-            async with client.post(
-                url,
-                data=body_bytes,
-                headers={**fwd_headers, "content-length": str(len(body_bytes))},
-            ) as resp:
-                resp_body = await resp.read()
-                resp_headers = _filter_headers(resp.headers)
-                resp_headers.update(extras)
-                return web.Response(
-                    status=resp.status,
-                    body=resp_body,
-                    headers=resp_headers,
-                )
-        except aiohttp.ClientError as exc:
-            err = json.dumps({"error": "upstream connection failed", "detail": str(exc)}).encode()
-            return web.Response(
-                status=502,
-                body=err,
-                content_type="application/json",
-            )
+        return await _relay_streaming(
+            request,
+            "POST",
+            url,
+            body_bytes,
+            {**fwd_headers, "content-length": str(len(body_bytes))},
+            extras=extras,
+        )
 
     # -----------------------------------------------------------------------
     # Transparent passthrough (all other paths / methods)
@@ -242,28 +293,7 @@ def make_app(
         if request.query_string:
             url = f"{url}?{request.query_string}"
 
-        client: aiohttp.ClientSession = request.app[_client_key]
-        try:
-            async with client.request(
-                request.method,
-                url,
-                data=raw or None,
-                headers=fwd_headers,
-            ) as resp:
-                resp_body = await resp.read()
-                resp_headers = _filter_headers(resp.headers)
-                return web.Response(
-                    status=resp.status,
-                    body=resp_body,
-                    headers=resp_headers,
-                )
-        except aiohttp.ClientError as exc:
-            err = json.dumps({"error": "upstream connection failed", "detail": str(exc)}).encode()
-            return web.Response(
-                status=502,
-                body=err,
-                content_type="application/json",
-            )
+        return await _relay_streaming(request, request.method, url, raw or None, fwd_headers)
 
     # -----------------------------------------------------------------------
     # Router
@@ -313,6 +343,8 @@ def serve(
     lossless_only: bool = False,
     verbatim: bool = False,
     shape_output: str = "off",
+    record: bool = True,
+    pricing_model: str = "claude-opus-4-8",
 ) -> None:
     """Run an async aiohttp proxy server.
 
@@ -336,11 +368,22 @@ def serve(
             "Install it with: pip install 'distil-llm[async]'"
         ) from exc
 
+    savings = None
+    if record:
+        from .runtime import RuntimeSavings
+
+        savings = RuntimeSavings(model=pricing_model)
     app = make_app(
-        upstream, lossless_only=lossless_only, verbatim=verbatim, shape_output=shape_output
+        upstream,
+        lossless_only=lossless_only,
+        verbatim=verbatim,
+        shape_output=shape_output,
+        savings=savings,
     )
     print(f"distil async proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
     if shape_output != "off":
         print(f"  → output shaping: {shape_output}")
+    if savings is not None:
+        print("  → recording genuine savings → distil leaderboard")
     web.run_app(app, host=host, port=port, print=None)

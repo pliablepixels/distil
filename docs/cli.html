@@ -284,13 +284,14 @@ holdout A/B savings measurement (deterministic partition + bootstrap CI)
 
     <!-- leaderboard -->
     <h2 id="leaderboard">distil leaderboard</h2>
-    <p>Shows cumulative savings from all runs recorded via <code>--record</code> flags on <code>savings</code> and <code>bench</code>. Local-first; no data leaves the machine unless you opt in to community sharing (not currently enabled).</p>
+    <p>Shows cumulative savings from all runs recorded via <code>--record</code> flags on <code>savings</code> and <code>bench</code>, plus genuine traffic recorded by <code>distil proxy</code>/<code>wrap</code>. Local-first; no data leaves the machine unless you opt in to community sharing (not currently enabled). Aliased as <code>distil stats</code> — both names run the identical command.</p>
 
     <h3>Flags</h3>
     <table>
       <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>--html</code></td><td>off</td><td>Render your savings ledger as a self-contained HTML page at this path</td></tr>
+        <tr><td><code>--json</code></td><td>off</td><td>Machine-readable output: the full savings summary plus decision-equivalence/shadow-sample counts when shadow data exists</td></tr>
       </tbody>
     </table>
 
@@ -485,6 +486,8 @@ distil performance benchmark
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key for per-tenant dollar accounting.</td></tr>
         <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Interactive-safe, lower savings.</td></tr>
+        <tr><td><code>--admin-token</code></td><td>unset (env <code>DISTIL_GATEWAY_TOKEN</code>)</td><td>Bearer token required for <code>/distil/stats</code> and <code>/distil/dashboard</code>. Mandatory for those routes on non-loopback binds — without it, <code>/distil/*</code> is disabled entirely rather than left open.</td></tr>
+        <tr><td><code>--trust-tenant-header</code></td><td>off</td><td>Honor the client-supplied <code>x-distil-tenant</code> header for accounting. Off by default: tenant identity is derived from the credential hash, never a client-writable header, so no caller can book its traffic under another tenant's line.</td></tr>
       </tbody>
     </table>
 
@@ -493,7 +496,7 @@ distil gateway listening on http://127.0.0.1:8789
   dashboard: http://127.0.0.1:8789/distil/dashboard
   → upstream: https://api.anthropic.com</pre>
 
-    <p>Tenant identification (priority order): <code>x-distil-tenant</code> header → anonymized key hash (<code>anon-&lt;sha256[:8]&gt;</code>) → <code>"default"</code>. Raw API keys are never stored or logged.</p>
+    <p>Tenant identification: by default, a stable anonymized key hash (<code>anon-&lt;sha256(credential)[:8]&gt;</code>) derived from <code>x-api-key</code> or <code>authorization</code>, falling back to <code>"default"</code> when no credential is present. The client-supplied <code>x-distil-tenant</code> header is ignored unless the operator opts in with <code>--trust-tenant-header</code> — otherwise any caller could write that header and book its usage under a different tenant's accounting line. Raw API keys are never stored or logged.</p>
 
     <pre class="term"><span class="d">$ curl -s http://127.0.0.1:8789/distil/stats | python3 -m json.tool</span>
 {
@@ -733,6 +736,39 @@ verifiable savings — 3 verified instance(s), 0 rejected
 
     <hr/>
 
+    <!-- certify-trajectories -->
+    <h2 id="certify-trajectories">distil certify-trajectories</h2>
+    <p>The <strong>trajectory-level risk certificate</strong> — bounds <em>end-to-end task degradation</em>, not per-step decision-equivalence. Reads a JSONL of matched full/compressed task runs and certifies <code>P(degradation risk &le; alpha) &ge; 1-delta</code> using Conformal Risk Control (Hoeffding&ndash;Bentkus), the invariant that transfers to real task success where per-step certificates (<a href="cli.html#conformal">DERC</a>) can't. See <a href="concepts.html#trajectory-certificate">Concepts &rarr; The trajectory-level certificate</a> for the full framing and honest assumptions.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>outcomes</code></td><td>required</td><td>Path to a JSONL file of matched runs, one object per line: <code>{"task_id": ..., "full_success": bool, "compressed_success": bool}</code></td></tr>
+        <tr><td><code>--alpha</code></td><td><code>0.05</code></td><td>Maximum end-to-end degradation risk to certify</td></tr>
+        <tr><td><code>--delta</code></td><td><code>0.05</code></td><td>Confidence budget — certificate holds at confidence 1&minus;&delta;</td></tr>
+        <tr><td><code>--json</code></td><td>off</td><td>Machine-readable output: the full certificate fields plus <code>statement</code></td></tr>
+      </tbody>
+    </table>
+
+    <pre class="term"><span class="d">$ distil certify-trajectories outcomes.jsonl --alpha 0.05 --delta 0.05</span>
+distil trajectory-risk certificate
+
+  matched trajectories : 200
+  observed degradation : 0.50%
+  risk bound (1-&delta;)     : 3.20%
+  certified (&alpha;=0.05, &delta;=0.05) : <span class="g">True</span>
+
+  With confidence 95%, compression degrades at most 5.0% of tasks the full
+  context would have solved (observed 0.50% over 200 matched trajectories).
+  Valid under: future trajectories exchangeable with calibration; loss =
+  measured end-to-end task outcome; calibration held out from compressor
+  tuning; recalibrate on drift</pre>
+
+    <p>Refuses to certify (exit 1, not a false PASS) below <code>min_n=20</code> matched trajectories — a certificate from a handful of samples is noise dressed up as a guarantee. Exits 0 only when <code>certified</code> is true.</p>
+
+    <hr/>
+
     <h2 id="onboard">distil onboard</h2>
     <p>One command to set up distil and learn to use it. Detects your environment — OS, package managers, agent CLIs (Claude Code / Codex / Gemini), how distil is installed, the optional <code>anthropic</code> extra, and whether you're on a flat-rate Claude subscription — then wires the savings status line and prints a <strong>next-steps guide tailored to what it found</strong>: how to route the detected agent (subscription-safe vs metered), validate outcomes with <a href="#shadow-stats">shadow mode</a>, watch savings on the <a href="#dashboard">dashboard</a>, run the test gate, and re-verify with <a href="#doctor">distil doctor</a>. <code>--dry-run</code> changes nothing; works on macOS and Windows.</p>
 
@@ -761,10 +797,27 @@ verifiable savings — 3 verified instance(s), 0 rejected
     <h2 id="shadow-stats">distil shadow-stats</h2>
     <p>Report the live decision-equivalence measured by shadow mode on real traffic: the percentage of sampled requests where the agent's chosen next action was identical with vs without compression, and how many samples that's based on. Start sampling with <code>distil wrap --shadow 0.1 -- claude</code>.</p>
 
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--json</code></td><td>off</td><td>Machine-readable output: <code>samples</code>, <code>changes</code>, <code>decision_change_rate</code>, <code>decision_equivalence</code></td></tr>
+      </tbody>
+    </table>
+
     <hr/>
 
     <h2 id="doctor">distil doctor</h2>
     <p>Diagnose a distil setup end-to-end: distil/Python version, the savings ledger (subscription-aware), shadow-validation status, an in-process proxy round-trip self-test (proves the proxy machinery works with no network), the optional <code>anthropic</code> extra and API key, and — for Claude Code — status-line wiring and subscription detection. Exits non-zero if any check fails, so it doubles as a setup gate.</p>
+
+    <h3>Flags</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>--no-color</code></td><td>off</td><td>Disable ANSI colors in the check list</td></tr>
+        <tr><td><code>--json</code></td><td>off</td><td>Machine-readable output (CI-gateable): <code>{"checks": [...], "ok": bool}</code>, one object per check with <code>name</code>/<code>status</code>/<code>detail</code>/<code>hint</code></td></tr>
+      </tbody>
+    </table>
 
     <hr/>
 

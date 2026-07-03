@@ -17,12 +17,33 @@ PAIRS_FILE = Path(__file__).resolve().parent.parent / "corpus" / "output_pairs.j
 
 
 # --- generation-side shaping ------------------------------------------------
-def test_shape_request_injects_system_directive_when_allowed():
+def test_shape_request_anthropic_uses_top_level_system():
+    # The Anthropic Messages API 400s on role:"system" inside messages —
+    # a Claude body must get the directive via the top-level system field.
     body = {"model": "claude-opus-4-8", "messages": [{"role": "user", "content": "hi"}]}
     out = shape_request(body, level="light", allow=True)
+    assert "concise" in out["system"].lower()
+    assert all(m["role"] != "system" for m in out["messages"])
+    assert body["messages"] == [{"role": "user", "content": "hi"}]  # input not mutated
+
+
+def test_shape_request_anthropic_appends_to_existing_system():
+    body = {"model": "claude-opus-4-8", "system": "You are a bot.", "messages": []}
+    out = shape_request(body, level="light", allow=True)
+    assert out["system"].startswith("You are a bot.")
+    assert "concise" in out["system"].lower()
+    # list-form system prompts get a text block appended
+    body2 = {"system": [{"type": "text", "text": "core"}], "messages": []}
+    out2 = shape_request(body2, level="light", allow=True, shape="anthropic")
+    assert out2["system"][0] == {"type": "text", "text": "core"}
+    assert "concise" in out2["system"][1]["text"].lower()
+
+
+def test_shape_request_openai_appends_system_message():
+    body = {"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]}
+    out = shape_request(body, level="light", allow=True, shape="openai")
     assert out["messages"][-1]["role"] == "system"
     assert "concise" in out["messages"][-1]["content"].lower()
-    assert body["messages"] == [{"role": "user", "content": "hi"}]  # input not mutated
 
 
 def test_shape_request_noop_when_off_or_disallowed():

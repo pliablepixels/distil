@@ -35,7 +35,7 @@ pub fn minify_json(text: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(s).ok()?;
     // serde_json::to_string produces compact JSON without whitespace, and
     // preserves non-ASCII characters (ensure_ascii=False equivalent).
-    Some(serde_json::to_string(&value).ok()?)
+    serde_json::to_string(&value).ok()
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

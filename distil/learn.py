@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -81,12 +82,18 @@ class ExpandStats:
 
     digested: dict[str, int] = field(default_factory=dict)
     expanded: dict[str, int] = field(default_factory=dict)
+    # The proxy mutates these dicts from ThreadingHTTPServer worker threads and
+    # serializes them in save(); without the lock, json.dumps racing a mutation
+    # raises "dictionary changed size during iteration" → a 500 to the agent.
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def record_digest(self, sig: str) -> None:
-        self.digested[sig] = self.digested.get(sig, 0) + 1
+        with self._lock:
+            self.digested[sig] = self.digested.get(sig, 0) + 1
 
     def record_expand(self, sig: str) -> None:
-        self.expanded[sig] = self.expanded.get(sig, 0) + 1
+        with self._lock:
+            self.expanded[sig] = self.expanded.get(sig, 0) + 1
 
     def expand_rate(self, sig: str) -> float:
         d = self.digested.get(sig, 0)
@@ -113,13 +120,15 @@ class ExpandStats:
 
     def save(self, path: Path | None = None) -> None:
         try:
+            with self._lock:  # snapshot under lock so concurrent records can't race dumps
+                payload = json.dumps({"digested": self.digested, "expanded": self.expanded})
             p = Path(path or _default_stats_path())
             p.parent.mkdir(parents=True, exist_ok=True)
             tmp = p.with_suffix(p.suffix + ".tmp")
-            tmp.write_text(json.dumps({"digested": self.digested, "expanded": self.expanded}))
+            tmp.write_text(payload)
             tmp.replace(p)  # atomic swap so a crash can't corrupt the policy
-        except OSError:
-            pass  # learning must never break the request path
+        except Exception:  # noqa: BLE001 — learning must never break the request path
+            pass
 
 
 def keep_predicate(

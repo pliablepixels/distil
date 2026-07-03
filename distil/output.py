@@ -45,15 +45,37 @@ OUTPUT_DIRECTIVES: dict[str, str] = {
 }
 
 
-def shape_request(body: dict, *, level: str = "light", allow: bool = True) -> dict:
+def shape_request(
+    body: dict, *, level: str = "light", allow: bool = True, shape: str = "auto"
+) -> dict:
     """Return a copy of an Anthropic/OpenAI request body with a verbosity-control
-    directive appended as a `role:"system"` operator message. No-op when
-    `level == "off"` or `allow` is False (auth-mode gating). Never mutates input."""
+    directive injected the way each provider actually accepts it. No-op when
+    `level == "off"` or `allow` is False (auth-mode gating). Never mutates input.
+
+    The Anthropic Messages API rejects ``role:"system"`` entries inside
+    ``messages`` (400) — there the directive goes into the top-level ``system``
+    field. The OpenAI chat shape takes an appended system message. ``shape`` is
+    ``"anthropic"``/``"openai"`` when the caller knows the request path, or
+    ``"auto"`` to sniff (top-level ``system`` or an Anthropic model id).
+    """
     if level == "off" or not allow:
         return body
     directive = OUTPUT_DIRECTIVES.get(level)
     if not directive:
         raise ValueError(f"unknown output level {level!r}; choose {sorted(OUTPUT_DIRECTIVES)}")
+    if shape == "auto":
+        anthropic = "system" in body or str(body.get("model", "")).startswith("claude")
+    else:
+        anthropic = shape == "anthropic"
+    if anthropic:
+        sys_prompt = body.get("system")
+        if isinstance(sys_prompt, list):
+            new_system: object = [*sys_prompt, {"type": "text", "text": directive}]
+        elif isinstance(sys_prompt, str) and sys_prompt:
+            new_system = sys_prompt + "\n\n" + directive
+        else:
+            new_system = directive
+        return {**body, "system": new_system}
     messages = list(body.get("messages", []))
     messages.append({"role": "system", "content": directive})
     return {**body, "messages": messages}

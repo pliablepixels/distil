@@ -171,8 +171,18 @@ def retrain(
         raise RuntimeError("Training set is empty — increase label set or lower test_fraction.")
 
     # Fall back to using all labels as both train and test if test set is empty
-    # (can happen with tiny corpora during tests).
+    # (can happen with tiny corpora during tests) — but SAY so: training-set
+    # accuracy is an overfit estimate and must never be read as held-out.
+    held_out = bool(test_set)
     eval_set = test_set if test_set else train_set
+    if not held_out:
+        import warnings
+
+        warnings.warn(
+            "online: empty test split — reported accuracy/f1 are TRAINING metrics "
+            "(overfit estimate), not held-out. Grow the corpus or lower test_fraction.",
+            stacklevel=2,
+        )
 
     # Train logistic regression.
     weights = train(train_set, epochs=epochs, lr=0.5, l2=1e-4, seed=0)
@@ -186,6 +196,7 @@ def retrain(
         "f1": metrics["f1"],
         "n_train": len(train_set),
         "n_test": len(eval_set),
+        "held_out": held_out,
     }
 
 

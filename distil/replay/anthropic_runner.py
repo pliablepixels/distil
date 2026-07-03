@@ -13,6 +13,8 @@ key); treat live results as UNVERIFIED until you run them against your account.
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..trajectory import Block, Kind, Stability
 from . import prompts
 
@@ -110,7 +112,9 @@ class AnthropicRunner:
                 }
             ],
         )
-        for block in resp.content:
+        resp_any: Any = resp
+        resp_blocks = resp_any.content
+        for block in resp_blocks:
             if getattr(block, "type", None) == "tool_use":
                 return prompts.fingerprint_from_args(block.input)
         return "<no-decision>"
@@ -124,6 +128,8 @@ class AnthropicRunner:
             system=system,
             messages=[{"role": "user", "content": user}],
         )
+        resp_any: Any = resp
+        content = resp_any.content
         return "".join(
-            getattr(b, "text", "") for b in resp.content if getattr(b, "type", None) == "text"
+            getattr(b, "text", "") for b in content if getattr(b, "type", None) == "text"
         )

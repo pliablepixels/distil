@@ -53,6 +53,8 @@ def parse_content_length(raw: object, *, max_bytes: int = MAX_BODY_BYTES) -> int
     """
     if raw is None:
         return 0
+    if not isinstance(raw, (str, int)):
+        return None
     try:
         n = int(raw)
     except (TypeError, ValueError):

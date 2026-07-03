@@ -20,12 +20,25 @@ from . import ledger, pricing
 
 @dataclass
 class RuntimeSavings:
+    """Per-model savings accumulator.
+
+    ``model`` is only the FALLBACK used when a request carries no model id of
+    its own — every request that names a model (the normal case) is accounted
+    and priced under that model, so a Claude Code session mixing Opus and
+    Haiku calls is never all priced at one rate. Models missing from the
+    pricing catalog (e.g. a Gemini upstream) record their genuine token
+    savings with dollars=0 rather than being silently priced at Claude rates.
+    """
+
     model: str = "claude-opus-4-8"
     requests: int = 0
     tokens_before: int = 0
     tokens_after: int = 0
     ledger_path: Path | None = None
+    # model id -> [requests, tokens_before, tokens_after]
+    by_model: dict[str, list[int]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+    _last_flush: float = field(default=0.0, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         # Accept a str path too — the ledger needs a real Path for `.parent`.
@@ -38,34 +51,68 @@ class RuntimeSavings:
 
     @property
     def dollars_saved(self) -> float:
-        # Genuine, conservative floor: tokens saved priced at the base input rate
-        # (the cache-aware benefit is larger; this is the defensible minimum).
-        return self.tokens_saved * pricing.get(self.model).input
+        # Genuine, conservative floor: tokens saved priced at each model's base
+        # input rate (the cache-aware benefit is larger; this is the defensible
+        # minimum). Unpriceable models contribute 0 — never guessed rates.
+        with self._lock:
+            total = 0.0
+            for mid, (_n, before, after) in self.by_model.items():
+                price = pricing.resolve(mid)
+                if price is not None:
+                    total += (before - after) * price.input
+            return total
 
-    def record(self, before: int, after: int) -> None:
+    def record(self, before: int, after: int, model: str | None = None) -> None:
+        mid = (model or "").strip() or self.model
         with self._lock:
             self.requests += 1
             self.tokens_before += before
             self.tokens_after += after
+            cell = self.by_model.setdefault(mid, [0, 0, 0])
+            cell[0] += 1
+            cell[1] += before
+            cell[2] += after
 
-    def flush(self) -> bool:
-        """Persist accumulated genuine savings to the ledger; reset counters.
-        Returns False when there is nothing to flush."""
+    def maybe_flush(self, every: int = 10, max_age: float = 30.0) -> bool:
+        """Flush when *every* requests accumulated OR *max_age* seconds passed
+        since the last flush — so the statusline/ledger stays fresh even in
+        short or slow sessions instead of sitting on unflushed savings."""
+        import time
+
+        now = time.monotonic()
         with self._lock:
             if self.requests == 0:
                 return False
-            price = pricing.get(self.model)
-            ledger.record(
-                trajectory_id="live-proxy",
-                model=self.model,
-                turns=self.requests,
-                baseline_dollars=self.tokens_before * price.input,
-                distil_dollars=self.tokens_after * price.input,
-                baseline_input_tokens=self.tokens_before,
-                distil_input_tokens=self.tokens_after,
-                path=self.ledger_path or ledger.DEFAULT_PATH,
-            )
+            due = self.requests >= every or (now - self._last_flush) >= max_age
+        if not due:
+            return False
+        flushed = self.flush()
+        if flushed:
+            self._last_flush = now
+        return flushed
+
+    def flush(self) -> bool:
+        """Persist accumulated genuine savings to the ledger (one record per
+        model, priced at that model's rate); reset counters. Returns False
+        when there is nothing to flush."""
+        with self._lock:
+            if self.requests == 0:
+                return False
+            for mid, (n, before, after) in self.by_model.items():
+                price = pricing.resolve(mid)
+                per_tok = price.input if price is not None else 0.0
+                ledger.record(
+                    trajectory_id="live-proxy",
+                    model=mid if price is not None else f"{mid} (unpriced)",
+                    turns=n,
+                    baseline_dollars=before * per_tok,
+                    distil_dollars=after * per_tok,
+                    baseline_input_tokens=before,
+                    distil_input_tokens=after,
+                    path=self.ledger_path or ledger.default_path(),
+                )
             self.requests = 0
             self.tokens_before = 0
             self.tokens_after = 0
+            self.by_model.clear()
             return True
