@@ -114,7 +114,10 @@ def gw_servers() -> Any:
     upstream_url = f"http://127.0.0.1:{upstream_port}"
     price = pricing_get("claude-opus-4-8")
     state = GatewayState(price)
-    handler_cls = build_gateway_handler(upstream_url, state, price)
+    # trust_tenant_header=True: these tests exercise multi-tenant accounting via
+    # explicit labels (the operator-opt-in mode); identity-derivation is tested
+    # separately in test_tenant_of_*.
+    handler_cls = build_gateway_handler(upstream_url, state, price, trust_tenant_header=True)
     gw_server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
     gw_port = gw_server.server_address[1]
     gw_thread = threading.Thread(target=gw_server.serve_forever, daemon=True)
@@ -255,13 +258,15 @@ def test_stats_empty_before_requests() -> None:
 
 
 def test_tenant_of_explicit_header() -> None:
-    """x-distil-tenant header takes priority."""
+    """x-distil-tenant is honored ONLY under operator opt-in — by default the
+    client-writable header must never enter accounting (impersonation)."""
 
     class _FakeHeaders:
         def get(self, key: str) -> str | None:
             return {"x-distil-tenant": "myco"}.get(key.lower())
 
-    assert tenant_of(_FakeHeaders()) == "myco"
+    assert tenant_of(_FakeHeaders()) == "default"  # untrusted by default
+    assert tenant_of(_FakeHeaders(), trust_tenant_header=True) == "myco"
 
 
 def test_tenant_of_api_key_anonymised() -> None:
@@ -312,3 +317,39 @@ def test_gateway_passthrough_non_compressible(gw_servers: Any) -> None:
         assert resp.status == 200
         # No distil compression header
         assert resp.headers.get("x-distil-tokens-saved") is None
+
+
+def test_management_endpoints_gated_off_loopback() -> None:
+    """/distil/* must not leak per-tenant usage to anyone on the network:
+    non-loopback binds refuse without a token; a token gates with Bearer auth."""
+    import http.client
+
+    upstream_server = ThreadingHTTPServer(("127.0.0.1", 0), _EchoHandler)
+    threading.Thread(target=upstream_server.serve_forever, daemon=True).start()
+    upstream_url = f"http://127.0.0.1:{upstream_server.server_address[1]}"
+    price = pricing_get("claude-opus-4-8")
+
+    def _get(port: int, headers: dict | None = None) -> int:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request("GET", "/distil/stats", headers=headers or {})
+        status = conn.getresponse().status
+        conn.close()
+        return status
+
+    # Non-loopback bind, no token → refused
+    h1 = build_gateway_handler(upstream_url, GatewayState(price), price, loopback=False)
+    s1 = ThreadingHTTPServer(("127.0.0.1", 0), h1)
+    threading.Thread(target=s1.serve_forever, daemon=True).start()
+    assert _get(s1.server_address[1]) == 403
+
+    # Token configured → 401 without, 200 with the right Bearer
+    h2 = build_gateway_handler(
+        upstream_url, GatewayState(price), price, loopback=False, admin_token="sekrit"
+    )
+    s2 = ThreadingHTTPServer(("127.0.0.1", 0), h2)
+    threading.Thread(target=s2.serve_forever, daemon=True).start()
+    assert _get(s2.server_address[1]) == 401
+    assert _get(s2.server_address[1], {"Authorization": "Bearer sekrit"}) == 200
+
+    for srv in (s1, s2, upstream_server):
+        srv.shutdown()

@@ -119,6 +119,22 @@ def cmd_savings(args: argparse.Namespace) -> int:
 
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     s = ledger.summary()
+    if getattr(args, "json", False):
+        from dataclasses import asdict
+
+        d = asdict(s)
+        d["tokenizers"] = sorted(s.tokenizers)
+        try:
+            from .shadow import ShadowLedger
+
+            led = ShadowLedger.load()
+            if led.samples:
+                d["decision_equivalence"] = 1 - led.rate()
+                d["shadow_samples"] = led.samples
+        except Exception:  # noqa: BLE001 — shadow stats are best-effort
+            pass
+        print(json.dumps(d, indent=2))
+        return 0
     if args.html:
         Path(args.html).write_text(ledger.render_html(s))
         print(f"your savings page → {args.html}")
@@ -396,6 +412,19 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
     from .shadow import ShadowLedger
 
     led = ShadowLedger.load()
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {
+                    "samples": led.samples,
+                    "changes": led.changes,
+                    "decision_change_rate": led.rate(),
+                    "decision_equivalence": 1 - led.rate(),
+                },
+                indent=2,
+            )
+        )
+        return 0
     if led.samples == 0:
         print(
             "No shadow samples yet. Start it in one command:\n"
@@ -515,6 +544,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     }
 
     checks = doctor.diagnose()
+    if getattr(args, "json", False):
+        from dataclasses import asdict
+
+        payload = {
+            "checks": [asdict(ch) for ch in checks],
+            "ok": all(ch.status != doctor.FAIL for ch in checks),
+        }
+        print(json.dumps(payload, indent=2))
+        return 0 if payload["ok"] else 1
     print(c("1;38;5;79", "distil doctor") + c("90", "  ·  setup diagnosis") + "\n")
     counts: dict[str, int] = {}
     for ch in checks:
@@ -969,6 +1007,44 @@ def cmd_wrap(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_certify_trajectories(args: argparse.Namespace) -> int:
+    """Trajectory-level risk certificate: bound END-TO-END task degradation.
+
+    Reads a JSONL of matched runs (one object per task:
+    {"task_id": ..., "full_success": bool, "compressed_success": bool}) and
+    certifies P(degradation risk <= alpha) >= 1-delta — the invariant that
+    actually transfers to task success, unlike per-step next-action equivalence.
+    """
+    from .certify.trajectory_risk import TrajectoryOutcome, certify_trajectory_risk
+
+    outcomes = []
+    for line in Path(args.outcomes).read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        d = json.loads(line)
+        outcomes.append(
+            TrajectoryOutcome(
+                task_id=str(d.get("task_id", len(outcomes))),
+                full_success=bool(d["full_success"]),
+                compressed_success=bool(d["compressed_success"]),
+            )
+        )
+    cert = certify_trajectory_risk(outcomes, alpha=args.alpha, delta=args.delta)
+    if args.json:
+        from dataclasses import asdict
+
+        print(json.dumps({**asdict(cert), "statement": cert.statement}, indent=2))
+    else:
+        print("distil trajectory-risk certificate\n")
+        print(f"  matched trajectories : {cert.n}")
+        print(f"  observed degradation : {cert.empirical_risk * 100:.2f}%")
+        print(f"  risk bound (1-δ)     : {cert.risk_bound * 100:.2f}%")
+        print(f"  certified (α={cert.alpha}, δ={cert.delta}) : {cert.certified}")
+        print(f"\n  {cert.statement}")
+    return 0 if cert.certified else 1
+
+
 def cmd_gateway(args: argparse.Namespace) -> int:
     """Managed multi-tenant gateway with a live per-tenant savings dashboard."""
     from .gateway import serve_gateway
@@ -980,6 +1056,8 @@ def cmd_gateway(args: argparse.Namespace) -> int:
         pricing_model=args.pricing,
         lossless_only=args.lossless_only,
         verbatim=args.verbatim,
+        admin_token=args.admin_token,
+        trust_tenant_header=args.trust_tenant_header,
     )
     return 0
 
@@ -1305,10 +1383,34 @@ def cmd_federated(args: argparse.Namespace) -> int:
     return 0
 
 
+_HELP_EPILOG = """\
+everyday commands:
+  onboard, doctor, setup, offboard    guided install / health-check / wiring
+  wrap, proxy, gateway                route agent traffic through compression
+  stats (leaderboard), dashboard,     your genuine savings + live equivalence
+  shadow-stats, statusline
+  expand                              recover any digested content by handle
+
+analysis & tuning:
+  compress, savings, bench, prune, sweep, calibrate, adaptive
+
+research / CI internals:
+  verify, holdout, conformal, gate, frontier, eval, online, corpus,
+  train-transformer, federated-leaderboard
+
+`distil <command> --help` shows each command's flags.
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="distil", description="Compression with a quality contract.")
+    p = argparse.ArgumentParser(
+        prog="distil",
+        description="Compression with a quality contract.",
+        epilog=_HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--version", action="version", version=f"distil {__version__}")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="<command>")
 
     def add_traj(sp: argparse.ArgumentParser) -> None:
         sp.add_argument(
@@ -1338,8 +1440,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.set_defaults(func=cmd_savings)
 
-    lb = sub.add_parser("leaderboard", help="your genuine cumulative savings (local ledger)")
+    lb = sub.add_parser(
+        "leaderboard",
+        aliases=["stats"],
+        help="your genuine cumulative savings (local ledger)",
+    )
     lb.add_argument("--html", help="render your savings as a self-contained HTML page")
+    lb.add_argument("--json", action="store_true", help="machine-readable output")
     lb.set_defaults(func=cmd_leaderboard)
 
     pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #4)")
@@ -1558,6 +1665,7 @@ def build_parser() -> argparse.ArgumentParser:
     ss = sub.add_parser(
         "shadow-stats", help="show live decision-equivalence measured by shadow mode"
     )
+    ss.add_argument("--json", action="store_true", help="machine-readable output")
     ss.set_defaults(func=cmd_shadow_stats)
 
     dash = sub.add_parser(
@@ -1573,6 +1681,7 @@ def build_parser() -> argparse.ArgumentParser:
         "doctor", help="diagnose your distil setup (ledger, shadow, proxy round-trip, wiring)"
     )
     dr.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    dr.add_argument("--json", action="store_true", help="machine-readable output (CI-gateable)")
     dr.set_defaults(func=cmd_doctor)
 
     su = sub.add_parser("setup", help="wire the distil status line into Claude Code settings")
@@ -1735,6 +1844,19 @@ def build_parser() -> argparse.ArgumentParser:
     fl.add_argument("--html", help="write a self-contained leaderboard HTML here")
     fl.set_defaults(func=cmd_federated)
 
+    ct = sub.add_parser(
+        "certify-trajectories",
+        help="trajectory-level risk certificate: bound end-to-end task degradation",
+    )
+    ct.add_argument(
+        "outcomes",
+        help="JSONL of matched runs: {task_id, full_success, compressed_success} per line",
+    )
+    ct.add_argument("--alpha", type=float, default=0.05, help="max degradation risk to certify")
+    ct.add_argument("--delta", type=float, default=0.05, help="confidence budget (1-δ)")
+    ct.add_argument("--json", action="store_true", help="machine-readable output")
+    ct.set_defaults(func=cmd_certify_trajectories)
+
     gw = sub.add_parser("gateway", help="managed multi-tenant gateway + live savings dashboard")
     gw.add_argument("--host", default="127.0.0.1")
     gw.add_argument("--port", type=int, default=8789)
@@ -1745,6 +1867,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbatim",
         action="store_true",
         help="skip the Tier-1 digest (Tier-0 only) for all tenants — lower savings",
+    )
+    gw.add_argument(
+        "--admin-token",
+        default=None,
+        help="bearer token for /distil/stats and /distil/dashboard "
+        "(required on non-loopback binds; env: DISTIL_GATEWAY_TOKEN)",
+    )
+    gw.add_argument(
+        "--trust-tenant-header",
+        action="store_true",
+        help="honor client-supplied x-distil-tenant for accounting (default: "
+        "tenant is derived from the credential, never a client header)",
     )
     gw.set_defaults(func=cmd_gateway)
 

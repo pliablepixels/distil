@@ -36,6 +36,7 @@ from ..trajectory import Block
 __all__ = [
     "salient_tokens",
     "salient_lines",
+    "surprise_lines",
     "reference_index",
     "protect",
 ]
@@ -49,10 +50,40 @@ _PATTERNS = re.compile(
       | \b[\w.+-]+@[\w-]+\.[\w.-]+\b                                # email
       | \b(?:\d{1,3}\.){3}\d{1,3}\b                                 # IPv4
       | \bv?\d+\.\d+\.\d+(?:-[\w.]+)?\b                             # semver
+      | (?:~|\.{1,2})?/?(?:[\w.\-]+/){2,}[\w.\-]+                   # file path (>=2 separators)
     )""",
     re.VERBOSE,
 )
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-/]{3,}")
+
+# --- Signal 4: surprise ------------------------------------------------------ #
+# Under a tight budget, compressors drop INCONGRUENT details first — yet in an
+# agent trajectory the anomaly (the error line, the unexpected state, the failed
+# assertion) is precisely what decides the next action ("lost if surprise",
+# arXiv 2412.17483). These lines are over-retained regardless of token signals.
+_SURPRISE = re.compile(
+    r"""(?xi)
+      \b(?:error|exception|traceback|fail(?:ed|ure|ing)?|fatal|panic|abort(?:ed)?
+        |denied|refused|rejected|timed\s+out|timeout|unexpected|mismatch
+        |assert(?:ion)?(?:\s*(?:error|failed))?|segfault|core\s+dumped
+        |not\s+found|no\s+such|cannot|unable\s+to|permission\s+denied)\b
+      | \bexit(?:\s+code|ed)?\s+[1-9]\d*\b
+      | \b[EW]\d{3,}\b
+    """,
+)
+
+
+def surprise_lines(text: str) -> list[str]:
+    """Lines carrying an anomaly/incongruence signal (errors, failures,
+    unexpected states, diff changes) — the load-bearing surprises a lossy
+    compressor would otherwise drop first."""
+    out: list[str] = []
+    for ln in text.splitlines():
+        if _SURPRISE.search(ln):
+            out.append(ln)
+        elif ln.startswith(("+", "-")) and not ln.startswith(("+++", "---")) and ln.strip("+- "):
+            out.append(ln)  # unified-diff changed line: the change IS the content
+    return out
 
 
 def _entropy(tok: str) -> float:
@@ -121,12 +152,14 @@ def salient_tokens(
 
 
 def salient_lines(text: str, *, ref_index: Counter | None = None, **kw) -> list[str]:
-    """The lines carrying a salient token — the decision *unit* (verb + target),
-    not an isolated token. Preserved verbatim so the agent reads them intact."""
+    """The lines carrying a salient token OR a surprise signal — the decision
+    *unit* (verb + target), not an isolated token. Preserved verbatim so the
+    agent reads them intact."""
     toks = salient_tokens(text, ref_index=ref_index, **kw)
-    if not toks:
+    surprises = set(surprise_lines(text))
+    if not toks and not surprises:
         return []
-    return [ln for ln in text.splitlines() if any(t in ln for t in toks)]
+    return [ln for ln in text.splitlines() if ln in surprises or any(t in ln for t in toks)]
 
 
 # --- The composable protector ---------------------------------------------- #

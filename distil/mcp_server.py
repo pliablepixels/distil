@@ -53,11 +53,21 @@ def _load_store() -> dict[str, str]:
         return {}
 
 
+# The store holds ORIGINAL tool-output content (that's its purpose — expand
+# must survive across processes), so it is bounded and owner-readable only.
+_MAX_STORE_ENTRIES = 512
+
+
 def _save_store(store: dict[str, str]) -> None:
     p = _store_path()
     try:
+        # FIFO-bound the store so it can't grow without limit across sessions
+        # (dict preserves insertion order; oldest handles age out first).
+        while len(store) > _MAX_STORE_ENTRIES:
+            store.pop(next(iter(store)))
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(store))
+        p.chmod(0o600)  # plaintext content at rest — owner-only
     except OSError:
         pass  # best-effort; never crash a tool call
 

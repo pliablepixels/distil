@@ -148,12 +148,22 @@ def build_handler(
     # Learning flywheel state (loaded once when expand is on): the learned
     # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
     _learn_stats = None
-    _learn_keep = None
+    _expand_keep = None
     if expand:
         from .learn import ExpandStats, keep_predicate
 
         _learn_stats = ExpandStats.load()
-        _learn_keep = keep_predicate(_learn_stats)
+        _expand_keep = keep_predicate(_learn_stats)
+
+    # Outcome-guided policy (always on — never-regressing by construction):
+    # content classes whose digestion co-occurred with END-TO-END task
+    # regressions are kept byte-exact. See distil.compress.guideline.
+    from .compress.guideline import OutcomeStats
+
+    _outcome_keep = OutcomeStats.load().keep_predicate()
+
+    def _learn_keep(text: str) -> bool:
+        return _outcome_keep(text) or (_expand_keep is not None and _expand_keep(text))
 
     # Shadow-mode live decision-equivalence: sample a fraction of requests, run the
     # decision uncompressed too (in the background), and record whether it matched.
