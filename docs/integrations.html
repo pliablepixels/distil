@@ -243,6 +243,31 @@ response = model.generate_content(<span class="g">"Hello!"</span>)</pre>
 
     <hr/>
 
+    <h2>Claude Code plugin</h2>
+    <p>The first-class integration: a <strong>session-first savings status line</strong> plus
+    slash commands, shipped as a marketplace-format plugin
+    (<a href="https://github.com/dshakes/distil/tree/main/plugins/distil"><code>plugins/distil</code></a>).
+    Wire it in one step with <code>distil setup</code> (or <code>distil onboard</code>), then
+    route the agent through compression with <code>distil wrap -- claude</code>.</p>
+    <table>
+      <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>/distil-onboard</code></td><td>Set up distil + a guided, tailored tour</td></tr>
+        <tr><td><code>/distil</code></td><td>Savings report + how to route more traffic through distil</td></tr>
+        <tr><td><code>/distil-stats</code></td><td>Full breakdown — tokens, cost, runs, per-trajectory bars</td></tr>
+        <tr><td><code>/distil-shadow</code></td><td>Live decision-equivalence: did compression preserve the next action?</td></tr>
+        <tr><td><code>/distil-dashboard</code></td><td>HTML savings page — session, lifetime, and decision-equivalence cards</td></tr>
+        <tr><td><code>/distil-doctor</code></td><td>Diagnose the setup — ledger, shadow validation, proxy round-trip, wiring</td></tr>
+        <tr><td><code>/distil-certify</code></td><td>Trajectory-level certificate: bound how many solvable tasks compression may cost</td></tr>
+        <tr><td><code>/distil-badge</code></td><td>Shareable badge of your measured savings</td></tr>
+      </tbody>
+    </table>
+    <p>The status line leads with <em>this session</em> (<code>▼75.0K −62% $0.31 · Σ27.0M</code>)
+    and shows decision-equivalence only once 25+ shadow samples exist — a rate over a handful
+    of samples is noise, and distil doesn't print noise.</p>
+
+    <hr/>
+
     <h2>MCP server</h2>
     <p>A zero-dependency <a href="https://modelcontextprotocol.io">Model Context Protocol</a>
     server (stdlib only — no SDK) exposes distil's reversible compression to any MCP client
