@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "distil",
-  "description": "Live savings status line + terminal dashboard, and /distil, /distil-stats, /distil-shadow, /distil-dashboard commands for distil context compression",
-  "version": "1.6.0",
+  "description": "Live session-first savings status line, /distil commands (stats, dashboard, shadow equivalence, doctor, onboard, trajectory certificate, savings badge) for distil \u2014 certified context compression",
+  "version": "1.8.0",
   "author": {
     "name": "Distil",
     "email": "chandu1221@gmail.com"
@@ -10,5 +10,13 @@
   "homepage": "https://github.com/dshakes/distil",
   "repository": "https://github.com/dshakes/distil",
   "license": "Apache-2.0",
-  "keywords": ["compression", "context", "llm", "tokens", "savings"]
+  "keywords": [
+    "compression",
+    "context",
+    "llm",
+    "tokens",
+    "savings",
+    "certificate",
+    "decision-equivalence"
+  ]
 }

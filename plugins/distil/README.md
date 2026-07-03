@@ -80,8 +80,10 @@ keeps your line clean either way.
 | `/distil` | Your savings report + how to route more traffic through distil |
 | `/distil-stats` | Full breakdown — orig→compressed tokens, cost, runs, per-trajectory bars |
 | `/distil-shadow` | Decision-equivalence: did compression preserve your agent's next action? |
-| `/distil-dashboard` | Open the interactive HTML savings dashboard in your browser |
+| `/distil-dashboard` | Open the HTML savings page — session, lifetime, decision-equivalence cards |
 | `/distil-doctor` | Diagnose your setup — ledger, shadow validation, proxy round-trip, wiring |
+| `/distil-certify` | Trajectory-level certificate: bound how many solvable tasks compression may cost |
+| `/distil-badge` | Shareable shields.io badge of your measured savings |
 
 Want a **live, refreshing view in your terminal**? Run the CLI directly (outside the
 slash-command flow, e.g. in a split pane):

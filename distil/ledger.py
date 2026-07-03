@@ -158,9 +158,18 @@ def summary(
     )
 
 
-def render_html(s: LedgerSummary) -> str:
+def render_html(
+    s: LedgerSummary,
+    *,
+    change_rate: float | None = None,
+    samples: int = 0,
+    session: "LedgerSummary | None" = None,
+) -> str:
     """Render the ledger as a self-contained dark HTML page — GENUINE savings
-    from your own usage (the `live-proxy` source is real proxy traffic)."""
+    from your own usage (the `live-proxy` source is real proxy traffic).
+    ``change_rate``/``samples`` add the decision-equivalence card (shown only
+    at >=25 samples — a rate over a handful of samples is noise); ``session``
+    adds a this-session card when a live session exists."""
     rows = (
         "".join(
             f'<tr><td>{_html.escape(str(tid))}</td><td class="r">${saved:,.4f}</td></tr>'
@@ -199,10 +208,38 @@ td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{
  <div class="card"><div class="l">Tokens saved</div><div class="v">{s.total_tokens_saved:,}</div></div>
  <div class="card"><div class="l">Dollars saved</div><div class="v g">${s.total_dollars_saved:,.4f}</div></div>
  <div class="card"><div class="l">Runs</div><div class="v">{s.runs:,}</div></div>
+ {_eq_card(change_rate, samples)}{_session_card(session)}
 </div>
 <table><thead><tr><th>source</th><th style="text-align:right">$ saved</th></tr></thead><tbody>{rows}</tbody></table>
 <p class="foot">{note} Share verifiably across instances with <code>distil federated-leaderboard</code>.</p>
 </div></body></html>"""
+
+
+def _eq_card(change_rate: float | None, samples: int) -> str:
+    """Decision-equivalence card — only once there is evidence behind the rate."""
+    if change_rate is None or samples < 25:
+        return (
+            '<div class="card"><div class="l">Decision-equivalence</div>'
+            '<div class="v muted" style="font-size:16px">needs 25+ shadow samples<br/>'
+            "<code>distil wrap --shadow 0.1 -- &lt;agent&gt;</code></div></div>"
+        )
+    eq = (1 - change_rate) * 100
+    return (
+        f'<div class="card"><div class="l">Decision-equivalence</div>'
+        f'<div class="v g">{eq:.1f}%</div>'
+        f'<div class="l">{samples:,} shadowed requests</div></div>'
+    )
+
+
+def _session_card(session: "LedgerSummary | None") -> str:
+    if session is None or not session.runs or not session.total_baseline_tokens:
+        return ""
+    trimmed = (1 - session.total_distil_tokens / session.total_baseline_tokens) * 100
+    return (
+        f'<div class="card"><div class="l">This session</div>'
+        f'<div class="v">▼{_human(session.total_tokens_saved)}</div>'
+        f'<div class="l">−{trimmed:.0f}% · ${session.total_dollars_saved:,.4f}</div></div>'
+    )
 
 
 def _human(n: float) -> str:
@@ -229,6 +266,7 @@ def render_dashboard(
     recent: list[int] | None = None,
     subscription: bool = False,
     color: bool = True,
+    session: "LedgerSummary | None" = None,
 ) -> str:
     """A framed, glanceable terminal dashboard of cumulative savings.
 
@@ -257,6 +295,15 @@ def render_dashboard(
         out.append(bot)
         return "\n".join(out)
 
+    if session is not None and session.runs and session.total_baseline_tokens:
+        st = 1 - session.total_distil_tokens / session.total_baseline_tokens
+        out.append(
+            row(
+                f"{'this session':<15}"
+                + c("36", f"▼{_human(session.total_tokens_saved)} −{st * 100:.0f}%")
+                + c("90", f"  ({session.runs} flushes)")
+            )
+        )
     trimmed = (
         0.0 if s.total_baseline_tokens == 0 else 1 - s.total_distil_tokens / s.total_baseline_tokens
     )

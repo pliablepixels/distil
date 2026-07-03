@@ -152,7 +152,29 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         print(json.dumps(d, indent=2))
         return 0
     if args.html:
-        Path(args.html).write_text(ledger.render_html(s))
+        change_rate: float | None = None
+        samples = 0
+        sess = None
+        try:
+            from .shadow import ShadowLedger
+
+            led = ShadowLedger.load()
+            samples = led.samples
+            if samples:
+                change_rate = led.rate()
+        except Exception:  # noqa: BLE001 — shadow stats are best-effort
+            pass
+        try:
+            import time as _time
+
+            sid, last_ts = ledger.latest_session()
+            if sid and (_time.time() - last_ts) < 4 * 3600:
+                sess = ledger.summary(session=sid)
+        except Exception:  # noqa: BLE001 — session slice is best-effort
+            pass
+        Path(args.html).write_text(
+            ledger.render_html(s, change_rate=change_rate, samples=samples, session=sess)
+        )
         print(f"your savings page → {args.html}")
         return 0
     print(f"distil savings ledger — {ledger.default_path()}\n")
@@ -970,6 +992,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         change_rate: float | None = None
         samples = 0
         recent: list[int] | None = None
+        sess = None
         try:
             led = ShadowLedger.load()
             samples = led.samples
@@ -978,6 +1001,12 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
                 recent = list(led.recent)
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
+        try:
+            sid, last_ts = ledger.latest_session()
+            if sid and (time.time() - last_ts) < 4 * 3600:
+                sess = ledger.summary(session=sid)
+        except Exception:  # noqa: BLE001 — session slice is best-effort
+            pass
         return ledger.render_dashboard(
             s,
             change_rate=change_rate,
@@ -985,6 +1014,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
             recent=recent,
             subscription=subscription,
             color=color,
+            session=sess,
         )
 
     if not interactive:
