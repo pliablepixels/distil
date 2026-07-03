@@ -34,6 +34,50 @@ def test_accepts_str_ledger_path(tmp_path):
     assert ledger.summary(tmp_path / "savings.jsonl").total_tokens_saved == 300
 
 
+def test_per_model_pricing(tmp_path):
+    """Requests naming different models are priced at THEIR rates, not the default's."""
+    from distil import pricing
+
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(1_000_000, 0, model="claude-opus-4-8")  # $5.00 saved
+    rs.record(1_000_000, 0, model="claude-haiku-4-5")  # $1.00 saved
+    assert abs(rs.dollars_saved - 6.0) < 1e-9  # NOT 10.00 (all-Opus mispricing)
+    assert rs.flush() is True
+    s = ledger.summary(led)
+    assert abs(s.total_dollars_saved - 6.0) < 1e-6
+    # dated snapshot ids resolve to their base price
+    assert pricing.resolve("claude-haiku-4-5-20251001").name == "claude-haiku-4-5"
+    assert pricing.resolve("anthropic.claude-opus-4-8").name == "claude-opus-4-8"
+
+
+def test_unknown_model_never_priced_at_claude_rates(tmp_path):
+    """A Gemini/OpenAI upstream records genuine token savings with dollars=0 —
+    never silently billed at the default Claude rate."""
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(1_000_000, 0, model="gemini-2.0-flash")
+    assert rs.dollars_saved == 0.0
+    rs.flush()
+    s = ledger.summary(led)
+    assert s.total_tokens_saved == 1_000_000  # tokens still counted honestly
+    assert s.total_dollars_saved == 0.0
+    assert any(
+        "unpriced" in tid
+        for tid in [json.loads(line)["model"] for line in led.read_text().splitlines()]
+    )
+
+
+def test_maybe_flush_time_based(tmp_path):
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(100, 50)
+    # _last_flush=0 → age check fires immediately: first record is visible fast
+    assert rs.maybe_flush(every=50) is True
+    rs.record(100, 50)
+    assert rs.maybe_flush(every=50, max_age=9999) is False  # neither condition met
+
+
 def _start_echo_upstream() -> ThreadingHTTPServer:
     class Echo(BaseHTTPRequestHandler):
         def do_POST(self) -> None:

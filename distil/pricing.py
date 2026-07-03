@@ -44,7 +44,12 @@ class Pricing:
 CATALOG: dict[str, Pricing] = {
     "claude-fable-5": Pricing("claude-fable-5", 10.0, 50.0),
     "claude-opus-4-8": Pricing("claude-opus-4-8", 5.0, 25.0),
+    "claude-opus-4-7": Pricing("claude-opus-4-7", 5.0, 25.0),
+    "claude-opus-4-6": Pricing("claude-opus-4-6", 5.0, 25.0),
+    "claude-opus-4-5": Pricing("claude-opus-4-5", 5.0, 25.0),
+    "claude-sonnet-5": Pricing("claude-sonnet-5", 3.0, 15.0),
     "claude-sonnet-4-6": Pricing("claude-sonnet-4-6", 3.0, 15.0),
+    "claude-sonnet-4-5": Pricing("claude-sonnet-4-5", 3.0, 15.0),
     "claude-haiku-4-5": Pricing("claude-haiku-4-5", 1.0, 5.0),
 }
 
@@ -53,3 +58,28 @@ def get(name: str) -> Pricing:
     if name not in CATALOG:
         raise KeyError(f"unknown model {name!r}; known: {sorted(CATALOG)}")
     return CATALOG[name]
+
+
+def resolve(model_id: str | None) -> Pricing | None:
+    """Best-effort catalog lookup for a *wire* model id, or None when unknown.
+
+    Handles the id shapes seen in real traffic: exact ids, dated snapshots
+    (``claude-haiku-4-5-20251001``), Bedrock's ``anthropic.`` prefix, and
+    Vertex's ``@`` version separator. Returning None (rather than guessing a
+    price) is deliberate — an unknown model (e.g. a Gemini/OpenAI upstream)
+    must never be silently billed at Claude rates.
+    """
+    if not model_id:
+        return None
+    mid = model_id.strip()
+    if mid.startswith("anthropic."):
+        mid = mid[len("anthropic.") :]
+    mid = mid.split("@", 1)[0]
+    if mid in CATALOG:
+        return CATALOG[mid]
+    # Dated snapshot / suffixed variant: longest catalog id that prefixes it.
+    best = None
+    for name, price in CATALOG.items():
+        if mid.startswith(name + "-") and (best is None or len(name) > len(best.name)):
+            best = price
+    return best

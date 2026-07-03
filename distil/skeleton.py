@@ -67,7 +67,10 @@ def _function_body_ranges(tree: ast.AST) -> list[tuple[int, int, int, str | None
                 first_stmt = body[1] if (doc and len(body) > 1) else body[0]
                 start = first_stmt.lineno
                 end = child.end_lineno or start
-                if end >= start:  # only elide if there is a body to elide
+                # Elide only when the body starts BELOW the signature line —
+                # a one-liner (`def f(): pass`) shares its line with the def,
+                # and eliding it would erase the signature itself.
+                if end >= start > child.lineno:
                     ranges.append((start, end, first_stmt.col_offset, doc))
                 # Descend with in_function=True so closures inside are not double-counted.
                 visit(child, True)

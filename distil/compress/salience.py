@@ -160,7 +160,10 @@ def protect(strategy: Strategy, **salience_kw) -> Strategy:
             if not missing:
                 fixed.append(c)
                 continue
-            patched = c.text + "\n⟦keep⟧ " + " ⟦keep⟧ ".join(ln.strip() for ln in missing)
+            # Keep leading whitespace: indentation is semantic in code/YAML, and a
+            # de-indented line misleads the model about scope. `missing` already
+            # excludes blank lines, so no stripping is needed.
+            patched = c.text + "\n⟦keep⟧ " + " ⟦keep⟧ ".join(missing)
             # Guarantee the needle survives: if the patched form would exceed the
             # original (so re-injection saves nothing), fall back to the ORIGINAL
             # block byte-exact — never to ``c``, which has the salient line removed.

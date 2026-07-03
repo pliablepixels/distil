@@ -122,7 +122,6 @@ def train_transformer(
     # --- corpus labels ---
     from distil.codec.learned import build_dataset
 
-    _, raw_lines_all = build_dataset()
     samples_lf, raw_lines = build_dataset()  # (features, label) pairs — we need raw_lines
     # We only need the raw lines and their labels; discard the feature vectors.
     labeled: list[tuple[str, int]] = [

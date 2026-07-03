@@ -55,6 +55,11 @@ def fold(text: str) -> str | None:
         return None
     if not all(isinstance(r, dict) and all(_scalar(v) for v in r.values()) for r in obj):
         return None
+    # Sparse records (a key present in one row, absent in another) would render
+    # a missing cell and an empty-string cell identically — same ambiguity the
+    # None exclusion above guards against. Fold only uniform-schema arrays.
+    if len({frozenset(r.keys()) for r in obj}) > 1:
+        return None
 
     # column order: first record's keys, then any extras in first-seen order
     cols: list[str] = []

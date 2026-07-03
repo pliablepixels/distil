@@ -130,13 +130,35 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         return 0
     live = s.by_trajectory.get("live-proxy", 0.0)
     print(f"runs recorded:        {s.runs}")
+    if s.total_baseline_tokens:
+        trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
+        print(
+            f"tokens:               {s.total_baseline_tokens:,} → "
+            f"{s.total_distil_tokens:,}  (−{trimmed * 100:.1f}%)"
+        )
     print(f"total tokens saved:   {s.total_tokens_saved:,}")
     print(f"total dollars saved:  ${s.total_dollars_saved:.5f}")
+    try:
+        from .shadow import ShadowLedger
+
+        led = ShadowLedger.load()
+        if led.samples:
+            print(
+                f"decision-equivalence: {(1 - led.rate()) * 100:.1f}% "
+                f"({led.samples:,} shadowed requests)"
+            )
+    except Exception:  # noqa: BLE001 — shadow stats are best-effort
+        pass
     if live:
         print(f"  of which genuine live traffic (live-proxy): ${live:.5f}")
     print("\nby source:")
     for tid, saved in sorted(s.by_trajectory.items(), key=lambda kv: -kv[1]):
         print(f"  {tid:<28} ${saved:.5f}")
+    if "heuristic" in s.tokenizers:
+        print(
+            "\n(token counts ≈ heuristic tokenizer — directionally accurate, "
+            "not billing-grade; dollars are a conservative floor.)"
+        )
     print(
         "\n(local-first; export a page with --html, or share verifiably with "
         "`distil federated-leaderboard`.)"
@@ -428,25 +450,21 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     if s is None or s.runs == 0:
         parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
     else:
-        parts.append(
-            c(
-                "36",
-                f"{ledger._human(s.total_baseline_tokens)}→"
-                f"{ledger._human(s.total_distil_tokens)} tok",
-            )
-        )
+        tok = f"{ledger._human(s.total_baseline_tokens)}→{ledger._human(s.total_distil_tokens)} tok"
+        # The percent trimmed is the single most glanceable savings number —
+        # lead with it rather than making the user do the division.
+        if s.total_baseline_tokens:
+            trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
+            tok += f" −{trimmed * 100:.0f}%"
+        parts.append(c("36", tok))
         # On a flat-rate subscription there's no per-token bill, so the dollar
         # figure is notional — show tokens only. Auto-detected (Claude OAuth, no
         # key); override with DISTIL_SUBSCRIPTION=0/1.
         from .doctor import subscription_mode
 
         if not subscription_mode():
-            parts.append(
-                c(
-                    "32",
-                    f"${s.total_baseline_dollars:,.2f}→${s.total_distil_dollars:,.2f}",
-                )
-            )
+            saved = s.total_baseline_dollars - s.total_distil_dollars
+            parts.append(c("32", f"${saved:,.2f} saved"))
         parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
         try:
             from .shadow import ShadowLedger
@@ -454,10 +472,14 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             led = ShadowLedger.load()
             if led.samples:
                 # decision-equivalence with its sample count, so the confidence
-                # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
+                # is visible at a glance (eq 99.5% over 1.0k shadowed requests),
+                # colored by health: green >=99%, yellow >=95%, red below — the
+                # at-a-glance "is compression still trustworthy?" signal.
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
-                parts.append(c("35", f"eq {100 * (1 - led.rate()):.1f}% ({n_str})"))
+                eq = 1 - led.rate()
+                hue = "32" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
+                parts.append(c(hue, f"eq {eq * 100:.1f}% ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:

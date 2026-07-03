@@ -181,7 +181,8 @@ def make_app(
                 if shape_output != "off" and not lossless_only:
                     from .output import shape_request
 
-                    body = shape_request(body, level=shape_output, allow=True)
+                    _shape = "anthropic" if request.path == "/v1/messages" else "openai"
+                    body = shape_request(body, level=shape_output, allow=True, shape=_shape)
                     extras["x-distil-output-shaping"] = shape_output
 
             elif "contents" in body and isinstance(body["contents"], list):

@@ -5,6 +5,15 @@ All notable changes to Distil are documented here. Format loosely follows
 
 ## [Unreleased] — 1.7.0 dev
 
+### Changed
+- **Status line is now glanceable**: shows the percent trimmed next to the token
+  figure (`1.2M→0.5M tok −58%`), a single `$X.XX saved` delta instead of two
+  dollar figures, and colors decision-equivalence by health (green ≥99%,
+  yellow ≥95%, red below) so a fidelity regression is visible at a glance.
+- **`distil stats`** now prints the orig→compressed token totals with the percent
+  trimmed and the live decision-equivalence (with shadow sample count) alongside
+  the dollar totals.
+
 ## [1.6.2] — 2026-06-30 — Consistent version reporting
 
 ### Fixed

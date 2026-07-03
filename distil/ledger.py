@@ -81,6 +81,9 @@ class LedgerSummary:
     total_distil_tokens: int = 0
     total_baseline_dollars: float = 0.0
     total_distil_dollars: float = 0.0
+    # Which tokenizers produced the counts — so callers can caveat heuristic
+    # (non-billing-grade) numbers instead of presenting them as exact.
+    tokenizers: frozenset[str] = frozenset()
 
 
 def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
@@ -94,11 +97,13 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
     base_usd = 0.0
     dist_usd = 0.0
     by_traj: dict[str, float] = {}
+    toks: set[str] = set()
     for line in path.read_text().splitlines():
         if not line.strip():
             continue
         d = json.loads(line)
         runs += 1
+        toks.add(d.get("tokenizer", "heuristic"))
         saved = d["baseline_dollars"] - d["distil_dollars"]
         dollars += saved
         tokens += d["baseline_input_tokens"] - d["distil_input_tokens"]
@@ -107,7 +112,9 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
         base_usd += d["baseline_dollars"]
         dist_usd += d["distil_dollars"]
         by_traj[d["trajectory_id"]] = by_traj.get(d["trajectory_id"], 0.0) + saved
-    return LedgerSummary(runs, dollars, tokens, by_traj, base_tok, dist_tok, base_usd, dist_usd)
+    return LedgerSummary(
+        runs, dollars, tokens, by_traj, base_tok, dist_tok, base_usd, dist_usd, frozenset(toks)
+    )
 
 
 def render_html(s: LedgerSummary) -> str:

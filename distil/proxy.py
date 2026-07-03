@@ -21,6 +21,8 @@ Or as a module::
 from __future__ import annotations
 
 import json
+import os
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -54,6 +56,15 @@ _HOP_BY_HOP = frozenset(
         "upgrade",
     }
 )
+
+
+# Upstream socket timeout (seconds). Generous — LLM generations run minutes —
+# but finite, so a wedged upstream can never pin a worker thread forever.
+_UPSTREAM_TIMEOUT = float(os.environ.get("DISTIL_UPSTREAM_TIMEOUT", "600"))
+
+
+def _is_timeout(exc: urllib.error.URLError) -> bool:
+    return isinstance(exc.reason, (socket.timeout, TimeoutError))
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +101,16 @@ def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> 
     return max(0, _count_messages(before) - _count_messages(after))
 
 
+def _model_from_path(path: str) -> str | None:
+    """Extract the model id from a Gemini-style URL (``.../models/<id>:action``)."""
+    marker = "/models/"
+    idx = path.find(marker)
+    if idx < 0:
+        return None
+    tail = path[idx + len(marker) :]
+    return tail.split(":", 1)[0].split("/", 1)[0] or None
+
+
 # ---------------------------------------------------------------------------
 # Handler factory
 # ---------------------------------------------------------------------------
@@ -102,7 +123,7 @@ def build_handler(
     verbatim: bool = False,
     shape_output: str = "off",
     savings: Any = None,
-    flush_every: int = 50,
+    flush_every: int = 10,
     expand: bool = False,
     shadow_rate: float = 0.0,
     session_delta: bool = False,
@@ -242,7 +263,7 @@ def build_handler(
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     return resp.status, rhdrs, rbody
@@ -251,10 +272,14 @@ def build_handler(
                 rhdrs = {k: v for k, v in exc.headers.items() if k.lower() not in _HOP_BY_HOP}
                 return exc.code, rhdrs, rbody
             except urllib.error.URLError as exc:
+                status = 504 if _is_timeout(exc) else 502
                 rbody = json.dumps(
                     {"error": "upstream connection failed", "detail": str(exc.reason)}
                 ).encode()
-                return 502, {"Content-Type": "application/json"}, rbody
+                return status, {"Content-Type": "application/json"}, rbody
+            except TimeoutError:
+                rbody = b'{"error":"upstream timed out"}'
+                return 504, {"Content-Type": "application/json"}, rbody
 
         # ----------------------------------------------------------------
         # Compression path
@@ -339,16 +364,17 @@ def build_handler(
                     from .expand import inject_expand_tool
 
                     body = inject_expand_tool(body)
-                # Accumulate GENUINE savings from real traffic into the ledger.
+                # Accumulate GENUINE savings from real traffic into the ledger,
+                # priced per the model THIS request names (agents mix models).
                 if savings is not None:
-                    savings.record(before_tok, after_tok)
-                    if savings.requests >= flush_every:
-                        savings.flush()
+                    savings.record(before_tok, after_tok, model=body.get("model"))
+                    savings.maybe_flush(every=flush_every)
                 # Output compression: gated by lossless_only (only on PAYG-style).
                 if shape_output != "off" and not lossless_only:
                     from .output import shape_request
 
-                    body = shape_request(body, level=shape_output, allow=True)
+                    _shape = "anthropic" if strip_query(self.path) == "/v1/messages" else "openai"
+                    body = shape_request(body, level=shape_output, allow=True, shape=_shape)
                     extras["x-distil-output-shaping"] = shape_output
 
             elif "contents" in body and isinstance(body["contents"], list):
@@ -376,9 +402,9 @@ def build_handler(
                     "x-distil-tokens-saved": str(saved),
                 }
                 if savings is not None:
-                    savings.record(before_tok, after_tok)
-                    if savings.requests >= flush_every:
-                        savings.flush()
+                    # Gemini requests carry the model in the URL path, not the body.
+                    savings.record(before_tok, after_tok, model=_model_from_path(self.path))
+                    savings.maybe_flush(every=flush_every)
 
             new_raw = json.dumps(body).encode()
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
@@ -465,7 +491,7 @@ def build_handler(
                 method=self.command,
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     self._relay(resp.status, rhdrs, rbody)
@@ -474,13 +500,39 @@ def build_handler(
                 rhdrs = {k: v for k, v in exc.headers.items() if k.lower() not in _HOP_BY_HOP}
                 self._relay(exc.code, rhdrs, rbody)
             except urllib.error.URLError as exc:
+                status = 504 if _is_timeout(exc) else 502
                 rbody = json.dumps(
                     {"error": "upstream connection failed", "detail": str(exc.reason)}
                 ).encode()
-                self._relay(502, {"Content-Type": "application/json"}, rbody)
+                self._relay(status, {"Content-Type": "application/json"}, rbody)
+            except TimeoutError:
+                self._relay(
+                    504, {"Content-Type": "application/json"}, b'{"error":"upstream timed out"}'
+                )
 
     _DistilHandler.shadow_threads = _shadow_threads  # drained on shutdown
     return _DistilHandler
+
+
+def _install_sigterm_flush(proc_holder: list | None = None) -> None:
+    """Turn SIGTERM into KeyboardInterrupt so the caller's ``finally`` block
+    (savings flush, shadow drain) runs on a plain ``kill`` instead of dropping
+    up to a flush-window of recorded savings. Forwards the signal to a wrapped
+    child process first, if one is registered in *proc_holder*."""
+    import signal
+
+    def _on_term(signum: int, frame: object) -> None:  # noqa: ARG001
+        if proc_holder:
+            try:
+                proc_holder[0].terminate()
+            except Exception:  # noqa: BLE001 — best-effort child shutdown
+                pass
+        raise KeyboardInterrupt
+
+    try:
+        signal.signal(signal.SIGTERM, _on_term)
+    except ValueError:
+        pass  # not the main thread (embedded use) — finally-blocks still cover Ctrl+C
 
 
 def _drain_shadow(handler: type, budget: float = 6.0) -> None:
@@ -572,6 +624,7 @@ def serve(
         print(f"  → output shaping: {shape_output}")
     if savings is not None:
         print("  → recording genuine savings → distil leaderboard")
+    _install_sigterm_flush()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -606,7 +659,6 @@ def wrap_run(
     runs the command to completion, then tears the proxy down — flushing genuine
     savings to the local ledger. Returns the child process's exit code.
     """
-    import os
     import subprocess
     import sys
 
@@ -646,8 +698,12 @@ def wrap_run(
         )
 
     code = 0
+    proc_holder: list = []
+    _install_sigterm_flush(proc_holder)
     try:
-        code = subprocess.run(command, env=child_env).returncode
+        proc = subprocess.Popen(command, env=child_env)
+        proc_holder.append(proc)
+        code = proc.wait()
     except FileNotFoundError:
         print(f"distil wrap: command not found: {command[0]}", file=sys.stderr)
         code = 127
@@ -657,7 +713,7 @@ def wrap_run(
         server.shutdown()
         _drain_shadow(handler)
         if savings is not None:
-            savings.flush()
+            savings.flush()  # SIGTERM lands here too — no savings are ever dropped
         server.server_close()
     return code
 
