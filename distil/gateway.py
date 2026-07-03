@@ -35,6 +35,7 @@ from .adapters.gemini import count_tokens as _gemini_count
 from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
+from .proxy import _UPSTREAM_TIMEOUT
 from .tokenizer import DEFAULT as _tokenizer
 
 # Safe tenant label: bounded length, no markup / control characters.
@@ -438,6 +439,9 @@ def build_gateway_handler(
     _upstream = upstream.rstrip("/")
 
     class _GatewayHandler(BaseHTTPRequestHandler):
+        # HTTP/1.1 so streamed responses can use chunked transfer framing.
+        protocol_version = "HTTP/1.1"
+
         # ----------------------------------------------------------------
         # Silence request logs
         # ----------------------------------------------------------------
@@ -556,6 +560,20 @@ def build_gateway_handler(
                 extras["x-distil-tokens-saved"] = str(tokens_saved)
 
             new_raw = json.dumps(body).encode()
+            # Streamed requests relay incrementally — TTFT preserved per tenant.
+            if bool(body.get("stream")) or ":streamGenerateContent" in self.path:
+                from .streamrelay import stream_upstream
+
+                stream_upstream(
+                    self,
+                    _upstream + self.path,
+                    new_raw,
+                    headers,
+                    timeout=_UPSTREAM_TIMEOUT,
+                    hop_by_hop=_HOP_BY_HOP,
+                    extras=extras,
+                )
+                return
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
             self._relay(status, rhdrs, rbody, extras=extras)
 
@@ -580,7 +598,7 @@ def build_gateway_handler(
                 method=self.command,
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     self._relay(resp.status, rhdrs, rbody)
@@ -593,6 +611,10 @@ def build_gateway_handler(
                     {"error": "upstream connection failed", "detail": str(exc.reason)}
                 ).encode()
                 self._relay(502, {"Content-Type": "application/json"}, rbody)
+            except TimeoutError:
+                self._relay(
+                    504, {"Content-Type": "application/json"}, b'{"error":"upstream timed out"}'
+                )
 
         # ----------------------------------------------------------------
         # Shared helpers
@@ -650,7 +672,7 @@ def build_gateway_handler(
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req) as resp:
+                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     return resp.status, rhdrs, rbody
@@ -663,6 +685,8 @@ def build_gateway_handler(
                     {"error": "upstream connection failed", "detail": str(exc.reason)}
                 ).encode()
                 return 502, {"Content-Type": "application/json"}, rbody
+            except TimeoutError:
+                return 504, {"Content-Type": "application/json"}, b'{"error":"upstream timed out"}'
 
     return _GatewayHandler
 

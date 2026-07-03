@@ -369,6 +369,8 @@ def cmd_proxy(args: argparse.Namespace) -> int:
             lossless_only=args.lossless_only,
             verbatim=args.verbatim,
             shape_output=args.shape_output,
+            record=not args.no_record,
+            pricing_model=args.pricing,
         )
     else:
         from .proxy import serve

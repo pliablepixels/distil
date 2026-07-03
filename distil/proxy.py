@@ -167,6 +167,10 @@ def build_handler(
         _shadow_ledger = ShadowLedger()
 
     class _DistilHandler(BaseHTTPRequestHandler):
+        # HTTP/1.1 so streamed responses can use chunked transfer framing
+        # (every non-streaming response still carries an exact Content-Length).
+        protocol_version = "HTTP/1.1"
+
         # ----------------------------------------------------------------
         # Silence request logs — quiet by design
         # ----------------------------------------------------------------
@@ -407,6 +411,37 @@ def build_handler(
                     savings.maybe_flush(every=flush_every)
 
             new_raw = json.dumps(body).encode()
+
+            # Decide shadow sampling BEFORE relaying so the marker header can be
+            # sent on the streaming path too (headers go out before the body).
+            shadow_sampled = _shadow_sampler is not None and _shadow_sampler.should_sample()
+            if shadow_sampled:
+                extras["x-distil-shadow"] = "sampled"
+
+            # Streaming pass-through: when the client asked for a streamed
+            # response, relay upstream bytes as they arrive — time-to-first-token
+            # is preserved. The expand loop needs the complete response (it may
+            # re-query before answering), so expand-eligible requests stay on
+            # the buffered path.
+            want_stream = bool(body.get("stream")) or ":streamGenerateContent" in self.path
+            if want_stream and not (expand and getattr(store, "handles", None)):
+                from .streamrelay import stream_upstream
+
+                rbody_opt = stream_upstream(
+                    self,
+                    _upstream + self.path,
+                    new_raw,
+                    headers,
+                    timeout=_UPSTREAM_TIMEOUT,
+                    hop_by_hop=_HOP_BY_HOP,
+                    extras=extras,
+                )
+                if _learn_stats is not None:
+                    _learn_stats.save()
+                if shadow_sampled and rbody_opt:
+                    self._spawn_shadow(raw, headers, rbody_opt)
+                return
+
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
 
             # Transparent expand loop: resolve any distil_expand tool calls against
@@ -440,35 +475,38 @@ def build_handler(
             # Shadow-mode: on a sampled request, re-run the decision UNCOMPRESSED in
             # the background and record whether it matched — a live decision-change
             # signal on real traffic. Never blocks the client's response.
-            if _shadow_sampler is not None and _shadow_sampler.should_sample():
-                extras["x-distil-shadow"] = "sampled"
-                # Capture the real (compressed) response body — JSON or SSE stream.
-                _compressed_body = rbody
-                _orig_raw, _hdrs = raw, headers
-
-                def _shadow_compare() -> None:
-                    try:
-                        from .shadow import decision_signature_from_body
-
-                        _s, _h, orig_rbody = self._post_upstream(self.path, _orig_raw, _hdrs)
-                        # decision_signature_from_body handles both JSON and streamed
-                        # (SSE / chunk-array) bodies, so this works for Claude Code /
-                        # Codex / Gemini sessions, which stream their responses.
-                        comp_sig = decision_signature_from_body(_compressed_body)
-                        orig_sig = decision_signature_from_body(orig_rbody)
-                        _shadow_ledger.record(comp_sig == orig_sig)
-                    except Exception:  # noqa: BLE001 — shadow must never affect the request
-                        pass
-
-                # Track the thread so teardown can drain it: a daemon thread is
-                # killed on process exit, which loses the sample on a quick run
-                # (e.g. `claude -p`) or right after the last turn. Prune finished
-                # ones first so the list stays bounded on long sessions.
-                _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
-                _t = threading.Thread(target=_shadow_compare, daemon=True)
-                _shadow_threads.append(_t)
-                _t.start()
+            if shadow_sampled:
+                self._spawn_shadow(raw, headers, rbody)
             self._relay(status, rhdrs, rbody, extras=extras)
+
+        def _spawn_shadow(
+            self, orig_raw: bytes, headers: dict[str, str], compressed: bytes
+        ) -> None:
+            """Re-run the request uncompressed in the background and record whether
+            the agent's decision matched. Never blocks the client's response."""
+
+            def _shadow_compare() -> None:
+                try:
+                    from .shadow import decision_signature_from_body
+
+                    _s, _h, orig_rbody = self._post_upstream(self.path, orig_raw, headers)
+                    # decision_signature_from_body handles both JSON and streamed
+                    # (SSE / chunk-array) bodies, so this works for Claude Code /
+                    # Codex / Gemini sessions, which stream their responses.
+                    comp_sig = decision_signature_from_body(compressed)
+                    orig_sig = decision_signature_from_body(orig_rbody)
+                    _shadow_ledger.record(comp_sig == orig_sig)
+                except Exception:  # noqa: BLE001 — shadow must never affect the request
+                    pass
+
+            # Track the thread so teardown can drain it: a daemon thread is
+            # killed on process exit, which loses the sample on a quick run
+            # (e.g. `claude -p`) or right after the last turn. Prune finished
+            # ones first so the list stays bounded on long sessions.
+            _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
+            _t = threading.Thread(target=_shadow_compare, daemon=True)
+            _shadow_threads.append(_t)
+            _t.start()
 
         # ----------------------------------------------------------------
         # Transparent passthrough (unchanged body, any verb)
@@ -482,33 +520,17 @@ def build_handler(
             if raw is None:
                 self._reject(413, "request body too large or malformed Content-Length")
                 return
-            headers = self._client_headers()
-            url = _upstream + self.path
-            req = urllib.request.Request(
-                url,
-                data=raw or None,
-                headers={**headers, **({"Content-Length": str(len(raw))} if raw else {})},
+            from .streamrelay import stream_upstream
+
+            stream_upstream(
+                self,
+                _upstream + self.path,
+                raw or None,
+                self._client_headers(),
                 method=self.command,
+                timeout=_UPSTREAM_TIMEOUT,
+                hop_by_hop=_HOP_BY_HOP,
             )
-            try:
-                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
-                    rbody = resp.read()
-                    rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
-                    self._relay(resp.status, rhdrs, rbody)
-            except urllib.error.HTTPError as exc:
-                rbody = exc.read() if exc.fp else b'{"error":"upstream error"}'
-                rhdrs = {k: v for k, v in exc.headers.items() if k.lower() not in _HOP_BY_HOP}
-                self._relay(exc.code, rhdrs, rbody)
-            except urllib.error.URLError as exc:
-                status = 504 if _is_timeout(exc) else 502
-                rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
-                ).encode()
-                self._relay(status, {"Content-Type": "application/json"}, rbody)
-            except TimeoutError:
-                self._relay(
-                    504, {"Content-Type": "application/json"}, b'{"error":"upstream timed out"}'
-                )
 
     _DistilHandler.shadow_threads = _shadow_threads  # drained on shutdown
     return _DistilHandler
