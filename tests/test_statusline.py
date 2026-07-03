@@ -232,3 +232,56 @@ def test_render_dashboard_recent_strip():
     )
     assert "recent" in out
     assert "▰" in out and "▱" in out  # equivalent + changed marks present
+
+
+def test_session_first_when_live_session(monkeypatch, capsys, tmp_path):
+    """A live session leads the line; lifetime collapses to one Σ figure."""
+    import time
+
+    from distil import ledger as led_mod
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
+    path = tmp_path / "savings.jsonl"
+    led_mod.record(
+        trajectory_id="live-proxy", model="claude-opus-4-8", turns=5,
+        baseline_dollars=1.0, distil_dollars=0.4,
+        baseline_input_tokens=200_000, distil_input_tokens=80_000,
+        session="old-session", path=path,
+    )
+    led_mod.record(
+        trajectory_id="live-proxy", model="claude-opus-4-8", turns=3,
+        baseline_dollars=0.5, distil_dollars=0.2,
+        baseline_input_tokens=100_000, distil_input_tokens=40_000,
+        session=f"s{int(time.time())}-99", path=path,
+    )
+    monkeypatch.setattr(led_mod, "default_path", lambda: path)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
+    rc = cmd_statusline(argparse.Namespace(no_color=True))
+    out = capsys.readouterr().out.strip()
+    assert rc == 0
+    assert "sess 100.0K→40.0K −60%" in out  # THIS session only
+    assert "Σ 180.0K saved" in out  # lifetime, one figure
+    assert "$0.30" in out  # session dollars, not lifetime
+
+
+def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
+    """No live session (>4h idle) → the familiar lifetime view."""
+    import json as _json
+
+    from distil import ledger as led_mod
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
+    path = tmp_path / "savings.jsonl"
+    rec = {
+        "trajectory_id": "live-proxy", "model": "claude-opus-4-8", "turns": 2,
+        "baseline_dollars": 1.0, "distil_dollars": 0.5,
+        "baseline_input_tokens": 50_000, "distil_input_tokens": 25_000,
+        "tokenizer": "heuristic", "ts": 1000.0, "session": "ancient",
+    }
+    path.write_text(_json.dumps(rec) + "\n")
+    monkeypatch.setattr(led_mod, "default_path", lambda: path)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
+    cmd_statusline(argparse.Namespace(no_color=True))
+    out = capsys.readouterr().out.strip()
+    assert "50.0K→25.0K tok −50%" in out
+    assert "sess" not in out

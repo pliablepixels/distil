@@ -31,6 +31,7 @@ class RuntimeSavings:
     """
 
     model: str = "claude-opus-4-8"
+    session_id: str = ""  # set in __post_init__; stamps every ledger record
     requests: int = 0
     tokens_before: int = 0
     tokens_after: int = 0
@@ -44,6 +45,12 @@ class RuntimeSavings:
         # Accept a str path too — the ledger needs a real Path for `.parent`.
         if self.ledger_path is not None and not isinstance(self.ledger_path, Path):
             self.ledger_path = Path(self.ledger_path)
+        if not self.session_id:
+            import os
+            import time
+
+            # One proxy process == one agent session (that's what wrap runs).
+            self.session_id = f"s{int(time.time())}-{os.getpid()}"
 
     @property
     def tokens_saved(self) -> int:
@@ -109,6 +116,7 @@ class RuntimeSavings:
                     distil_dollars=after * per_tok,
                     baseline_input_tokens=before,
                     distil_input_tokens=after,
+                    session=self.session_id,
                     path=self.ledger_path or ledger.default_path(),
                 )
             self.requests = 0

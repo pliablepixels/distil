@@ -482,35 +482,52 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     if s is None or s.runs == 0:
         parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
     else:
-        tok = f"{ledger._human(s.total_baseline_tokens)}→{ledger._human(s.total_distil_tokens)} tok"
-        # The percent trimmed is the single most glanceable savings number —
-        # lead with it rather than making the user do the division.
-        if s.total_baseline_tokens:
-            trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
-            tok += f" −{trimmed * 100:.0f}%"
-        parts.append(c("36", tok))
-        # On a flat-rate subscription there's no per-token bill, so the dollar
-        # figure is notional — show tokens only. Auto-detected (Claude OAuth, no
-        # key); override with DISTIL_SUBSCRIPTION=0/1.
+        # SESSION-FIRST: what this wrapped agent saved right now is the number a
+        # developer acts on; lifetime is context, compressed to one Σ figure
+        # (full breakdown: distil stats / dashboard). "This session" = the most
+        # recently active proxy process, shown while it's fresh (<4h idle).
         from .doctor import subscription_mode
 
-        if not subscription_mode():
-            saved = s.total_baseline_dollars - s.total_distil_dollars
-            parts.append(c("32", f"${saved:,.2f} saved"))
-        # Freshness: today's savings next to lifetime, so an active session
-        # shows movement instead of a static all-time number.
+        metered = not subscription_mode()
+        shown_session = False
         try:
             import time as _time
 
-            midnight = _time.mktime(
-                _time.struct_time(_time.localtime()[:3] + (0, 0, 0) + _time.localtime()[6:])
-            )
-            today = ledger.summary(since=midnight)
-            if 0 < today.total_tokens_saved < s.total_tokens_saved:
-                parts.append(c("36", f"today {ledger._human(today.total_tokens_saved)}"))
-        except Exception:  # noqa: BLE001 — freshness is best-effort
+            sid, last_ts = ledger.latest_session()
+            if sid and (_time.time() - last_ts) < 4 * 3600:
+                sess = ledger.summary(session=sid)
+                if sess.runs and sess.total_baseline_tokens:
+                    trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
+                    seg = (
+                        f"sess {ledger._human(sess.total_baseline_tokens)}→"
+                        f"{ledger._human(sess.total_distil_tokens)} −{trimmed * 100:.0f}%"
+                    )
+                    parts.append(c("36", seg))
+                    if metered and sess.total_dollars_saved > 0:
+                        parts.append(c("32", f"${sess.total_dollars_saved:,.2f}"))
+                    shown_session = True
+        except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
-        parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
+        if shown_session:
+            # Lifetime as one glanceable figure (tokens saved all-time).
+            life = f"Σ {ledger._human(s.total_tokens_saved)} saved"
+            if metered:
+                life += f" (${s.total_dollars_saved:,.2f})"
+            parts.append(c("90", life))
+        else:
+            # No live session — fall back to the lifetime view.
+            tok = (
+                f"{ledger._human(s.total_baseline_tokens)}→"
+                f"{ledger._human(s.total_distil_tokens)} tok"
+            )
+            if s.total_baseline_tokens:
+                trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
+                tok += f" −{trimmed * 100:.0f}%"
+            parts.append(c("36", tok))
+            if metered:
+                saved = s.total_baseline_dollars - s.total_distil_dollars
+                parts.append(c("32", f"${saved:,.2f} saved"))
+            parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
         try:
             from .shadow import ShadowLedger
 

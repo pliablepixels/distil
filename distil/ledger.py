@@ -40,6 +40,7 @@ class SavingsRecord:
     distil_input_tokens: int
     tokenizer: str
     ts: float
+    session: str = ""  # proxy-process session id — lets the statusline show THIS session
 
     @property
     def dollars_saved(self) -> float:
@@ -60,6 +61,7 @@ def record(
     baseline_input_tokens: int,
     distil_input_tokens: int,
     tokenizer: str = "heuristic",
+    session: str = "",
     path: Path | None = None,
 ) -> SavingsRecord:
     rec = SavingsRecord(
@@ -72,6 +74,7 @@ def record(
         distil_input_tokens,
         tokenizer,
         time.time(),
+        session,
     )
     path = path or default_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,9 +99,30 @@ class LedgerSummary:
     tokenizers: frozenset[str] = frozenset()
 
 
-def summary(path: Path | None = None, *, since: float | None = None) -> LedgerSummary:
-    """Roll up the ledger; ``since`` (unix ts) restricts to recent records so
-    callers can show a fresh window (today / this session) next to lifetime."""
+def latest_session(path: Path | None = None) -> tuple[str, float]:
+    """(session id, last-activity ts) of the most recently ACTIVE session in the
+    ledger, or ("", 0.0). One pass, cheap enough for a status line."""
+    path = path or default_path()
+    best_id, best_ts = "", 0.0
+    try:
+        for line in path.read_text().splitlines():
+            if not line.strip():
+                continue
+            d = json.loads(line)
+            sid = d.get("session") or ""
+            ts = d.get("ts", 0.0)
+            if sid and ts >= best_ts:
+                best_id, best_ts = sid, ts
+    except OSError:
+        pass
+    return best_id, best_ts
+
+
+def summary(
+    path: Path | None = None, *, since: float | None = None, session: str | None = None
+) -> LedgerSummary:
+    """Roll up the ledger; ``since`` (unix ts) and/or ``session`` restrict the
+    window so callers can show a fresh slice (this session) next to lifetime."""
     path = path or default_path()
     if not path.exists():
         return LedgerSummary(0, 0.0, 0, {})
@@ -116,6 +140,8 @@ def summary(path: Path | None = None, *, since: float | None = None) -> LedgerSu
             continue
         d = json.loads(line)
         if since is not None and d.get("ts", 0.0) < since:
+            continue
+        if session is not None and (d.get("session") or "") != session:
             continue
         runs += 1
         toks.add(d.get("tokenizer", "heuristic"))
