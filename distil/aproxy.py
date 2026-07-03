@@ -179,13 +179,17 @@ def make_app(
     ) -> web.StreamResponse:
         client: aiohttp.ClientSession = request.app[_client_key]
         try:
-            resp_cm = client.request(method, url, data=data, headers=headers, timeout=_timeout)
+            # allow_redirects=False: relay 3xx instead of re-sending the client's
+            # credentials to whatever host the upstream redirect names.
+            resp_cm = client.request(
+                method, url, data=data, headers=headers, timeout=_timeout, allow_redirects=False
+            )
             resp = await resp_cm.__aenter__()
         except aiohttp.ServerTimeoutError:
             return web.json_response({"error": "upstream timed out"}, status=504)
         except (aiohttp.ClientError, TimeoutError) as exc:
             return web.json_response(
-                {"error": "upstream connection failed", "detail": str(exc)}, status=502
+                {"error": "upstream connection failed", "detail": str(exc)[:200]}, status=502
             )
         try:
             resp_headers = _filter_headers(resp.headers)

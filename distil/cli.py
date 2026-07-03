@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from typing import Any
 from pathlib import Path
 
 from . import __version__, ledger, pricing, tokenizer
@@ -62,7 +63,7 @@ def cmd_savings(args: argparse.Namespace) -> int:
     tok = tokenizer.resolve(args.tokenizer, model=price.name)
     out_t = args.output_tokens_per_turn
 
-    runs = {
+    runs: dict[str, dict[str, Any]] = {
         "baseline (no cache, no compress)": dict(strategy="none", caching=False),
         "cache only": dict(strategy="none", caching=True),
         "naive compress + cache": dict(strategy="naive", caching=True),
@@ -376,9 +377,9 @@ def cmd_holdout(args: argparse.Namespace) -> int:
 def cmd_proxy(args: argparse.Namespace) -> int:
     """Drop-in provider proxy: point any base_url-honoring client at it."""
     if args.use_async:
-        from .aproxy import serve  # high-concurrency (needs distil-llm[async])
+        from .aproxy import serve as aserve  # high-concurrency (needs distil-llm[async])
 
-        serve(
+        aserve(
             host=args.host,
             port=args.port,
             upstream=args.upstream,
@@ -819,6 +820,9 @@ def cmd_default(args: argparse.Namespace) -> int:
                 "for the alias, or run `distil proxy` yourself."
             )
             return 1
+        if content is None:
+            print("✗ could not render the service file for this platform")
+            return 1
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         print(f"✓ wrote proxy service → {path}")
@@ -1030,7 +1034,7 @@ def cmd_certify_trajectories(args: argparse.Namespace) -> int:
     """
     from .certify.trajectory_risk import TrajectoryOutcome, certify_trajectory_risk
 
-    outcomes = []
+    outcomes: list = []
     for line in Path(args.outcomes).read_text().splitlines():
         line = line.strip()
         if not line:
@@ -1187,7 +1191,7 @@ def cmd_conformal(args: argparse.Namespace) -> int:
     agent's decision-change rate at a user-chosen risk level."""
     from .conformal import calibrate
 
-    runner = None
+    runner: Any = None
     if args.runner == "anthropic":
         from .replay.anthropic_runner import AnthropicRunner
 
@@ -1312,7 +1316,7 @@ def cmd_frontier(args: argparse.Namespace) -> int:
     from .compress.adaptive import frontier
     from .replay.runner import DeterministicRunner
 
-    runner = DeterministicRunner()
+    runner: Any = DeterministicRunner()
     if args.runner == "anthropic":
         from .replay.anthropic_runner import AnthropicRunner
 

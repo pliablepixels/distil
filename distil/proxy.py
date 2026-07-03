@@ -67,6 +67,17 @@ def _is_timeout(exc: urllib.error.URLError) -> bool:
     return isinstance(exc.reason, (socket.timeout, TimeoutError))
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Relay 3xx instead of following: auto-following would re-send the
+    client's credentials to whatever host the upstream redirect names."""
+
+    def redirect_request(self, *a, **k):  # noqa: ANN002, ANN003
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 # ---------------------------------------------------------------------------
 # Token-saving estimator
 # ---------------------------------------------------------------------------
@@ -222,9 +233,18 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def _read_body(self) -> bytes | None:
-            """Read the request body, or None if Content-Length is malformed/oversized."""
+            """Read the request body; on a malformed/oversized/chunked request,
+            send the error response itself and return None (caller just returns)."""
+            if not self.headers.get("Content-Length") and "chunked" in (
+                self.headers.get("Transfer-Encoding") or ""
+            ):
+                # A chunked body would otherwise be read as empty and silently
+                # dropped — fail loudly instead (LLM SDKs always send a length).
+                self._reject(411, "chunked request bodies are not supported; send Content-Length")
+                return None
             length = parse_content_length(self.headers.get("Content-Length"))
             if length is None:
+                self._reject(413, "request body too large or malformed Content-Length")
                 return None
             return self.rfile.read(length) if length else b""
 
@@ -232,10 +252,16 @@ def build_handler(
             body = json.dumps({"error": message}).encode()
             self._relay(code, {"Content-Type": "application/json"}, body)
 
-        def _client_headers(self) -> dict[str, str]:
+        def _client_headers(self, *, identity: bool = False) -> dict[str, str]:
             """Client headers with hop-by-hop stripped (Content-Length excluded
-            so we can recompute it after compression)."""
-            return {k: v for k, v in self.headers.items() if k.lower() not in _HOP_BY_HOP}
+            so we can recompute it after compression). ``identity=True`` also
+            drops Accept-Encoding: on compressible paths a gzip upstream body
+            would silently defeat the expand loop and shadow decision parsing
+            (both read the response), so those requests ask for identity."""
+            out = {k: v for k, v in self.headers.items() if k.lower() not in _HOP_BY_HOP}
+            if identity:
+                out = {k: v for k, v in out.items() if k.lower() != "accept-encoding"}
+            return out
 
         def _relay(
             self,
@@ -277,7 +303,7 @@ def build_handler(
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
+                with _OPENER.open(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     return resp.status, rhdrs, rbody
@@ -288,7 +314,7 @@ def build_handler(
             except urllib.error.URLError as exc:
                 status = 504 if _is_timeout(exc) else 502
                 rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
+                    {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
                 ).encode()
                 return status, {"Content-Type": "application/json"}, rbody
             except TimeoutError:
@@ -305,9 +331,8 @@ def build_handler(
                 return
             raw = self._read_body()
             if raw is None:
-                self._reject(413, "request body too large or malformed Content-Length")
-                return
-            headers = self._client_headers()
+                return  # _read_body already sent the error response
+            headers = self._client_headers(identity=True)
             extras: dict[str, str] = {}
             store: Any = None  # RestoreStore once messages are compressed (for expand)
 
@@ -505,7 +530,8 @@ def build_handler(
                     # Codex / Gemini sessions, which stream their responses.
                     comp_sig = decision_signature_from_body(compressed)
                     orig_sig = decision_signature_from_body(orig_rbody)
-                    _shadow_ledger.record(comp_sig == orig_sig)
+                    if _shadow_ledger is not None:
+                        _shadow_ledger.record(comp_sig == orig_sig)
                 except Exception:  # noqa: BLE001 — shadow must never affect the request
                     pass
 
@@ -528,8 +554,7 @@ def build_handler(
                 return
             raw = self._read_body()
             if raw is None:
-                self._reject(413, "request body too large or malformed Content-Length")
-                return
+                return  # _read_body already sent the error response
             from .streamrelay import stream_upstream
 
             stream_upstream(
@@ -542,7 +567,7 @@ def build_handler(
                 hop_by_hop=_HOP_BY_HOP,
             )
 
-    _DistilHandler.shadow_threads = _shadow_threads  # drained on shutdown
+    _DistilHandler.shadow_threads = _shadow_threads  # type: ignore[attr-defined]  # drained on shutdown
     return _DistilHandler
 
 

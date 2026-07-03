@@ -24,6 +24,8 @@ Two production guarantees:
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -239,7 +241,7 @@ def bandit_select_operating_point(
     constrained-RL policy (a learned per-turn keep policy) needs training data and is a
     tracked GA research item (`docs/GA_READINESS.md`), not a shipped default.
     """
-    state = {
+    state: dict[str, dict[str, Any]] = {
         name: {"name": name, "gate_recent": gr, "b": 0, "c": 0, "n": 0, "alive": True}
         for name, gr in arms
     }

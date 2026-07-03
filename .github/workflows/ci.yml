@@ -14,6 +14,20 @@ jobs:
         uses: astral-sh/setup-uv@v5
       - name: ruff check
         run: uvx ruff check distil tests
+      - name: mypy (the package ships py.typed — keep it actually typed)
+        run: uvx mypy --python-version 3.12 --ignore-missing-imports distil
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      # Floor just under the current 80% — coverage may only erode loudly.
+      - name: pytest with coverage floor
+        run: uv run --with pytest --with pytest-cov python -m pytest -q --cov=distil --cov-fail-under=78
 
   gate:
     runs-on: ${{ matrix.os }}

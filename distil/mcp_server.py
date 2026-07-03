@@ -190,7 +190,7 @@ def handle_message(msg: dict[str, Any]) -> dict[str, Any] | None:
 
     if method == "tools/call":
         params = msg.get("params") or {}
-        name = params.get("name")
+        name = params.get("name") or ""
         args = params.get("arguments") or {}
         fn = _DISPATCH.get(name)
         if fn is None:

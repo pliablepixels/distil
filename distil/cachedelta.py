@@ -193,11 +193,11 @@ def _encode_block(
     # 1) Exact re-send → back-reference.
     if h in prior:
         store._record(h, text)
-        marker = _exact_marker(h, nlines)
-        if len(marker) < len(text):
+        exact = _exact_marker(h, nlines)
+        if len(exact) < len(text):
             stats.exact_refs += 1
-            stats.tokens_saved += max(0, _tok.count(text) - _tok.count(marker))
-            return marker
+            stats.tokens_saved += max(0, _tok.count(text) - _tok.count(exact))
+            return exact
         return text
 
     # 2) Near-duplicate (e.g. a file re-read after an edit) → reference + delta.

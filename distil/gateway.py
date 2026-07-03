@@ -37,7 +37,7 @@ from .adapters.gemini import count_tokens as _gemini_count
 from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
-from .proxy import _UPSTREAM_TIMEOUT
+from .proxy import _OPENER, _UPSTREAM_TIMEOUT
 from .tokenizer import DEFAULT as _tokenizer
 
 # Safe tenant label: bounded length, no markup / control characters.
@@ -569,7 +569,12 @@ def build_gateway_handler(
                 self._relay(status, rhdrs, rbody)
                 return
 
-            extras: dict[str, str] = {"x-distil-tenant": tenant}
+            # Echo the tenant label back only when it's an operator-trusted
+            # explicit label — an anon-<hash> is a stable credential-derived
+            # correlator that shouldn't ride response headers.
+            extras: dict[str, str] = {}
+            if not tenant.startswith("anon-"):
+                extras["x-distil-tenant"] = tenant
 
             if "messages" in body and isinstance(body["messages"], list):
                 original: list[dict[str, Any]] = body["messages"]
@@ -638,7 +643,7 @@ def build_gateway_handler(
                 method=self.command,
             )
             try:
-                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
+                with _OPENER.open(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     self._relay(resp.status, rhdrs, rbody)
@@ -648,7 +653,7 @@ def build_gateway_handler(
                 self._relay(exc.code, rhdrs, rbody)
             except urllib.error.URLError as exc:
                 rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
+                    {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
                 ).encode()
                 self._relay(502, {"Content-Type": "application/json"}, rbody)
             except TimeoutError:
@@ -712,7 +717,7 @@ def build_gateway_handler(
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req, timeout=_UPSTREAM_TIMEOUT) as resp:
+                with _OPENER.open(req, timeout=_UPSTREAM_TIMEOUT) as resp:
                     rbody = resp.read()
                     rhdrs = {k: v for k, v in resp.headers.items() if k.lower() not in _HOP_BY_HOP}
                     return resp.status, rhdrs, rbody
@@ -722,7 +727,7 @@ def build_gateway_handler(
                 return exc.code, rhdrs, rbody
             except urllib.error.URLError as exc:
                 rbody = json.dumps(
-                    {"error": "upstream connection failed", "detail": str(exc.reason)}
+                    {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
                 ).encode()
                 return 502, {"Content-Type": "application/json"}, rbody
             except TimeoutError:

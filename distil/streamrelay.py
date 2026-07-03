@@ -19,6 +19,18 @@ from http.server import BaseHTTPRequestHandler
 _CHUNK = 8192
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Relay 3xx to the client instead of following it: auto-following would
+    re-send the client's Authorization/x-api-key to whatever host the upstream
+    names — the client's own HTTP stack must decide that."""
+
+    def redirect_request(self, *a, **k):  # noqa: ANN002, ANN003
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _is_timeout(exc: urllib.error.URLError) -> bool:
     import socket
 
@@ -59,7 +71,7 @@ def stream_upstream(
         handler.wfile.write(payload)
 
     try:
-        resp = urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 — operator-set upstream
+        resp = _OPENER.open(req, timeout=timeout)  # noqa: S310 — operator-set upstream
     except urllib.error.HTTPError as exc:
         rbody = exc.read() if exc.fp else b'{"error":"upstream error"}'
         handler.send_response(exc.code)
@@ -74,7 +86,9 @@ def stream_upstream(
         status = 504 if _is_timeout(exc) else 502
         _error(
             status,
-            json.dumps({"error": "upstream connection failed", "detail": str(exc.reason)}).encode(),
+            json.dumps(
+                {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
+            ).encode(),
         )
         return None
     except TimeoutError:
