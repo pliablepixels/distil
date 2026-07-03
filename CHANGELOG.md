@@ -5,6 +5,60 @@ All notable changes to Distil are documented here. Format loosely follows
 
 ## [Unreleased] — 1.7.0 dev
 
+### Added
+- **Trajectory-level risk certificate** (`distil certify-trajectories`,
+  `distil.certify.trajectory_risk`): certify the invariant that actually
+  transfers to task success — a distribution-free Conformal Risk Control /
+  Learn-Then-Test bound on **end-to-end task degradation** over matched
+  full-context/compressed runs, with stated exchangeability assumptions,
+  small-sample refusal, and an anytime-valid drift monitor that flags when the
+  certificate needs recalibration. This is the corrected certificate target:
+  per-step next-action equivalence provably overpredicts multi-step success
+  (our E7 experiment; arXiv 2412.17483).
+- **Outcome-guided compression policy** (`distil.compress.guideline`):
+  ACON-style learning from trajectory outcomes — content classes whose
+  digestion co-occurs with end-to-end regressions get protected byte-exact.
+  Never-regressing by construction (only makes compression more conservative);
+  content-free signatures only; always on in the proxy.
+- **Surprise-preserving retention**: a fourth salience signal — error lines,
+  failures, anomalies, and unified-diff changes are over-retained (the "lost
+  if surprise" failure mode of lossy compressors), plus file-path protection.
+- **True streaming pass-through** in all three servers (proxy, async proxy,
+  gateway): SSE responses relay chunk-by-chunk, preserving time-to-first-token
+  (previously every response was buffered start-to-finish). Shadow-mode
+  decision-equivalence accounting tees off the streamed bytes.
+- **`--json` output** on `doctor`, `leaderboard`/`stats`, and `shadow-stats`;
+  a `stats` alias for `leaderboard`; grouped `distil --help`.
+- **Doctor checks** for pricing-catalog drift (unpriced models in the ledger)
+  and tokenizer grade (heuristic vs billing-grade counts).
+
+### Fixed
+- **Savings were priced at one fixed model.** The proxy now accounts each
+  request under the model it names (mixed Opus/Haiku sessions are no longer
+  all priced at the Opus rate), the pricing catalog covers current model ids
+  (dated/Bedrock/Vertex shapes resolve too), and unknown upstreams (e.g.
+  Gemini) record token savings with dollars=0 rather than being silently
+  billed at Claude rates. The async proxy now records savings at all.
+- **One-liner `def f(): pass` functions vanished from code skeletons**,
+  leaving orphaned `...` where the signature should be.
+- **`--shape-output` broke against the Anthropic API** (injected
+  `role:"system"` into `messages`, which `/v1/messages` rejects); the
+  directive now goes into the top-level `system` field on Anthropic bodies.
+- **Upstream calls had no timeout** — a wedged upstream pinned a worker
+  thread forever; now a finite (env-tunable) timeout maps to a 504.
+- **Savings flushed only every 50 requests and were dropped on `kill`** —
+  now every 10 requests or 30 s, plus a SIGTERM handler that flushes (and
+  forwards the signal to the wrapped agent).
+- **Gateway tenant identity trusted a client header** — accounting identity
+  now derives from the credential hash; `x-distil-tenant` is honored only
+  under `--trust-tenant-header`. `/distil/stats` and `/distil/dashboard`
+  require `--admin-token` (Bearer) and are refused on non-loopback binds
+  without one. The MCP handle store is bounded and chmod 0600.
+- Concurrency race in expand-mode learning stats (intermittent 500s), sparse
+  record arrays no longer fold ambiguously, delta replay order is a declared
+  field with a loud error on mismatched turns, salience re-injection keeps
+  indentation, `online` warns when reporting train-set metrics.
+
 ### Changed
 - **Status line is now glanceable**: shows the percent trimmed next to the token
   figure (`1.2M→0.5M tok −58%`), a single `$X.XX saved` delta instead of two

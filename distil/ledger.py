@@ -86,7 +86,9 @@ class LedgerSummary:
     tokenizers: frozenset[str] = frozenset()
 
 
-def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
+def summary(path: Path = DEFAULT_PATH, *, since: float | None = None) -> LedgerSummary:
+    """Roll up the ledger; ``since`` (unix ts) restricts to recent records so
+    callers can show a fresh window (today / this session) next to lifetime."""
     if not path.exists():
         return LedgerSummary(0, 0.0, 0, {})
     runs = 0
@@ -102,6 +104,8 @@ def summary(path: Path = DEFAULT_PATH) -> LedgerSummary:
         if not line.strip():
             continue
         d = json.loads(line)
+        if since is not None and d.get("ts", 0.0) < since:
+            continue
         runs += 1
         toks.add(d.get("tokenizer", "heuristic"))
         saved = d["baseline_dollars"] - d["distil_dollars"]

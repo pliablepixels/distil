@@ -496,6 +496,19 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         if not subscription_mode():
             saved = s.total_baseline_dollars - s.total_distil_dollars
             parts.append(c("32", f"${saved:,.2f} saved"))
+        # Freshness: today's savings next to lifetime, so an active session
+        # shows movement instead of a static all-time number.
+        try:
+            import time as _time
+
+            midnight = _time.mktime(
+                _time.struct_time(_time.localtime()[:3] + (0, 0, 0) + _time.localtime()[6:])
+            )
+            today = ledger.summary(since=midnight)
+            if 0 < today.total_tokens_saved < s.total_tokens_saved:
+                parts.append(c("36", f"today {ledger._human(today.total_tokens_saved)}"))
+        except Exception:  # noqa: BLE001 — freshness is best-effort
+            pass
         parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
         try:
             from .shadow import ShadowLedger

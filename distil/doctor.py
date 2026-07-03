@@ -236,6 +236,52 @@ def _check_claude_code() -> list[Check]:
     return out
 
 
+def _check_pricing_catalog() -> Check:
+    """Warn when the ledger contains models the pricing catalog can't price —
+    their dollar savings are recorded as $0 (honest floor), which understates
+    the headline number until the catalog is updated."""
+    from . import ledger, pricing
+
+    path = ledger.DEFAULT_PATH
+    unknown: set[str] = set()
+    try:
+        for line in path.read_text().splitlines():
+            if not line.strip():
+                continue
+            model = json.loads(line).get("model", "")
+            base = model.replace(" (unpriced)", "")
+            if pricing.resolve(base) is None:
+                unknown.add(base)
+    except OSError:
+        return Check("pricing", OK, f"catalog covers {len(pricing.CATALOG)} model ids")
+    if unknown:
+        return Check(
+            "pricing",
+            WARN,
+            f"ledger contains unpriced models: {', '.join(sorted(unknown)[:4])}",
+            "their savings show as $0 — update distil (or the catalog) to price them",
+        )
+    return Check("pricing", OK, f"all recorded models priced ({len(pricing.CATALOG)} in catalog)")
+
+
+def _check_tokenizer_grade() -> Check:
+    """Say out loud which tokenizer produced the numbers users see daily."""
+    from . import ledger
+
+    try:
+        s = ledger.summary()
+    except Exception:  # noqa: BLE001
+        return Check("tokenizer", INFO, "no ledger yet — counts will use the heuristic tokenizer")
+    if s.runs and s.tokenizers <= {"heuristic"}:
+        return Check(
+            "tokenizer",
+            INFO,
+            "savings measured with the heuristic tokenizer (≈, directionally accurate)",
+            "billing-grade counts: distil savings --tokenizer anthropic (needs API key)",
+        )
+    return Check("tokenizer", OK, f"tokenizers in ledger: {', '.join(sorted(s.tokenizers)) or '—'}")
+
+
 def diagnose() -> list[Check]:
     """Run every check; each is isolated so one failure can't abort the rest."""
     checks: list[Check] = []
@@ -246,6 +292,8 @@ def diagnose() -> list[Check]:
         _check_proxy_selftest,
         _check_anthropic_extra,
         _check_api_key,
+        _check_pricing_catalog,
+        _check_tokenizer_grade,
     ):
         try:
             checks.append(fn())
