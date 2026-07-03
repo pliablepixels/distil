@@ -232,7 +232,7 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 | **Zero install** | `uvx --from distil-llm distil bench` | [uv](https://docs.astral.sh/uv/) — **auto-provisions Python 3.9+** |
 | **Isolated CLI** | `pipx install distil-llm` → `distil bench` | Python **3.9+** (else `pipx install --python python3.12 distil-llm`) |
 | **Homebrew** | `brew install dshakes/tap/distil` | Homebrew |
-| **Docker** | `docker build -t distil . && docker run distil bench` | Docker |
+| **Docker** | `docker run ghcr.io/dshakes/distil:latest bench` (or `docker build -t distil .`) | Docker |
 | **Single file** | `make pyz` → `python dist/distil.pyz bench` | Python 3.9+ |
 | **In a venv** | `pip install distil-llm` (inside an active virtualenv) | Python 3.9+ |
 
@@ -377,6 +377,12 @@ Every number reproduces from the bundled corpus (`distil bench`, no key). The no
 </p>
 
 ---
+
+## ⭐ If distil saved you tokens
+
+A star is how the next engineer finds provable savings instead of a lossy guess — and
+`distil stats --badge` gives you a shareable badge of **your own measured number** to
+show alongside it. That badge + this repo are the whole marketing department.
 
 ## 🤝 Contributing
 
