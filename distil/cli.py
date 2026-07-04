@@ -572,7 +572,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                         parts.append(
                             c("1;38;5;84", f"session ▼{ledger._human(sess.total_tokens_saved)}")
                         )
-                        parts.append(c("38;5;245", f"{trimmed * 100:.0f}% smaller"))
+                        parts.append(c("38;5;80", f"{trimmed * 100:.0f}% smaller"))
                         if metered and sess.total_dollars_saved > 0:
                             parts.append(c("1;38;5;114", f"${sess.total_dollars_saved:,.2f}"))
                     else:
