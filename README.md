@@ -6,7 +6,6 @@
   <a href="https://github.com/dshakes/distil/actions/workflows/ci.yml"><img src="https://github.com/dshakes/distil/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <a href="https://pypi.org/project/distil-llm/"><img src="https://img.shields.io/pypi/v/distil-llm?color=5ad1c9&label=pypi" alt="PyPI version"/></a>
   <a href="https://pypi.org/project/distil-llm/"><img src="https://img.shields.io/pypi/pyversions/distil-llm?color=5ad1c9" alt="Python versions"/></a>
-  <a href="https://pypi.org/project/distil-llm/"><img src="https://img.shields.io/pypi/dm/distil-llm?color=5ad19a&label=installs" alt="PyPI downloads"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/pypi/l/distil-llm?color=8b7bff" alt="license"/></a>
   <a href="#-what-we-wont-pretend"><img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero runtime deps"/></a>
   <a href="https://dshakes.github.io/distil/architecture.html"><img src="https://img.shields.io/badge/typed-py.typed%20%C2%B7%20mypy%20clean-8b7bff" alt="typed"/></a>
