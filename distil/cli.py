@@ -1039,8 +1039,27 @@ def cmd_offboard(args: argparse.Namespace) -> int:
         elif not args.purge:
             print(f"  kept your savings data at {home}  (delete it with: distil offboard --purge)")
 
-    # 5 · the package itself — we can't remove the process we're running in
-    print(f"\nFinally, uninstall the package:\n  {onboard.uninstall_command(env.method)}")
+    # 5 · the package itself — we can't remove the process we're running in.
+    # Detect from the ACTUAL binary path (brew/pipx/uv/pip) so the command we
+    # print actually works — a bare `pip uninstall` is blocked on modern
+    # externally-managed Pythons (PEP 668).
+    installer, _ = _detect_installer()
+    uninstall = {
+        "homebrew": "brew uninstall dshakes/tap/distil && brew untap dshakes/tap",
+        "pipx": "pipx uninstall distil-llm",
+        "uv": "uv tool uninstall distil-llm",
+        "pip (venv)": "pip uninstall distil-llm  (inside the venv)",
+    }.get(installer)
+    if uninstall is None:
+        uninstall = onboard.uninstall_command(env.method)
+    print(f"\nFinally, uninstall the package ({installer}):\n  {uninstall}")
+    from .doctor import _find_all_distil
+
+    extra = _find_all_distil()
+    if len(extra) > 1:
+        print("  note: multiple distil on PATH — remove each:")
+        for p in extra:
+            print(f"    {p}")
     return 0
 
 
