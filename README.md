@@ -34,13 +34,14 @@ Every agent re-sends its whole context every turn — you pay for all of it, eve
 
 <table align="center">
 <tr><th>On a real 500-instance long-horizon agent<br/><sub>(SWE-bench Verified, official harness)</sub></th><th>task success</th><th>tied with full context?</th><th>reversible&nbsp;+&nbsp;certified?</th></tr>
-<tr><td><b>Distil</b> (relevance-gated)</td><td align="center"><b>36.8%</b></td><td align="center">✅ <b>only one</b></td><td align="center">✅</td></tr>
+<tr><td><b>Distil</b> (gated + surprise digest, v1.7)</td><td align="center"><b>42.0%</b></td><td align="center">✅ <b>+2.8pp over full</b> <sub>(CI −0.6..+6.2)</sub></td><td align="center">✅</td></tr>
+<tr><td><b>Distil</b> (relevance-gated, E8)</td><td align="center"><b>36.8%</b></td><td align="center">✅</td><td align="center">✅</td></tr>
 <tr><td>Headroom <sub>(lossy)</sub></td><td align="center">32.6%</td><td align="center">❌ −6.6pp</td><td align="center">❌</td></tr>
 <tr><td>LLMLingua-2 <sub>(lossy)</sub></td><td align="center">2.4%</td><td align="center">❌ −36.8pp</td><td align="center">❌</td></tr>
 <tr><td>no compression <sub>(full)</sub></td><td align="center">39.2%</td><td align="center">—</td><td align="center">—</td></tr>
 </table>
 
-<p align="center"><b>Distil is the only compressor statistically tied with full context</b> — every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-the-proof">Full breakdown ↓</a></p>
+<p align="center"><b>Distil is the only compressor statistically tied with full context — and its v1.7 surprise-preserving digest lands <i>above</i> full context (42.0% vs 39.2%, paired non-inferiority certified)</b> while every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-the-proof">Full breakdown ↓</a></p>
 
 ---
 
