@@ -70,6 +70,13 @@ All notable changes to Distil are documented here. Format loosely follows
 - Landing page: `Python 3.11+`→`3.9+` (factual); heading hierarchy; two "How it works"→ one is "Under the hood"; proof section now cites E14 (42.0% vs 39.2%); plain-English section linked from nav + hero; smart quotes.
 - benchmark.html cites E14; getting-started smart quotes + stale version example.
 
+## [1.8.5] — 2026-07-04 — Statusline clarity + self-diagnosing doctor
+
+### Fixed
+- **Statusline no longer flickers across terminals.** `distil default` spawns a proxy+session per terminal; the live ▼ now aggregates a 15-minute activity WINDOW across ALL sessions instead of one flickering "latest session".
+- **Zero-savings state is unmistakable:** `✓ on · waiting for a large read` (bright green, clearly active) instead of a dim, easily-misread "watching".
+- **`distil doctor` self-diagnoses the two traps:** `live routing` warns when a wrap/proxy is running but no traffic is recorded (agent bypassing distil); `this session` explains the watching state.
+
 ## [Unreleased] — 1.9.0 dev
 
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified

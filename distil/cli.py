@@ -520,7 +520,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     if os.environ.get("DISTIL_STATUSLINE", "").lower() in ("minimal", "lite", "compact"):
         mseg = [c("1;38;5;79", "distil")]
         if s is None or s.runs == 0:
-            mseg.append(c("90", "wrap -- <agent> to start"))
+            mseg.append(c("38;5;73", "wrap -- <agent> to start"))
         else:
             recent_saved = 0
             try:
@@ -534,7 +534,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 mseg.append(c("1;38;5;84", f"▼{ledger._human(recent_saved)}"))
             mseg.append(c("38;5;73", f"{ledger._human(s.total_tokens_saved)} total"))
         if model:
-            mseg.append(c("90", model))
+            mseg.append(c("38;5;73", model))
         print("  ".join(mseg))
         return 0
 
@@ -549,7 +549,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     # Full breakdown: distil stats / dashboard.
     parts = [c("1;38;5;79", "distil")]
     if s is None or s.runs == 0:
-        parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
+        parts.append(c("38;5;73", "no savings yet · distil wrap -- <agent>"))
     else:
         from .doctor import subscription_mode
 
@@ -576,7 +576,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     # Traffic is flowing but nothing large has come through yet.
                     # Make it UNMISTAKABLE that distil is ON and working — a bare
                     # "watching" read as broken to real users.
-                    parts.append(c("1;38;5;84", "✓ on") + c("38;5;250", " · waiting for a large read"))
+                    parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · waiting for a large read"))
                 parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
                 shown_session = True
         except Exception:  # noqa: BLE001 — recent slice is best-effort
@@ -614,11 +614,11 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     if eq >= 0.95
                     else ("✗", "38;5;196")
                 )
-                parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("90", f" ({n_str})"))
+                parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("38;5;73", f" ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
-        parts.append(c("90", model))
+        parts.append(c("38;5;73", model))
     print(" · ".join(parts))
     return 0
 
