@@ -60,6 +60,16 @@ All notable changes to Distil are documented here. Format loosely follows
 ### Docs
 - Lean README (~40% less prose) + live/clickable badges; 18-page site polish; every link verified; PAPER.md figures; honest banner.
 
+## [1.8.4] — 2026-07-04 — Statusline polish + landing/docs GA audit
+
+### Changed
+- **Status line** fully colored (cohesive teal→green, no gray): session number pops bold green, trim rate mid-teal, total muted teal. `N% smaller` (not a misleading `−N%`).
+- **Version single-sourced** — `__init__` reads pyproject instead of a hardcoded literal (no drift, no merge-back conflicts).
+
+### Fixed (docs, proactive audit)
+- Landing page: `Python 3.11+`→`3.9+` (factual); heading hierarchy; two "How it works"→ one is "Under the hood"; proof section now cites E14 (42.0% vs 39.2%); plain-English section linked from nav + hero; smart quotes.
+- benchmark.html cites E14; getting-started smart quotes + stale version example.
+
 ## [Unreleased] — 1.9.0 dev
 
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
