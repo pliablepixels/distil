@@ -458,6 +458,38 @@ operating point was certified at. Three shipped pieces close it:
 To our knowledge this is the first anytime-valid drift monitor for a context-compression
 decision-equivalence certificate.
 
+### 6.0.9 Surprise-preserving digestion — compression that beats full context (E14)
+
+E8 fixed head-truncation as the gated tier's digest, but head-truncation drops a block's *tail*
+— exactly where a traceback puts the assertion that decides the agent's next action (the "lost
+if surprise" failure, Deng et al. 2025, arXiv:2412.17483). E14 tests the shipped fix: the **same
+relevance gate**, with a digest that keeps the head **plus up to 40 anomaly lines** (errors,
+failures, unexpected states, unified-diff changes — the production `surprise_lines` salience
+signal), still byte-recoverable via `distil_expand`. Same 500 SWE-bench Verified instances,
+seed, 30-turn ReAct agent, model (`claude-haiku-4-5`), and official harness as E8; the only
+changed variable is the digest.
+
+| condition | pass@1 | 95% CI | non-empty patches |
+|---|--:|--:|--:|
+| full context | 39.2% | [35.0, 43.6] | — |
+| **gated + surprise digest (v1.7)** | **42.0%** | [37.8, 46.4] | 67.4% |
+| gated (head digest, E8) | 36.8% | — | 59.8% |
+
+Paired vs. full context: `b=31` (full solved, surprise did not), `c=45` (surprise solved, full
+did not), **Δ = +2.8pp**, 95% CI [−0.6, +6.2]pp — **non-inferior at the 5pp margin, with the
+point estimate above full context** (superiority not yet significant). +5.2pp over E8's head
+gate, gaining net +26 instances across 9 repositories. The trajectory-risk certificate — the
+**shipped** `distil.certify.trajectory_risk` machinery, i.e. the product grading its own
+experiment — certifies α=0.10 with observed degradation 6.2% (n=500).
+
+Two readings. The anomaly-preserving digest lifts the agent's ability to *finish* (non-empty
+patch rate 59.8% → 67.4%), consistent with the mechanism: an agent that can still see the
+assertion keeps acting instead of stalling. And the end-to-end effect is reported by the same
+trajectory-level machinery a deployment uses (`distil certify-trajectories`), so the experiment
+and the product make the same statement with the same statistics. Honest scope: E14 and E8's
+conditions are independent sweeps over the same instance set (matched by instance, not seed),
+one model/agent pairing; the certificate quantifies exactly what was measured.
+
 ### 6.1 Exploratory run — 8 trajectories, 67 real decision points, Haiku grader, samples=1
 
 | level | savings | decision-change |
