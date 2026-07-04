@@ -68,6 +68,48 @@ def _check_version() -> Check:
     )
 
 
+def _find_all_distil() -> list[str]:
+    """Every `distil` on PATH, in resolution order (like `which -a`)."""
+    import os
+
+    seen: list[str] = []
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        cand = os.path.join(d, "distil")
+        if cand not in seen and os.path.isfile(cand) and os.access(cand, os.X_OK):
+            seen.append(cand)
+    return seen
+
+
+def _check_shadowed_install() -> Check:
+    """The single most confusing distil failure: two installs (brew + pipx),
+    where an upgrade lands on a copy the shell never reaches, so `doctor` keeps
+    reporting the old version. Catch it explicitly."""
+    paths = _find_all_distil()
+    if len(paths) <= 1:
+        return Check("install", OK, f"one distil on PATH{f' ({paths[0]})' if paths else ''}")
+    active = paths[0]
+
+    def _mgr(p: str) -> str:
+        return (
+            "homebrew"
+            if "/Cellar/" in p or "/homebrew/" in p or p.startswith("/usr/local/")
+            else "pipx"
+            if "/pipx/" in p or "/.local/bin/" in p
+            else "uv"
+            if "/uv/" in p
+            else "pip/other"
+        )
+
+    others = ", ".join(f"{p} ({_mgr(p)})" for p in paths[1:])
+    return Check(
+        "install",
+        WARN,
+        f"{len(paths)} distil installs — ACTIVE: {active} ({_mgr(active)}); shadowed: {others}",
+        "an upgrade to a shadowed copy won't take effect. Keep one: upgrade the "
+        f"active install ({_mgr(active)}), or remove it so another wins.",
+    )
+
+
 def _check_ledger() -> Check:
     from . import ledger
 
@@ -330,6 +372,7 @@ def diagnose() -> list[Check]:
     checks: list[Check] = []
     for fn in (
         _check_version,
+        _check_shadowed_install,
         _check_ledger,
         _check_shadow,
         _check_proxy_selftest,

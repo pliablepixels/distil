@@ -60,3 +60,20 @@ def test_mode_check_warns_on_verbatim_service(tmp_path, monkeypatch):
     # lossless-only is healthy
     svc.write_text("<string>proxy</string><string>--lossless-only</string>")
     assert doctor._check_mode().status == doctor.OK
+
+
+def test_shadowed_install_warns(monkeypatch):
+    """Two distil on PATH (brew active, pipx shadowed) must be flagged."""
+    from distil import doctor
+
+    monkeypatch.setattr(
+        doctor, "_find_all_distil",
+        lambda: ["/usr/local/bin/distil", "/Users/x/.local/bin/distil"],
+    )
+    ch = doctor._check_shadowed_install()
+    assert ch.status == doctor.WARN
+    assert "homebrew" in ch.detail and "pipx" in ch.detail
+    assert "ACTIVE: /usr/local/bin/distil" in ch.detail
+    # single install is fine
+    monkeypatch.setattr(doctor, "_find_all_distil", lambda: ["/usr/local/bin/distil"])
+    assert doctor._check_shadowed_install().status == doctor.OK
