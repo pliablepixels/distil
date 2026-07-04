@@ -13,7 +13,7 @@
 
 <h2 align="center">Compress your agent's context.<br/>Prove its decisions don't change.</h2>
 
-<p align="center"><b>The only context compressor with a statistical fidelity certificate.</b><br/>Compressed context <b>solved more</b> than full context — <b>42.0% vs 39.2%</b> on 500 SWE-bench Verified tasks.</p>
+<p align="center"><b>The only context compressor with a statistical fidelity certificate.</b><br/>On <b>500 real coding tasks</b>, an AI agent solved <b>more</b> using distil's compressed context (<b>42.0%</b>) than with the full, uncompressed context (<b>39.2%</b>) — compression that <i>helped</i>, not hurt. <sub>(SWE-bench Verified)</sub></p>
 
 ```console
 $ uvx --from distil-llm distil bench     # ~10s, no API key
