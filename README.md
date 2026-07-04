@@ -15,13 +15,10 @@
 
 <p align="center"><b>Every other compressor asks you to <i>trust</i> it won't break your agent. Distil is the only one that proves it won't.</b><br/>On <b>500 real coding tasks</b>, compressed context didn't just match the full context — it <b>beat</b> it: <b>42.0% vs 39.2%</b>. <sub>(SWE-bench Verified)</sub></p>
 
-```console
-$ uvx --from distil-llm distil bench     # ~10s, no API key
-GATE: PASS — every trajectory certified non-inferior; aggressive rejected.
-
-$ distil wrap -- claude                  # route Claude Code, zero config
-distil · ▼75.0K · 62% smaller · $0.31 · total ▼27.0M · ✓eq 99.5%
-```
+<p align="center">
+  <img src="docs/assets/distil-demo.gif" alt="distil bench certifies 7 real agent trajectories — all PASS, aggressive rejected — then distil wrap shows live token savings ticking to ▼200K, 62% smaller" width="84%"/>
+</p>
+<p align="center"><sub><code>uvx --from distil-llm distil bench</code> — runs the certificate gate in ~10s, no API key · <code>distil wrap -- claude</code> routes your agent, zero config.</sub></p>
 
 <table align="center"><tr>
 <td align="center"><b>⚡ Get the savings</b><br/><sub>2 min, no config</sub><br/><br/><code>pipx install distil-llm</code><br/><code>distil onboard</code></td>

@@ -183,7 +183,14 @@
   <p class="sub" style="font-size:17px">On <b>500 real coding tasks</b>, compressed context didn't just match the full context —
     it <b>beat</b> it: <b>42.0% vs 39.2%</b>
     <small>(<a href="compare.html">SWE-bench Verified, E14</a>; 95% CI &minus;0.6..+6.2pp)</small></p>
-  <p class="sub" style="font-size:15px;margin-top:10px">New to this? <a href="#plain"><b>See how it works in plain English →</b></a></p>
+  <figure style="margin:26px auto 0;max-width:860px">
+    <img src="assets/distil-demo.gif" alt="distil bench certifies 7 real agent trajectories (all PASS, aggressive rejected), then distil wrap shows live token savings ticking to 200K, 62% smaller"
+         style="width:100%;border:1px solid var(--line,#232a3e);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35)" loading="lazy">
+    <figcaption style="font-size:13px;opacity:.7;margin-top:10px;text-align:center">
+      <code>uvx --from distil-llm distil bench</code> — the certificate gate, in ~10s, no API key.
+    </figcaption>
+  </figure>
+  <p class="sub" style="font-size:15px;margin-top:18px">New to this? <a href="#plain"><b>See how it works in plain English →</b></a></p>
 
   <div class="doors">
     <a class="door" href="getting-started.html">
