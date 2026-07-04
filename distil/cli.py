@@ -267,7 +267,8 @@ def cmd_certify(args: argparse.Namespace) -> int:
     print(f"\ndecision-equivalence match rate: {report.match_rate * 100:.1f}%")
     print(
         f"TOST non-inferiority (margin={t.margin}, alpha={t.alpha}): "
-        f"mean diff={t.mean_diff:+.3f}, p={t.p_non_inferior:.4g}"
+        f"mean diff={t.mean_diff:+.3f}, "
+        f"p={'<0.0001' if t.p_non_inferior < 1e-4 else format(t.p_non_inferior, '.4g')}"
     )
     print(
         f"\nVERDICT: {report.verdict}  "
@@ -412,6 +413,14 @@ def cmd_holdout(args: argparse.Namespace) -> int:
     """Holdout A/B savings with a bootstrap CI (Phase 5)."""
     from .certify.holdout import run_holdout
 
+    import sys as _sys
+
+    if not 0.0 < args.control_fraction < 1.0:
+        print(
+            "distil holdout: --control-fraction must be between 0 and 1 (exclusive)",
+            file=_sys.stderr,
+        )
+        return 2
     price = pricing.get(args.pricing)
     tok = tokenizer.resolve(args.tokenizer, model=price.name)
     rep = run_holdout(load_corpus(), price, control_fraction=args.control_fraction, tok=tok)
@@ -486,6 +495,13 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
         return 0
     change = led.rate()
     print("Shadow-mode live decision-equivalence (real traffic, content-free)\n")
+    smp = f"{led.samples} shadowed request{'s' if led.samples != 1 else ''}"
+    if led.samples < 25:
+        # Same 25-sample floor as the status line / leaderboard / doctor — a rate
+        # over a handful is noise, so don't print a decision-equivalence guarantee.
+        print(f"  {smp} — collecting (need 25 for a decision-equivalence rate)")
+        print("  keep using your agent; the rate appears once there's real evidence.")
+        return 0
     print(f"  shadowed requests : {led.samples}")
     print(f"  decision changes  : {led.changes}")
     print(f"  decision-change rate (rolling): {change * 100:.2f}%")
@@ -1263,7 +1279,16 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
     from .ingest import ingest_file
 
+    import sys as _sys
+
     traj = ingest_file(args.input, provider=args.provider, model=args.model)
+    if not traj.turns:
+        print(
+            f"distil ingest: parsed 0 turns from {args.input} — is it newline-delimited "
+            "provider-request JSON? (nothing was written)",
+            file=_sys.stderr,
+        )
+        return 2
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     fname = f"{traj.id}.json"
@@ -1287,8 +1312,13 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 def cmd_perf(args: argparse.Namespace) -> int:
     """Report compression + adapter latency/throughput (p50/p95)."""
+    import sys as _sys
+
     from .perf import format_table, run_perf
 
+    if args.iterations < 1:
+        print("distil perf: --iterations must be >= 1", file=_sys.stderr)
+        return 2
     print(format_table(run_perf(iterations=args.iterations)))
     return 0
 
@@ -1527,6 +1557,8 @@ def cmd_online(args: argparse.Namespace) -> int:
         "self-distilling round — keep-model learns from causal labels, gated by non-inferiority\n"
     )
     for k, v in rep.items():
+        if isinstance(v, float):
+            v = f"{v:.1%}" if k in ("accuracy", "precision", "recall") else f"{v:.3f}"
         print(f"  {k}: {v}")
     if not rep.get("certified"):
         print("\nNOT promoted — the candidate failed the non-inferiority gate (never-regressing).")
@@ -2091,10 +2123,11 @@ def main(argv: list[str] | None = None) -> int:
         rc = args.func(args)
     except BrokenPipeError:
         rc = 0
-    except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
-        # A missing/unreadable input file is a user mistake, not a distil bug —
+    except (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError) as e:
+        # A missing/unreadable input path is a user mistake, not a distil bug —
         # a clean message beats an 8-line pathlib traceback. Covers every
         # file-reading command at the dispatch chokepoint (no per-command patch).
+        # NotADirectoryError = a --corpus that points at a file, not a dir.
         print(f"distil {getattr(args, 'cmd', '')}: {e}", file=sys.stderr)
         return 2
     except json.JSONDecodeError as e:
