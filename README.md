@@ -20,7 +20,7 @@ $ uvx --from distil-llm distil bench     # ~10s, no API key
 GATE: PASS — every trajectory certified non-inferior; aggressive rejected.
 
 $ distil wrap -- claude                  # route Claude Code, zero config
-distil · session ▼75.0K · 62% smaller · $0.31 · total ▼27.0M · ✓eq 99.5%
+distil · ▼75.0K · 62% smaller · $0.31 · total ▼27.0M · ✓eq 99.5%
 ```
 
 <table align="center"><tr>
@@ -280,7 +280,15 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 | Recover digested detail from any agent (MCP) | `distil mcp` |
 | Self-improving keep policy | `distil learn` / `distil online` |
 
-> **Status line:** rich by default — `distil · session ▼7.8K · 4% smaller · total ▼27.0M · ✓eq 99%` (this run + lifetime + health). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` gives a two-fact segment: `distil ▼7.8K · 27M total`. On a flat-rate **Claude subscription** dollars are notional and auto-hidden (override: `DISTIL_SUBSCRIPTION=0/1`).
+> **Status line** — one pattern in every state: `distil · <live> · total ▼<lifetime>`.
+>
+> | state | you see | means |
+> |---|---|---|
+> | **saving** | `distil · ▼12.0K · 40% smaller · $0.31 · total ▼27.0M · ✓eq 99%` | compressing your recent traffic (last 15 min, all terminals) |
+> | **watching** | `distil · ✓ on · waiting for a large read · total ▼27.0M` | on, but no large content yet — savings come from big file/command output |
+> | **idle** | `distil · ✓ on · total ▼27.0M` | set up and on, no recent traffic |
+>
+> `▼` = tokens saved · `total` = lifetime · `✓eq` = decision-equivalence (shown past 25 shadow samples). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
 
 Rule of thumb: **subscription/interactive → `--lossless-only` (+`--verbatim`)** · **PAYG/autonomous → default digest (+`--expand`)** · **coding re-reads → add `--session-delta`**.
 
