@@ -13,30 +13,22 @@
 
 <h2 align="center">Cut your agent's token bill in half.<br/>Prove its decisions don't change.</h2>
 
-<p align="center">
-<b>The only context compressor with a statistical fidelity certificate.</b><br/>
-Every other tool asks you to <i>trust</i> that dropping context won't change what your agent does.<br/>
-Distil <b>measures it, certifies it, and falls back to full context when it can't</b> — never silently lossy.
-</p>
-
-<p align="center">
-🤯 <b>The surprising part:</b> in our newest 500-task SWE-bench Verified run, compressing context ~60% let the agent solve <b>more</b> tasks than full context — <b>42.0% vs 39.2%</b> — because keeping the <i>right</i> lines (the error, the assertion, the diff) beats keeping <i>all</i> of them.
-</p>
+<p align="center"><b>The only context compressor with a statistical fidelity certificate.</b><br/>Compressed context <b>solved more</b> than full context — <b>42.0% vs 39.2%</b> on 500 SWE-bench Verified tasks.</p>
 
 ```console
-$ uvx --from distil-llm distil bench        # runs on your machine, ~10s, no API key
-GATE: PASS — every trajectory certified non-inferior; aggressive rejected on all.
+$ uvx --from distil-llm distil bench     # ~10s, no API key
+GATE: PASS — every trajectory certified non-inferior; aggressive rejected.
 
-$ distil wrap -- claude                     # route Claude Code through distil, zero config
-distil · ▼75.0K −62% · $0.31 · Σ27.0M · ✓eq 99.5%   ← live in your status line
+$ distil wrap -- claude                  # route Claude Code, zero config
+distil · ▼75.0K −62% · $0.31 · Σ27.0M · ✓eq 99.5%
 ```
 
 <table align="center"><tr>
-<td align="center"><b>⚡ Just want the savings?</b><br/><sub>2 minutes, no config change</sub><br/><br/><code>pipx install distil-llm</code><br/><code>distil onboard</code></td>
-<td align="center"><b>🔬 Want the proof first?</b><br/><sub>real harness, real numbers</sub><br/><br/><a href="#-the-proof"><b>the benchmark ↓</b></a><br/><a href="docs/PAPER.md">the paper</a> · <a href="https://dshakes.github.io/distil/compare.html">vs the others</a></td>
+<td align="center"><b>⚡ Get the savings</b><br/><sub>2 min, no config</sub><br/><br/><code>pipx install distil-llm</code><br/><code>distil onboard</code></td>
+<td align="center"><b>🔬 See the proof</b><br/><sub>real harness</sub><br/><br/><a href="#-the-proof"><b>benchmark ↓</b></a> · <a href="docs/PAPER.md">paper</a><br/><a href="https://dshakes.github.io/distil/compare.html">vs the others</a></td>
 </tr></table>
 
-<p align="center"><sub><b>Honest scope:</b> the +2.8pp win is a point estimate (paired CI −0.6..+6.2pp — <b>non-inferiority certified, superiority not yet significant</b>). The per-request certificate is a proxy (next-action equivalence, <a href="#-the-proof">E7</a>); end-to-end task cost is certified separately by <a href="#-the-trajectory-level-certificate"><code>distil certify-trajectories</code></a>. Distil calibrates per deployment and fails safe. We publish what doesn't transfer, too.</sub></p>
+<p align="center"><sub>Honest scope: +2.8pp is a point estimate (CI −0.6..+6.2pp — <b>non-inferiority certified, superiority not yet</b>). <a href="#-the-proof">Details, incl. what doesn't transfer →</a></sub></p>
 
 <p align="center">
   <a href="#-use-it-now">Use it</a> ·
