@@ -94,9 +94,12 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
             led.recent.append(1 if eq else 0)
         return led
 
-    # healthy = calm brand magenta (color is an alarm, not decoration);
-    # yellow under 99%, red under 95%
-    for changes, code in ((0, "\033[35m"), (3, "\033[33m"), (10, "\033[31m")):
+    # theme-stable 256-color hues + health glyph: ✓ teal, ⚠ yellow, ✗ red
+    for changes, code in (
+        (0, "\033[38;5;86m✓"),
+        (3, "\033[38;5;220m⚠"),
+        (10, "\033[38;5;196m✗"),
+    ):
         monkeypatch.setattr(
             shadow.ShadowLedger, "load", classmethod(lambda cls, *a, _l=led_with(changes), **k: _l)
         )

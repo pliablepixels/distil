@@ -540,9 +540,9 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 if sess.runs and sess.total_baseline_tokens:
                     trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
                     seg = f"▼{ledger._human(sess.total_tokens_saved)} −{trimmed * 100:.0f}%"
+                    parts.append(c("38;5;80", seg))
                     if metered and sess.total_dollars_saved > 0:
-                        seg += f" ${sess.total_dollars_saved:,.2f}"
-                    parts.append(c("36", seg))
+                        parts.append(c("38;5;114", f"${sess.total_dollars_saved:,.2f}"))
                     parts.append(c("90", f"Σ{ledger._human(s.total_tokens_saved)}"))
                     shown_session = True
         except Exception:  # noqa: BLE001 — session slice is best-effort
@@ -554,9 +554,9 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 else 0.0
             )
             seg = f"Σ{ledger._human(s.total_tokens_saved)} saved −{trimmed * 100:.0f}%"
+            parts.append(c("38;5;80", seg))
             if metered:
-                seg += f" ${s.total_dollars_saved:,.2f}"
-            parts.append(c("36", seg))
+                parts.append(c("38;5;114", f"${s.total_dollars_saved:,.2f}"))
         try:
             from .shadow import ShadowLedger
 
@@ -567,9 +567,16 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
                 eq = 1 - led.rate()
-                # Calm brand hue when healthy; color is an ALARM, not decoration.
-                hue = "35" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
-                parts.append(c(hue, f"eq {eq * 100:.1f}% ({n_str})"))
+                # Explicit 256-color hues (basic ANSI is terminal-theme roulette —
+                # 'magenta' renders as unreadable purple on many dark themes) and a
+                # health GLYPH so the state reads even without color: ✓ proven-safe,
+                # ⚠ slipping, ✗ degraded. Color stays an alarm, not decoration.
+                glyph, hue = (
+                    ("✓", "38;5;86") if eq >= 0.99
+                    else ("⚠", "38;5;220") if eq >= 0.95
+                    else ("✗", "38;5;196")
+                )
+                parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("90", f" ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
