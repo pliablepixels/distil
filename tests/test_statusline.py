@@ -51,10 +51,11 @@ def test_populated_ledger(monkeypatch, capsys):
     )
     rc, out = _run(monkeypatch, capsys, s)
     assert rc == 0
-    assert "50.0K→28.4K tok" in out  # orig → compressed, not just the delta
+    # compact composite-statusline grammar: lifetime = one Σ figure + trim + $
+    assert "Σ21.6K saved" in out
     assert "−43%" in out  # percent trimmed, the glanceable number
-    assert "$0.04 saved" in out  # single delta, not two figures to subtract
-    assert "3 runs" in out
+    assert "$0.04" in out
+    assert "runs" not in out  # run counts live in `distil stats`, not the line
 
 
 def test_subscription_hides_notional_dollars(monkeypatch, capsys):
@@ -73,7 +74,7 @@ def test_subscription_hides_notional_dollars(monkeypatch, capsys):
     )
     rc, out = _run(monkeypatch, capsys, s)
     assert rc == 0
-    assert "50.0K→28.4K tok" in out
+    assert "Σ21.6K saved" in out
     assert "$" not in out
 
 
@@ -93,9 +94,12 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
             led.recent.append(1 if eq else 0)
         return led
 
-    # healthy = calm brand magenta (color is an alarm, not decoration);
-    # yellow under 99%, red under 95%
-    for changes, code in ((0, "\033[35m"), (3, "\033[33m"), (10, "\033[31m")):
+    # theme-stable 256-color hues + health glyph: ✓ teal, ⚠ yellow, ✗ red
+    for changes, code in (
+        (0, "\033[38;5;86m✓"),
+        (3, "\033[38;5;220m⚠"),
+        (10, "\033[38;5;196m✗"),
+    ):
         monkeypatch.setattr(
             shadow.ShadowLedger, "load", classmethod(lambda cls, *a, _l=led_with(changes), **k: _l)
         )
@@ -103,10 +107,12 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
         assert f"{code}eq " in out, out
 
 
-def test_singular_run(monkeypatch, capsys):
+def test_run_counts_not_in_line(monkeypatch, capsys):
+    # run counts moved to `distil stats` — the composite line stays compact
     s = ledger.LedgerSummary(1, 0.01, 500, {"x": 0.01})
     _rc, out = _run(monkeypatch, capsys, s)
-    assert "1 run" in out and "1 runs" not in out
+    assert "run" not in out
+    assert out.startswith("distil")
 
 
 def test_model_name_from_stdin(monkeypatch, capsys):
@@ -232,3 +238,69 @@ def test_render_dashboard_recent_strip():
     )
     assert "recent" in out
     assert "▰" in out and "▱" in out  # equivalent + changed marks present
+
+
+def test_session_first_when_live_session(monkeypatch, capsys, tmp_path):
+    """A live session leads the line; lifetime collapses to one Σ figure."""
+    import time
+
+    from distil import ledger as led_mod
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
+    path = tmp_path / "savings.jsonl"
+    led_mod.record(
+        trajectory_id="live-proxy", model="claude-opus-4-8", turns=5,
+        baseline_dollars=1.0, distil_dollars=0.4,
+        baseline_input_tokens=200_000, distil_input_tokens=80_000,
+        session="old-session", path=path,
+    )
+    led_mod.record(
+        trajectory_id="live-proxy", model="claude-opus-4-8", turns=3,
+        baseline_dollars=0.5, distil_dollars=0.2,
+        baseline_input_tokens=100_000, distil_input_tokens=40_000,
+        session=f"s{int(time.time())}-99", path=path,
+    )
+    monkeypatch.setattr(led_mod, "default_path", lambda: path)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
+    rc = cmd_statusline(argparse.Namespace(no_color=True))
+    out = capsys.readouterr().out.strip()
+    assert rc == 0
+    assert "▼60.0K −60%" in out  # THIS session's saved tokens + trim
+    assert "Σ180.0K" in out  # lifetime, one figure
+    assert "$0.30" in out  # session dollars, not lifetime
+
+
+def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
+    """No live session (>4h idle) → the familiar lifetime view."""
+    import json as _json
+
+    from distil import ledger as led_mod
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
+    path = tmp_path / "savings.jsonl"
+    rec = {
+        "trajectory_id": "live-proxy", "model": "claude-opus-4-8", "turns": 2,
+        "baseline_dollars": 1.0, "distil_dollars": 0.5,
+        "baseline_input_tokens": 50_000, "distil_input_tokens": 25_000,
+        "tokenizer": "heuristic", "ts": 1000.0, "session": "ancient",
+    }
+    path.write_text(_json.dumps(rec) + "\n")
+    monkeypatch.setattr(led_mod, "default_path", lambda: path)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
+    cmd_statusline(argparse.Namespace(no_color=True))
+    out = capsys.readouterr().out.strip()
+    assert "Σ25.0K saved −50%" in out
+    assert "▼" not in out  # no live-session segment
+
+
+def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
+    """eq 100.0% over 1 sample is noise wearing a number — suppressed until 25."""
+    import distil.shadow as shadow
+
+    s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
+    led = shadow.ShadowLedger()
+    led.samples = 1
+    led.recent.append(1)
+    monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
+    _rc, out = _run(monkeypatch, capsys, s)
+    assert "eq" not in out

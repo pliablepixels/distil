@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Compare — Distil</title>
+<link rel="stylesheet" href="site.css"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Distil"/>
+<meta property="og:title" content="Compare — Distil"/>
+<meta property="og:description" content="Distil vs Headroom vs rtk vs LLMLingua-2 vs provider caching — an honest capability matrix and the real SWE-bench Verified task-success numbers, cited to the harness."/>
+<meta property="og:url" content="https://dshakes.github.io/distil/compare.html"/>
+<meta property="og:image" content="https://dshakes.github.io/distil/og.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Compare — Distil"/>
+<meta name="twitter:description" content="An honest capability matrix vs Headroom, rtk, LLMLingua-2, and provider caching — plus the real task-success numbers."/>
+<meta name="twitter:image" content="https://dshakes.github.io/distil/og.png"/>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+  <a href="index.html" class="topbar-logo">Dist<b>il</b></a>
+  <span class="topbar-pill">compression with a quality contract</span>
+  <nav class="topbar-links">
+    <a href="getting-started.html">Docs</a>
+    <a href="https://github.com/dshakes/distil" target="_blank" rel="noopener">GitHub →</a>
+  </nav>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Getting started</div>
+    <a href="getting-started.html">Install &amp; Quickstart</a>
+
+    <div class="sidebar-section">Learn</div>
+    <a href="token-economics.html">Token Economics <span class="nav-badge">Start here</span></a>
+    <a href="concepts.html">Concepts</a>
+    <a href="techniques.html">Techniques</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="research.html">Research &amp; Frontier</a>
+    <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html" class="active">Compare</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="cli.html">CLI Reference</a>
+    <a href="adapters.html">Adapters</a>
+    <a href="corpus.html">Corpus</a>
+    <a href="output.html">Output &amp; I/O</a>
+
+    <div class="sidebar-section">More</div>
+    <a href="faq.html">FAQ</a>
+    <a href="integrations.html">Integrations</a>
+    <a href="deploy-security.html">Deploy &amp; Security</a>
+    <a href="index.html">&#8592; Landing page</a>
+  </aside>
+
+  <main class="content">
+
+    <h1>Distil vs <span class="g">everything else</span></h1>
+    <p class="lead">The <a href="benchmark.html">Benchmark</a> page measures savings and decision-equivalence head-to-head. This page is the other axis: what each tool actually <em>guarantees</em>, and what happens to real task success on a real harness. Competitors are real, shipping tools that solve real problems for real teams — we say so below. The honest gap is narrower on savings than on proof.</p>
+
+    <hr/>
+
+    <h2>Capability matrix</h2>
+    <p>Marked from what each project documents or ships, not from marketing. Distil's own claims are the ones audited throughout this site — see <a href="concepts.html">Concepts</a> and <a href="deploy-security.html">Deploy &amp; Security</a> for the code behind each ✔.</p>
+
+    <table>
+      <thead>
+        <tr><th>Capability</th><th>Distil</th><th>Headroom</th><th>rtk</th><th>LLMLingua-2</th><th>Provider caching</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Per-step statistical certificate</td>
+          <td><span class="badge-pass">✔</span> DERC (Learn-Then-Test / CRC)</td>
+          <td><span class="badge-fail">✘</span> none published</td>
+          <td><span class="badge-fail">✘</span> none published</td>
+          <td><span class="badge-fail">✘</span> raw score deltas, not an equivalence test</td>
+          <td>— not a compressor</td>
+        </tr>
+        <tr>
+          <td>Trajectory-level (task-outcome) certificate</td>
+          <td><span class="badge-pass">✔</span> <code>distil certify-trajectories</code></td>
+          <td><span class="badge-fail">✘</span></td>
+          <td><span class="badge-fail">✘</span></td>
+          <td><span class="badge-fail">✘</span></td>
+          <td>— not a compressor</td>
+        </tr>
+        <tr>
+          <td>Reversible (bytes recoverable on demand)</td>
+          <td><span class="badge-pass">✔</span> Tier-1 digest + handle, <code>distil_expand</code></td>
+          <td><span class="badge-pass">✔</span> documents a local store + <code>headroom_retrieve</code>; the compression itself is lossy in-context (the configuration benchmarked in E8)</td>
+          <td><span class="badge-fail">✘</span> lossy filtering (strips boilerplate; keeps raw logs on failure)</td>
+          <td><span class="badge-fail">✘</span> lossy</td>
+          <td><span class="badge-pass">✔</span> trivially — nothing is removed</td>
+        </tr>
+        <tr>
+          <td>Live shadow decision-equivalence on real traffic</td>
+          <td><span class="badge-pass">✔</span> <code>--shadow</code> / <code>shadow-stats</code></td>
+          <td>not published</td>
+          <td>not published</td>
+          <td>not published</td>
+          <td>— no decision risk to measure</td>
+        </tr>
+        <tr>
+          <td>SSE streaming pass-through (TTFT preserved)</td>
+          <td><span class="badge-pass">✔</span> chunk-by-chunk relay</td>
+          <td>n/a — library, not an HTTP relay</td>
+          <td>n/a — CLI output proxy, not an LLM API relay</td>
+          <td>n/a — library, not an HTTP relay</td>
+          <td>n/a — no proxy layer in the path</td>
+        </tr>
+        <tr>
+          <td>Savings ledger + status line</td>
+          <td><span class="badge-pass">✔</span> local ledger, <code>leaderboard</code>/<code>statusline</code></td>
+          <td>not published</td>
+          <td>not published</td>
+          <td>not published</td>
+          <td>— provider billing dashboard covers this natively</td>
+        </tr>
+        <tr>
+          <td>Multi-tenant gateway (per-tenant accounting)</td>
+          <td><span class="badge-pass">✔</span> <code>distil gateway</code></td>
+          <td>not published</td>
+          <td>not published</td>
+          <td>not published</td>
+          <td>— orthogonal, provider-side</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>What each does well.</strong> <strong>Headroom</strong> is a real, adopted compressor with a genuinely useful whole-conversation optimizer and a ModernBERT relevance scorer — and on the live head-to-head it's the <em>cheaper</em> compute path (no model in Distil's path either, but Headroom's scorer is lighter than a full digest cycle in some configurations). <strong>rtk</strong> solves a different, real problem well: stripping known boilerplate from specific wrapped CLI commands (<code>git</code>, <code>ls</code>, <code>psql</code>, <code>aws</code>…) is a good fit for shell-heavy agents, which is why it's adopted there — it just doesn't compress arbitrary agent context, so it isn't a head-to-head contender on that axis (see the note on <a href="benchmark.html#live-head-to-head">Benchmark</a>). <strong>LLMLingua-2</strong> posts genuinely high raw compression ratios and is the most-cited method in this space for a reason. <strong>Provider prompt caching</strong> is zero-risk by construction — it doesn't touch what the model reads, only what you're billed for re-sending it — and it composes cleanly with everything above, including Distil: cache-aware compression exists specifically to keep that discount intact rather than compete with it.
+    </div>
+
+    <hr/>
+
+    <h2 id="e8-outcomes">Real task success — SWE-bench Verified, official harness</h2>
+    <p>Capability tables can't settle whether any of this holds up on a real, long-horizon coding agent. <a href="research.html#e8">E8</a> runs six conditions of the identical ReAct agent (only the compressor differs) end-to-end on the <strong>full 500-instance SWE-bench Verified set</strong>, scored by the <strong>official <code>swebench</code> harness</strong> (hidden tests, per-instance Docker) — not a proxy metric.</p>
+
+    <table>
+      <thead><tr><th>Condition</th><th style="text-align:center">Task success</th><th style="text-align:center">Tied with full context?</th><th style="text-align:center">Reversible + certified?</th></tr></thead>
+      <tbody>
+        <tr style="background:rgba(90,209,154,.16)">
+          <td><strong>Distil</strong> (gated + surprise digest, v1.7)</td>
+          <td style="text-align:center"><strong>42.0%</strong></td>
+          <td style="text-align:center"><span class="badge-pass">✔ +2.8pp over full</span> <small>(paired CI &minus;0.6..+6.2pp)</small></td>
+          <td style="text-align:center"><span class="badge-pass">✔</span></td>
+        </tr>
+        <tr style="background:rgba(90,209,154,.10)">
+          <td><strong>Distil</strong> (relevance-gated, E8)</td>
+          <td style="text-align:center"><strong>36.8%</strong></td>
+          <td style="text-align:center"><span class="badge-pass">✔</span></td>
+          <td style="text-align:center"><span class="badge-pass">✔</span></td>
+        </tr>
+        <tr>
+          <td>Headroom <span style="color:#5b6177">(lossy)</span></td>
+          <td style="text-align:center">32.6%</td>
+          <td style="text-align:center"><span class="badge-fail">✘ &minus;6.6&nbsp;pp</span></td>
+          <td style="text-align:center"><span class="badge-fail">✘</span></td>
+        </tr>
+        <tr>
+          <td>LLMLingua-2 <span style="color:#5b6177">(lossy)</span></td>
+          <td style="text-align:center">2.4%</td>
+          <td style="text-align:center"><span class="badge-fail">✘ &minus;36.8&nbsp;pp</span></td>
+          <td style="text-align:center"><span class="badge-fail">✘</span></td>
+        </tr>
+        <tr>
+          <td>No compression <span style="color:#5b6177">(full)</span></td>
+          <td style="text-align:center">39.2%</td>
+          <td style="text-align:center">&mdash;</td>
+          <td style="text-align:center">&mdash;</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:12.5px;color:#5b6177;">500-instance long-horizon ReAct agent, full SWE-bench Verified, official <code>swebench</code> harness (hidden tests, per-instance Docker), paired McNemar across all six conditions. Distil's gate is the only condition statistically non-inferior to full context (&minus;2.4&nbsp;pp, 95% CI [&minus;5.7, +0.9], McNemar p=0.19) and beats Headroom with significance (+4.2&nbsp;pp, p=0.035). rtk was not run in this harness — it does not compress arbitrary agent context (see above), so it has no comparable condition. Full methodology, CIs, and the recovery-round-trip ablation: <a href="research.html#e8">Research &rarr; E8</a>.</p>
+
+    <div class="callout warn">
+      <strong>Honest scope.</strong> This table is task success on one harness (SWE-bench Verified) with one agent design and one base model (<code>claude-haiku-4-5</code>). It is not a claim that Distil wins every workload — see <a href="research.html#e7">E7</a> for the negative result that motivated the trajectory-level certificate in the first place. It's a claim that when someone actually measured end-to-end outcomes instead of raw compression ratios, the guarantee-carrying compressor also led on the number that pays the bills.
+    </div>
+
+    <div class="site-footer">
+      Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+    sb.classList.remove('open');
+  }
+});
+</script>
+<script src="site.js" defer></script>
+</body>
+</html>

@@ -46,6 +46,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -425,6 +426,8 @@ rust</pre>
 
     <h2>Threat model summary</h2>
 
+    <p>The table below is a summary. The full threat model — assets, trust boundaries per component, and guarantees enforced in code — is tracked as a living document at <a href="https://github.com/dshakes/distil/blob/main/THREAT_MODEL.md" target="_blank" rel="noopener"><code>THREAT_MODEL.md</code></a> in the repository root; update it whenever a trust boundary moves.</p>
+
     <table>
       <thead>
         <tr><th>Threat</th><th>Mitigation</th></tr>
@@ -476,6 +479,11 @@ rust</pre>
         </tr>
       </tbody>
     </table>
+
+    <hr/>
+
+    <h2>For compliance teams</h2>
+    <p>Two artifacts double as an audit trail that compression didn't quietly change agent behavior: the <a href="concepts.html#contract">DERC certificate</a> (a distribution-free, finite-sample statistical guarantee, re-run in CI on every strategy) and the <a href="cli.html#shadow-stats">shadow-mode ledger</a> (a rolling record of live decision-equivalence on your actual traffic, sampled and compared in real time). Together they're evidence, not a claim: a certificate ships with its exchangeability assumptions stated inline, and the shadow ledger is local data you already hold, not a vendor-reported number. See <a href="https://github.com/dshakes/distil/blob/main/THREAT_MODEL.md" target="_blank" rel="noopener"><code>THREAT_MODEL.md</code></a> for the accompanying trust-boundary review.</p>
 
     <div class="site-footer">
       Distil · compression with a quality contract · Apache-2.0 · <a href="https://github.com/dshakes/distil">github.com/dshakes/distil</a>

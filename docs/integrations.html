@@ -46,6 +46,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -183,6 +184,22 @@ response = litellm.completion(
     messages=[{<span class="g">"role"</span>: <span class="g">"user"</span>, <span class="g">"content"</span>: <span class="g">"Hello!"</span>}],
 )</pre>
 
+    <h4 style="margin:14px 0 6px;font-size:14px;color:#9aa1b3;">Running the standalone LiteLLM Proxy instead?</h4>
+    <p>Same mechanism, one YAML field: point each model's <code>api_base</code> at <code>distil proxy</code> and every request routed through the LiteLLM Proxy is compressed transparently, with no change to callers.</p>
+    <pre class="term"><span class="d"># Terminal 1 — distil sits in front of the real upstream</span>
+distil proxy --port 8788 --upstream https://api.anthropic.com
+
+<span class="d"># config.yaml — Terminal 2</span>
+model_list:
+  - model_name: claude-opus-4-5
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_base: <span class="g">http://127.0.0.1:8788</span>
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+<span class="d"># Terminal 2 — start the LiteLLM Proxy against that config</span>
+litellm --config config.yaml</pre>
+
     <h3>Vercel AI SDK (TypeScript)</h3>
     <pre class="term"><span class="c">import</span> { createAnthropic } <span class="c">from</span> <span class="g">"@ai-sdk/anthropic"</span>;
 <span class="c">import</span> { generateText } <span class="c">from</span> <span class="g">"ai"</span>;
@@ -223,6 +240,31 @@ genai.configure(
 model = genai.GenerativeModel(<span class="g">"gemini-1.5-pro"</span>)
 response = model.generate_content(<span class="g">"Hello!"</span>)</pre>
     <p>See <a href="https://github.com/dshakes/distil/blob/main/examples/python_gemini.py"><code>examples/python_gemini.py</code></a> for a full runnable example including tool-use turns. The proxy transparently compresses <code>text</code> parts (Tier-0 lossless) and <code>functionResponse</code> payloads (Tier-1 reversible digest). <code>functionCall</code>, <code>inlineData</code>, <code>fileData</code>, model-authored text, and <code>systemInstruction</code> are always passed through unchanged.</p>
+
+    <hr/>
+
+    <h2>Claude Code plugin</h2>
+    <p>The first-class integration: a <strong>session-first savings status line</strong> plus
+    slash commands, shipped as a marketplace-format plugin
+    (<a href="https://github.com/dshakes/distil/tree/main/plugins/distil"><code>plugins/distil</code></a>).
+    Wire it in one step with <code>distil setup</code> (or <code>distil onboard</code>), then
+    route the agent through compression with <code>distil wrap -- claude</code>.</p>
+    <table>
+      <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>/distil-onboard</code></td><td>Set up distil + a guided, tailored tour</td></tr>
+        <tr><td><code>/distil</code></td><td>Savings report + how to route more traffic through distil</td></tr>
+        <tr><td><code>/distil-stats</code></td><td>Full breakdown — tokens, cost, runs, per-trajectory bars</td></tr>
+        <tr><td><code>/distil-shadow</code></td><td>Live decision-equivalence: did compression preserve the next action?</td></tr>
+        <tr><td><code>/distil-dashboard</code></td><td>HTML savings page — session, lifetime, and decision-equivalence cards</td></tr>
+        <tr><td><code>/distil-doctor</code></td><td>Diagnose the setup — ledger, shadow validation, proxy round-trip, wiring</td></tr>
+        <tr><td><code>/distil-certify</code></td><td>Trajectory-level certificate: bound how many solvable tasks compression may cost</td></tr>
+        <tr><td><code>/distil-badge</code></td><td>Shareable badge of your measured savings</td></tr>
+      </tbody>
+    </table>
+    <p>The status line leads with <em>this session</em> (<code>▼75.0K −62% $0.31 · Σ27.0M</code>)
+    and shows decision-equivalence only once 25+ shadow samples exist — a rate over a handful
+    of samples is noise, and distil doesn't print noise.</p>
 
     <hr/>
 

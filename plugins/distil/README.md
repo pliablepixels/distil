@@ -36,14 +36,24 @@ Add this to your `~/.claude/settings.json` (the plugin ships the script):
 
 It renders, e.g.:
 
+During a live session (an agent currently routed through `distil wrap`/`proxy`):
+
+```
+distil · sess 120.0K→45.0K −62% · $0.31 · Σ 12.4M saved ($38.02) · eq 99.5% (1.2k)
+```
+
+**This session leads** (original → compressed tokens, percent trimmed, session
+dollars); lifetime collapses to one `Σ` figure — the full breakdown lives in
+`distil stats` and `/distil-dashboard`. Between sessions (>4 h idle) the line
+falls back to the lifetime view:
+
 ```
 distil · 1.2M→0.5M tok −58% · $2.01 saved · 128 runs · eq 99.5% (1.2k)
 ```
 
-(original → compressed tokens with the percent trimmed · dollars saved ·
-runs · decision-equivalence with its shadow-sample count when shadow mode has
-samples — green ≥99%, yellow ≥95%, red below). With no savings yet it shows a
-hint instead.
+Decision-equivalence shows whenever shadow mode has samples — calm magenta when
+healthy, yellow under 99%, red under 95% (color is an alarm, not decoration).
+With no savings yet it shows a hint instead.
 Requires `distil` on `PATH` or `uvx` available.
 
 **On a flat-rate subscription** (Claude Pro/Max) the per-token dollar figure is
@@ -70,8 +80,10 @@ keeps your line clean either way.
 | `/distil` | Your savings report + how to route more traffic through distil |
 | `/distil-stats` | Full breakdown — orig→compressed tokens, cost, runs, per-trajectory bars |
 | `/distil-shadow` | Decision-equivalence: did compression preserve your agent's next action? |
-| `/distil-dashboard` | Open the interactive HTML savings dashboard in your browser |
+| `/distil-dashboard` | Open the HTML savings page — session, lifetime, decision-equivalence cards |
 | `/distil-doctor` | Diagnose your setup — ledger, shadow validation, proxy round-trip, wiring |
+| `/distil-certify` | Trajectory-level certificate: bound how many solvable tasks compression may cost |
+| `/distil-badge` | Shareable shields.io badge of your measured savings |
 
 Want a **live, refreshing view in your terminal**? Run the CLI directly (outside the
 slash-command flow, e.g. in a split pane):

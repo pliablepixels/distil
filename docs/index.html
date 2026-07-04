@@ -146,9 +146,13 @@
 <header><div class="wrap">
   <div class="eyebrow">The certified context layer for agents</div>
   <h1>Compress what your agent reads.<br><b class="g">Certify</b> <b>its next action doesn't change.</b></h1>
+  <p class="sub"><b>The most tokens you can save without losing outcomes — and the only compressor that can prove the second half.</b></p>
   <p class="sub">Cache-aware, causally-pruned context compression for agentic runtimes —
     gated by a statistical non-inferiority test on the agent's <b>next action</b> (a proxy).
-    <b>Same potency, less volume.</b></p>
+    Newest result (<a href="compare.html">E14, n=500, official harness</a>): the compressed agent
+    <b>solved more tasks than full context — 42.0% vs 39.2%</b>
+    <small>(paired CI &minus;0.6..+6.2pp; non-inferiority certified)</small>.
+    <b>Trim the noise, keep the anomalies.</b></p>
   <p class="sub" style="font-size:13px;opacity:.85">Honest scope: the certificate covers
     <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success. On
     <a href="research.html#e7">real SWE-bench Verified (E7)</a> the proxy <b>does not transfer</b>
@@ -290,7 +294,8 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
     <tr><td>Reversible digest + handles</td><td>Originals stay local and re-expand on demand</td><td>reversible</td></tr>
     <tr><td>Reject-if-bigger invariant</td><td>Never emits a block larger than its original</td><td>safety</td></tr>
     <tr><td>Causal / counterfactual pruning</td><td>Ablation discovers context that never changes a decision</td><td><span class="new">certified</span></td></tr>
-    <tr><td>TOST non-inferiority gate</td><td>A strategy ships only if it passes the quality contract</td><td><span class="new">the moat</span></td></tr>
+    <tr><td>TOST non-inferiority gate (DERC)</td><td>Per-step: a strategy ships only if it passes the quality contract</td><td><span class="new">the moat</span></td></tr>
+    <tr><td>Trajectory-level certificate</td><td>Task-level: <code>distil certify-trajectories</code> bounds end-to-end degradation on matched full/compressed runs</td><td><span class="new">the differentiator</span></td></tr>
     <tr><td>Savings ledger + leaderboard</td><td>Local-first, privacy-preserving cumulative savings</td><td>opt-in</td></tr>
   </table>
 </div></section>

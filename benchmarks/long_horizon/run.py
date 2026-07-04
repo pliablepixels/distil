@@ -34,7 +34,8 @@ from benchmarks.swe_bench_e2e.compress_proxy import (
     COMPRESSORS,
     EXPAND_CONDITION,
     GATE_RECENT,
-    GATED_CONDITION,
+    GATED_CONDITIONS,
+    GATED_SURPRISE_CONDITION,
     CompressStats,
     serve,
 )
@@ -48,7 +49,15 @@ from benchmarks.long_horizon.agent import MODEL, TEMPERATURE, run_agent, run_age
 from benchmarks.swe_bench_e2e.compress_proxy_openai import serve as serve_openai
 
 ROOT = Path(__file__).resolve().parents[2]
-CONDITIONS = ("full", "distil_trunc500", "llmlingua2", "headroom", "distil_expand", "distil_gated")
+CONDITIONS = (
+    "full",
+    "distil_trunc500",
+    "llmlingua2",
+    "headroom",
+    "distil_expand",
+    "distil_gated",
+    "distil_gated_surprise",
+)
 
 # Serialise worktree add/remove per clone (mirrors run_agent._CLONE_LOCKS).
 _CLONE_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -87,6 +96,13 @@ def run_instance(
       local model base URL (e.g. Ollama at ``http://127.0.0.1:11434/v1``).
     """
     iid = inst["instance_id"]
+    # Per-condition digest mode: E8's ablation fixed head-truncation as the gated
+    # tier's digest; the surprise condition layers the v1.7.0 anomaly-preserving
+    # digest on top of the same gate (the ONLY difference between the two arms).
+    if condition == GATED_SURPRISE_CONDITION:
+        os.environ["DISTIL_DIGEST_MODE"] = "surprise"
+    elif condition in GATED_CONDITIONS:
+        os.environ.setdefault("DISTIL_DIGEST_MODE", "head")
     clone = ensure_clone(inst["repo"], cache_dir)
     with _get_clone_lock(clone):
         wt = make_worktree(clone, inst["base_commit"], work_root)
@@ -98,15 +114,15 @@ def run_instance(
             compressor=COMPRESSORS[condition],
             upstream=upstream,
             protect=inst["problem_statement"],
-            expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
-            gate_recent=(GATE_RECENT if condition == GATED_CONDITION else None),
+            expand=(condition == EXPAND_CONDITION or condition in GATED_CONDITIONS),
+            gate_recent=(GATE_RECENT if condition in GATED_CONDITIONS else None),
         )
     else:
         httpd, state = serve(
             compressor=COMPRESSORS[condition],
             protect=inst["problem_statement"],
-            expand=(condition in (EXPAND_CONDITION, GATED_CONDITION)),
-            gate_recent=(GATE_RECENT if condition == GATED_CONDITION else None),
+            expand=(condition == EXPAND_CONDITION or condition in GATED_CONDITIONS),
+            gate_recent=(GATE_RECENT if condition in GATED_CONDITIONS else None),
         )
     base_url = f"http://127.0.0.1:{httpd.server_address[1]}"
     try:

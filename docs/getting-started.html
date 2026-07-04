@@ -46,6 +46,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html">CLI Reference</a>
@@ -160,10 +161,10 @@ distil wrap --lossless-only -- claude
 <span class="d"># Codex, Gemini CLI, or any agent — same pattern:</span>
 distil wrap --expand -- codex</pre>
     <p>Then watch genuine, measured savings from <em>your</em> traffic (not estimates):</p>
-    <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger</span>
+    <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger (alias: distil stats)</span>
 distil dashboard            <span class="d"># live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit</span>
 distil doctor               <span class="d"># diagnose your setup: ledger, shadow, proxy self-test, wiring</span></pre>
-    <p>Wire the status line in one step with <code>distil setup</code>. The <strong>status line</strong> and <code>distil dashboard</code> auto-detect a flat-rate <strong>Claude subscription</strong> — the per-token dollar figure is notional, so it's dropped and the token reduction leads (override with <code>DISTIL_SUBSCRIPTION=0/1</code>). Inside Claude Code, <code>/distil-stats</code>, <code>/distil-shadow</code>, <code>/distil-dashboard</code>, and <code>/distil-doctor</code> surface this on demand.</p>
+    <p>Wire the status line in one step with <code>distil setup</code>. The <strong>status line</strong> and <code>distil dashboard</code> auto-detect a flat-rate <strong>Claude subscription</strong> — the per-token dollar figure is notional, so it's dropped and the token reduction leads (override with <code>DISTIL_SUBSCRIPTION=0/1</code>). Inside Claude Code, <code>/distil-stats</code>, <code>/distil-shadow</code>, <code>/distil-dashboard</code>, <code>/distil-doctor</code>, <code>/distil-certify</code> (the trajectory-level certificate), and <code>/distil-badge</code> (share your measured savings) surface this on demand — see <a href="integrations.html">Integrations</a> for the full plugin.</p>
     <p>Tired of typing <code>distil wrap</code> each session? Make it the default — once:</p>
     <pre class="term">distil default              <span class="d"># managed shell alias so `claude` always routes through distil</span>
 distil default --always-on  <span class="d"># or a persistent proxy service covering every SDK</span>
@@ -190,6 +191,14 @@ distil certify --runner anthropic</pre>
 distil shadow-stats                  <span class="d"># live decision-equivalence rate (or /distil-shadow)</span></pre>
     <p>The rate also shows in the <a href="deploy-security.html">status line</a> once shadow has samples — read it as <em>“of the requests I checked, N% produced the identical next action with vs without compression.”</em> Start at <code>0.1</code>; if equivalence holds high, dial compression up — if it dips, back off. Distil fails safe to full context.</p>
     <p style="font-size:13px;opacity:.85"><strong>Honest scope:</strong> this certifies <strong>next-action equivalence — a proxy</strong>, not end-to-end task success. On <a href="research.html#e7">real SWE-bench Verified (E7)</a> the proxy does not fully transfer once compression gets aggressive — which is exactly why you monitor the live rate and keep the gate conservative.</p>
+
+    <h3>Certify the level that matters: task outcomes</h3>
+    <p>Shadow mode watches the per-step proxy live. When you have (or can run) an eval suite, <code>distil certify-trajectories</code> certifies the invariant that actually transfers: run it twice — full context and compressed — on the same tasks, and get a distribution-free bound on how many <em>solvable</em> tasks compression may have cost you.</p>
+    <pre class="term">distil certify-trajectories outcomes.jsonl --alpha 0.05 --delta 0.05
+<span class="d"># each line: {"task_id": "...", "full_success": true, "compressed_success": true}</span>
+<span class="d"># → With confidence 95%, compression degrades at most 5.0% of tasks the full</span>
+<span class="d">#   context would have solved (observed 0.5% over 200 matched trajectories).</span></pre>
+    <p style="font-size:13px;opacity:.85">It refuses to certify below 20 matched trajectories, states its exchangeability assumptions in the certificate itself, and ships a drift monitor that flags when live traffic has shifted enough to need recalibration. See <a href="concepts.html#trajectory-certificate">Concepts &rarr; The trajectory-level certificate</a> and the <a href="cli.html#certify-trajectories">CLI reference</a>.</p>
 
     <hr/>
 

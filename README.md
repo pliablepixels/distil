@@ -6,15 +6,16 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b7bff" alt="license"/></a>
   <img src="https://img.shields.io/badge/python-3.9%2B-5ad1c9" alt="python"/>
   <img src="https://img.shields.io/badge/runtime%20deps-0-5ad19a" alt="zero deps"/>
-  <img src="https://img.shields.io/badge/tests-711%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-737%20passing-5ad19a" alt="tests"/>
+  <img src="https://img.shields.io/badge/typed-py.typed%20%C2%B7%20mypy%20clean-8b7bff" alt="typed"/>
   <img src="https://img.shields.io/badge/corpus%20gate-PASS-5ad19a" alt="gate"/>
   <img src="https://img.shields.io/badge/works%20with-any%20SDK-8b7bff" alt="any sdk"/>
 </p>
 
-<h3 align="center">The certified context compressor for AI agents.</h3>
+<h3 align="center">The most tokens you can save without losing outcomes — and the only compressor that can prove the second half.</h3>
 
 <p align="center">
-Every agent re-sends its whole context every turn — you pay for all of it, every turn. Compressing it is easy; compressing it <strong>without quietly changing what your agent does</strong> is the part everyone skips. Distil ships a <strong>statistical proof</strong> the next action is unchanged — measured on the same runs as the savings, gated in CI — and falls back to full context when it can't certify. <strong>Never silently lossy.</strong></p>
+Every agent re-sends its whole context every turn — you pay for all of it, every turn. Compressing it is easy; compressing it <strong>without quietly changing what your agent does</strong> is the part everyone skips. Distil ships a <strong>statistical proof</strong> the next action is unchanged — measured on the same runs as the savings, gated in CI — and falls back to full context when it can't certify. <strong>Never silently lossy.</strong> And in our newest 500-instance SWE-bench Verified run, the compressed agent <strong>solved more tasks than full context</strong> (42.0% vs 39.2%<sub> — paired CI −0.6..+6.2pp, superiority not yet significant; non-inferiority certified</sub>): trim the noise, keep the anomalies, and compression stops being a tax.</p>
 
 <p align="center"><sub><b>Honest scope:</b> the per-request certificate is a <b>proxy</b> (next-action equivalence) — under <em>aggressive lossy</em> compression it doesn't fully transfer to task success (<a href="#-the-proof">E7</a>). That's why Distil also certifies the level that matters: <a href="#-the-trajectory-level-certificate"><code>distil certify-trajectories</code></a> bounds <b>end-to-end task degradation</b> on matched runs, and Distil calibrates per deployment and fails safe.</sub></p>
 
@@ -33,13 +34,14 @@ Every agent re-sends its whole context every turn — you pay for all of it, eve
 
 <table align="center">
 <tr><th>On a real 500-instance long-horizon agent<br/><sub>(SWE-bench Verified, official harness)</sub></th><th>task success</th><th>tied with full context?</th><th>reversible&nbsp;+&nbsp;certified?</th></tr>
-<tr><td><b>Distil</b> (relevance-gated)</td><td align="center"><b>36.8%</b></td><td align="center">✅ <b>only one</b></td><td align="center">✅</td></tr>
+<tr><td><b>Distil</b> (gated + surprise digest, v1.7)</td><td align="center"><b>42.0%</b></td><td align="center">✅ <b>+2.8pp over full</b> <sub>(CI −0.6..+6.2)</sub></td><td align="center">✅</td></tr>
+<tr><td><b>Distil</b> (relevance-gated, E8)</td><td align="center"><b>36.8%</b></td><td align="center">✅</td><td align="center">✅</td></tr>
 <tr><td>Headroom <sub>(lossy)</sub></td><td align="center">32.6%</td><td align="center">❌ −6.6pp</td><td align="center">❌</td></tr>
 <tr><td>LLMLingua-2 <sub>(lossy)</sub></td><td align="center">2.4%</td><td align="center">❌ −36.8pp</td><td align="center">❌</td></tr>
 <tr><td>no compression <sub>(full)</sub></td><td align="center">39.2%</td><td align="center">—</td><td align="center">—</td></tr>
 </table>
 
-<p align="center"><b>Distil is the only compressor statistically tied with full context</b> — every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-the-proof">Full breakdown ↓</a></p>
+<p align="center"><b>Distil is the only compressor statistically tied with full context — and its v1.7 surprise-preserving digest lands <i>above</i> full context (42.0% vs 39.2%, paired non-inferiority certified)</b> while every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-the-proof">Full breakdown ↓</a></p>
 
 ---
 
@@ -231,7 +233,7 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 | **Zero install** | `uvx --from distil-llm distil bench` | [uv](https://docs.astral.sh/uv/) — **auto-provisions Python 3.9+** |
 | **Isolated CLI** | `pipx install distil-llm` → `distil bench` | Python **3.9+** (else `pipx install --python python3.12 distil-llm`) |
 | **Homebrew** | `brew install dshakes/tap/distil` | Homebrew |
-| **Docker** | `docker build -t distil . && docker run distil bench` | Docker |
+| **Docker** | `docker run ghcr.io/dshakes/distil:latest bench` (or `docker build -t distil .`) | Docker |
 | **Single file** | `make pyz` → `python dist/distil.pyz bench` | Python 3.9+ |
 | **In a venv** | `pip install distil-llm` (inside an active virtualenv) | Python 3.9+ |
 
@@ -376,6 +378,12 @@ Every number reproduces from the bundled corpus (`distil bench`, no key). The no
 </p>
 
 ---
+
+## ⭐ If distil saved you tokens
+
+A star is how the next engineer finds provable savings instead of a lossy guess — and
+`distil stats --badge` gives you a shareable badge of **your own measured number** to
+show alongside it. That badge + this repo are the whole marketing department.
 
 ## 🤝 Contributing
 

@@ -43,6 +43,7 @@
     <a href="research.html">Research &amp; Frontier</a>
 
     <a href="benchmark.html">Benchmark</a>
+    <a href="compare.html">Compare</a>
 
     <div class="sidebar-section">Reference</div>
     <a href="cli.html" class="active">CLI Reference</a>
@@ -790,7 +791,13 @@ distil trajectory-risk certificate
     <hr/>
 
     <h2 id="statusline">distil statusline</h2>
-    <p>One compact line for the Claude Code status bar: <code>distil &middot; &lt;orig&gt;&rarr;&lt;compressed&gt; tok &middot; $a&rarr;$b &middot; N runs &middot; eq 99.5% (n)</code>. Reads the local ledger and, when shadow has samples, the live decision-equivalence rate. Auto-detects a flat-rate subscription and drops the notional dollar segment. Wire it with <a href="#setup">distil setup</a> or the <a href="https://github.com/dshakes/distil/tree/main/plugins/distil">plugin</a>.</p>
+    <p>One compact line, designed to be a segment inside your own composite status line — every character earns its place:</p>
+    <pre class="term"><span class="d"># a proxy session is active (or was, within the last 4h)</span>
+distil &middot; &#9660;75.0K &minus;62% $0.31 &middot; &Sigma;27.0M
+
+<span class="d"># no recent session — falls back to the lifetime figure</span>
+distil &middot; &Sigma;27.0M saved &minus;50% $96.10</pre>
+    <p><code>&#9660;</code> is tokens saved and <code>&minus;N%</code> the trim rate of the <strong>active scope</strong> — the current proxy session while one is live (last activity &lt;4h ago), lifetime otherwise; <code>&Sigma;</code> is the lifetime tokens-saved figure, shown as a compact suffix next to a live session or as the headline when idle. The dollar figure only appears on metered/PAYG billing (dropped entirely on a flat-rate subscription) and only when it's non-zero. Dropped by design: the orig&rarr;compressed pair (derivable from the trim %), run counts, and any equivalence rate under 25 shadow samples — <code>eq 100.0% (1)</code> is noise wearing a number. Once shadow has &ge;25 samples, an <code>eq N.N% (n)</code> segment appears; its color is <strong>alarm-only</strong>, not decoration — calm brand hue while &ge;99%, warning under 99%, alarm under 95%. Full breakdown: <code>distil stats</code> / <code>distil dashboard</code>. Wire it with <a href="#setup">distil setup</a> or the <a href="https://github.com/dshakes/distil/tree/main/plugins/distil">plugin</a>.</p>
 
     <hr/>
 

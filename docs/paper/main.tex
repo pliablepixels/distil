@@ -1248,6 +1248,52 @@ upper bound even if one grader family is unfaithful---removing the single-grader
 risk estimate. To our knowledge this is the first anytime-valid drift monitor for a context-
 compression decision-equivalence certificate.
 
+\subsection{E14: surprise-preserving digestion --- fixing the anomaly-loss failure}
+\label{sec:e14}
+\IfFileExists{generated/e14_macros.tex}{\input{generated/e14_macros.tex}}{}
+
+E8's digest ablation fixed \emph{head-truncation} as the gated tier's correct digest, but
+head-truncation has a characteristic blind spot: it keeps a block's head and drops its tail
+--- and in agent traces the tail is where tracebacks put the assertion that decides the next
+action. This is precisely the ``lost if surprise'' failure mode identified for lossy
+compressors~\cite{silverbullet}: under a budget, \emph{incongruent} details are dropped
+first, yet the anomaly is the load-bearing content. E14 tests the shipped fix: an identical
+relevance gate whose digest keeps the head \emph{plus up to 40 anomaly lines} (errors,
+failures, unexpected states, unified-diff changes --- the production salience signal), still
+byte-recoverable via \texttt{distil\_expand}. Same 500 SWE-bench Verified instances, seed,
+30-turn ReAct agent, model (\texttt{claude-haiku-4-5}), and official harness as E8; the only
+changed variable is the digest.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+condition & pass@1 & 95\% CI & non-empty patches \\
+\midrule
+A. full context & \sweEeightFullPass & [\sweEeightFullCIlo, \sweEeightFullCIhi] & --- \\
+E$'$. gated + surprise digest & \textbf{\sweEfourteenPass} & [\sweEfourteenCIlo, \sweEfourteenCIhi] & \sweEfourteenPatchRate \\
+E. gated (head digest, E8) & \sweEeightGatedPass & [\sweEeightGatedCIlo, \sweEeightGatedCIhi] & \sweEeightGatedPatchRate \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{E14: the surprise-preserving digest vs.\ E8's head digest} under the
+identical relevance gate (500 SWE-bench Verified instances, official harness). Paired
+vs.\ full context: $b=\sweEfourteenB$ (full solved, E$'$ did not), $c=\sweEfourteenC$
+(E$'$ solved, full did not), $\Delta=\sweEfourteenDelta$; non-inferior at the 5pp margin:
+\sweEfourteenNI. Trajectory-risk certificate on the matched runs
+(\Cref{prop:trajcert}, $\delta=.05$): degradation $\le \sweEfourteenTrajBound$.}
+\label{tab:e14}
+\end{table}
+
+Two observations. First, the anomaly-preserving digest lifts the agent's ability to
+\emph{finish} --- non-empty patch rate \sweEeightGatedPatchRate\ $\rightarrow$
+\sweEfourteenPatchRate\ on identical tasks --- consistent with the mechanism: the agent that
+can still see the assertion keeps acting instead of stalling. Second, the end-to-end effect
+on pass@1 is reported by the same trajectory-level machinery a deployment would use
+(\texttt{distil certify-trajectories}), so the experiment and the product make the same
+statement with the same statistics. Honest scope: E$'$ and E8's conditions were run as
+independent sweeps over the same instance set (matched by instance, not seed), and this is
+one model/agent pairing; the certificate quantifies exactly what was measured, nothing more.
+
 \section{Conclusion}
 Decision-equivalence is the right contract for agent context compression, and it can
 carry a distribution-free guarantee validated on real traces. The certificate
@@ -1314,6 +1360,9 @@ S.~Rajmohan. \emph{ACON: Optimizing Context Compression for Long-horizon LLM Age
 ICML, 2026. arXiv:2510.00615.
 \bibitem{wsr} I.~Waudby-Smith, A.~Ramdas. \emph{Estimating means of bounded random variables
 by betting.} J.~R.~Stat.~Soc.~B, 2023. arXiv:2010.09686.
+\bibitem{silverbullet} C.~Deng et al. \emph{A Silver Bullet or a Compromise for Full
+Attention? A Comprehensive Study of Gist Token-based Context Compression.} ACL, 2025.
+arXiv:2412.17483.
 \end{thebibliography}
 
 \end{document}

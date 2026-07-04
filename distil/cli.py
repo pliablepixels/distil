@@ -120,6 +120,21 @@ def cmd_savings(args: argparse.Namespace) -> int:
 
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     s = ledger.summary()
+    if getattr(args, "badge", False):
+        # A shields.io badge of YOUR measured savings — paste it in a README or
+        # a tweet. The number comes from the local ledger (genuine, content-free);
+        # markdown includes a link to the project so the badge explains itself.
+        import urllib.parse
+
+        label = urllib.parse.quote("distil saved")
+        value = urllib.parse.quote(
+            f"{ledger._human(s.total_tokens_saved)} tokens"
+            + (f" (${s.total_dollars_saved:,.2f})" if s.total_dollars_saved >= 0.01 else "")
+        )
+        url = f"https://img.shields.io/badge/{label}-{value}-5ad1c9"
+        print(url)
+        print(f"\nmarkdown:\n[![distil savings]({url})](https://github.com/dshakes/distil)")
+        return 0
     if getattr(args, "json", False):
         from dataclasses import asdict
 
@@ -137,7 +152,29 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         print(json.dumps(d, indent=2))
         return 0
     if args.html:
-        Path(args.html).write_text(ledger.render_html(s))
+        change_rate: float | None = None
+        samples = 0
+        sess = None
+        try:
+            from .shadow import ShadowLedger
+
+            led = ShadowLedger.load()
+            samples = led.samples
+            if samples:
+                change_rate = led.rate()
+        except Exception:  # noqa: BLE001 — shadow stats are best-effort
+            pass
+        try:
+            import time as _time
+
+            sid, last_ts = ledger.latest_session()
+            if sid and (_time.time() - last_ts) < 4 * 3600:
+                sess = ledger.summary(session=sid)
+        except Exception:  # noqa: BLE001 — session slice is best-effort
+            pass
+        Path(args.html).write_text(
+            ledger.render_html(s, change_rate=change_rate, samples=samples, session=sess)
+        )
         print(f"your savings page → {args.html}")
         return 0
     print(f"distil savings ledger — {ledger.default_path()}\n")
@@ -478,53 +515,68 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     except Exception:  # noqa: BLE001 — a status line must never error out
         s = None
 
+    # Built for COMPOSITE statuslines (users append this segment to their own):
+    # every character earns its place. Grammar:
+    #   live session:  distil · ▼75.0K −62% [$0.31] · Σ27.0M
+    #   idle:          distil · Σ27.0M saved −50% [$96.10]
+    # ▼/−% = tokens saved and trim rate of the ACTIVE scope; Σ = lifetime saved.
+    # Dropped by design: orig→compressed pair (derivable), run counts, and any
+    # eq% under 25 shadow samples — "eq 100.0% (1)" is noise wearing a number.
+    # Full breakdown: distil stats / dashboard.
     parts = [c("38;5;79", "distil")]
     if s is None or s.runs == 0:
         parts.append(c("90", "no savings yet · distil wrap -- <agent>"))
     else:
-        tok = f"{ledger._human(s.total_baseline_tokens)}→{ledger._human(s.total_distil_tokens)} tok"
-        # The percent trimmed is the single most glanceable savings number —
-        # lead with it rather than making the user do the division.
-        if s.total_baseline_tokens:
-            trimmed = 1 - s.total_distil_tokens / s.total_baseline_tokens
-            tok += f" −{trimmed * 100:.0f}%"
-        parts.append(c("36", tok))
-        # On a flat-rate subscription there's no per-token bill, so the dollar
-        # figure is notional — show tokens only. Auto-detected (Claude OAuth, no
-        # key); override with DISTIL_SUBSCRIPTION=0/1.
         from .doctor import subscription_mode
 
-        if not subscription_mode():
-            saved = s.total_baseline_dollars - s.total_distil_dollars
-            parts.append(c("32", f"${saved:,.2f} saved"))
-        # Freshness: today's savings next to lifetime, so an active session
-        # shows movement instead of a static all-time number.
+        metered = not subscription_mode()
+        shown_session = False
         try:
             import time as _time
 
-            midnight = _time.mktime(
-                _time.struct_time(_time.localtime()[:3] + (0, 0, 0) + _time.localtime()[6:])
-            )
-            today = ledger.summary(since=midnight)
-            if 0 < today.total_tokens_saved < s.total_tokens_saved:
-                parts.append(c("36", f"today {ledger._human(today.total_tokens_saved)}"))
-        except Exception:  # noqa: BLE001 — freshness is best-effort
+            sid, last_ts = ledger.latest_session()
+            if sid and (_time.time() - last_ts) < 4 * 3600:
+                sess = ledger.summary(session=sid)
+                if sess.runs and sess.total_baseline_tokens:
+                    trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
+                    seg = f"▼{ledger._human(sess.total_tokens_saved)} −{trimmed * 100:.0f}%"
+                    parts.append(c("38;5;80", seg))
+                    if metered and sess.total_dollars_saved > 0:
+                        parts.append(c("38;5;114", f"${sess.total_dollars_saved:,.2f}"))
+                    parts.append(c("90", f"Σ{ledger._human(s.total_tokens_saved)}"))
+                    shown_session = True
+        except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
-        parts.append(c("90", f"{s.runs} run{'s' if s.runs != 1 else ''}"))
+        if not shown_session:
+            trimmed = (
+                1 - s.total_distil_tokens / s.total_baseline_tokens
+                if s.total_baseline_tokens
+                else 0.0
+            )
+            seg = f"Σ{ledger._human(s.total_tokens_saved)} saved −{trimmed * 100:.0f}%"
+            parts.append(c("38;5;80", seg))
+            if metered:
+                parts.append(c("38;5;114", f"${s.total_dollars_saved:,.2f}"))
         try:
             from .shadow import ShadowLedger
 
             led = ShadowLedger.load()
-            if led.samples:
-                # decision-equivalence with its sample count, so the confidence
-                # is visible at a glance (eq 99.5% over 1.0k shadowed requests).
-                # Healthy stays in the calm brand hue — color is an ALARM, not
-                # decoration: yellow when eq slips under 99%, red under 95%.
+            # Only claim an equivalence rate once there is evidence behind it —
+            # a percentage over a handful of samples is noise wearing a number.
+            if led.samples >= 25:
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
                 eq = 1 - led.rate()
-                hue = "35" if eq >= 0.99 else "33" if eq >= 0.95 else "31"
-                parts.append(c(hue, f"eq {eq * 100:.1f}% ({n_str})"))
+                # Explicit 256-color hues (basic ANSI is terminal-theme roulette —
+                # 'magenta' renders as unreadable purple on many dark themes) and a
+                # health GLYPH so the state reads even without color: ✓ proven-safe,
+                # ⚠ slipping, ✗ degraded. Color stays an alarm, not decoration.
+                glyph, hue = (
+                    ("✓", "38;5;86") if eq >= 0.99
+                    else ("⚠", "38;5;220") if eq >= 0.95
+                    else ("✗", "38;5;196")
+                )
+                parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("90", f" ({n_str})"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
@@ -947,6 +999,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         change_rate: float | None = None
         samples = 0
         recent: list[int] | None = None
+        sess = None
         try:
             led = ShadowLedger.load()
             samples = led.samples
@@ -955,6 +1008,12 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
                 recent = list(led.recent)
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
+        try:
+            sid, last_ts = ledger.latest_session()
+            if sid and (time.time() - last_ts) < 4 * 3600:
+                sess = ledger.summary(session=sid)
+        except Exception:  # noqa: BLE001 — session slice is best-effort
+            pass
         return ledger.render_dashboard(
             s,
             change_rate=change_rate,
@@ -962,6 +1021,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
             recent=recent,
             subscription=subscription,
             color=color,
+            session=sess,
         )
 
     if not interactive:
@@ -1464,6 +1524,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lb.add_argument("--html", help="render your savings as a self-contained HTML page")
     lb.add_argument("--json", action="store_true", help="machine-readable output")
+    lb.add_argument(
+        "--badge",
+        action="store_true",
+        help="print a shields.io badge URL + markdown of your measured savings",
+    )
     lb.set_defaults(func=cmd_leaderboard)
 
     pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #4)")

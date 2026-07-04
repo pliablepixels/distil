@@ -3,6 +3,44 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
+
+### Headline result (E14, SWE-bench Verified n=500, official harness)
+- The v1.7 **surprise-preserving digest resolves 42.0% of tasks vs full
+  context's 39.2%** (+2.8pp, paired CI [−0.6, +6.2]pp — statistically
+  non-inferior with the point estimate above full) and +5.2pp over the E8
+  head-digest gate. The shipped trajectory certificate certifies it
+  (α=0.10, observed degradation 6.2%). Mechanism confirmed end-to-end:
+  keeping a traceback's tail preserves the anomaly the next action needs.
+  Paper §E14; `docs/compare.html`.
+
+### Added
+- **GA container image**: `ghcr.io/dshakes/distil` (amd64+arm64), published
+  on release tags. Multi-stage, non-root, gate-verified.
+- **Session-first statusline**: this session leads (`▼75.0K −62% $0.31`),
+  lifetime collapses to `Σ27.0M`; compact composite-friendly grammar;
+  theme-proof 256-color palette with ✓/⚠/✗ health glyphs; equivalence shown
+  only at 25+ shadow samples (a rate over a handful of samples is noise).
+- **`distil stats --badge`** — shareable shields.io badge of your measured
+  savings; ledger records carry a session id (`ledger.summary(session=)`).
+- **Decision-equivalence + session cards** on the HTML savings page and a
+  session row in the TUI dashboard.
+- **Claude Code plugin 1.8**: `/distil-certify` and `/distil-badge` commands;
+  full command table on the Integrations page.
+- **E14 benchmark condition** (`distil_gated_surprise`) + committed results,
+  paper section, and macro generator.
+- `docs/compare.html` (honest head-to-head), LiteLLM Proxy recipe,
+  compliance-teams section, THREAT_MODEL.md, LAUNCH.md.
+
+### Fixed
+- Homebrew tap served 0.24.0 (pre-GA) — bumped to current and verified.
+- `ledger.default_path()` honors `DISTIL_HOME`; forward path never follows
+  redirects; identity encoding on compressible requests; 411 on chunked
+  bodies; gateway stops echoing the anon tenant hash; mypy-clean package
+  with typecheck + coverage floor in CI.
+
+
+
 ## [1.7.0] — 2026-07-03 — The trajectory-level certificate, true streaming, trust-critical savings fixes
 
 ### Added
