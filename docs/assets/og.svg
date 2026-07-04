@@ -31,7 +31,7 @@
     <g transform="translate(0,300)" font-size="22" font-weight="700">
       <g>
         <rect x="0" y="0" width="330" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
-        <text x="22" y="37" fill="#8b7bff">42.0% &gt; 39.2%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> vs full context</tspan></text>
+        <text x="22" y="37" fill="#8b7bff">42.0% &gt; 39.2%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> · beat full context</tspan></text>
       </g>
       <g transform="translate(350,0)">
         <rect x="0" y="0" width="176" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
