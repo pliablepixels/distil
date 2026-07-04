@@ -41,3 +41,22 @@ def test_subscription_mode_metered_key_means_real_dollars(monkeypatch) -> None:
     monkeypatch.delenv("DISTIL_SUBSCRIPTION", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     assert doctor.subscription_mode() is False
+
+
+def test_mode_check_warns_on_verbatim_service(tmp_path, monkeypatch):
+    """A verbatim always-on service must be flagged — it caps savings ~0."""
+    import platform
+
+    from distil import doctor
+
+    svc = tmp_path / "Library" / "LaunchAgents" / "com.distil.proxy.plist"
+    svc.parent.mkdir(parents=True)
+    svc.write_text("<string>distil</string><string>proxy</string><string>--verbatim</string>")
+    monkeypatch.setattr(doctor.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    ch = doctor._check_mode()
+    assert ch.status == doctor.WARN
+    assert "VERBATIM" in ch.detail
+    # lossless-only is healthy
+    svc.write_text("<string>proxy</string><string>--lossless-only</string>")
+    assert doctor._check_mode().status == doctor.OK

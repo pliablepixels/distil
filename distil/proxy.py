@@ -155,6 +155,11 @@ def build_handler(
     """
 
     _upstream = upstream.rstrip("/")
+    # A human-readable mode label, echoed on every compressed response as
+    # x-distil-mode so a user seeing ▼0 can tell *why*: verbatim disables the
+    # reversible digest (savings come only from lossless whitespace/JSON), so
+    # ▼0 there is the mode, not a bug.
+    _mode_label = "verbatim" if verbatim else ("lossless-only" if lossless_only else "digest")
 
     # Learning flywheel state (loaded once when expand is on): the learned
     # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
@@ -387,6 +392,12 @@ def build_handler(
                 extras = {
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
+                    "x-distil-mode": _mode_label,
+                    # Bytes in the compressible zone (user/tool content distil is
+                    # allowed to touch) — when this is ~0, a ▼0 is "nothing large
+                    # to compress this turn", not a failure. System prompt, tool
+                    # definitions, images and assistant text are never counted.
+                    "x-distil-compressible-tokens": str(_count_messages(original)),
                 }
                 if _dstats is not None:
                     extras["x-distil-cache-refs"] = str(_dstats.exact_refs + _dstats.delta_refs)
