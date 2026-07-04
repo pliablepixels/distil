@@ -24,22 +24,22 @@
 
     <text x="0" y="178" font-size="40" font-weight="700" fill="#f2f3f7">Compression with a <tspan fill="url(#g)">quality contract.</tspan></text>
 
-    <text x="0" y="224" font-size="23" fill="#9aa1b3">Cache-aware, causally-pruned context compression for agentic runtimes —</text>
-    <text x="0" y="256" font-size="23" fill="#9aa1b3">it proves the agent makes the <tspan fill="#f2f3f7">same decisions</tspan>, certified across 7 domains.</text>
+    <text x="0" y="224" font-size="23" fill="#9aa1b3">Compress your agent's context — and <tspan fill="#f2f3f7">prove its decisions don't change.</tspan></text>
+    <text x="0" y="256" font-size="23" fill="#9aa1b3">The only context compressor with a statistical fidelity certificate.</text>
 
     <!-- stat chips -->
     <g transform="translate(0,300)" font-size="22" font-weight="700">
       <g>
+        <rect x="0" y="0" width="330" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
+        <text x="22" y="37" fill="#8b7bff">42.0% &gt; 39.2%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> vs full context</tspan></text>
+      </g>
+      <g transform="translate(350,0)">
+        <rect x="0" y="0" width="176" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
+        <text x="22" y="37" fill="#5ad1c9">SWE-bench<tspan fill="#9aa1b3" font-weight="500" font-size="18"> ✓</tspan></text>
+      </g>
+      <g transform="translate(546,0)">
         <rect x="0" y="0" width="196" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
-        <text x="22" y="37" fill="#8b7bff">−30%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> input</tspan></text>
-      </g>
-      <g transform="translate(216,0)">
-        <rect x="0" y="0" width="206" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
-        <text x="22" y="37" fill="#5ad1c9">−72%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> output</tspan></text>
-      </g>
-      <g transform="translate(442,0)">
-        <rect x="0" y="0" width="300" height="58" rx="14" fill="url(#chip)" stroke="#252c3e"/>
-        <text x="22" y="37" fill="#5ad19a">100%<tspan fill="#9aa1b3" font-weight="500" font-size="18"> decision-equivalence</tspan></text>
+        <text x="22" y="37" fill="#5ad19a">certified<tspan fill="#9aa1b3" font-weight="500" font-size="18"> · reversible</tspan></text>
       </g>
     </g>
   </g>
