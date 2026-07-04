@@ -576,7 +576,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     # Traffic is flowing but nothing large has come through yet.
                     # Make it UNMISTAKABLE that distil is ON and working — a bare
                     # "watching" read as broken to real users.
-                    parts.append(c("38;5;80", "✓ on") + c("90", " · waiting for a large read"))
+                    parts.append(c("1;38;5;84", "✓ on") + c("38;5;250", " · waiting for a large read"))
                 parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
                 shown_session = True
         except Exception:  # noqa: BLE001 — recent slice is best-effort
