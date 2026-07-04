@@ -535,7 +535,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 pass
             if sess_saved > 0:
                 mseg.append(c("1;38;5;84", f"▼{ledger._human(sess_saved)}"))
-            mseg.append(c("90", f"{ledger._human(s.total_tokens_saved)} total"))
+            mseg.append(c("38;5;73", f"{ledger._human(s.total_tokens_saved)} total"))
         if model:
             mseg.append(c("90", model))
         print("  ".join(mseg))
@@ -585,7 +585,7 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                                 f"session: watching · {ledger._human(sess.total_baseline_tokens)} seen",
                             )
                         )
-                    parts.append(c("90", f"total ▼{ledger._human(s.total_tokens_saved)}"))
+                    parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
                     shown_session = True
         except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
@@ -598,9 +598,9 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             seg = (
                 f"total ▼{ledger._human(s.total_tokens_saved)} saved · {trimmed * 100:.0f}% smaller"
             )
-            parts.append(c("38;5;80", seg))
+            parts.append(c("38;5;73", seg))
             if metered:
-                parts.append(c("38;5;114", f"${s.total_dollars_saved:,.2f}"))
+                parts.append(c("1;38;5;114", f"${s.total_dollars_saved:,.2f}"))
         try:
             from .shadow import ShadowLedger
 
