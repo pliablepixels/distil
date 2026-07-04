@@ -44,4 +44,8 @@ docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json
 
 # local alt-venvs (swebench etc.)
 .venv*/
-coverage:
+
+# coverage artifacts
+.coverage
+.coverage.*
+htmlcov/

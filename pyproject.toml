@@ -97,4 +97,11 @@ exclude_also = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "@(abc\\.)?abstractmethod",
+    # Blocking server-launch / subprocess-spawn entry points. The request-
+    # handling LOGIC they wire up (build_handler / make_app) is unit-tested
+    # directly; these functions themselves run a server forever or Popen the
+    # agent, so they're exercised by integration, not unit tests.
+    "def serve\\(",
+    "def wrap_run\\(",
+    "def serve_gateway\\(",
 ]
