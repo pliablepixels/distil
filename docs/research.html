@@ -94,7 +94,7 @@
 
     <!-- E8: long-horizon agent task-success -->
     <h2 id="e8">E8: long-horizon agent task-success</h2>
-    <p><strong>Harness:</strong> <code>benchmarks/swe_bench_e2e/</code> (official <code>swebench</code>) &middot; <strong>Numbers:</strong> <a href="paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json"><code>docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json</code></a></p>
+    <p><strong>Harness:</strong> <code>benchmarks/swe_bench_e2e/</code> (official <code>swebench</code>) &middot; <strong>Numbers:</strong> <a href="https://github.com/dshakes/distil/tree/main/docs/paper/results/swe_e2e_longhorizon/reports"><code>docs/paper/results/swe_e2e_longhorizon/reports/</code></a> (per-condition resolved-instance reports)</p>
 
     <p>E7 flagged relevance-gated reversible compression as an untested path on real long-horizon execution. E8 runs that test across six conditions, including a Headroom competitor and LLMLingua-2. A custom multi-turn <strong>ReAct</strong> coding agent (read / search / edit_file / run_tests tools, up to 30 turns, <strong>claude-haiku-4-5</strong>, temp 0) is run end-to-end on the <strong>full 500-instance SWE-bench Verified set</strong>, scored by the <strong>official <code>swebench</code> harness</strong> (hidden tests, per-instance Docker). Runs average <strong>~27 turns</strong> — read-file and tool outputs accumulate into large peripheral context behind a small active working set, which is exactly the regime the relevance gate was designed for. Six conditions share the identical agent; only the compressor differs.</p>
 

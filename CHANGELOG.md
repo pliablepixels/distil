@@ -24,6 +24,26 @@ All notable changes to Distil are documented here. Format loosely follows
 - E14 propagated to ALL paper artifacts (main.pdf, NeurIPS variant, PAPER.md);
   paper-build now rebuilds + commits PDFs on push to main so they can't drift.
 
+## [1.8.2] — 2026-07-04 — GA polish: no papercuts
+
+### Fixed
+- **No raw tracebacks on bad input.** A missing/malformed input file across
+  8 commands dumped a Python stack trace; one guard at the dispatch point now
+  prints a clean `distil <cmd>: <error>` and exits 2.
+- **`--help` no longer lists commands that don't exist** (expand/sweep/gate/
+  corpus/adaptive were phantom); a regression test fails if any return.
+- **One installer-detection source of truth** (`onboard.install_method`):
+  `upgrade`, `offboard`, and `doctor` all use it, so upgrade/uninstall hints
+  are always the runnable command (brew/pipx/uv/pip-with-venv-caveat) — no
+  more bare `pip` that PEP 668 blocks.
+- **`distil doctor` detects shadowed installs** (two `distil` on PATH) and
+  **verbatim mode** — the two traps that made "▼0" or "upgrade didn't take".
+
+### Added
+- `distil version` (the word people type) and `distil upgrade` (installer-aware).
+- World-class README hero (runnable terminal proof block); figures in PAPER.md;
+  Homebrew tap auto-bumps on release; GHCR image + PDFs auto-rebuilt on push.
+
 ## [Unreleased] — 1.9.0 dev
 
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
