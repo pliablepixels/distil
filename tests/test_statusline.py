@@ -25,6 +25,10 @@ def test_humanize_tokens():
 
 def _run(monkeypatch, capsys, summary, stdin="{}", no_color=True):
     monkeypatch.setattr(ledger, "summary", lambda *a, **k: summary)
+    # Isolate from the developer's real ledger: no live session unless a test
+    # sets one up itself (otherwise a proxy running on the dev machine flips
+    # these lifetime-view tests into the session view).
+    monkeypatch.setattr(ledger, "latest_session", lambda *a, **k: ("", 0.0))
     monkeypatch.setattr("sys.stdin", io.StringIO(stdin))
     rc = cmd_statusline(argparse.Namespace(no_color=no_color))
     return rc, capsys.readouterr().out.strip()
