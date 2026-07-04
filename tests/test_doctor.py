@@ -81,7 +81,8 @@ def test_shadowed_install_warns(monkeypatch):
 
 def test_live_routing_warns_on_bypass(monkeypatch):
     """wrap running + stale ledger → WARN 'bypassing distil'."""
-    import subprocess, time as _t
+    import subprocess
+    import time as _t
     from distil import doctor, ledger
 
     class _P:
