@@ -11,7 +11,7 @@
   <a href="https://dshakes.github.io/distil/architecture.html"><img src="https://img.shields.io/badge/typed-py.typed%20%C2%B7%20mypy%20clean-8b7bff" alt="typed"/></a>
 </p>
 
-<h2 align="center">Cut your agent's token bill in half.<br/>Prove its decisions don't change.</h2>
+<h2 align="center">Compress your agent's context.<br/>Prove its decisions don't change.</h2>
 
 <p align="center"><b>The only context compressor with a statistical fidelity certificate.</b><br/>Compressed context <b>solved more</b> than full context — <b>42.0% vs 39.2%</b> on 500 SWE-bench Verified tasks.</p>
 
