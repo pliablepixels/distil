@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 # One in-flight build per ref; new pushes cancel the previous run.
 concurrency:
@@ -37,6 +37,30 @@ jobs:
           root_file: main.tex
           latexmk_use_xelatex: false
           args: -pdf -interaction=nonstopmode -halt-on-error -file-line-error
+
+      - name: Compile NeurIPS variant
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: docs/paper
+          root_file: main_neurips.tex
+          latexmk_use_xelatex: false
+          args: -pdf -interaction=nonstopmode -halt-on-error -file-line-error
+
+      # Close the staleness loop: on push to main, commit the rebuilt PDFs so the
+      # tracked artifacts can never drift from the source again. (PRs only verify.)
+      - name: Commit rebuilt PDFs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cd docs/paper
+          if ! git diff --quiet -- main.pdf main_neurips.pdf; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add main.pdf main_neurips.pdf
+            git commit -m "paper: rebuild PDFs from source [skip ci]"
+            git push
+          else
+            echo "PDFs already match source."
+          fi
 
       # Visual-polish triage: undefined refs/citations and overfull/underfull
       # boxes don't fail a -halt-on-error build, so surface them as annotations
