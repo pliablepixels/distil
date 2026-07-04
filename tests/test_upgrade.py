@@ -45,3 +45,46 @@ def test_upgrade_uvx_is_noop(monkeypatch, capsys):
     monkeypatch.setattr(onboard, "install_method", lambda: "uvx")
     assert cmd_upgrade(argparse.Namespace(dry_run=False)) == 0
     assert "nothing to upgrade" in capsys.readouterr().out.lower()
+
+
+def test_bad_file_gives_clean_error_not_traceback(capsys):
+    """Missing input file → clean message + exit 2, never a raw traceback."""
+    from distil.cli import main
+
+    rc = main(["compress", "--trajectory", "/nonexistent-xyz.json"])
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "Traceback" not in err
+    assert "distil compress:" in err and "nonexistent-xyz.json" in err
+
+
+def test_malformed_json_gives_clean_error(tmp_path, capsys):
+    from distil.cli import main
+
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text("this is not json\n")
+    rc = main(["certify-trajectories", str(bad)])
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "Traceback" not in err and "not valid JSON" in err
+
+
+def test_help_epilog_lists_only_real_commands():
+    """Every command named in the grouped --help epilog must be a real subparser
+    (regression guard: the epilog once advertised expand/sweep/gate/corpus/adaptive)."""
+    import re
+
+    from distil.cli import _HELP_EPILOG, build_parser
+
+    real = set(build_parser()._subparsers._group_actions[0].choices)  # type: ignore[attr-defined]
+    # words in the epilog that look like command names (lowercase, hyphens)
+    named = set(re.findall(r"\b[a-z][a-z-]{2,}\b", _HELP_EPILOG))
+    prose = {
+        "commands", "everyday", "guided", "install", "health", "check", "wiring",
+        "route", "agent", "traffic", "through", "compression", "your", "genuine",
+        "savings", "live", "equivalence", "show", "version", "update", "distil",
+        "place", "analysis", "tuning", "research", "internals", "each", "flags",
+        "leaderboard", "and", "help", "health-check", "shows", "command",
+    }
+    phantom = {w for w in named if w not in real and w not in prose}
+    assert not phantom, f"help epilog names non-existent commands: {phantom}"

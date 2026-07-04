@@ -1524,13 +1524,13 @@ everyday commands:
   wrap, proxy, gateway                route agent traffic through compression
   stats (leaderboard), dashboard,     your genuine savings + live equivalence
   shadow-stats, statusline
-  expand                              recover any digested content by handle
+  version, upgrade                    show version / update distil in place
 
 analysis & tuning:
-  compress, savings, bench, prune, sweep, calibrate, adaptive
+  compress, savings, bench, prune, calibrate, certify, certify-trajectories
 
 research / CI internals:
-  verify, holdout, conformal, gate, frontier, eval, online, corpus,
+  verify, holdout, conformal, frontier, eval, online,
   train-transformer, federated-leaderboard
 
 `distil <command> --help` shows each command's flags.
@@ -2060,6 +2060,16 @@ def main(argv: list[str] | None = None) -> int:
         rc = args.func(args)
     except BrokenPipeError:
         rc = 0
+    except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
+        # A missing/unreadable input file is a user mistake, not a distil bug —
+        # a clean message beats an 8-line pathlib traceback. Covers every
+        # file-reading command at the dispatch chokepoint (no per-command patch).
+        print(f"distil {getattr(args, 'cmd', '')}: {e}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as e:
+        path = getattr(args, "trajectory", None) or getattr(args, "outcomes", None) or "input"
+        print(f"distil {getattr(args, 'cmd', '')}: {path} is not valid JSON — {e}", file=sys.stderr)
+        return 2
 
     # The status line is piped to a consumer (Claude Code) that may close the
     # pipe the instant it has our one line. Flush under guard, then hard-exit so
