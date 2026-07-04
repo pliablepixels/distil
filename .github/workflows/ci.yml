@@ -31,7 +31,7 @@ jobs:
       # [tool.coverage.run] — see the justification there. Floor climbs as
       # coverage does; it may only ratchet up, never erode.
       - name: pytest with coverage floor
-        run: uv run --with pytest --with pytest-asyncio --with aiohttp --with pytest-cov python -m pytest -q --cov=distil --cov-fail-under=90
+        run: uv run --with pytest --with pytest-asyncio --with aiohttp --with pytest-cov python -m pytest -q --cov=distil --cov-fail-under=95
 
   gate:
     runs-on: ${{ matrix.os }}
