@@ -422,3 +422,41 @@ def test_total_segment_identical_across_all_states(monkeypatch, capsys):
     assert len(set(totals.values())) == 1, f"total segment differs across states: {totals}"
     for name, o in outs.items():
         assert o.startswith("distil ·") and o.endswith("total ▼27.0M"), (name, o)
+
+
+def test_per_session_via_distil_session_env(monkeypatch, tmp_path):
+    """PROD per-session: DISTIL_SESSION (stamped by `distil wrap`, inherited by
+    the status line) filters the live ▼ to THIS session; total stays lifetime.
+    Two terminals on the same machine must NOT bleed into each other."""
+    import io
+
+    from distil import ledger as led_mod
+    from distil.runtime import RuntimeSavings
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "1")
+    path = tmp_path / "savings.jsonl"
+    monkeypatch.setattr(led_mod, "default_path", lambda: path)
+
+    # session A records 30K saved; the RuntimeSavings id comes from DISTIL_SESSION
+    monkeypatch.setenv("DISTIL_SESSION", "sess-A")
+    rs = RuntimeSavings(model="claude-fable-5", ledger_path=path)
+    assert rs.session_id == "sess-A"
+    rs.record(50_000, 20_000)
+    rs.flush()
+
+    import contextlib
+
+    outA, outB = io.StringIO(), io.StringIO()
+    monkeypatch.setenv("DISTIL_SESSION", "sess-A")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    with contextlib.redirect_stdout(outA):
+        cmd_statusline(argparse.Namespace(no_color=True))
+    monkeypatch.setenv("DISTIL_SESSION", "sess-B")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    with contextlib.redirect_stdout(outB):
+        cmd_statusline(argparse.Namespace(no_color=True))
+
+    a, b = outA.getvalue().strip(), outB.getvalue().strip()
+    assert "▼30.0K" in a and "60% smaller" in a  # session A sees its own savings
+    assert "✓ on" in b and "▼" not in b.split("total")[0]  # session B: none of its own
+    assert "total ▼30.0K" in a and "total ▼30.0K" in b  # shared lifetime total

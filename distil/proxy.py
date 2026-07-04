@@ -729,6 +729,13 @@ def wrap_run(
     """
     import subprocess
     import sys
+    import time
+
+    # One stable id for THIS wrap invocation, exported so BOTH the in-process
+    # proxy (which tags every ledger record) and the wrapped agent — plus the
+    # status line the agent spawns — see the same value and can attribute
+    # savings to this exact session. Each terminal's wrap gets its own.
+    os.environ.setdefault("DISTIL_SESSION", f"s{int(time.time())}-{os.getpid()}")
 
     savings = None
     if record:

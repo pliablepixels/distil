@@ -49,8 +49,13 @@ class RuntimeSavings:
             import os
             import time
 
-            # One proxy process == one agent session (that's what wrap runs).
-            self.session_id = f"s{int(time.time())}-{os.getpid()}"
+            # DISTIL_SESSION (set by `distil wrap`) is the SAME id the wrapped
+            # agent — and the status line it spawns — inherit, so per-session
+            # savings correlate across the proxy and the status line. Falls back
+            # to one-id-per-proxy-process when wrap didn't set it.
+            self.session_id = (
+                os.environ.get("DISTIL_SESSION") or f"s{int(time.time())}-{os.getpid()}"
+            )
 
     @property
     def tokens_saved(self) -> int:

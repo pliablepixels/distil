@@ -544,6 +544,22 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     except Exception:  # noqa: BLE001 — a status line must never error out
         s = None
 
+    def _live() -> "ledger.LedgerSummary":
+        """THIS session's savings. Under `distil wrap`, DISTIL_SESSION is stamped
+        by the proxy AND inherited by the status line, so we filter the ledger to
+        exactly this session — true per-session, no cross-terminal bleed. If it's
+        unset (status line run outside a wrap), fall back to a 15-min activity
+        window so the number is still meaningful, not empty."""
+        import time as _t
+
+        sid = os.environ.get("DISTIL_SESSION")
+        try:
+            if sid:
+                return ledger.summary(session=sid)
+            return ledger.summary(since=_t.time() - 15 * 60)
+        except Exception:  # noqa: BLE001 — live slice is best-effort
+            return ledger.LedgerSummary(0, 0.0, 0, {})
+
     # MINIMAL is opt-in (DISTIL_STATUSLINE=minimal|lite|compact) — a two-fact
     # segment for crowded composite lines: this session's saving + lifetime.
     if os.environ.get("DISTIL_STATUSLINE", "").lower() in ("minimal", "lite", "compact"):
@@ -551,16 +567,9 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         if s is None or s.runs == 0:
             mseg.append(c("38;5;73", "wrap -- <agent> to start"))
         else:
-            recent_saved = 0
-            try:
-                import time as _time
-
-                # recent activity across all terminals (15-min window), not one session
-                recent_saved = ledger.summary(since=_time.time() - 15 * 60).total_tokens_saved
-            except Exception:  # noqa: BLE001 — recent slice is best-effort
-                pass
-            if recent_saved > 0:
-                mseg.append(c("1;38;5;84", f"▼{ledger._human(recent_saved)}"))
+            live_saved = _live().total_tokens_saved
+            if live_saved > 0:
+                mseg.append(c("1;38;5;84", f"▼{ledger._human(live_saved)}"))
             mseg.append(c("38;5;73", f"{ledger._human(s.total_tokens_saved)} total"))
         if model:
             mseg.append(c("38;5;73", model))
@@ -584,17 +593,12 @@ def cmd_statusline(args: argparse.Namespace) -> int:
 
         metered = not subscription_mode()
         # ONE consistent pattern in every state:  distil · <live> · total ▼27.0M
-        #   <live> = ▼75K · 62% smaller [· $]   (recent savings)
-        #          = ✓ on · waiting for a large read   (recent traffic, nothing big yet)
-        #          = ✓ on   (set up, idle — no recent traffic)
-        # LIVE aggregates a 15-min window across ALL sessions (each terminal's
-        # `distil default` spawns its own session), so the number never flickers.
-        try:
-            import time as _time
-
-            recent = ledger.summary(since=_time.time() - 15 * 60)
-        except Exception:  # noqa: BLE001 — recent slice is best-effort
-            recent = ledger.LedgerSummary(0, 0.0, 0, {})
+        #   <live> = ▼75K · 62% smaller [· $]   (this session saved)
+        #          = ✓ on · waiting for a large read   (this session, nothing big yet)
+        #          = ✓ on   (set up, idle — no traffic this session)
+        # LIVE = THIS session under `distil wrap` (DISTIL_SESSION), so each
+        # terminal shows only its own; total = lifetime across all sessions.
+        recent = _live()
         if recent.runs and recent.total_baseline_tokens and recent.total_tokens_saved > 0:
             trimmed = 1 - recent.total_distil_tokens / recent.total_baseline_tokens
             parts.append(c("1;38;5;84", f"▼{ledger._human(recent.total_tokens_saved)}"))
@@ -1114,9 +1118,17 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
         try:
-            sid, last_ts = ledger.latest_session()
-            if sid and (time.time() - last_ts) < 4 * 3600:
+            # THIS session under `distil wrap` (DISTIL_SESSION), else the most
+            # recent session — mirrors the status line's per-session view.
+            import os as _os
+
+            sid = _os.environ.get("DISTIL_SESSION")
+            if sid:
                 sess = ledger.summary(session=sid)
+            else:
+                sid2, last_ts = ledger.latest_session()
+                if sid2 and (time.time() - last_ts) < 4 * 3600:
+                    sess = ledger.summary(session=sid2)
         except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
         return ledger.render_dashboard(
