@@ -23,11 +23,15 @@ def test_humanize_tokens():
     assert ledger._human(1_200_000) == "1.2M"
 
 
-def _run(monkeypatch, capsys, summary, stdin="{}", no_color=True):
-    monkeypatch.setattr(ledger, "summary", lambda *a, **k: summary)
-    # Isolate from the developer's real ledger: no live session unless a test
-    # sets one up itself (otherwise a proxy running on the dev machine flips
-    # these lifetime-view tests into the session view).
+def _run(monkeypatch, capsys, summary, recent=None, stdin="{}", no_color=True):
+    """summary() → lifetime; summary(since=…) → recent window (empty by default,
+    so these tests exercise the lifetime/idle view unless a test sets `recent`)."""
+    empty = ledger.LedgerSummary(0, 0.0, 0, {})
+
+    def _summary(*a, **k):
+        return (recent if recent is not None else empty) if k.get("since") is not None else summary
+
+    monkeypatch.setattr(ledger, "summary", _summary)
     monkeypatch.setattr(ledger, "latest_session", lambda *a, **k: ("", 0.0))
     monkeypatch.setattr("sys.stdin", io.StringIO(stdin))
     rc = cmd_statusline(argparse.Namespace(no_color=no_color))
@@ -244,34 +248,50 @@ def test_render_dashboard_recent_strip():
     assert "▰" in out and "▱" in out  # equivalent + changed marks present
 
 
-def test_session_first_when_live_session(monkeypatch, capsys, tmp_path):
-    """A live session leads the line; lifetime collapses to one Σ figure."""
+def test_recent_window_leads_lifetime_follows(monkeypatch, capsys, tmp_path):
+    """Live ▼ = RECENT activity (15-min window, aggregates all terminals — no
+    single-session flicker); total = lifetime."""
+    import json as _json
     import time
 
     from distil import ledger as led_mod
 
     monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
     path = tmp_path / "savings.jsonl"
+    # an OLD record (ts=1000, outside the 15-min window) — lifetime only
+    old = {
+        "trajectory_id": "live-proxy",
+        "model": "claude-opus-4-8",
+        "turns": 5,
+        "baseline_dollars": 1.0,
+        "distil_dollars": 0.4,
+        "baseline_input_tokens": 200_000,
+        "distil_input_tokens": 80_000,
+        "tokenizer": "heuristic",
+        "ts": 1000.0,
+        "session": "old",
+    }
+    path.write_text(_json.dumps(old) + "\n")
+    # a RECENT record (now) — this is the live number, from a different session
     led_mod.record(
-        trajectory_id="live-proxy", model="claude-opus-4-8", turns=5,
-        baseline_dollars=1.0, distil_dollars=0.4,
-        baseline_input_tokens=200_000, distil_input_tokens=80_000,
-        session="old-session", path=path,
-    )
-    led_mod.record(
-        trajectory_id="live-proxy", model="claude-opus-4-8", turns=3,
-        baseline_dollars=0.5, distil_dollars=0.2,
-        baseline_input_tokens=100_000, distil_input_tokens=40_000,
-        session=f"s{int(time.time())}-99", path=path,
+        trajectory_id="live-proxy",
+        model="claude-opus-4-8",
+        turns=3,
+        baseline_dollars=0.5,
+        distil_dollars=0.2,
+        baseline_input_tokens=100_000,
+        distil_input_tokens=40_000,
+        session=f"s{int(time.time())}-99",
+        path=path,
     )
     monkeypatch.setattr(led_mod, "default_path", lambda: path)
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
     rc = cmd_statusline(argparse.Namespace(no_color=True))
     out = capsys.readouterr().out.strip()
     assert rc == 0
-    assert "session ▼60.0K · 60% smaller" in out  # THIS session
-    assert "total ▼180.0K" in out  # lifetime
-    assert "$0.30" in out  # session dollars, not lifetime
+    assert "▼60.0K · 60% smaller" in out  # recent activity, not lifetime
+    assert "total ▼180.0K" in out  # lifetime = old + recent
+    assert "$0.30" in out  # recent dollars, not lifetime
 
 
 def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
@@ -283,10 +303,16 @@ def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
     monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
     path = tmp_path / "savings.jsonl"
     rec = {
-        "trajectory_id": "live-proxy", "model": "claude-opus-4-8", "turns": 2,
-        "baseline_dollars": 1.0, "distil_dollars": 0.5,
-        "baseline_input_tokens": 50_000, "distil_input_tokens": 25_000,
-        "tokenizer": "heuristic", "ts": 1000.0, "session": "ancient",
+        "trajectory_id": "live-proxy",
+        "model": "claude-opus-4-8",
+        "turns": 2,
+        "baseline_dollars": 1.0,
+        "distil_dollars": 0.5,
+        "baseline_input_tokens": 50_000,
+        "distil_input_tokens": 25_000,
+        "tokenizer": "heuristic",
+        "ts": 1000.0,
+        "session": "ancient",
     }
     path.write_text(_json.dumps(rec) + "\n")
     monkeypatch.setattr(led_mod, "default_path", lambda: path)
@@ -319,17 +345,23 @@ def test_zero_savings_session_says_watching(monkeypatch, capsys, tmp_path):
     monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
     path = tmp_path / "savings.jsonl"
     led_mod.record(
-        trajectory_id="live-proxy", model="claude-opus-4-8", turns=4,
-        baseline_dollars=0.1, distil_dollars=0.1,
-        baseline_input_tokens=12_000, distil_input_tokens=12_000,
-        session=f"s{int(time.time())}-7", path=path,
+        trajectory_id="live-proxy",
+        model="claude-opus-4-8",
+        turns=4,
+        baseline_dollars=0.1,
+        distil_dollars=0.1,
+        baseline_input_tokens=12_000,
+        distil_input_tokens=12_000,
+        session=f"s{int(time.time())}-7",
+        path=path,
     )
     monkeypatch.setattr(led_mod, "default_path", lambda: path)
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
     cmd_statusline(argparse.Namespace(no_color=True))
     out = capsys.readouterr().out.strip()
-    assert "watching · 12.0K seen" in out
-    assert "session ▼" not in out and "smaller" not in out.split("total")[0]
+    # unmistakable: distil is ON, waiting for large content — not a bare "watching"
+    assert "✓ on" in out and "waiting for a large read" in out
+    assert "▼" not in out.split("total")[0]  # no live ▼ savings before 'total'
 
 
 def test_flush_skips_zero_baseline_records(tmp_path):

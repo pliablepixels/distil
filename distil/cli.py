@@ -522,19 +522,16 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         if s is None or s.runs == 0:
             mseg.append(c("90", "wrap -- <agent> to start"))
         else:
-            sess_saved = 0
+            recent_saved = 0
             try:
                 import time as _time
 
-                sid, last_ts = ledger.latest_session()
-                if sid and (_time.time() - last_ts) < 4 * 3600:
-                    ss = ledger.summary(session=sid)
-                    if ss.runs:
-                        sess_saved = ss.total_tokens_saved
-            except Exception:  # noqa: BLE001 — session slice is best-effort
+                # recent activity across all terminals (15-min window), not one session
+                recent_saved = ledger.summary(since=_time.time() - 15 * 60).total_tokens_saved
+            except Exception:  # noqa: BLE001 — recent slice is best-effort
                 pass
-            if sess_saved > 0:
-                mseg.append(c("1;38;5;84", f"▼{ledger._human(sess_saved)}"))
+            if recent_saved > 0:
+                mseg.append(c("1;38;5;84", f"▼{ledger._human(recent_saved)}"))
             mseg.append(c("38;5;73", f"{ledger._human(s.total_tokens_saved)} total"))
         if model:
             mseg.append(c("90", model))
@@ -561,33 +558,28 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         try:
             import time as _time
 
-            sid, last_ts = ledger.latest_session()
-            if sid and (_time.time() - last_ts) < 4 * 3600:
-                sess = ledger.summary(session=sid)
-                if sess.runs and sess.total_baseline_tokens:
-                    if sess.total_tokens_saved > 0:
-                        trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
-                        # The hero number pops (bold bright green); the rate rides
-                        # dim beside it, so the eye lands on what you saved.
-                        parts.append(
-                            c("1;38;5;84", f"session ▼{ledger._human(sess.total_tokens_saved)}")
-                        )
-                        parts.append(c("38;5;80", f"{trimmed * 100:.0f}% smaller"))
-                        if metered and sess.total_dollars_saved > 0:
-                            parts.append(c("1;38;5;114", f"${sess.total_dollars_saved:,.2f}"))
-                    else:
-                        # Traffic is flowing but nothing was worth trimming yet
-                        # (small/early contexts — savings grow with context).
-                        # "▼0 −0%" reads as broken; say what's actually true.
-                        parts.append(
-                            c(
-                                "90",
-                                f"session: watching · {ledger._human(sess.total_baseline_tokens)} seen",
-                            )
-                        )
-                    parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
-                    shown_session = True
-        except Exception:  # noqa: BLE001 — session slice is best-effort
+            # LIVE = recent activity across ALL sessions (a 15-min window), not one
+            # session. With `distil default` every terminal spawns its own proxy +
+            # session id; keying on a single "latest session" made the number
+            # flicker between terminals and often show 'watching'. A time window
+            # aggregates every active terminal into one stable, honest figure.
+            recent = ledger.summary(since=_time.time() - 15 * 60)
+            if recent.runs and recent.total_baseline_tokens:
+                if recent.total_tokens_saved > 0:
+                    trimmed = 1 - recent.total_distil_tokens / recent.total_baseline_tokens
+                    # The hero number pops (bold bright green); rate rides beside it.
+                    parts.append(c("1;38;5;84", f"▼{ledger._human(recent.total_tokens_saved)}"))
+                    parts.append(c("38;5;80", f"{trimmed * 100:.0f}% smaller"))
+                    if metered and recent.total_dollars_saved > 0:
+                        parts.append(c("1;38;5;114", f"${recent.total_dollars_saved:,.2f}"))
+                else:
+                    # Traffic is flowing but nothing large has come through yet.
+                    # Make it UNMISTAKABLE that distil is ON and working — a bare
+                    # "watching" read as broken to real users.
+                    parts.append(c("38;5;80", "✓ on") + c("90", " · waiting for a large read"))
+                parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
+                shown_session = True
+        except Exception:  # noqa: BLE001 — recent slice is best-effort
             pass
         if not shown_session:
             trimmed = (
