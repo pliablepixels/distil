@@ -554,45 +554,30 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         from .doctor import subscription_mode
 
         metered = not subscription_mode()
-        shown_session = False
+        # ONE consistent pattern in every state:  distil · <live> · total ▼27.0M
+        #   <live> = ▼75K · 62% smaller [· $]   (recent savings)
+        #          = ✓ on · waiting for a large read   (recent traffic, nothing big yet)
+        #          = ✓ on   (set up, idle — no recent traffic)
+        # LIVE aggregates a 15-min window across ALL sessions (each terminal's
+        # `distil default` spawns its own session), so the number never flickers.
         try:
             import time as _time
 
-            # LIVE = recent activity across ALL sessions (a 15-min window), not one
-            # session. With `distil default` every terminal spawns its own proxy +
-            # session id; keying on a single "latest session" made the number
-            # flicker between terminals and often show 'watching'. A time window
-            # aggregates every active terminal into one stable, honest figure.
             recent = ledger.summary(since=_time.time() - 15 * 60)
-            if recent.runs and recent.total_baseline_tokens:
-                if recent.total_tokens_saved > 0:
-                    trimmed = 1 - recent.total_distil_tokens / recent.total_baseline_tokens
-                    # The hero number pops (bold bright green); rate rides beside it.
-                    parts.append(c("1;38;5;84", f"▼{ledger._human(recent.total_tokens_saved)}"))
-                    parts.append(c("38;5;80", f"{trimmed * 100:.0f}% smaller"))
-                    if metered and recent.total_dollars_saved > 0:
-                        parts.append(c("1;38;5;114", f"${recent.total_dollars_saved:,.2f}"))
-                else:
-                    # Traffic is flowing but nothing large has come through yet.
-                    # Make it UNMISTAKABLE that distil is ON and working — a bare
-                    # "watching" read as broken to real users.
-                    parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · waiting for a large read"))
-                parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
-                shown_session = True
         except Exception:  # noqa: BLE001 — recent slice is best-effort
-            pass
-        if not shown_session:
-            trimmed = (
-                1 - s.total_distil_tokens / s.total_baseline_tokens
-                if s.total_baseline_tokens
-                else 0.0
-            )
-            seg = (
-                f"total ▼{ledger._human(s.total_tokens_saved)} saved · {trimmed * 100:.0f}% smaller"
-            )
-            parts.append(c("38;5;73", seg))
-            if metered:
-                parts.append(c("1;38;5;114", f"${s.total_dollars_saved:,.2f}"))
+            recent = ledger.LedgerSummary(0, 0.0, 0, {})
+        if recent.runs and recent.total_baseline_tokens and recent.total_tokens_saved > 0:
+            trimmed = 1 - recent.total_distil_tokens / recent.total_baseline_tokens
+            parts.append(c("1;38;5;84", f"▼{ledger._human(recent.total_tokens_saved)}"))
+            parts.append(c("38;5;80", f"{trimmed * 100:.0f}% smaller"))
+            if metered and recent.total_dollars_saved > 0:
+                parts.append(c("1;38;5;114", f"${recent.total_dollars_saved:,.2f}"))
+        elif recent.runs and recent.total_baseline_tokens:
+            parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · waiting for a large read"))
+        else:
+            parts.append(c("1;38;5;84", "✓ on"))
+        # TOTAL (lifetime) — identical format in every state.
+        parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
         try:
             from .shadow import ShadowLedger
 

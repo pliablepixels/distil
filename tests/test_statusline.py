@@ -57,12 +57,13 @@ def test_populated_ledger(monkeypatch, capsys):
         total_baseline_dollars=0.10,
         total_distil_dollars=0.06,
     )
-    rc, out = _run(monkeypatch, capsys, s)
+    rc, out = _run(monkeypatch, capsys, s, recent=s)  # recent activity with savings
     assert rc == 0
-    # compact grammar: lifetime = one total ▼ figure + trim + $
-    assert "total ▼21.6K saved" in out
+    # unified grammar: live ▼ + rate + $, then a bare `total ▼`
+    assert "▼21.6K" in out
     assert "43% smaller" in out  # trim rate, the glanceable number
     assert "$0.04" in out
+    assert "total ▼21.6K" in out  # lifetime, always the same bare format
     assert "runs" not in out  # run counts live in `distil stats`, not the line
 
 
@@ -80,9 +81,9 @@ def test_subscription_hides_notional_dollars(monkeypatch, capsys):
         total_baseline_dollars=0.10,
         total_distil_dollars=0.06,
     )
-    rc, out = _run(monkeypatch, capsys, s)
+    rc, out = _run(monkeypatch, capsys, s, recent=s)
     assert rc == 0
-    assert "total ▼21.6K saved" in out
+    assert "▼21.6K" in out and "total ▼21.6K" in out
     assert "$" not in out
 
 
@@ -319,8 +320,11 @@ def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
     cmd_statusline(argparse.Namespace(no_color=True))
     out = capsys.readouterr().out.strip()
-    assert "total ▼25.0K saved · 50% smaller" in out
-    assert "session ▼" not in out  # no live-session segment
+    # idle (no recent traffic): set-up-and-on, then the same bare `total ▼`
+    assert "✓ on" in out
+    assert "total ▼25.0K" in out
+    assert "saved · 50% smaller" not in out  # no special idle formatting anymore
+    assert "▼" not in out.split("total")[0]  # no live savings figure when idle
 
 
 def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
@@ -373,3 +377,48 @@ def test_flush_skips_zero_baseline_records(tmp_path):
     rs.record(0, 0)  # a request passed through with nothing measurable
     assert rs.flush() is True  # counters reset...
     assert not led.exists()  # ...but no record was written
+
+
+def test_total_segment_identical_across_all_states(monkeypatch, capsys):
+    """CONSISTENCY GUARD (the bug a user caught): the lifetime `total ▼` segment
+    and the overall `distil · <live> · total ▼…` shape must hold in EVERY state —
+    idle, watching, and saving. This is the cross-state check my per-state tests
+    were missing."""
+    import re
+
+    from distil import ledger as led_mod
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "1")
+    monkeypatch.setattr(led_mod, "latest_session", lambda *a, **k: ("", 0.0))
+    life = ledger.LedgerSummary(
+        9,
+        0.0,
+        27_000_000,
+        {"live-proxy": 1.0},
+        total_baseline_tokens=54_000_000,
+        total_distil_tokens=27_000_000,
+    )
+    states = {
+        "idle": ledger.LedgerSummary(0, 0.0, 0, {}),
+        "watching": ledger.LedgerSummary(
+            2, 0.0, 0, {}, total_baseline_tokens=46_000, total_distil_tokens=46_000
+        ),
+        "saving": ledger.LedgerSummary(
+            3, 0.0, 12_000, {}, total_baseline_tokens=30_000, total_distil_tokens=18_000
+        ),
+    }
+    outs = {}
+    for name, recent in states.items():
+        monkeypatch.setattr(
+            led_mod,
+            "summary",
+            lambda *a, _r=recent, **k: _r if k.get("since") is not None else life,
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+        cmd_statusline(argparse.Namespace(no_color=True))
+        outs[name] = capsys.readouterr().out.strip()
+
+    totals = {name: re.search(r"total ▼\S+", o).group(0) for name, o in outs.items()}
+    assert len(set(totals.values())) == 1, f"total segment differs across states: {totals}"
+    for name, o in outs.items():
+        assert o.startswith("distil ·") and o.endswith("total ▼27.0M"), (name, o)
