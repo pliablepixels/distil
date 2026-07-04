@@ -602,45 +602,28 @@ def cmd_version(args: argparse.Namespace) -> int:
     return 0
 
 
-def _detect_installer() -> tuple[str, str | None]:
-    """(installer name, upgrade command) for how THIS distil was installed, by
-    inspecting the resolved executable path. Returns ("unknown", None) when we
-    can't tell — better to say so than guess a command that does the wrong thing."""
-    import shutil
-
-    exe = shutil.which("distil") or ""
-    real = str(Path(exe).resolve()) if exe else ""
-    home = str(Path.home())
-    if "/Cellar/" in real or "/homebrew/" in real or real.startswith("/usr/local/"):
-        return "homebrew", "brew upgrade distil"
-    if f"{home}/.local/pipx" in real or "/pipx/venvs/" in real:
-        return "pipx", "pipx upgrade distil-llm"
-    if "/uv/tools/" in real or f"{home}/.local/share/uv" in real:
-        return "uv", "uv tool upgrade distil-llm"
-    if real.endswith("/bin/distil") and (Path(real).parent.parent / "pyvenv.cfg").exists():
-        return "pip (venv)", "pip install -U distil-llm"
-    return "unknown", None
-
-
 def cmd_upgrade(args: argparse.Namespace) -> int:
     """Upgrade distil the way it was installed — detect brew/pipx/uv/pip and run
     (or, with --dry-run, print) the right command. distil can't replace its own
-    running binary, so the upgrade goes through the installer that owns it."""
+    running binary, so the upgrade goes through the installer that owns it.
+    Uses onboard.install_method — the single source of truth for installer
+    detection (shared by onboard, offboard, doctor)."""
     import subprocess
 
-    installer, cmd = _detect_installer()
-    if cmd is None:
-        print(
-            "Couldn't tell how distil was installed. Upgrade with whichever you used:\n"
-            "  pipx:  pipx upgrade distil-llm\n"
-            "  brew:  brew upgrade distil\n"
-            "  uv:    uv tool upgrade distil-llm\n"
-            "  pip:   pip install -U distil-llm  (inside your venv)\n"
-            "  or zero-install always-latest:  uvx --from distil-llm distil <cmd>"
-        )
-        return 1
-    print(f"detected install: {installer}\n$ {cmd}")
+    from . import onboard
+
+    method = onboard.install_method()
+    if method == "uvx":
+        print("uvx runs the latest distil-llm on every invocation — nothing to upgrade.")
+        return 0
+    cmd = onboard.upgrade_command(method)
+    print(f"detected install: {method}\n$ {cmd}")
     if args.dry_run:
+        return 0
+    # A comment-only / advisory command (pip inside a venv we can't enter) isn't
+    # safe to run for the user — just print it.
+    if cmd.strip().startswith("#") or "inside your venv" in cmd:
+        print("  run that yourself in the right environment.")
         return 0
     rc = subprocess.run(cmd, shell=True).returncode
     if rc == 0:
@@ -1003,7 +986,6 @@ def cmd_offboard(args: argparse.Namespace) -> int:
             return False
 
     shell, rc = detect_shell()
-    env = onboard.detect()
     print("distil offboard — remove distil's footprint\n")
 
     # 1 · shell default (alias / env block)
@@ -1040,19 +1022,11 @@ def cmd_offboard(args: argparse.Namespace) -> int:
             print(f"  kept your savings data at {home}  (delete it with: distil offboard --purge)")
 
     # 5 · the package itself — we can't remove the process we're running in.
-    # Detect from the ACTUAL binary path (brew/pipx/uv/pip) so the command we
-    # print actually works — a bare `pip uninstall` is blocked on modern
-    # externally-managed Pythons (PEP 668).
-    installer, _ = _detect_installer()
-    uninstall = {
-        "homebrew": "brew uninstall dshakes/tap/distil && brew untap dshakes/tap",
-        "pipx": "pipx uninstall distil-llm",
-        "uv": "uv tool uninstall distil-llm",
-        "pip (venv)": "pip uninstall distil-llm  (inside the venv)",
-    }.get(installer)
-    if uninstall is None:
-        uninstall = onboard.uninstall_command(env.method)
-    print(f"\nFinally, uninstall the package ({installer}):\n  {uninstall}")
+    # onboard.install_method detects brew/pipx/uv/pip from the real path, so the
+    # printed command actually works (a bare `pip uninstall` is blocked on
+    # modern externally-managed Pythons, PEP 668).
+    method = onboard.install_method()
+    print(f"\nFinally, uninstall the package ({method}):\n  {onboard.uninstall_command(method)}")
     from .doctor import _find_all_distil
 
     extra = _find_all_distil()

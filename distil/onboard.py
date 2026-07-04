@@ -14,6 +14,7 @@ import os
 import platform
 import shutil
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .doctor import subscription_mode
 
@@ -50,35 +51,46 @@ def detect() -> Env:
 
 
 def install_method() -> str:
-    """How the running distil is installed — drives the right upgrade command."""
+    """How the running distil is installed — drives the right upgrade/uninstall
+    command. THE single source of truth (offboard, upgrade, doctor all use it).
+    Checks the package path AND the resolved `distil` binary path, because a
+    Homebrew install lives in a Cellar venv the package path alone can miss."""
     from . import __file__ as pkg_file
 
-    p = (pkg_file or "").replace(os.sep, "/").lower()
-    if "/pipx/" in p:
+    paths = [(pkg_file or "")]
+    exe = shutil.which("distil")
+    if exe:
+        paths.append(str(Path(exe).resolve()))
+    blob = " ".join(paths).replace(os.sep, "/").lower()
+    if "/cellar/" in blob or "/homebrew/" in blob or "/usr/local/" in blob:
+        return "homebrew"
+    if "/pipx/" in blob:
         return "pipx"
-    if "/uv/tools/" in p:
+    if "/uv/tools/" in blob:
         return "uv"
-    if "/uv/" in p or "/.cache/uv/" in p:
+    if "/uv/" in blob or "/.cache/uv/" in blob:
         return "uvx"  # ephemeral run — nothing persistent to upgrade
     return "pip"
 
 
 def upgrade_command(method: str) -> str:
     return {
+        "homebrew": "brew upgrade distil",
         "pipx": "pipx upgrade distil-llm",
         "uv": "uv tool upgrade distil-llm",
         "uvx": "uvx --from distil-llm@latest distil onboard   # uvx runs the latest each time",
-        "pip": "pip install --upgrade distil-llm",
+        "pip": "pip install --upgrade distil-llm   # inside your venv (PEP 668)",
     }.get(method, "pip install --upgrade distil-llm")
 
 
 def uninstall_command(method: str) -> str:
     """How to uninstall distil for the way it was installed (used by offboard)."""
     return {
+        "homebrew": "brew uninstall dshakes/tap/distil && brew untap dshakes/tap",
         "pipx": "pipx uninstall distil-llm",
         "uv": "uv tool uninstall distil-llm",
         "uvx": "# uvx runs ephemerally — nothing persistent to uninstall",
-        "pip": "pip uninstall distil-llm",
+        "pip": "pip uninstall distil-llm   # inside your venv (PEP 668)",
     }.get(method, "pip uninstall distil-llm")
 
 
