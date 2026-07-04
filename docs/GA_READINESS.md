@@ -9,7 +9,7 @@ it falls back to full context.
 
 **What "1.0 / GA" means here (and what it does not).** The compression engine, the proxy/SDK
 integrations, and the decision-equivalence certificate machinery are production-grade,
-API-stable, and covered by 658 tests with a zero-dependency stdlib core. The guarantee is
+API-stable, and covered by 700+ tests with a zero-dependency stdlib core. The guarantee is
 **honestly scoped**: decision-equivalence is certified *distribution-free and finite-sample*,
 **conditional on exchangeability** with your calibration distribution — and when distil cannot
 certify safety it **falls back to full context**, never silently shipping a lossy operating
@@ -36,7 +36,7 @@ ship 1.0 because the contract that protects you (certify-or-fall-back) is itself
 | **Operating point is auto-calibrated to agent capability** | `distil/calibrate.py` selects the most aggressive `gate_recent` still non-inferior to full; `distil calibrate` CLI; validated on real E11 data (selects gate@12, rejects gate@6) in `tests/test_calibrate.py` |
 | **Fail-safe default (never silently lossy)** | If no operating point certifies non-inferior, calibration returns `fail_safe` → caller keeps full context (`test_fail_safe_when_nothing_certifies`, `test_real_e11_strict_margin_fails_safe`) |
 | **Cross-model generality demonstrated** | E11: non-inferiority transfers to DeepSeek-V3 (different vendor, far stronger) at a capability-appropriate point |
-| **Engineering maturity** | v1.0.0, 658 tests, full CI (ci/pages/paper-build/release), zero-dependency stdlib core, packaged (`distil` entrypoint) |
+| **Engineering maturity** | v1.0.0, 700+ tests, full CI (ci/pages/paper-build/release), zero-dependency stdlib core, packaged (`distil` entrypoint) |
 | **Per-turn + trajectory certificates, validated out-of-sample** | E2 (coverage 96.6–100%), E10 (trajectory, coverage 95.4/96.7%) |
 
 ## Open (tracked GA items)
