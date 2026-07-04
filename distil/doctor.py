@@ -264,6 +264,49 @@ def _check_pricing_catalog() -> Check:
     return Check("pricing", OK, f"all recorded models priced ({len(pricing.CATALOG)} in catalog)")
 
 
+def _check_mode() -> Check:
+    """Surface the compression mode of the managed always-on proxy service, if
+    one is installed — because a `verbatim` service silently caps savings near
+    zero (Tier-1 digest off), which otherwise looks like a broken statusline."""
+    import platform
+
+    home = Path.home()
+    sysname = platform.system()
+    if sysname == "Darwin":
+        svc = home / "Library" / "LaunchAgents" / "com.distil.proxy.plist"
+    elif sysname == "Linux":
+        svc = home / ".config" / "systemd" / "user" / "distil-proxy.service"
+    else:
+        svc = None
+    if svc is None or not svc.exists():
+        return Check(
+            "compression mode",
+            INFO,
+            "no always-on service — mode is set per `distil wrap`/`proxy` run",
+            "digest (default) and lossless-only compress; verbatim only trims "
+            "whitespace/JSON (near-zero savings on code/prose)",
+        )
+    try:
+        text = svc.read_text(encoding="utf-8")
+    except OSError:
+        return Check("compression mode", INFO, "service present (mode unreadable)")
+    mode = (
+        "verbatim"
+        if "--verbatim" in text
+        else ("lossless-only" if "--lossless-only" in text else "digest")
+    )
+    if mode == "verbatim":
+        return Check(
+            "compression mode",
+            WARN,
+            "always-on proxy runs in VERBATIM mode — the reversible digest is off, "
+            "so savings are near-zero by design (this is why ▼ can read 0)",
+            "switch to reversible savings:  distil default --mode lossless-only "
+            "(subscription-safe) or --mode expand (metered)",
+        )
+    return Check("compression mode", OK, f"always-on proxy: {mode} (reversible digest active)")
+
+
 def _check_tokenizer_grade() -> Check:
     """Say out loud which tokenizer produced the numbers users see daily."""
     from . import ledger
@@ -294,6 +337,7 @@ def diagnose() -> list[Check]:
         _check_api_key,
         _check_pricing_catalog,
         _check_tokenizer_grade,
+        _check_mode,
     ):
         try:
             checks.append(fn())

@@ -39,6 +39,24 @@
   .btn{padding:12px 20px;border-radius:12px;font-weight:600;font-size:14px;border:1px solid var(--line)}
   .btn.primary{background:var(--grad);color:#0a0a10;border:0}
   .btn.ghost{background:var(--panel);color:var(--ink)}
+  /* two-door hero CTA */
+  .doors{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;max-width:640px}
+  .door{display:flex;align-items:center;gap:14px;padding:18px 20px;border-radius:16px;border:1px solid var(--line);
+    background:linear-gradient(180deg,var(--panel2),var(--panel))}
+  .door.door-alt{border-color:#2a2550}
+  .door-ico{font-size:26px;line-height:1}
+  .door-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .door-t{font-weight:700;font-size:15px;color:var(--ink)}
+  .door-d{font-size:12.5px;color:var(--mut)}
+  .door-d a{color:var(--acc2);text-decoration:underline}
+  /* hero terminal proof card */
+  .heroterm{max-width:640px;margin-top:22px;background:#070810;border:1px solid var(--line);
+    border-radius:14px;overflow:hidden}
+  .heroterm .bar{display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .heroterm .bar i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .heroterm pre{margin:0;border:0;border-radius:0;background:transparent;padding:14px 18px;
+    font:12.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto}
+  .heroterm .cap{padding:8px 18px 12px;color:var(--dim);font-size:12px}
   /* stats */
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:54px 0 10px}
   .stat{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
@@ -81,6 +99,7 @@
     table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;font-size:13px}
     header{padding:56px 0 28px}section{padding:40px 0}
     .cta{flex-direction:column}.cta .btn{text-align:center}
+    .doors{grid-template-columns:1fr}
     .pill{display:none}
     nav .links{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:16px;padding-bottom:2px}
     nav .links::-webkit-scrollbar{display:none}
@@ -147,28 +166,39 @@
   <div class="eyebrow">The certified context layer for agents</div>
   <h1>Compress what your agent reads.<br><b class="g">Certify</b> <b>its next action doesn't change.</b></h1>
   <p class="sub"><b>The most tokens you can save without losing outcomes — and the only compressor that can prove the second half.</b></p>
-  <p class="sub">Cache-aware, causally-pruned context compression for agentic runtimes —
-    gated by a statistical non-inferiority test on the agent's <b>next action</b> (a proxy).
-    Newest result (<a href="compare.html">E14, n=500, official harness</a>): the compressed agent
-    <b>solved more tasks than full context — 42.0% vs 39.2%</b>
-    <small>(paired CI &minus;0.6..+6.2pp; non-inferiority certified)</small>.
-    <b>Trim the noise, keep the anomalies.</b></p>
-  <p class="sub" style="font-size:13px;opacity:.85">Honest scope: the certificate covers
-    <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success. On
-    <a href="research.html#e7">real SWE-bench Verified (E7)</a> the proxy <b>does not transfer</b>
-    once compression gets aggressive — we publish that. Relevance-gated reversible compression is the
-    <b>only condition non-inferior to full context</b>
-    (<a href="research.html#e8">E8</a>: &minus;2.4&nbsp;pp, 95% CI [&minus;5.7,&nbsp;+0.9]), and a
-    trajectory-level certificate bounds the cost at <b>&le;11.4% of exchangeable runs</b>, holding across
-    <b>5 models / 3 vendors</b>. <a href="research.html#e10">Full evidence, CIs and ablations &rarr;</a></p>
+  <p class="sub" style="font-size:17px">In our newest test (<a href="compare.html">E14</a>, n=500, official harness),
+    the compressed agent solved <b>more tasks than the uncompressed one — 42.0% vs 39.2%</b>
+    <small>(95% CI &minus;0.6..+6.2pp)</small>.</p>
+
+  <div class="doors">
+    <a class="door" href="getting-started.html">
+      <span class="door-ico">⚡</span>
+      <span class="door-body"><span class="door-t">Get saving (2 min)</span><span class="door-d">One command, no code changes</span></span>
+    </a>
+    <div class="door door-alt">
+      <span class="door-ico">🔬</span>
+      <span class="door-body"><span class="door-t"><a href="compare.html">See the proof</a></span><span class="door-d">Benchmarks &amp; <a href="research.html">full research</a></span></span>
+    </div>
+  </div>
+
+  <div class="heroterm">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+    <pre class="term"><span class="d">$</span> uvx --from distil-llm distil bench
+<span class="g">GATE: PASS — every trajectory certified non-inferior; aggressive rejected on all.</span>
+<span class="d">$</span> distil wrap -- claude
+<span class="c">distil</span> · <span class="c">▼75.0K −62%</span> · <span class="g">$0.31</span> · <span class="d">Σ27.0M</span> · <span style="color:#5ad19a">✓eq 99.5%</span> <span class="d">(1.2k)</span></pre>
+    <div class="cap">Real output — runs on your machine in ~10 seconds, no API key.</div>
+  </div>
+
+  <p class="sub" style="font-size:13px;opacity:.85;margin-top:26px">Honest scope: the certificate covers
+    <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success — on real SWE-bench
+    Verified the proxy <b>does not transfer</b> once compression gets aggressive, and we publish that.
+    Relevance-gated reversible compression is the one condition proven non-inferior to full context —
+    <a href="concepts.html#honest-scope">full statement, CIs and ablations &rarr;</a></p>
+
   <p class="sub" style="font-size:13.5px;margin-top:16px">One command sets you up — <code>distil onboard</code> detects your agent + billing, wires the status line, and hands you the exact next steps:<br>
     <code>pipx install distil-llm &amp;&amp; distil onboard</code><br>
     <span style="opacity:.8">…or route Claude Code directly, no code change: <code>distil wrap --expand -- claude</code></span></p>
-  <div class="cta">
-    <a class="btn primary" href="getting-started.html">Get started →</a>
-    <a class="btn ghost" href="#how">How it works</a>
-    <a class="btn ghost" href="#proof">Read the proof</a>
-  </div>
 
   <div class="stats">
     <div class="stat hl">
@@ -326,7 +356,7 @@ docker run distil bench</pre></div>
       <pre style="margin-top:10px">make pyz
 python dist/distil.pyz bench</pre></div>
   </div>
-  <p class="lead" style="margin-top:18px"><b>Installed? Do this next →</b> <code>distil onboard</code> — it detects your agent + billing, wires the savings status line, and prints a guided tour tailored to your setup. Want it on for every session? <code>distil default</code> makes distil the default (and <code>distil offboard</code> cleanly removes it later).</p>
+  <p class="lead" style="margin-top:18px"><b>Already installed? Do this next →</b> <code>distil onboard</code> detects your agent + billing, wires the savings status line, and gives you a guided tour tailored to your setup — then <code>distil default</code> makes it the default for every session (<code>distil offboard</code> reverses that).</p>
   <p style="color:var(--dim);font-size:12.5px;margin-top:10px">Needs Python 3.11+. Install isolated (pipx/uv/brew/Docker) — system <code>pip install</code> is blocked by <a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a> on modern macOS/Linux. Node/other stacks: point your SDK <code>baseURL</code> at <code>distil proxy</code>.</p>
   <div class="callout" style="margin-top:18px">
     Drop-in, no call-site change:

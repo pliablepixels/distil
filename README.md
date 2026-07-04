@@ -15,14 +15,23 @@
 <h3 align="center">The most tokens you can save without losing outcomes — and the only compressor that can prove the second half.</h3>
 
 <p align="center">
-Every agent re-sends its whole context every turn — you pay for all of it, every turn. Compressing it is easy; compressing it <strong>without quietly changing what your agent does</strong> is the part everyone skips. Distil ships a <strong>statistical proof</strong> the next action is unchanged — measured on the same runs as the savings, gated in CI — and falls back to full context when it can't certify. <strong>Never silently lossy.</strong> And in our newest 500-instance SWE-bench Verified run, the compressed agent <strong>solved more tasks than full context</strong> (42.0% vs 39.2%<sub> — paired CI −0.6..+6.2pp, superiority not yet significant; non-inferiority certified</sub>): trim the noise, keep the anomalies, and compression stops being a tax.</p>
+Your agent re-sends its whole context every turn. Distil shrinks it — and <strong>proves, statistically, that your agent still does the same thing</strong>.<br/>
+In our newest 500-task run the compressed agent <strong>solved more than full context</strong> (42.0% vs 39.2%).<br/>
+When it can't prove safety, it sends the original. <strong>Never silently lossy.</strong>
+</p>
 
-<p align="center"><sub><b>Honest scope:</b> the per-request certificate is a <b>proxy</b> (next-action equivalence) — under <em>aggressive lossy</em> compression it doesn't fully transfer to task success (<a href="#-the-proof">E7</a>). That's why Distil also certifies the level that matters: <a href="#-the-trajectory-level-certificate"><code>distil certify-trajectories</code></a> bounds <b>end-to-end task degradation</b> on matched runs, and Distil calibrates per deployment and fails safe.</sub></p>
+<table align="center"><tr>
+<td align="center"><b>⚡ Just want the savings?</b><br/><sub>2 minutes, no config</sub><br/><br/><code>pipx install distil-llm</code><br/><code>distil onboard</code></td>
+<td align="center"><b>🔬 Want the proof first?</b><br/><sub>runs on your machine, no API key</sub><br/><br/><code>uvx --from distil-llm distil bench</code><br/><a href="#-the-proof">the numbers</a> · <a href="docs/PAPER.md">the paper</a></td>
+</tr></table>
+
+<p align="center"><sub><b>Honest scope:</b> the +2.8pp win over full context is a point estimate (paired CI −0.6..+6.2pp — superiority not yet significant; non-inferiority certified). The per-request certificate is a proxy (next-action equivalence, <a href="#-the-proof">E7</a>); the level users feel is certified separately by <a href="#-the-trajectory-level-certificate"><code>distil certify-trajectories</code></a>. Distil calibrates per deployment and fails safe.</sub></p>
 
 <p align="center">
   <a href="#-use-it-now">Use it</a> ·
   <a href="#-works-with-every-sdk">Integrations</a> ·
   <a href="#-install-your-way">Install</a> ·
+  <a href="https://dshakes.github.io/distil/compare.html">vs the others</a> ·
   <a href="https://dshakes.github.io/distil/getting-started.html"><b>Full Docs →</b></a>
 </p>
 
@@ -67,6 +76,9 @@ distil wrap --lossless-only -- claude
 distil wrap --expand -- codex
 ```
 
+<details>
+<summary><b>Make it the default</b> — never type <code>distil wrap</code> again</summary>
+
 **Tired of typing `distil wrap` every time?** Make it the default — once:
 
 ```bash
@@ -78,6 +90,9 @@ It detects your shell (zsh / bash / fish / PowerShell) and billing mode, writes 
 right line to the rc file your shell actually reads, and **tells you what it detected**.
 Want every SDK covered (not just the agent you type)? `distil default --always-on`
 runs a persistent proxy service — powerful, but it's a daemon you keep alive.
+
+
+</details>
 
 Then watch genuine savings from **your** traffic — measured, not estimated:
 
@@ -213,6 +228,9 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 
 **New here?** `pipx install distil-llm`, then `distil onboard` — it sets you up and guides you (see [Use it now](#-use-it-now)). Want to see it prove itself first instead? `distil bench` runs the certified gate in ~10s, no API key. The matrix below is for picking an *install format* — everything in it is an alternative, not a requirement.
 
+<details>
+<summary><b>Install gotchas & troubleshooting</b> (package name, old-Python errors, stale mirrors)</summary>
+
 > ⚠️ **The one gotcha — the name.** The PyPI package is **`distil-llm`** but the command is **`distil`** (the bare name was taken). So `pipx install distil-llm` → run `distil …`. `pip install distil` installs something else.
 
 > 🔧 **Seeing `Could not find a version that satisfies the requirement distil-llm (from versions: none)`?** The package **is** on PyPI — that error means your `pip`/`pipx` is on a Python older than the package's floor, so pip filters every release out. **Distil now supports Python 3.9+** (the version macOS ships), so a current install just works; if you still hit this on a very old Python, let **uv provision one for you**: `uvx --python 3.12 --from distil-llm distil bench` (or `uv tool install --python 3.12 distil-llm`). Check yours with `python3 --version`.
@@ -225,6 +243,9 @@ client = wrap(anthropic.Anthropic())   # compresses the request, keeps the cache
 > pipx install --pip-args="--index-url https://pypi.org/simple/" distil-llm
 > # (or, if you must use the mirror, ask your platform team to sync distil-llm; it exists upstream)
 > ```
+
+
+</details>
 
 <p align="center"><img src="docs/assets/install.svg" alt="install options" width="100%"/></p>
 

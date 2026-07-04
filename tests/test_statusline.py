@@ -25,6 +25,10 @@ def test_humanize_tokens():
 
 def _run(monkeypatch, capsys, summary, stdin="{}", no_color=True):
     monkeypatch.setattr(ledger, "summary", lambda *a, **k: summary)
+    # Isolate from the developer's real ledger: no live session unless a test
+    # sets one up itself (otherwise a proxy running on the dev machine flips
+    # these lifetime-view tests into the session view).
+    monkeypatch.setattr(ledger, "latest_session", lambda *a, **k: ("", 0.0))
     monkeypatch.setattr("sys.stdin", io.StringIO(stdin))
     rc = cmd_statusline(argparse.Namespace(no_color=no_color))
     return rc, capsys.readouterr().out.strip()
@@ -304,3 +308,36 @@ def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
     monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
     _rc, out = _run(monkeypatch, capsys, s)
     assert "eq" not in out
+
+
+def test_zero_savings_session_says_watching(monkeypatch, capsys, tmp_path):
+    """Traffic flowing but nothing trimmed yet must read as 'watching', not ▼0 −0%."""
+    import time
+
+    from distil import ledger as led_mod
+
+    monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
+    path = tmp_path / "savings.jsonl"
+    led_mod.record(
+        trajectory_id="live-proxy", model="claude-opus-4-8", turns=4,
+        baseline_dollars=0.1, distil_dollars=0.1,
+        baseline_input_tokens=12_000, distil_input_tokens=12_000,
+        session=f"s{int(time.time())}-7", path=path,
+    )
+    monkeypatch.setattr(led_mod, "default_path", lambda: path)
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("{}"))
+    cmd_statusline(argparse.Namespace(no_color=True))
+    out = capsys.readouterr().out.strip()
+    assert "watching · 12.0K seen" in out
+    assert "▼0" not in out and "−0%" not in out
+
+
+def test_flush_skips_zero_baseline_records(tmp_path):
+    """A flush window with zero measured tokens writes nothing (no noise records)."""
+    from distil.runtime import RuntimeSavings
+
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(0, 0)  # a request passed through with nothing measurable
+    assert rs.flush() is True  # counters reset...
+    assert not led.exists()  # ...but no record was written

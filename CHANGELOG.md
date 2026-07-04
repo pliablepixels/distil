@@ -3,6 +3,8 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased] — 1.9.0 dev
+
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
 
 ### Headline result (E14, SWE-bench Verified n=500, official harness)
