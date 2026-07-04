@@ -106,7 +106,32 @@ already proven solid (an evidence-based runtime audit came back clean).
   proof-first hero everywhere (dropped the unmeasured "in half"); technique
   numbering aligned CLI↔site.
 
-## [Unreleased] — 1.9.0 dev
+## [1.9.0] — 2026-07-04 — Per-session savings + hardened CI
+
+### Added
+- **True per-session status line** (the headline UX): each terminal now shows
+  ITS OWN session's savings (`distil · ▼30.0K · 60% smaller`), while `total`
+  stays lifetime across all sessions. `distil wrap` stamps a `DISTIL_SESSION`
+  id inherited by both the proxy (which tags every ledger record) and the agent
+  → the status line it spawns — so attribution is exact, with no cross-terminal
+  bleed. A fresh terminal reads `✓ on` until it compresses something. The
+  `distil dashboard` mirrors the same per-session view.
+
+### Changed
+- **Sharper positioning everywhere** (README, docs site, social image): dropped
+  the "statistical fidelity certificate" jargon → *"Every other compressor asks
+  you to trust it won't break your agent. Distil is the only one that proves it
+  won't."* The E14 result reframed as a win — *"compressed context didn't just
+  match the full context — it beat it: 42.0% vs 39.2%."*
+
+### Quality
+- **95% test coverage** (was a 78% floor), 1140+ tests: the CLI, status line,
+  doctor, ledger, the network layer (proxy / gateway / streamrelay / async
+  proxy), and the statistical-certificate paths are all exercised. Genuinely
+  external code (the torch training loop, live-model proof-harness runners) is
+  documented-and-omitted, not hidden.
+- Fixed a Python-3.9-only flaky proxy-timeout test and a `$HOME`-dependent test
+  that failed in a clean CI environment; the coverage floor now ratchets at 95%.
 
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
 
