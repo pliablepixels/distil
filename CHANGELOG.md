@@ -77,6 +77,35 @@ All notable changes to Distil are documented here. Format loosely follows
 - **Zero-savings state is unmistakable:** `✓ on · waiting for a large read` (bright green, clearly active) instead of a dim, easily-misread "watching".
 - **`distil doctor` self-diagnoses the two traps:** `live routing` warns when a wrap/proxy is running but no traffic is recorded (agent bypassing distil); `this session` explains the watching state.
 
+## [1.8.6] — 2026-07-04 — GA presentation + full-surface audit
+
+Rendered every user-facing surface and fixed everything found — the engine was
+already proven solid (an evidence-based runtime audit came back clean).
+
+### Fixed — presentation & consistency
+- **Status line**: ONE pattern in every state (`distil · <live> · total ▼<lifetime>`);
+  live = 15-min window across ALL terminals (no session flicker); zero-savings
+  reads `✓ on · waiting for a large read` (never a broken-looking `▼0 −0%`);
+  all-teal palette, no gray.
+- **No tracebacks on bad input** anywhere — added `NotADirectoryError` to the
+  dispatch guard (a `--corpus` pointing at a file leaked a traceback on 6
+  commands); `perf --iterations 0` and `holdout --control-fraction` out of range
+  now give clean errors; `ingest` no longer silently 'succeeds' on garbage.
+- **decision-equivalence suppressed below 25 samples EVERYWHERE** (status line,
+  leaderboard, doctor, dashboard, shadow-stats) — no 100% guarantee off n=1.
+- Dollars 2dp (or notional on a subscription); correct singular/plural
+  (`1 request`/`1 sample`/`1 matched trajectory`); `online` shows `87.3%` not
+  16 digits; certify `p=<0.0001` not `p=0`.
+- **`distil default` now says: RESTART your agent** — the #1 onboarding trap
+  (an agent started before the alias bypasses distil → savings stay at zero).
+  `distil doctor` also flags this (`live routing`) and explains the `watching`
+  state (`this session`).
+
+### Docs
+- Statusline state table (saving / watching / idle) in README + Integrations;
+  proof-first hero everywhere (dropped the unmeasured "in half"); technique
+  numbering aligned CLI↔site.
+
 ## [Unreleased] — 1.9.0 dev
 
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
