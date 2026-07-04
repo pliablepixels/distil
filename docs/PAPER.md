@@ -78,6 +78,8 @@ single headline ratio.
 
 ## 4. Method
 
+![Distil architecture: cache-aware, causally-pruned, certified compression](assets/architecture.svg)
+
 ### 4.1 Cache-aware reversible engine
 - Keep the prefix byte-stable (schema canonicalization; lift volatile fields), digest
   only the volatile tail behind a content handle, keep the original locally, expose a
@@ -192,6 +194,8 @@ This is the headline statistical result: **a distribution-free decision-equivale
 certificate whose finite-sample coverage holds on real agent traces.**
 
 ### 6.0.2 Head-to-head vs. baselines (E5) — same grader, with an honest confound
+
+![Live head-to-head: Distil vs LLMLingua-2 vs Headroom — token savings vs decision-change rate](assets/head-to-head.svg)
 
 On a 100-trajectory SWE subset, all methods graded identically (α=0.15; the
 `certifies?` column is the *single-shot* Hoeffding–Bentkus test over the full data —
@@ -406,6 +410,8 @@ recovers the manual choice automatically (selects gate@12, rejects gate@6 on Dee
 (`distil/gate.py`), not benchmark-only. See `docs/GA_READINESS.md`.
 
 ### 6.0.7 The cost frontier under the motto (E12)
+
+![Cache-aware cost model: cached reads are ~10x cheaper than fresh input](assets/cache-aware.svg)
 
 Distil does **not** claim cost-domination — an uncertified lossy method can always be cheaper
 because it is allowed to change decisions. The five techniques below cut cost *inside* the

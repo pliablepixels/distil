@@ -595,6 +595,61 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_version(args: argparse.Namespace) -> int:
+    """Print the installed version — the `version` word people actually type
+    (argparse's --version flag stays too)."""
+    print(f"distil {__version__}")
+    return 0
+
+
+def _detect_installer() -> tuple[str, str | None]:
+    """(installer name, upgrade command) for how THIS distil was installed, by
+    inspecting the resolved executable path. Returns ("unknown", None) when we
+    can't tell — better to say so than guess a command that does the wrong thing."""
+    import shutil
+
+    exe = shutil.which("distil") or ""
+    real = str(Path(exe).resolve()) if exe else ""
+    home = str(Path.home())
+    if "/Cellar/" in real or "/homebrew/" in real or real.startswith("/usr/local/"):
+        return "homebrew", "brew upgrade distil"
+    if f"{home}/.local/pipx" in real or "/pipx/venvs/" in real:
+        return "pipx", "pipx upgrade distil-llm"
+    if "/uv/tools/" in real or f"{home}/.local/share/uv" in real:
+        return "uv", "uv tool upgrade distil-llm"
+    if real.endswith("/bin/distil") and (Path(real).parent.parent / "pyvenv.cfg").exists():
+        return "pip (venv)", "pip install -U distil-llm"
+    return "unknown", None
+
+
+def cmd_upgrade(args: argparse.Namespace) -> int:
+    """Upgrade distil the way it was installed — detect brew/pipx/uv/pip and run
+    (or, with --dry-run, print) the right command. distil can't replace its own
+    running binary, so the upgrade goes through the installer that owns it."""
+    import subprocess
+
+    installer, cmd = _detect_installer()
+    if cmd is None:
+        print(
+            "Couldn't tell how distil was installed. Upgrade with whichever you used:\n"
+            "  pipx:  pipx upgrade distil-llm\n"
+            "  brew:  brew upgrade distil\n"
+            "  uv:    uv tool upgrade distil-llm\n"
+            "  pip:   pip install -U distil-llm  (inside your venv)\n"
+            "  or zero-install always-latest:  uvx --from distil-llm distil <cmd>"
+        )
+        return 1
+    print(f"detected install: {installer}\n$ {cmd}")
+    if args.dry_run:
+        return 0
+    rc = subprocess.run(cmd, shell=True).returncode
+    if rc == 0:
+        print("✓ upgraded — run `distil version` to confirm")
+    else:
+        print(f"✗ upgrade command exited {rc}; run it yourself: {cmd}")
+    return rc
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Diagnose a distil setup: ledger, shadow, proxy round-trip, deps, Claude Code
     wiring. Exit 1 if any check fails, so it's usable as a CI/setup gate."""
@@ -1498,6 +1553,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--version", action="version", version=f"distil {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="<command>")
+
+    vs = sub.add_parser("version", help="print the installed version")
+    vs.set_defaults(func=cmd_version)
+
+    up = sub.add_parser("upgrade", help="upgrade distil (auto-detects brew/pipx/uv/pip)")
+    up.add_argument("--dry-run", action="store_true", help="print the command, don't run it")
+    up.set_defaults(func=cmd_upgrade)
 
     def add_traj(sp: argparse.ArgumentParser) -> None:
         sp.add_argument(
