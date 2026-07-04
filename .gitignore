@@ -49,3 +49,6 @@ docs/paper/results/swe_e2e_longhorizon/swe_bench_verified_longhorizon.json
 .coverage
 .coverage.*
 htmlcov/
+
+# local launch/marketing drafts (not public)
+launch/
