@@ -155,22 +155,23 @@ def _check_session() -> Check:
         return Check("this session", INFO, f"session slice unavailable — {exc}")
     if not s.runs or not s.total_baseline_tokens:
         return Check("this session", INFO, "no traffic recorded yet")
+    reqs = f"{s.runs} request{'s' if s.runs != 1 else ''}"
     if s.total_tokens_saved > 0:
         pct = (1 - s.total_distil_tokens / s.total_baseline_tokens) * 100
         return Check(
             "this session",
             OK,
-            f"▼{s.total_tokens_saved:,} tokens saved ({pct:.0f}% smaller) over {s.runs} requests",
+            f"▼{s.total_tokens_saved:,} tokens saved ({pct:.0f}% smaller) over {reqs}",
         )
     seen = (
-        f"{s.total_baseline_tokens / 1000:.1f}K"
+        f"{s.total_baseline_tokens / 1000:.1f}K tokens"
         if s.total_baseline_tokens >= 1000
-        else str(s.total_baseline_tokens)
+        else f"{s.total_baseline_tokens} token{'s' if s.total_baseline_tokens != 1 else ''}"
     )
     return Check(
         "this session",
         INFO,
-        f"watching — {s.runs} requests, {seen} tokens seen, 0 saved yet",
+        f"watching — {reqs}, {seen} seen, 0 saved yet",
         "normal early in a session: savings come from LARGE tool output (file reads, "
         "logs). A small request that's mostly the system prompt has nothing to trim — "
         "▼ climbs once your agent reads big content.",
@@ -228,12 +229,16 @@ def _check_shadow() -> Check:
             "not running — no decision-equivalence samples",
             "start it in one command:  distil wrap --shadow 0.1 -- claude",
         )
+    smp = f"{led.samples} sample{'s' if led.samples != 1 else ''}"
+    if led.samples < 25:
+        # Same 25-sample floor the status line uses — a rate over a handful is noise.
+        return Check(
+            "shadow validation",
+            INFO,
+            f"collecting — {smp} (need 25 for a decision-equivalence rate)",
+        )
     eq = 100 * (1 - led.rate())
-    return Check(
-        "shadow validation",
-        OK,
-        f"{eq:.1f}% decision-equivalence over {led.samples} samples",
-    )
+    return Check("shadow validation", OK, f"{eq:.1f}% decision-equivalence over {smp}")
 
 
 def _check_proxy_selftest() -> Check:

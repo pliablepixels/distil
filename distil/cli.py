@@ -2,7 +2,7 @@
 
 distil compress  --trajectory T            shrink a trajectory, report ratio + reversibility
 distil savings   --trajectory T --pricing  price 4 strategies in real dollars (technique #1)
-distil prune     --trajectory T            causal ablation: what is free to drop (technique #4)
+distil prune     --trajectory T            causal ablation: what is free to drop (technique #2)
 distil certify   --trajectory T --strategy non-inferiority gate (the quality contract)
 """
 
@@ -191,23 +191,36 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
             f"{s.total_distil_tokens:,}  (−{trimmed * 100:.1f}%)"
         )
     print(f"total tokens saved:   {s.total_tokens_saved:,}")
-    print(f"total dollars saved:  ${s.total_dollars_saved:.5f}")
+    from .doctor import subscription_mode
+
+    if subscription_mode():
+        print("total dollars saved:  — (flat-rate subscription; dollars are notional)")
+    else:
+        print(f"total dollars saved:  ${s.total_dollars_saved:,.2f}")
     try:
         from .shadow import ShadowLedger
 
         led = ShadowLedger.load()
-        if led.samples:
+        if led.samples >= 25:
+            # Only claim a rate with evidence behind it — the same 25-sample floor
+            # the status line uses; a rate over a handful is noise.
             print(
                 f"decision-equivalence: {(1 - led.rate()) * 100:.1f}% "
-                f"({led.samples:,} shadowed requests)"
+                f"({led.samples:,} shadowed request{'s' if led.samples != 1 else ''})"
+            )
+        elif led.samples:
+            print(
+                f"decision-equivalence: collecting — {led.samples} "
+                f"sample{'s' if led.samples != 1 else ''} (need 25 for a rate)"
             )
     except Exception:  # noqa: BLE001 — shadow stats are best-effort
         pass
-    if live:
-        print(f"  of which genuine live traffic (live-proxy): ${live:.5f}")
-    print("\nby source:")
-    for tid, saved in sorted(s.by_trajectory.items(), key=lambda kv: -kv[1]):
-        print(f"  {tid:<28} ${saved:.5f}")
+    if live and not subscription_mode():
+        print(f"  of which genuine live traffic (live-proxy): ${live:,.2f}")
+    if not subscription_mode():
+        print("\nby source:")
+        for tid, saved in sorted(s.by_trajectory.items(), key=lambda kv: -kv[1]):
+            print(f"  {tid:<28} ${saved:,.2f}")
     if "heuristic" in s.tokenizers:
         print(
             "\n(token counts ≈ heuristic tokenizer — directionally accurate, "
@@ -956,8 +969,13 @@ def cmd_default(args: argparse.Namespace) -> int:
     st, msg = write_managed(rc, alias_body(agent, mode, shell=shell))
     glyph = {"ok": "✓", "updated": "✓", "exists": "✓"}.get(st, "⚠")
     print(f"{glyph} {msg}")
-    print(f"  `{agent}` now routes through distil (--{mode}). Reload your shell (source {rc}).")
-    print("  Undo anytime: distil default --undo")
+    print(f"  `{agent}` now routes through distil (--{mode}).")
+    print("\n  ⚠ IMPORTANT — one more step, or you'll see savings stay at zero:")
+    print(f"     1. reload this shell:   source {rc}")
+    print(f"     2. RESTART {agent}:       any {agent} already running was launched")
+    print("        before the alias, so it bypasses distil. Start a fresh one.")
+    print("     verify it's routed:     echo $ANTHROPIC_BASE_URL   (should not be empty)")
+    print("\n  Undo anytime: distil default --undo")
     return 0
 
 
@@ -1609,7 +1627,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lb.set_defaults(func=cmd_leaderboard)
 
-    pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #4)")
+    pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #2)")
     add_traj(pr)
     pr.set_defaults(func=cmd_prune)
 
