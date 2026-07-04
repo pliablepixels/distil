@@ -3,6 +3,27 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.8.1] — 2026-07-04 — Believe-it UX + honest ▼0
+
+### Fixed
+- **Statusline session view**: shows THIS session first (`▼75.0K −62% $0.31`),
+  lifetime as one `Σ` figure; theme-proof 256-color palette + ✓/⚠/✗ health
+  glyphs (basic magenta rendered unreadable on dark themes); a session with
+  traffic but nothing trimmed yet reads `watching · N seen`, not `▼0 −0%`.
+- **▼0 self-explains**: every compressed response carries `x-distil-mode` +
+  `x-distil-compressible-tokens`; `distil doctor` warns when the always-on
+  proxy runs in verbatim (which caps savings near zero by design).
+- Ledger records carry a session id; proxy no longer writes zero-baseline records.
+
+### Added
+- Landing hero: two-door router + a real terminal proof card; benchmark chart
+  in the hero; site-wide editorial layering (both audiences, less prose).
+- `distil stats --badge` (shareable measured-savings badge); LAUNCH.md.
+
+### Docs / process
+- E14 propagated to ALL paper artifacts (main.pdf, NeurIPS variant, PAPER.md);
+  paper-build now rebuilds + commits PDFs on push to main so they can't drift.
+
 ## [Unreleased] — 1.9.0 dev
 
 ## [1.8.0] — 2026-07-04 — GA: compression that beats full context, certified
