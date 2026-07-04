@@ -230,6 +230,26 @@
   </p>
 </div></header>
 
+<section id="plain"><div class="wrap">
+  <h2>How it works <span class="g">— in plain English</span></h2>
+  <p class="lead">No jargon. Here's the whole idea in three pictures.</p>
+  <div class="tiers">
+    <div class="card">
+      <h3>🗂️ Don't re-send what's already remembered</h3>
+      <p style="color:var(--mut)">Every turn, your agent re-sends the <em>entire</em> conversation — and you pay for all of it, again. The model can cheaply "remember" the parts that haven't changed, so Distil keeps those parts perfectly stable and only touches the new bits. <b>Like not re-reading someone the whole book to add one sentence.</b></p>
+    </div>
+    <div class="card">
+      <h3>✂️ Drop only what doesn't matter</h3>
+      <p style="color:var(--mut)">Most of that context never changes what the agent decides to do next. Distil finds those dead-weight parts with a simple test — <em>remove it, replay, did the decision change?</em> If no, it was safe to cut. <b>Keep the clues, drop the filler.</b></p>
+    </div>
+    <div class="card">
+      <h3>🧾 Prove it — don't just trust it</h3>
+      <p style="color:var(--mut)">Here's the part nobody else does: Distil <em>measures</em> that your agent still makes the same choice on the shrunk context. If it can't prove that, it sends everything, untouched. <b>A warranty on the compression, not a promise.</b></p>
+    </div>
+  </div>
+  <p style="color:var(--mut);margin-top:18px">And nothing is truly thrown away — trimmed detail is filed nearby, and the agent can pull back the exact original the moment it needs it. That's why Distil can compress hard <em>and</em> stay safe. <a href="token-economics.html">The gentle, longer walkthrough →</a></p>
+</div></section>
+
 <section id="how"><div class="wrap">
   <h2>How it works <span class="g">— a cost-optimized cache hierarchy with a contract</span></h2>
   <p class="lead">Most compressors optimize bytes. In an agent loop the money is somewhere else.</p>
