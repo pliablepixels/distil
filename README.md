@@ -20,7 +20,7 @@ $ uvx --from distil-llm distil bench     # ~10s, no API key
 GATE: PASS — every trajectory certified non-inferior; aggressive rejected.
 
 $ distil wrap -- claude                  # route Claude Code, zero config
-distil · ▼75.0K −62% · $0.31 · Σ27.0M · ✓eq 99.5%
+distil · session ▼75.0K · 62% smaller · $0.31 · total ▼27.0M · ✓eq 99.5%
 ```
 
 <table align="center"><tr>
