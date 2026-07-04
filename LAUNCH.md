@@ -28,12 +28,14 @@ reader a command, not a claim.
 
 ## Day 1 — Show HN (the single highest-leverage shot)
 
-- [ ] Title the **negative result**, not the product:
-      *"We built a statistical certificate for LLM context compression — it passed
-      while our agent's success rate collapsed. Here's the fix."*
-- [ ] Body: the E7 → trajectory-certificate arc, the E14 anomaly-digest finding,
-      the `bench` one-liner, the compare page. HN rewards honest engineering
-      stories 10× over launches.
+- [ ] Title the **story arc**, not the product:
+      *"Our compression certificate passed while agent success collapsed. The fix
+      made the compressed agent outperform full context."*
+- [ ] Body: E7 (certificate passed, success collapsed) → trajectory certificate →
+      E14 (42.0% vs 39.2% on 500 SWE-bench Verified, official harness, paired CI
+      −0.6..+6.2pp — say "point estimate above full, superiority not yet
+      significant" and let the honesty carry it) → the `bench` one-liner + compare
+      page. HN rewards honest engineering stories 10× over launches.
 - [ ] Be present in the thread all day; answer with data and commands.
 
 ## Day 2 — Community posts
