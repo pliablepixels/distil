@@ -23,7 +23,14 @@ jobs:
           python-version: "3.12"
       - name: Resolve version from pyproject
         id: ver
-        run: echo "version=$(grep -m1 '^version' pyproject.toml | cut -d'\"' -f2)" >> "$GITHUB_OUTPUT"
+        # sed (not `cut -d'"'`, which mis-parsed the quote and yielded an empty
+        # version → a release literally named "v"). Fail loudly if empty so a
+        # bad version can never silently create/clobber the wrong release.
+        run: |
+          V=$(grep -m1 '^version' pyproject.toml | sed -E 's/^version *= *"([^"]+)".*/\1/')
+          echo "Resolved version: '$V'"
+          test -n "$V" || { echo "::error::could not resolve version from pyproject.toml"; exit 1; }
+          echo "version=$V" >> "$GITHUB_OUTPUT"
       - name: Gate before release
         run: |
           uv run --with pytest python -m pytest -q
