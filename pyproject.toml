@@ -77,3 +77,24 @@ line-length = 100
 # transient logs/ and image/worktree caches (which contain files named test_*.py).
 testpaths = ["tests"]
 norecursedirs = ["logs", ".e7_cache", ".venv*", "docs", "corpus", "benchmarks"]
+
+[tool.coverage.run]
+branch = false
+# Excluded from the coverage metric because they cannot be exercised by an
+# offline unit test — they require a GPU/torch training run or live, credentialed
+# model calls (the proof-harness runners). They ARE integration-tested manually.
+omit = [
+    "distil/codec/train_transformer.py",       # torch training loop (optional [transformer] extra)
+    "distil/replay/anthropic_runner.py",       # live Anthropic SDK + credentials
+    "distil/replay/openai_runner.py",          # live OpenAI SDK + credentials
+    "distil/replay/claude_cli_runner.py",      # spawns the real `claude` CLI subprocess
+    "distil/replay/expand_runner.py",          # live model round-trip
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@(abc\\.)?abstractmethod",
+]

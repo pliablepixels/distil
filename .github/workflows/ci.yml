@@ -25,9 +25,13 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      # Floor just under the current 80% — coverage may only erode loudly.
+      # aiohttp + pytest-asyncio so the async proxy (distil/aproxy.py, the
+      # [async] extra) is exercised and counted. Genuinely-external code (torch
+      # training loop, live-model proof-harness runners) is omitted in
+      # [tool.coverage.run] — see the justification there. Floor climbs as
+      # coverage does; it may only ratchet up, never erode.
       - name: pytest with coverage floor
-        run: uv run --with pytest --with pytest-cov python -m pytest -q --cov=distil --cov-fail-under=78
+        run: uv run --with pytest --with pytest-asyncio --with aiohttp --with pytest-cov python -m pytest -q --cov=distil --cov-fail-under=90
 
   gate:
     runs-on: ${{ matrix.os }}
