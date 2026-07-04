@@ -538,11 +538,19 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             if sid and (_time.time() - last_ts) < 4 * 3600:
                 sess = ledger.summary(session=sid)
                 if sess.runs and sess.total_baseline_tokens:
-                    trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
-                    seg = f"▼{ledger._human(sess.total_tokens_saved)} −{trimmed * 100:.0f}%"
-                    parts.append(c("38;5;80", seg))
-                    if metered and sess.total_dollars_saved > 0:
-                        parts.append(c("38;5;114", f"${sess.total_dollars_saved:,.2f}"))
+                    if sess.total_tokens_saved > 0:
+                        trimmed = 1 - sess.total_distil_tokens / sess.total_baseline_tokens
+                        seg = f"▼{ledger._human(sess.total_tokens_saved)} −{trimmed * 100:.0f}%"
+                        parts.append(c("38;5;80", seg))
+                        if metered and sess.total_dollars_saved > 0:
+                            parts.append(c("38;5;114", f"${sess.total_dollars_saved:,.2f}"))
+                    else:
+                        # Traffic is flowing but nothing was worth trimming yet
+                        # (small/early contexts — savings grow with context).
+                        # "▼0 −0%" reads as broken; say what's actually true.
+                        parts.append(
+                            c("90", f"watching · {ledger._human(sess.total_baseline_tokens)} seen")
+                        )
                     parts.append(c("90", f"Σ{ledger._human(s.total_tokens_saved)}"))
                     shown_session = True
         except Exception:  # noqa: BLE001 — session slice is best-effort
@@ -572,8 +580,10 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 # health GLYPH so the state reads even without color: ✓ proven-safe,
                 # ⚠ slipping, ✗ degraded. Color stays an alarm, not decoration.
                 glyph, hue = (
-                    ("✓", "38;5;86") if eq >= 0.99
-                    else ("⚠", "38;5;220") if eq >= 0.95
+                    ("✓", "38;5;86")
+                    if eq >= 0.99
+                    else ("⚠", "38;5;220")
+                    if eq >= 0.95
                     else ("✗", "38;5;196")
                 )
                 parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("90", f" ({n_str})"))

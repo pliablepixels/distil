@@ -106,6 +106,8 @@ class RuntimeSavings:
             if self.requests == 0:
                 return False
             for mid, (n, before, after) in self.by_model.items():
+                if before == 0:
+                    continue  # nothing measured — a zero-baseline record is noise
                 price = pricing.resolve(mid)
                 per_tok = price.input if price is not None else 0.0
                 ledger.record(
