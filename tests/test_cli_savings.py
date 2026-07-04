@@ -382,14 +382,10 @@ class TestCmdLearn:
         for _ in range(10):
             s.record_digest("log:m")
 
-        import distil.cli as _cli
-
-        class _Fake:
-            @staticmethod
-            def load():
-                return s
-
-        monkeypatch.setattr(_cli, "ExpandStats", _Fake, raising=False)
+        # cmd_learn does `from .learn import ExpandStats; ExpandStats.load()`,
+        # so patch the SOURCE classmethod — otherwise it reads the real ledger
+        # (empty in a clean CI HOME) and the rate column never appears.
+        monkeypatch.setattr("distil.learn.ExpandStats.load", staticmethod(lambda: s))
 
         rc = cmd_learn(_ns())
         assert rc == 0
