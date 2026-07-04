@@ -1,7 +1,7 @@
 # distil — GA launch week plan
 
-**Positioning (locked):** *The most tokens you can save without losing outcomes — and
-the only compressor that can prove the second half.*
+**Positioning (locked):** *Every other compressor asks you to trust it won't break your
+agent. Distil is the only one that proves it won't.*
 
 Every asset delivers one of three proofs, never an adjective:
 

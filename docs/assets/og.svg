@@ -25,7 +25,7 @@
     <text x="0" y="178" font-size="40" font-weight="700" fill="#f2f3f7">Compression with a <tspan fill="url(#g)">quality contract.</tspan></text>
 
     <text x="0" y="224" font-size="23" fill="#9aa1b3">Compress your agent's context — and <tspan fill="#f2f3f7">prove its decisions don't change.</tspan></text>
-    <text x="0" y="256" font-size="23" fill="#9aa1b3">Others ask you to trust it. Distil proves your agent still does the same thing.</text>
+    <text x="0" y="256" font-size="23" fill="#9aa1b3">Others ask you to trust it. Distil is the only one that proves it.</text>
 
     <!-- stat chips -->
     <g transform="translate(0,300)" font-size="22" font-weight="700">
