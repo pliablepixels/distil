@@ -28,7 +28,7 @@ import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from typing import Any
 
 from .adapters.anthropic import compress_messages
@@ -37,7 +37,7 @@ from .adapters.gemini import count_tokens as _gemini_count
 from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
-from .proxy import _OPENER, _UPSTREAM_TIMEOUT
+from .proxy import _OPENER, _UPSTREAM_TIMEOUT, QuietHTTPServer
 from .tokenizer import DEFAULT as _tokenizer
 
 # Safe tenant label: bounded length, no markup / control characters.
@@ -781,7 +781,7 @@ def serve_gateway(
         loopback=loopback,
         trust_tenant_header=trust_tenant_header,
     )
-    server = ThreadingHTTPServer((host, port), handler)
+    server = QuietHTTPServer((host, port), handler)
     print(f"distil gateway listening on http://{host}:{port}")
     print(f"  dashboard: http://{host}:{port}/distil/dashboard")
     if not loopback and not (admin_token or os.environ.get("DISTIL_GATEWAY_TOKEN")):

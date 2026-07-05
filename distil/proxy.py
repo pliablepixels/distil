@@ -67,6 +67,24 @@ def _is_timeout(exc: urllib.error.URLError) -> bool:
     return isinstance(exc.reason, (socket.timeout, TimeoutError))
 
 
+class QuietHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that doesn't traceback-spam on client disconnects.
+
+    Agents (Claude Code especially) reset/abandon connections constantly —
+    cancelled streams, retries, statusline polls. Those surface here as
+    ConnectionResetError/BrokenPipeError in the handler thread; they are
+    routine, not bugs. Everything else still gets the stdlib traceback.
+    """
+
+    def handle_error(self, request, client_address):  # noqa: ANN001 - stdlib signature
+        import sys
+
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Relay 3xx instead of following: auto-following would re-send the
     client's credentials to whatever host the upstream redirect names."""
@@ -676,7 +694,7 @@ def serve(
         shadow_rate=shadow_rate,
         session_delta=session_delta,
     )
-    server = ThreadingHTTPServer((host, port), handler)
+    server = QuietHTTPServer((host, port), handler)
     print(f"distil proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
     if shadow_rate and shadow_rate > 0:
@@ -752,7 +770,7 @@ def wrap_run(
         session_delta=session_delta,
         shadow_rate=shadow_rate,
     )
-    server = ThreadingHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
+    server = QuietHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
     base = f"http://{host}:{server.server_address[1]}"
     threading.Thread(target=server.serve_forever, daemon=True).start()
 

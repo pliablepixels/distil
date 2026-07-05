@@ -232,3 +232,21 @@ def test_drain_shadow_is_bounded_by_budget() -> None:
     start = time.monotonic()
     _drain_shadow(_H, budget=0.3)
     assert time.monotonic() - start < 2.0  # did not wait the full 5s
+
+
+def test_quiet_server_swallows_client_disconnects(capsys) -> None:
+    """Client resets (agent cancels a stream) must not traceback-spam stderr."""
+    from distil.proxy import QuietHTTPServer
+
+    srv = QuietHTTPServer.__new__(QuietHTTPServer)  # no bind needed for handle_error
+    try:
+        raise ConnectionResetError(54, "Connection reset by peer")
+    except ConnectionResetError:
+        srv.handle_error(None, ("127.0.0.1", 12345))
+    assert capsys.readouterr().err == ""
+
+    try:
+        raise ValueError("real bug")
+    except ValueError:
+        srv.handle_error(None, ("127.0.0.1", 12345))
+    assert "ValueError" in capsys.readouterr().err  # real errors still surface
