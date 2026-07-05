@@ -106,6 +106,17 @@ already proven solid (an evidence-based runtime audit came back clean).
   proof-first hero everywhere (dropped the unmeasured "in half"); technique
   numbering aligned CLI↔site.
 
+## [1.9.1] — 2026-07-04 — Quiet client disconnects
+
+### Fixed
+- **No more traceback spam on client disconnects**: agents (Claude Code
+  especially) reset/abandon connections constantly — cancelled streams,
+  retries, statusline polls — and every one dumped a full
+  `ConnectionResetError: [Errno 54]` stack trace into the terminal running
+  `distil wrap`/`proxy`/`gateway`. All three servers now run on a
+  `QuietHTTPServer` that silently drops `ConnectionResetError` /
+  `BrokenPipeError` / `ConnectionAbortedError`; real errors still print.
+
 ## [1.9.0] — 2026-07-04 — Per-session savings + hardened CI
 
 ### Added
