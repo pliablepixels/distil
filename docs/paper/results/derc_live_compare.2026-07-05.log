@@ -1,0 +1,70 @@
+# derc_live_compare.py — raw run output
+# date: 2026-07-05 | distil v1.10.1 (compression path identical to release; run from working tree on 19df3b4)
+# env: anthropic 0.111.0, llmlingua 0.2.2, headroom-ai 0.27.0, rtk-py 0.42.4.1 (rtk binary absent -> not comparable, as documented)
+# corpus: python benchmarks/gen_realworld.py 30 /tmp/corpus_realworld (seeded Random(20260623), 120 turns)
+# grader: claude-opus-4-8, majority-of-3, 3240 calls, 920s wall-clock grading
+#
+realistic corpus: 120 turns; compressing with 8 methods...
+  byte-exact: savings=2.6%  engaged 120/120  (0s)
+  lossless: savings=47.9%  engaged 120/120  (0s)
+  causal-prune: savings=83.2%  engaged 120/120  (0s)
+  prune+lossless: savings=83.2%  engaged 120/120  (0s)
+  truncate@400: savings=61.6%  engaged 120/120  (0s)
+  truncate@200: savings=73.9%  engaged 120/120  (0s)
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 10038.27it/s]
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (1031 > 512). Running this sequence through the model will result in indexing errors
+  LLMLingua-2: savings=53.1%  engaged 120/120  (125s)
+Loading weights:   0%|          | 0/134 [00:00<?, ?it/s]Loading weights: 100%|██████████| 134/134 [00:00<00:00, 5765.43it/s]
+[transformers] [1mModernBertModel LOAD REPORT[0m from: answerdotai/ModernBERT-base
+Key               | Status     |  | 
+------------------+------------+--+-
+decoder.bias      | UNEXPECTED |  | 
+head.dense.weight | UNEXPECTED |  | 
+head.norm.weight  | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  Headroom: savings=39.7%  engaged 120/120  (3s)
+
+live grading: 3240 calls (9 cells x 120 turns x 3)...
+  ... 240/3240 (76s)
+  ... 480/3240 (138s)
+  ... 720/3240 (205s)
+  ... 960/3240 (269s)
+  ... 1200/3240 (342s)
+  ... 1440/3240 (404s)
+  ... 1680/3240 (472s)
+  ... 1920/3240 (545s)
+  ... 2160/3240 (609s)
+  ... 2400/3240 (680s)
+  ... 2640/3240 (756s)
+  ... 2880/3240 (818s)
+  ... 3120/3240 (892s)
+
+================================================================================
+LIVE DERC CERTIFICATE  (claude-opus-4-8, majority-of-3, n=120, realistic corpus)
+================================================================================
+ladder level        risk   savings      hb_p  certifies@α=0.05
+--------------------------------------------------------------------------------
+byte-exact          0.0%      2.6%    0.0058  YES
+lossless            0.0%     47.9%    0.0058  YES
+causal-prune        0.0%     83.2%    0.0058  YES
+prune+lossless      0.0%     83.2%    0.0058  YES
+truncate@400        0.0%     61.6%    0.0058  YES
+truncate@200      100.0%     73.9%    1.0000  no
+
+  ✔ CERTIFIED 'causal-prune' → 83.2% token savings @ ≤5% decision-change, 95% confidence (LTT, n=120)
+  CRC cross-check: truncate@400
+
+================================================================================
+LIVE HEAD-TO-HEAD  (same corpus, same gate)
+================================================================================
+method                      savings  dec-change  certifies?
+--------------------------------------------------------------------------------
+distil (prune+lossless)       83.2%        0.0%         YES
+LLMLingua-2                   53.1%       12.5%          no
+Headroom                      39.7%        0.0%         YES
+RTK                               —           —           —   NOT COMPARABLE — rtk binary not found on PATH — install with `pip install rtk-py` or `brew install rtk`.
+--------------------------------------------------------------------------------
+wall-clock: 920s grading

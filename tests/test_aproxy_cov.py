@@ -347,3 +347,17 @@ def test_aproxy_upstream_client_error_502() -> None:
             assert resp.status == 502
 
     _run(_body())
+
+
+def test_aproxy_health_answers_locally() -> None:
+    """GET /distil/health is served by the proxy itself, not the upstream."""
+
+    async def _body() -> None:
+        async with TestServer(_echo_app()) as up:
+            app = make_app(str(up.make_url("/")).rstrip("/"))
+            async with TestClient(TestServer(app)) as client:
+                resp = await client.get("/distil/health")
+                assert resp.status == 200
+                assert await resp.json() == {"status": "ok"}
+
+    _run(_body())

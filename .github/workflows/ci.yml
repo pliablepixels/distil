@@ -44,6 +44,10 @@ jobs:
         include:
           - os: macos-latest
             python: "3.12"
+          # The classifier says OS Independent and the code carries Windows
+          # guards (fcntl/termios/SIGPIPE) — this is what proves they work.
+          - os: windows-latest
+            python: "3.12"
     steps:
       - uses: actions/checkout@v4
       - name: Install uv

@@ -25,6 +25,7 @@ import json
 import os
 import re
 import threading
+import time
 import urllib.error
 import urllib.request
 from collections import OrderedDict
@@ -33,6 +34,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 
+from ._log import log
 from .adapters.anthropic import compress_messages
 from .adapters.gemini import compress_generate_request
 from .adapters.gemini import count_tokens as _gemini_count
@@ -106,6 +108,7 @@ class TenantStats:
 # Cap the per-tenant map so a key-spraying client can't grow it without bound;
 # least-recently-active tenants are evicted first. Generous for real fleets.
 _MAX_TENANTS = 50_000
+_CHECKPOINT_SECS = 30.0  # max staleness of persisted tenant accounting on a hard crash
 
 
 def _state_path() -> Path:
@@ -121,6 +124,7 @@ class GatewayState:
         self._lock = threading.Lock()
         self._tenants: OrderedDict[str, TenantStats] = OrderedDict()
         self._price = price
+        self._last_save = time.monotonic()
 
     def record(self, tenant: str, baseline_tokens: int, compressed_tokens: int) -> None:
         """Accumulate one request's worth of token counts for *tenant* (LRU-bounded)."""
@@ -136,6 +140,14 @@ class GatewayState:
             s.requests += 1
             s.tokens_baseline += baseline_tokens
             s.tokens_compressed += compressed_tokens
+        # Crash-safety checkpoint: the shutdown-path save() never runs on
+        # kill -9/OOM, which would zero same-day tenant accounting. Throttled
+        # so it costs at most one atomic write per interval; claiming the
+        # timestamp before saving keeps concurrent racers to one write-ish.
+        now = time.monotonic()
+        if now - self._last_save >= _CHECKPOINT_SECS:
+            self._last_save = now
+            self.save()
 
     def save(self, path: Path | None = None) -> None:
         """Atomically persist per-tenant counters so a restart/SIGTERM doesn't zero them."""
@@ -565,6 +577,16 @@ def build_gateway_handler(
         # ----------------------------------------------------------------
 
         def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/distil/health":
+                # Liveness probe: unauthenticated by design (leaks nothing but
+                # "up"), answers locally, never touches the billed upstream.
+                payload = b'{"status":"ok"}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             if self.path == "/distil/stats":
                 if self._admin_authorized():
                     self._handle_stats()
@@ -676,6 +698,7 @@ def build_gateway_handler(
                 try:
                     compressed, _store = compress_messages(original, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
+                    log.debug("compress_messages failed; forwarding uncompressed", exc_info=True)
                     compressed = original
 
                 baseline_tokens = _count_tokens(original)
@@ -693,7 +716,7 @@ def build_gateway_handler(
                 try:
                     body, _store = compress_generate_request(body, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
-                    pass
+                    log.debug("gemini compression failed; forwarding uncompressed", exc_info=True)
                 compressed_tokens = _gemini_count(body)
                 tokens_saved = max(0, baseline_tokens - compressed_tokens)
                 _pending_tenant_record = (tenant, baseline_tokens, compressed_tokens)
