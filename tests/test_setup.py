@@ -200,7 +200,10 @@ def test_cmd_default_always_on_writes_service_and_env(tmp_path, monkeypatch, cap
 
     # undo stops the running service (one shell-out) and cleans up rc + file
     assert cli.cmd_default(_default_args(tmp_path, undo=True)) == 0
-    assert calls  # unload was invoked
+    if setup.service_unload_cmd() is not None:
+        assert calls  # unload was invoked
+    else:
+        assert calls == []  # no service manager on this platform (e.g. Windows)
     assert not svc.exists()
     assert "ANTHROPIC_BASE_URL" not in rc.read_text()
 

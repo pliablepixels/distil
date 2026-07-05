@@ -9,6 +9,7 @@ All tests are hermetic — no network, no real ~/.zshrc / ~/.claude writes.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 
 import pytest
@@ -1664,3 +1665,76 @@ def test_cmd_online_not_certified(monkeypatch, capsys) -> None:
     rc = cli_mod.cmd_online(argparse.Namespace(corpus=None, promote_to="lossless-only"))
     assert rc == 0
     assert "NOT promoted" in capsys.readouterr().out
+
+
+def test_stats_text_warns_on_legacy_records(tmp_path, monkeypatch, capsys) -> None:
+    """The pre-1.10 overstatement warning must reach the TEXT output users
+    actually read, not just the HTML page."""
+    import json as _json
+
+    from distil import ledger as ledger_mod
+
+    p = tmp_path / "savings.jsonl"
+    rec = {
+        "trajectory_id": "live-proxy", "model": "m", "turns": 1,
+        "baseline_dollars": 1.0, "distil_dollars": 0.5,
+        "baseline_input_tokens": 1000, "distil_input_tokens": 500,
+        "tokenizer": "heuristic", "ts": 1.0,
+    }  # no "acct" key -> legacy era
+    p.write_text(_json.dumps(rec) + "\n", encoding="utf-8")
+    monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
+    assert cli.cmd_leaderboard(argparse.Namespace(badge=False, json=False, html=None)) == 0
+    out = capsys.readouterr().out
+    assert "pre-1.10 accounting" in out and "overstated" in out
+
+
+def test_cmd_reset_archives_ledger(tmp_path, monkeypatch, capsys) -> None:
+    import json as _json
+
+    from distil import ledger as ledger_mod
+
+    p = tmp_path / "savings.jsonl"
+    rec = {
+        "trajectory_id": "live-proxy", "model": "m", "turns": 1,
+        "baseline_dollars": 1.0, "distil_dollars": 0.5,
+        "baseline_input_tokens": 1000, "distil_input_tokens": 500,
+        "tokenizer": "heuristic", "ts": 1.0,
+    }
+    p.write_text(_json.dumps(rec) + "\n", encoding="utf-8")
+    monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
+    assert cli.cmd_reset(argparse.Namespace(shadow=False)) == 0
+    out = capsys.readouterr().out
+    assert "archived" in out and not p.exists()
+    archived = list(tmp_path.glob("savings.jsonl.reset-*"))
+    assert len(archived) == 1  # non-destructive: history kept for audit
+    # Fresh ledger: stats start from zero
+    assert cli.cmd_leaderboard(argparse.Namespace(badge=False, json=False, html=None)) == 0
+    assert "no genuine savings recorded" in capsys.readouterr().out
+
+
+def test_statusline_says_off_when_session_not_routed(tmp_path, monkeypatch, capsys) -> None:
+    """'✓ on' must mean this session's requests actually route through distil."""
+    import json as _json
+
+    from distil import ledger as ledger_mod
+
+    p = tmp_path / "savings.jsonl"
+    rec = {
+        "trajectory_id": "live-proxy", "model": "m", "turns": 1,
+        "baseline_dollars": 1.0, "distil_dollars": 0.5,
+        "baseline_input_tokens": 1000, "distil_input_tokens": 500,
+        "tokenizer": "heuristic", "ts": 1.0,
+    }
+    p.write_text(_json.dumps(rec) + "\n", encoding="utf-8")
+    monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
+    for var in ("DISTIL_SESSION", "ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
+    out = capsys.readouterr().out
+    assert "off — session not routed" in out and "✓ on" not in out
+    # And with wrap's env present, it says on again.
+    monkeypatch.setenv("DISTIL_SESSION", "s123")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
+    assert "✓ on" in capsys.readouterr().out

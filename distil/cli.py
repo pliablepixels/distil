@@ -118,6 +118,42 @@ def cmd_savings(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reset(args: argparse.Namespace) -> int:
+    """Archive the savings ledger (and optionally shadow stats) and start fresh.
+
+    Non-destructive: the ledger is renamed to ``savings.jsonl.reset-<utc>`` next
+    to the original, so history is auditable but the statusline/leaderboard
+    start from zero on the current (post-1.10, record-after-2xx) accounting."""
+    import time as _time
+
+    from . import ledger
+
+    stamp = _time.strftime("%Y%m%d-%H%M%SZ", _time.gmtime())
+    reset_any = False
+    src = ledger.default_path()
+    if src.exists():
+        s = ledger.summary()
+        dst = src.with_name(src.name + f".reset-{stamp}")
+        src.rename(dst)
+        legacy = f" ({s.legacy_records:,} pre-1.10 records)" if s.legacy_records else ""
+        print(f"savings ledger archived → {dst}")
+        print(f"  {s.runs} runs, {s.total_tokens_saved:,} tokens saved{legacy} — kept for audit, no longer counted")
+        reset_any = True
+    if getattr(args, "shadow", False):
+        from .shadow import _state_dir
+
+        sh = _state_dir() / "shadow.jsonl"
+        if sh.exists():
+            sh.rename(sh.with_name(sh.name + f".reset-{stamp}"))
+            print("shadow decision-equivalence stats archived and reset")
+            reset_any = True
+    if not reset_any:
+        print("nothing to reset — no ledger recorded yet.")
+        return 0
+    print("fresh start: all new records use post-1.10 accounting (booked only after upstream 2xx).")
+    return 0
+
+
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     s = ledger.summary()
     if getattr(args, "badge", False):
@@ -192,6 +228,12 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
             f"{s.total_distil_tokens:,}  (−{trimmed * 100:.1f}%)"
         )
     print(f"total tokens saved:   {s.total_tokens_saved:,}")
+    if s.legacy_records:
+        print(
+            f"  ⚠ includes {s.legacy_records:,} record(s) from pre-1.10 accounting — "
+            "savings for those may be overstated (booked before upstream success; "
+            "retries double-counted). `distil reset` archives the ledger and starts fresh."
+        )
     from .doctor import subscription_mode
 
     if subscription_mode():
@@ -599,8 +641,18 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         #          = ✓ on   (set up, idle — no traffic this session)
         # LIVE = THIS session under `distil wrap` (DISTIL_SESSION), so each
         # terminal shows only its own; total = lifetime across all sessions.
+        # "on" must mean THIS session's requests route through distil: wrap sets
+        # DISTIL_SESSION in the agent's env; always-on setups point the base URL
+        # at loopback. Neither present -> requests go direct, say so honestly.
+        _routed = bool(os.environ.get("DISTIL_SESSION")) or any(
+            h in os.environ.get(v, "")
+            for v in ("ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL")
+            for h in ("127.0.0.1", "localhost")
+        )
         recent = _live()
-        if recent.runs and recent.total_baseline_tokens and recent.total_tokens_saved > 0:
+        if not _routed:
+            parts.append(c("38;5;178", "off — session not routed"))
+        elif recent.runs and recent.total_baseline_tokens and recent.total_tokens_saved > 0:
             trimmed = 1 - recent.total_distil_tokens / recent.total_baseline_tokens
             parts.append(c("1;38;5;84", f"▼{ledger._human(recent.total_tokens_saved)}"))
             parts.append(c("38;5;80", f"{trimmed * 100:.0f}% smaller"))
@@ -1713,6 +1765,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="print a shields.io badge URL + markdown of your measured savings",
     )
     lb.set_defaults(func=cmd_leaderboard)
+
+    rs = sub.add_parser(
+        "reset",
+        help="archive the savings ledger and start fresh (non-destructive)",
+    )
+    rs.add_argument(
+        "--shadow", action="store_true", help="also archive/reset shadow decision-equivalence stats"
+    )
+    rs.set_defaults(func=cmd_reset)
 
     pr = sub.add_parser("prune", help="causal ablation: what is free to drop (technique #2)")
     add_traj(pr)

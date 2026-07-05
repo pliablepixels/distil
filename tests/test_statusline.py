@@ -34,6 +34,10 @@ def _hermetic_env(monkeypatch, tmp_path):
     must be pinned or these tests' results depend on the developer's machine."""
     monkeypatch.delenv("DISTIL_SESSION", raising=False)
     monkeypatch.setenv("DISTIL_HOME", str(tmp_path / "distil-home"))
+    # These tests exercise the live/idle displays of a ROUTED session; route via
+    # loopback base URL (not DISTIL_SESSION, which would switch the live slice
+    # to session= lookups). The unrouted "off" label is covered in test_cli_onboard.
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://127.0.0.1:8788")
 
 
 def _run(monkeypatch, capsys, summary, recent=None, stdin="{}", no_color=True):

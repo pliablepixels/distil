@@ -3,6 +3,16 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`distil reset`** — archives the savings ledger to `savings.jsonl.reset-<utc>` (non-destructive, auditable) and starts fresh on post-1.10 accounting; `--shadow` also resets decision-equivalence stats. For ledgers dominated by pre-1.10 records whose savings may be overstated.
+
+### Fixed
+- **Statusline honesty: "✓ on" now means routed.** The idle segment said "✓ on" even in a session whose requests went straight to the provider (no `distil wrap`, no loopback base URL). Unrouted sessions now show "off — session not routed".
+- **Pre-1.10 overstatement warning reaches the terminal.** `distil stats` text output now prints the legacy-accounting footnote (was HTML-only, despite the 1.10 changelog claim), with a pointer to `distil reset`.
+- Windows: `distil default --undo` test no longer assumes a service manager exists (none is wired on Windows).
+
 ## [1.11.0] — 2026-07-05 — Ops-ready: debuggable fail-open, crash-safe accounting, health probes; claims audit
 
 ### Added
