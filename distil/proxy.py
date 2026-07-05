@@ -702,14 +702,19 @@ def build_handler(
     return _DistilHandler
 
 
-def _install_sigterm_flush(proc_holder: list | None = None) -> None:
+def _install_sigterm_flush(proc_holder: list | None = None, term_flag: list | None = None) -> None:
     """Turn SIGTERM into KeyboardInterrupt so the caller's ``finally`` block
     (savings flush, shadow drain) runs on a plain ``kill`` instead of dropping
     up to a flush-window of recorded savings. Forwards the signal to a wrapped
-    child process first, if one is registered in *proc_holder*."""
+    child process first, if one is registered in *proc_holder*. Appends to
+    *term_flag* so callers can tell a real SIGTERM apart from a Ctrl+C that
+    also lands as KeyboardInterrupt (wrap_run must exit on the former but keep
+    waiting on the latter)."""
     import signal
 
     def _on_term(signum: int, frame: object) -> None:  # noqa: ARG001
+        if term_flag is not None:
+            term_flag.append(True)
         if proc_holder:
             try:
                 proc_holder[0].terminate()
@@ -929,19 +934,33 @@ def wrap_run(
 
     code = 0
     proc_holder: list = []
-    _install_sigterm_flush(proc_holder)
+    terminated: list = []  # non-empty once the SIGTERM handler has fired
+    _install_sigterm_flush(proc_holder, terminated)
     try:
         # Reserve the slot before Popen so a SIGTERM in the spawn window still
         # finds the child: the handler no-ops on the None placeholder, then the
         # single-statement store binds the real proc as tightly as possible.
         proc_holder.append(None)
         proc_holder[0] = proc = subprocess.Popen(command, env=child_env)
-        code = proc.wait()
+        while True:
+            try:
+                code = proc.wait()
+                break
+            except KeyboardInterrupt:
+                if terminated:
+                    code = 130  # real SIGTERM: child was .terminate()d — exit as before
+                    break
+                # Plain Ctrl+C goes to the whole foreground process group: the
+                # child received it too and decides its own fate (Claude Code's
+                # first press only cancels the current turn — the app survives).
+                # Exiting here would tear the proxy down under a live agent,
+                # killing its session on the next API call. Keep waiting.
+                continue
     except FileNotFoundError:
         print(f"distil wrap: command not found: {command[0]}", file=sys.stderr)
         code = 127
     except KeyboardInterrupt:
-        code = 130
+        code = 130  # Ctrl+C in the spawn window, before the child existed
     finally:
         server.shutdown()
         _drain_shadow(handler)

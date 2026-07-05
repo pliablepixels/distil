@@ -93,6 +93,81 @@ def test_cmd_wrap_strips_separator_and_rejects_empty():
     assert cmd_wrap(ns) == 2  # only the separator → nothing to run
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+def test_wrap_survives_ctrl_c_while_child_lives(tmp_path):
+    """A terminal Ctrl+C hits the whole foreground group. Agents like Claude Code
+    swallow the first SIGINT (it cancels the turn, not the app) — the wrap must
+    keep the proxy alive underneath them instead of exiting 130 and leaving the
+    agent pointed at a dead port."""
+    import os
+    import signal
+    import subprocess
+    import time
+
+    # Child mimics claude: ignores SIGINT, then proves the proxy still answers.
+    child = tmp_path / "child.py"
+    child.write_text(
+        "import os, signal, time, urllib.request\n"
+        "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+        "time.sleep(3)\n"  # outlive the SIGINT sent at ~1s
+        "urllib.request.urlopen(os.environ['ANTHROPIC_BASE_URL'] + '/', timeout=2)\n",
+        encoding="utf-8",
+    )
+    wrap = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "distil.cli",
+            "wrap",
+            "--no-record",
+            "--",
+            sys.executable,
+            str(child),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,  # own group, like a terminal foreground job
+    )
+    time.sleep(1.5)
+    os.killpg(os.getpgid(wrap.pid), signal.SIGINT)
+    out, _ = wrap.communicate(timeout=20)
+    # Child got HTTP 404 from the still-alive proxy root (any response beats
+    # connection-refused); it exits nonzero on urllib.HTTPError — accept that,
+    # reject only the pre-fix signature: wrap exit 130 with the child orphaned.
+    assert wrap.returncode != 130, f"wrap died on Ctrl+C while child lived:\n{out}"
+    assert "Connection refused" not in out and "URLError" not in out, out
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+def test_wrap_still_exits_on_sigterm(tmp_path):
+    """SIGTERM keeps its meaning: terminate the child, flush, exit."""
+    import os
+    import signal
+    import subprocess
+    import time
+
+    wrap = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "distil.cli",
+            "wrap",
+            "--no-record",
+            "--",
+            sys.executable,
+            "-c",
+            "import time; time.sleep(30)",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    time.sleep(1.5)
+    os.kill(wrap.pid, signal.SIGTERM)
+    assert wrap.wait(timeout=10) == 130
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="termios is POSIX-only")
 def test_wrap_run_restores_terminal_on_child_exit(monkeypatch):
     """FIX 3: wrap_run restores the tty mode after the child exits, so an agent that
