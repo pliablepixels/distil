@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.11.1] — 2026-07-05 — Statusline honesty, pre-1.10 warning in terminal, `distil reset`
 
 ### Added
 - **`distil reset`** — archives the savings ledger to `savings.jsonl.reset-<utc>` (non-destructive, auditable) and starts fresh on post-1.10 accounting; `--shadow` also resets decision-equivalence stats. For ledgers dominated by pre-1.10 records whose savings may be overstated.
