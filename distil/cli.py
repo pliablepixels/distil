@@ -632,7 +632,9 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     if eq >= 0.95
                     else ("✗", "38;5;196")
                 )
-                parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("38;5;73", f" ({n_str})"))
+                # Same "de" label as the collecting state below, so the segment
+                # reads as one metric maturing: de 12/25 → ✓de 99.5% (30).
+                parts.append(c(hue, f"{glyph}de {eq * 100:.1f}%") + c("38;5;73", f" ({n_str})"))
             elif led.samples > 0:
                 # Below 25 samples we don't claim a rate (a % over a handful is noise),
                 # but we do show collection progress so decision-equivalence reads as

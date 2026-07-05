@@ -75,12 +75,27 @@ def _stream_request(port: int, payload: bytes, path: str = "/v1/messages"):
     return t_first, bytes(body), dict(resp.headers), first
 
 
+_DIGESTIBLE = "\n".join(f"log line {i}: benign filler output" for i in range(40))
+
+
 def _payload(stream: bool = True) -> bytes:
+    # The tool_result sits two turns back so the recency exemption does not keep
+    # it verbatim — the request genuinely compresses and savings are non-zero
+    # (0-savings flush windows write no ledger row by design).
     return json.dumps(
         {
             "model": "claude-opus-4-8",
             "stream": stream,
-            "messages": [{"role": "user", "content": "hi"}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "tool_result", "tool_use_id": "t1", "content": _DIGESTIBLE}
+                    ],
+                },
+                {"role": "user", "content": "next"},
+                {"role": "user", "content": "hi"},
+            ],
         }
     ).encode()
 
@@ -170,6 +185,10 @@ def test_sync_proxy_streaming_records_savings_and_shadow(tmp_path, monkeypatch):
                 "messages": [
                     {"role": "user", "content": "go"},
                     {"role": "user", "content": [{"type": "tool_result", "content": long}]},
+                    # Two later turns keep the tool_result out of the recency-exempt
+                    # window so it digests — 0-savings windows write no ledger row.
+                    {"role": "user", "content": "next"},
+                    {"role": "user", "content": "hi"},
                 ],
             }
         ).encode()
