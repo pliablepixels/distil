@@ -3,6 +3,13 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.11.2] — 2026-07-05 — Ctrl+C no longer kills wrapped sessions; fresh-install statusline honesty
+
+### Fixed
+- **Ctrl+C no longer tears down the proxy under a live agent.** A terminal Ctrl+C is delivered to the whole foreground process group; agents like Claude Code survive the first press (it cancels the turn, not the app), but `distil wrap` treated it as shutdown — exiting and leaving the agent pointed at a dead port, so the session died on its next API call. The wrap now keeps waiting through SIGINT (the child owns that signal); SIGTERM keeps its terminate-child + flush-savings + exit semantics.
+- **Statusline honesty for fresh installs.** A routed session (`distil wrap` env present) with an empty ledger was told to run `distil wrap -- <agent>` — the exact state every new user hits first. It now shows "✓ on · no savings yet"; the wrap hint remains only for genuinely unrouted shells.
+- **Alias-mode verify hint fixed.** `distil default` told users to check `echo $ANTHROPIC_BASE_URL`, which is empty by design in alias mode (the URL is injected only into the wrapped agent's env). It now says `type <agent>` (should show the distil wrap alias); the env-var check applies to `--always-on` only.
+
 ## [1.11.1] — 2026-07-05 — Statusline honesty, pre-1.10 warning in terminal, `distil reset`
 
 ### Added
