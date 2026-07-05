@@ -177,6 +177,10 @@ class GatewayState:
                 except (KeyError, TypeError, ValueError):
                     continue  # skip a corrupt tenant entry
                 self._tenants[tid] = s
+            # A pre-cap (or hand-edited) state file may exceed the ceiling;
+            # enforce the invariant at load, not just on record().
+            while len(self._tenants) > _MAX_TENANTS:
+                self._tenants.popitem(last=False)
 
     def snapshot(self) -> dict[str, Any]:
         """Return a serialisable dict with per-tenant stats and totals."""

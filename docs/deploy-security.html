@@ -168,8 +168,8 @@ def log_message(self, fmt: str, *args: object) -&gt; None:
     <h3>Auth-mode gating — prompt-cache stability and subscription policy</h3>
     <p>The proxy compresses the <code>messages</code> array only — never the <code>system</code> prefix — so Anthropic prompt-cache prefix stability is preserved in <em>all</em> modes. Two flags give additional control:</p>
     <ul>
-      <li><code>--lossless-only</code> — policy mode: restricts the proxy to lossless strategies (no lossy output-shaping, no tool injection via <code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription or OAuth-gated deployments.</li>
-      <li><code>--verbatim</code> — skips the Tier-1 digest entirely, so the model sees message content byte-for-byte (Tier-0 only: JSON minification, run-length collapse). Use for interactive sessions or anywhere <code>distil_expand</code> recovery is unavailable. Lower savings.</li>
+      <li><code>--lossless-only</code> — policy mode: restricts the proxy to Tier-0 verbatim only (no lossy output-shaping, no tool injection, no Tier-1 digest stubs). Without an injected expand tool the agent cannot recover a stub, so <code>--lossless-only</code> folds directly into verbatim — no separate <code>--verbatim</code> flag needed. Use for subscription or OAuth-gated deployments.</li>
+      <li><code>--verbatim</code> — explicitly selects Tier-0 only (JSON minification, run-length collapse), byte-for-byte message content. Lower savings; implied by <code>--lossless-only</code>. Use for interactive sessions or anywhere <code>distil_expand</code> recovery is unavailable.</li>
     </ul>
 
     <pre class="term">distil proxy --lossless-only --upstream https://api.anthropic.com
@@ -182,12 +182,12 @@ distil proxy --verbatim     --upstream https://api.anthropic.com</pre>
 
     <h2>Data retention and zero-data retention (ZDR)</h2>
 
-    <p>Distil itself retains no data. The proxy is stateless: it reads a request, compresses the <code>messages</code> array in memory, forwards it, and relays the response. Nothing is written to disk.</p>
+    <p>The proxy itself carries no per-request state after the response is relayed. Digest originals are written to <code>~/.distil/restore/</code> (respecting <code>DISTIL_HOME</code>) so that handles survive proxy restarts. Nothing is forwarded upstream beyond the compressed payload.</p>
 
-    <p>If your Anthropic contract includes Zero Data Retention (ZDR), the compressed payload forwarded by the proxy is covered by the same ZDR terms as a direct call — Distil does not introduce any additional retention surface.</p>
+    <p>If your Anthropic contract includes Zero Data Retention (ZDR), the compressed payload forwarded by the proxy is covered by the same ZDR terms as a direct call. The local restore store is outside the ZDR perimeter: for strict ZDR deployments, point <code>DISTIL_HOME</code> at an ephemeral path (e.g. a <code>tmpfs</code> mount) or clear <code>~/.distil/restore/</code> between sessions.</p>
 
     <div class="callout">
-      <b>RestoreStore is in-process only.</b> The Tier-1 reversible digest stores original text in a Python dict for the duration of a single request. It is never persisted, never sent to the model, and is garbage-collected when the request handler exits.
+      <b>RestoreStore persists to disk.</b> The Tier-1 reversible digest stores original text in <code>~/.distil/restore/</code> (under <code>DISTIL_HOME</code>) so that handles survive proxy restarts — <code>distil expand &lt;handle&gt;</code> works even after a restart. Originals are never sent to the model or to the upstream API.
     </div>
 
     <hr/>
@@ -222,7 +222,7 @@ distil gateway listening on http://127.0.0.1:8789
         <tr><td><code>--port</code></td><td><code>8789</code></td><td>Port to listen on (distinct from the basic proxy default of 8788).</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL. Set once at startup — cannot be overridden per-request.</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key from the catalog; used for per-tenant dollar accounting in the dashboard.</td></tr>
-        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: Tier-0 verbatim only — no lossy output-shaping, no tool injection (<code>--expand</code>), no Tier-1 digest stubs. Folds directly into verbatim. Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Message content is byte-stable. Interactive-safe, lower savings.</td></tr>
         <tr><td><code>--admin-token</code></td><td>unset (env <code>DISTIL_GATEWAY_TOKEN</code>)</td><td>Bearer token required for <code>/distil/stats</code> and <code>/distil/dashboard</code>. On a non-loopback bind, these routes are disabled entirely without it.</td></tr>
         <tr><td><code>--trust-tenant-header</code></td><td>off</td><td>Honor the client-supplied <code>x-distil-tenant</code> header for accounting. Off by default — tenant identity comes from the credential hash.</td></tr>
@@ -447,7 +447,7 @@ rust</pre>
         </tr>
         <tr>
           <td>Cache prefix corruption</td>
-          <td>The proxy never compresses the <code>system</code> prefix, so prompt-cache stability holds in all modes. <code>--verbatim</code> additionally makes message content byte-stable (Tier-0 only). <code>--lossless-only</code> is the policy mode (no tool injection, digest still runs).</td>
+          <td>The proxy never compresses the <code>system</code> prefix, so prompt-cache stability holds in all modes. <code>--verbatim</code> makes message content byte-stable (Tier-0 only). <code>--lossless-only</code> is the policy mode (no tool injection, no Tier-1 stubs — folds into verbatim).</td>
         </tr>
         <tr>
           <td>Header injection</td>
@@ -455,7 +455,7 @@ rust</pre>
         </tr>
         <tr>
           <td>Data retention beyond request</td>
-          <td>Stateless handler; RestoreStore is in-process, not persisted.</td>
+          <td>Per-request proxy state is discarded after response relay. Digest originals persist to <code>~/.distil/restore/</code> for handle recovery across restarts; point <code>DISTIL_HOME</code> at an ephemeral path for strict ZDR.</td>
         </tr>
         <tr>
           <td>API key exposure in gateway logs</td>

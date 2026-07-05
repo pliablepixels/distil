@@ -50,3 +50,17 @@ def test_lru_eviction_bounds_the_map(monkeypatch):
     tenants = {t["tenant"] for t in s.snapshot()["tenants"]}
     assert len(tenants) == 3
     assert tenants == {"t2", "t3", "t4"}  # oldest two evicted
+
+
+def test_load_enforces_tenant_cap(monkeypatch, tmp_path):
+    """A pre-cap (or hand-edited) state file must not exceed _MAX_TENANTS in memory."""
+    p = tmp_path / "gateway_state.json"
+    s = _state()
+    for i in range(5):
+        s.record(f"t{i}", 10, 4)
+    s.save(p)
+
+    monkeypatch.setattr(gw, "_MAX_TENANTS", 3)
+    s2 = _state()
+    s2.load(p)
+    assert len(s2.snapshot()["tenants"]) == 3
