@@ -182,11 +182,17 @@ def test_anthropic_adapter_branches():
     messages = [
         {"role": "user", "content": [{"type": "text", "text": '{  "a" :  1 ,  "b" : 2  }'}]},
         {"role": "assistant", "content": [{"type": "text", "text": "thinking..."}]},
-        {"role": "user", "content": [
-            {"type": "tool_result", "content": "one\ntwo"},                 # short → tier0
-            {"type": "tool_result", "content": [{"type": "text", "text": big}]},  # digests
-            {"type": "image", "source": {"type": "base64", "data": "x"}},   # passthrough
-        ]},
+        {
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "content": "one\ntwo"},  # short → tier0
+                {"type": "tool_result", "content": [{"type": "text", "text": big}]},  # digests
+                {"type": "image", "source": {"type": "base64", "data": "x"}},  # passthrough
+            ],
+        },
+        # Later turns keep the big tool_result out of the recency-exempt window.
+        {"role": "user", "content": "next"},
+        {"role": "user", "content": "next"},
     ]
     compressed, store = compress_messages(messages, verbatim=False)
     # the big tool_result got a handle in the store; images/assistant unchanged

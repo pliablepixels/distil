@@ -135,7 +135,11 @@ def test_compressible_path_digests_tool_result(servers: Any) -> None:
                     "content": _LONG_TOOL_RESULT,
                 }
             ],
-        }
+        },
+        # Two later turns keep the tool_result out of the recency-exempt window
+        # (adapter keeps the most recent K turns verbatim) so it still digests.
+        {"role": "user", "content": "next"},
+        {"role": "user", "content": "next"},
     ]
     payload = {"model": "claude-opus-4-5", "max_tokens": 256, "messages": messages}
 
@@ -250,3 +254,15 @@ def test_quiet_server_swallows_client_disconnects(capsys) -> None:
     except ValueError:
         srv.handle_error(None, ("127.0.0.1", 12345))
     assert "ValueError" in capsys.readouterr().err  # real errors still surface
+
+
+def test_build_handler_eager_loads_request_path_modules() -> None:
+    """FIX 4a: request-path modules imported lazily per request must be warmed at
+    server setup, so an in-place upgrade never loads a post-upgrade file mid-serve."""
+    import sys
+
+    for m in ("distil.streamrelay", "distil.compress.guideline"):
+        sys.modules.pop(m, None)
+    build_handler("http://127.0.0.1:1")
+    assert "distil.streamrelay" in sys.modules
+    assert "distil.compress.guideline" in sys.modules

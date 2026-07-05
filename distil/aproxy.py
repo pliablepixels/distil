@@ -86,8 +86,6 @@ def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> 
     return max(0, _count_msgs(before) - _count_msgs(after))
 
 
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -138,6 +136,17 @@ def make_app(
         ) from exc
 
     _upstream = upstream.rstrip("/")
+
+    # lossless-only implies Tier-0-only: without an injected expand tool the agent
+    # cannot recover a Tier-1 digest stub, so a stub there would be irreversibly
+    # lossy. Fold it into verbatim (the flag that already disables Tier-1 digests).
+    verbatim = verbatim or lossless_only
+
+    # Eager-load the request-path module the handler otherwise imports lazily, so
+    # an in-place upgrade never loads a post-upgrade .py mid-serve against the
+    # running interpreter (version skew). Warmed here at server setup; the
+    # per-request `from .output import ...` is then a module-cache hit.
+    from .output import shape_request as _shape_request  # noqa: F401
 
     # Generous but finite: connect fails fast; sock_read is an INACTIVITY timeout
     # (resets on every chunk), so long generations stream freely while a wedged

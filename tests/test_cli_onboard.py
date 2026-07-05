@@ -708,6 +708,33 @@ def test_cmd_upgrade_runs_and_succeeds(monkeypatch, capsys) -> None:
     assert "upgraded" in capsys.readouterr().out
 
 
+def test_cmd_upgrade_warns_when_proxy_running(monkeypatch, capsys) -> None:
+    """FIX 4b: a live proxy must be flagged for restart before an in-place upgrade."""
+    import subprocess
+
+    from distil import onboard
+
+    monkeypatch.setattr(onboard, "install_method", lambda: "pipx")
+
+    class _Res:
+        def __init__(self, rc: int, out: str = "") -> None:
+            self.returncode = rc
+            self.stdout = out
+
+    def fake_run(*a, **k):
+        cmd = a[0] if a else k.get("args")
+        if isinstance(cmd, list) and cmd and cmd[0] == "pgrep":
+            return _Res(0, "12345 distil wrap -- claude\n67890 distil proxy\n")
+        return _Res(0)  # the installer command
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    rc = cli.cmd_upgrade(argparse.Namespace(dry_run=False))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "running distil proxy" in out
+    assert "restart" in out
+
+
 def test_cmd_upgrade_runs_and_fails(monkeypatch, capsys) -> None:
     import subprocess
     from distil import onboard

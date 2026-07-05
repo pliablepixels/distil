@@ -31,11 +31,23 @@ import hashlib
 from typing import Any
 
 from ..compress.tier0 import collapse_runs, minify_json
+from ..mcp_server import load_restore as _load_restore
+from ..mcp_server import record_restore as _record_restore
 from ..compress.tier1 import digest as _tier1_digest
 from ..tokenizer import DEFAULT as _tokenizer
 
 # Minimum line count for a tool_result to be digested (matches Tier1Reversible default).
 _MIN_LINES = 6
+
+# Recency exemption: tool_result blocks in the last K user/tool turns are NEVER
+# digested — an agent must always see its most recent tool outputs byte-exact to
+# choose its next action, and a Tier-1 stub it may not be able to expand there
+# would break that. Digesting only OLDER turns is also strictly cache-safe here:
+# place_cache_control never puts message history in the cached prefix, and
+# compress_messages already re-digests the whole history every call, so exempting
+# recent turns only ever *reduces* what we rewrite — it never mutates bytes a
+# previous call already sent.
+_RECENCY_KEEP_TURNS = 2
 
 # Thread-local learned "keep byte-exact" predicate, scoped per compress_messages call
 # (ThreadingHTTPServer handles requests on separate threads, so this must be per-thread).
@@ -47,6 +59,19 @@ _keep_tls = _threading.local()
 def _active_keep(text: str) -> bool:
     fn = getattr(_keep_tls, "fn", None)
     return bool(fn and fn(text))
+
+
+def _recent_verbatim_indices(messages: list[dict[str, Any]], k: int) -> set[int]:
+    """Indices of the last *k* tool-output-bearing turns (role ``user``/``tool``),
+    whose tool_result blocks must stay verbatim. See ``_RECENCY_KEEP_TURNS``."""
+    if k <= 0:
+        return set()
+    idxs = [
+        i
+        for i, m in enumerate(messages)
+        if isinstance(m, dict) and m.get("role") in ("user", "tool")
+    ]
+    return set(idxs[-k:])
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +95,7 @@ class RestoreStore:
 
     def _record(self, handle: str, original: str) -> None:
         self._store[handle] = original
+        _record_restore(handle, original)  # survive restarts; expandable cross-process
 
     # ------------------------------------------------------------------
     # Public API
@@ -85,7 +111,14 @@ class RestoreStore:
 
         Raises KeyError if the handle is not in this store.
         """
-        return self._store[handle]
+        try:
+            return self._store[handle]
+        except KeyError:
+            original = _load_restore(handle)  # disk fallback: pre-restart handles
+            if original is None:
+                raise
+            self._store[handle] = original
+            return original
 
 
 # ---------------------------------------------------------------------------
@@ -292,11 +325,15 @@ def compress_messages(
     try:
         store = RestoreStore()
         new_messages: list[dict[str, Any]] = []
-        for msg in messages:
+        recent = _recent_verbatim_indices(messages, _RECENCY_KEEP_TURNS)
+        for idx, msg in enumerate(messages):
             if not isinstance(msg, dict):
                 new_messages.append(msg)  # malformed entry — pass through untouched
                 continue
-            new_messages.append(_compress_message(msg, store, verbatim))
+            # Force verbatim for the most recent turns so their tool_results are
+            # never replaced by a digest stub the agent must reason over blind.
+            msg_verbatim = verbatim or idx in recent
+            new_messages.append(_compress_message(msg, store, msg_verbatim))
         return new_messages, store
     finally:
         _keep_tls.fn = None

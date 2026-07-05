@@ -457,6 +457,18 @@ def build_gateway_handler(
 
     _upstream = upstream.rstrip("/")
 
+    # lossless-only implies Tier-0-only: without an injected expand tool the agent
+    # cannot recover a Tier-1 digest stub, so a stub there would be irreversibly
+    # lossy. Fold it into verbatim (the flag that already disables Tier-1 digests).
+    verbatim = verbatim or lossless_only
+
+    # Eager-load the streaming relay the handler otherwise imports lazily per
+    # request, so a gateway upgraded in place never loads a post-upgrade .py
+    # mid-serve against the running interpreter (version skew). Warmed here at
+    # server setup; the per-request `from .streamrelay import ...` is then a
+    # module-cache hit, and CLI cold start stays cheap.
+    from .streamrelay import stream_upstream as _stream_upstream  # noqa: F401
+
     class _GatewayHandler(BaseHTTPRequestHandler):
         # HTTP/1.1 so streamed responses can use chunked transfer framing.
         protocol_version = "HTTP/1.1"

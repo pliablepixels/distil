@@ -179,6 +179,12 @@ def build_handler(
     # ▼0 there is the mode, not a bug.
     _mode_label = "verbatim" if verbatim else ("lossless-only" if lossless_only else "digest")
 
+    # lossless-only is a hard safety boundary: with no injected expand tool the
+    # agent can never recover a Tier-1 digest stub, so a stub there is irreversibly
+    # lossy. Force Tier-0-only (verbatim) whenever lossless_only is set. The label
+    # above stays distinct so x-distil-mode still reports which of the two it is.
+    verbatim = verbatim or lossless_only
+
     # Learning flywheel state (loaded once when expand is on): the learned
     # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
     _learn_stats = None
@@ -195,6 +201,14 @@ def build_handler(
     from .compress.guideline import OutcomeStats
 
     _outcome_keep = OutcomeStats.load().keep_predicate()
+
+    # Eager-load the other request-path module that handlers import lazily, so a
+    # proxy upgraded in place never loads a post-upgrade .py mid-serve against the
+    # already-running interpreter (version skew). guideline is warmed just above;
+    # streamrelay is the remaining per-request import. Warmed here at server setup
+    # the per-request `from .streamrelay import ...` is a module-cache hit, and CLI
+    # cold start stays cheap because this is not run at `import distil` time.
+    from .streamrelay import stream_upstream as _stream_upstream  # noqa: F401
 
     def _learn_keep(text: str) -> bool:
         return _outcome_keep(text) or (_expand_keep is not None and _expand_keep(text))
@@ -790,6 +804,20 @@ def wrap_run(
             f"{shadow_rate * 100:.0f}% (distil shadow-stats)"
         )
 
+    # Save the controlling terminal's mode before handing the tty to the child: an
+    # agent that dies in raw mode (TUI, readline, password prompt) would otherwise
+    # leave the user's shell wedged (no echo / no line editing). POSIX-only — the
+    # import is guarded so this is a no-op on Windows.
+    _saved_tty: tuple[int, Any] | None = None
+    try:
+        import termios
+
+        if sys.stdin.isatty():
+            _tty_fd = sys.stdin.fileno()
+            _saved_tty = (_tty_fd, termios.tcgetattr(_tty_fd))
+    except Exception:  # noqa: BLE001 — never fail wrap over terminal bookkeeping
+        _saved_tty = None
+
     code = 0
     proc_holder: list = []
     _install_sigterm_flush(proc_holder)
@@ -808,6 +836,15 @@ def wrap_run(
         if savings is not None:
             savings.flush()  # SIGTERM lands here too — no savings are ever dropped
         server.server_close()
+        if _saved_tty is not None:
+            # Restore the terminal even if the child died mid-raw-mode. TCSADRAIN
+            # waits for pending output to flush first.
+            try:
+                import termios
+
+                termios.tcsetattr(_saved_tty[0], termios.TCSADRAIN, _saved_tty[1])
+            except Exception:  # noqa: BLE001 — best-effort; child may have closed the tty
+                pass
     return code
 
 

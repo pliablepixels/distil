@@ -198,6 +198,10 @@ def test_proxy_expand_loop_end_to_end(tmp_path, monkeypatch):
                         "role": "user",
                         "content": [{"type": "tool_result", "tool_use_id": "t", "content": big}],
                     },
+                    # Later turns keep the tool_result out of the recency-exempt
+                    # window so it still digests and the expand loop has a handle.
+                    {"role": "user", "content": "next"},
+                    {"role": "user", "content": "next"},
                 ],
             }
         ).encode()

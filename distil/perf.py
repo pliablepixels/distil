@@ -198,6 +198,17 @@ def _build_messages() -> list[dict[str, Any]]:
             "role": "user",
             "content": "Good. What is the cause of the Pending status?",
         },
+        {
+            "role": "assistant",
+            "content": "The Pending pod is unschedulable — no node has enough free memory.",
+        },
+        {
+            # Two more turns follow the large tool_result so it is no longer one of
+            # the most-recent turns the adapter keeps verbatim (recency exemption)
+            # and the benchmark still exercises Tier-1 digestion of older history.
+            "role": "user",
+            "content": "Thanks, that explains it.",
+        },
     ]
 
 
