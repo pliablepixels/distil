@@ -101,7 +101,7 @@ def submit(signed: dict, dir: str) -> str:
     """
     path = Path(dir) / "submissions.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as f:
+    with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(signed) + "\n")
     return str(path)
 
@@ -142,7 +142,7 @@ def build_leaderboard(dir: str, keys: dict[str, str]) -> Leaderboard:
     best: dict[str, dict] = {}
 
     if path.exists():
-        for raw_line in path.read_text().splitlines():
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
             line = raw_line.strip()
             if not line:
                 continue

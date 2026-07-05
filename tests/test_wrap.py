@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+
+import pytest
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -91,6 +93,7 @@ def test_cmd_wrap_strips_separator_and_rejects_empty():
     assert cmd_wrap(ns) == 2  # only the separator → nothing to run
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="termios is POSIX-only")
 def test_wrap_run_restores_terminal_on_child_exit(monkeypatch):
     """FIX 3: wrap_run restores the tty mode after the child exits, so an agent that
     dies in raw mode never leaves the user's shell wedged."""

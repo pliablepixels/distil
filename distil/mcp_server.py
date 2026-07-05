@@ -67,7 +67,7 @@ def _store_add(handle: str, text: str) -> None:
     lock_path = _store_path().with_suffix(".lock")
     try:
         lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with lock_path.open("w") as lk:
+        with lock_path.open("w", encoding="utf-8") as lk:
             if _HAVE_FCNTL:
                 fcntl.flock(lk.fileno(), fcntl.LOCK_EX)
             store = _load_store()
@@ -80,7 +80,7 @@ def _store_add(handle: str, text: str) -> None:
 def _load_store() -> dict[str, str]:
     p = _store_path()
     try:
-        return json.loads(p.read_text())
+        return json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, ValueError):
         return {}
 
@@ -98,7 +98,7 @@ def _save_store(store: dict[str, str]) -> None:
         while len(store) > _MAX_STORE_ENTRIES:
             store.pop(next(iter(store)))
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(store))
+        p.write_text(json.dumps(store), encoding="utf-8")
         p.chmod(0o600)  # plaintext content at rest — owner-only
     except OSError:
         pass  # best-effort; never crash a tool call
@@ -127,7 +127,7 @@ def record_restore(handle: str, original: str) -> None:
         d = _restore_dir()
         d.mkdir(parents=True, exist_ok=True)
         p = d / handle
-        p.write_text(original)
+        p.write_text(original, encoding="utf-8")
         p.chmod(0o600)  # plaintext content at rest — owner-only
         stale = sorted(d.iterdir(), key=lambda f: f.stat().st_mtime)[:-_RESTORE_CAP]
         if _RESTORE_TTL_DAYS > 0:
@@ -145,7 +145,7 @@ def load_restore(handle: str) -> str | None:
     if not _HANDLE_RE.fullmatch(handle):  # untrusted MCP arg — no path traversal
         return None
     try:
-        return (_restore_dir() / handle).read_text()
+        return (_restore_dir() / handle).read_text(encoding="utf-8")
     except OSError:
         return None
 

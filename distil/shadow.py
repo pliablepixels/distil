@@ -337,7 +337,7 @@ class ShadowLedger:
         try:
             p = path or (_state_dir() / "shadow.jsonl")
             p.parent.mkdir(parents=True, exist_ok=True)
-            with p.open("a") as f:
+            with p.open("a", encoding="utf-8") as f:
                 f.write(json.dumps({"equivalent": bool(equivalent), "ts": time.time()}) + "\n")
         except OSError:
             pass  # telemetry must never break the request path
@@ -347,7 +347,7 @@ class ShadowLedger:
         led = cls()
         try:
             p = path or (_state_dir() / "shadow.jsonl")
-            for line in p.read_text().splitlines():
+            for line in p.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line:
                     continue

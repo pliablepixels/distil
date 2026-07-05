@@ -3,6 +3,10 @@ self-test must round-trip a request through an in-process upstream."""
 
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 from distil import doctor
 
 
@@ -767,6 +771,7 @@ def test_check_mode_windows_returns_info(monkeypatch):
     assert "no always-on service" in ch.detail
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="chmod 0o000 is a no-op on Windows")
 def test_check_mode_unreadable_file(tmp_path, monkeypatch):
     """Service file exists but is unreadable → INFO 'unreadable' (lines 415-416)."""
     import platform

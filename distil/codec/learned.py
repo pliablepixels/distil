@@ -96,7 +96,7 @@ class LogisticKeepModel:
     def load(cls, path: Path | str | None = None) -> "LogisticKeepModel":
         """Load weights from *path* (default: ``distil/codec/weights.json``)."""
         p = Path(path) if path is not None else DEFAULT_WEIGHTS_PATH
-        data = json.loads(p.read_text())
+        data = json.loads(p.read_text(encoding="utf-8"))
         return cls(data["weights"])
 
     def to_json(self) -> str:
@@ -109,7 +109,7 @@ class LogisticKeepModel:
     def save(self, path: Path | str | None = None) -> None:
         """Persist weights to *path* (default: ``distil/codec/weights.json``)."""
         p = Path(path) if path is not None else DEFAULT_WEIGHTS_PATH
-        p.write_text(self.to_json())
+        p.write_text(self.to_json(), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

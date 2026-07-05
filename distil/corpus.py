@@ -46,7 +46,7 @@ class CorpusEntry:
 
 def load_corpus(corpus_dir: Path | str = CORPUS_DIR) -> list[CorpusEntry]:
     corpus_dir = Path(corpus_dir)
-    manifest = json.loads((corpus_dir / "manifest.json").read_text())
+    manifest = json.loads((corpus_dir / "manifest.json").read_text(encoding="utf-8"))
     entries: list[CorpusEntry] = []
     for e in manifest["trajectories"]:
         traj = Trajectory.load(corpus_dir / e["file"])

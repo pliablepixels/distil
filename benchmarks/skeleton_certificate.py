@@ -61,7 +61,7 @@ def reversibility_check() -> dict:
     files = glob.glob(str(ROOT / "distil/*.py")) + glob.glob(str(ROOT / "benchmarks/*.py"))
     total = recovered = orig = comp = 0
     for f in files:
-        t = Path(f).read_text()
+        t = Path(f).read_text(encoding="utf-8")
         if len(t) < 500:
             continue
         total += 1

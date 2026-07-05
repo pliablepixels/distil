@@ -168,8 +168,11 @@ def test_cmd_default_installs_alias_and_undoes(tmp_path, capsys) -> None:
 
     rc = tmp_path / ".zshrc"
     rc.write_text("# keep me\n")
+    from distil import setup
+
     assert cli.cmd_default(_default_args(tmp_path)) == 0
-    assert "alias claude='distil wrap --lossless-only -- claude'" in rc.read_text()
+    # Expect the platform-appropriate managed block (alias on POSIX, function on Windows).
+    assert setup.alias_body("claude", "lossless-only") in rc.read_text()
     assert "# keep me" in rc.read_text()
 
     assert cli.cmd_default(_default_args(tmp_path, undo=True)) == 0
@@ -192,7 +195,7 @@ def test_cmd_default_always_on_writes_service_and_env(tmp_path, monkeypatch, cap
     rc = tmp_path / ".zshrc"
     assert cli.cmd_default(_default_args(tmp_path, always_on=True, mode="lossless-only")) == 0
     assert svc.exists() and "8788" in svc.read_text()
-    assert "export ANTHROPIC_BASE_URL=http://127.0.0.1:8788" in rc.read_text()
+    assert setup.env_body(8788) in rc.read_text()
     assert calls == []  # --no-start never shells out
 
     # undo stops the running service (one shell-out) and cleans up rc + file

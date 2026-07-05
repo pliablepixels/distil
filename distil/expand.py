@@ -87,7 +87,7 @@ def record_signal(handle: str, original: str, *, path: Path | None = None) -> No
     try:
         path = path or _default_signal_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a") as f:
+        with path.open("a", encoding="utf-8") as f:
             f.write(
                 json.dumps({"handle": handle, "recovered_chars": len(original), "ts": time.time()})
                 + "\n"

@@ -173,7 +173,8 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
         Path(args.html).write_text(
-            ledger.render_html(s, change_rate=change_rate, samples=samples, session=sess)
+            ledger.render_html(s, change_rate=change_rate, samples=samples, session=sess),
+            encoding="utf-8",
         )
         print(f"your savings page → {args.html}")
         return 0
@@ -1248,7 +1249,7 @@ def cmd_certify_trajectories(args: argparse.Namespace) -> int:
     from .certify.trajectory_risk import TrajectoryOutcome, certify_trajectory_risk
 
     outcomes: list = []
-    for line in Path(args.outcomes).read_text().splitlines():
+    for line in Path(args.outcomes).read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -1312,7 +1313,11 @@ def cmd_output_savings(args: argparse.Namespace) -> int:
     src = args.input or (CORPUS_DIR / "output_pairs.jsonl")
     pairs = [
         (d["baseline"], d["shaped"])
-        for d in (_json.loads(ln) for ln in Path(src).read_text().splitlines() if ln.strip())
+        for d in (
+            _json.loads(ln)
+            for ln in Path(src).read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        )
     ]
     rep = measure_output_savings(pairs)
     print("output compression — generation-side shaping, measured A/B\n")
@@ -1340,14 +1345,16 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     fname = f"{traj.id}.json"
-    (out / fname).write_text(_json.dumps(traj.to_dict(), indent=2))
+    (out / fname).write_text(_json.dumps(traj.to_dict(), indent=2), encoding="utf-8")
     manifest = out / "manifest.json"
     entries = []
     if manifest.exists():
-        entries = _json.loads(manifest.read_text()).get("trajectories", [])
+        entries = _json.loads(manifest.read_text(encoding="utf-8")).get("trajectories", [])
     entries = [e for e in entries if e.get("file") != fname]
     entries.append({"file": fname, "domain": "ingested", "title": traj.id})
-    manifest.write_text(_json.dumps({"version": 1, "trajectories": entries}, indent=2))
+    manifest.write_text(
+        _json.dumps({"version": 1, "trajectories": entries}, indent=2), encoding="utf-8"
+    )
     print(f"ingested {len(traj.turns)} turn(s) from {args.input} -> {out / fname}")
     print(
         f"run:  DISTIL_CORPUS={out} distil savings   # or: distil bench --corpus {out} --savings-only"
@@ -1405,7 +1412,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     )
     print(bm.format_report(rep))
     if args.html:
-        Path(args.html).write_text(bm.render_html(rep))
+        Path(args.html).write_text(bm.render_html(rep), encoding="utf-8")
         print(f"\nbenchmark page → {args.html}")
     if args.out:
         path = bm.write_raw(rep, args.out, str(int(time.time())))
@@ -1481,7 +1488,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     cert = calibrate_from_scores(args.baseline, candidates, margin=args.margin)
 
     if args.json:
-        Path(args.json).write_text(json.dumps(cert.to_dict(), indent=2))
+        Path(args.json).write_text(json.dumps(cert.to_dict(), indent=2), encoding="utf-8")
 
     print("Operating-Point Calibration Certificate\n")
     print(f"  baseline    : full context ({args.baseline})")
@@ -1619,12 +1626,12 @@ def cmd_federated(args: argparse.Namespace) -> int:
 
     from .telemetry import build_leaderboard, render_leaderboard_html
 
-    keys = _json.loads(Path(args.keys).read_text()) if args.keys else {}
+    keys = _json.loads(Path(args.keys).read_text(encoding="utf-8")) if args.keys else {}
     lb = build_leaderboard(args.dir, keys)
     print(f"verifiable savings — {len(lb.verified)} verified instance(s), {lb.rejected} rejected\n")
     print(f"  totals (certified only): {lb.totals}")
     if args.html:
-        Path(args.html).write_text(render_leaderboard_html(lb))
+        Path(args.html).write_text(render_leaderboard_html(lb), encoding="utf-8")
         print(f"  leaderboard html → {args.html}")
     return 0
 

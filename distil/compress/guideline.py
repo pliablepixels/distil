@@ -76,7 +76,7 @@ class OutcomeStats:
     @classmethod
     def load(cls, path: Path | None = None) -> OutcomeStats:
         try:
-            raw = json.loads(Path(path or _default_path()).read_text())
+            raw = json.loads(Path(path or _default_path()).read_text(encoding="utf-8"))
             return cls(dict(raw.get("degraded", {})), dict(raw.get("ok", {})))
         except (OSError, ValueError, TypeError):
             return cls()
@@ -88,7 +88,7 @@ class OutcomeStats:
             p = Path(path or _default_path())
             p.parent.mkdir(parents=True, exist_ok=True)
             tmp = p.with_suffix(p.suffix + ".tmp")
-            tmp.write_text(payload)
+            tmp.write_text(payload, encoding="utf-8")
             tmp.replace(p)
         except Exception:  # noqa: BLE001 — learning must never break anything
             pass

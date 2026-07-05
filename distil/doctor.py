@@ -369,7 +369,7 @@ def _check_pricing_catalog() -> Check:
     path = ledger.default_path()
     unknown: set[str] = set()
     try:
-        for line in path.read_text().splitlines():
+        for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             model = json.loads(line).get("model", "")

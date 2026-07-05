@@ -451,7 +451,7 @@ def write_raw(report: BenchReport, out_dir: str, stamp: str) -> str:
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"benchmark-{stamp}.jsonl"
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         for r in report.results:
             f.write(
                 json.dumps(

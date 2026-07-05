@@ -94,7 +94,7 @@ def record(
     path = path or default_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     _maybe_backup(path)
-    with path.open("a") as f:
+    with path.open("a", encoding="utf-8") as f:
         if _HAVE_FCNTL:
             # Serialize appends from concurrent proxies (advisory; released on close)
             # so interleaved writes can't corrupt a line.
@@ -154,7 +154,7 @@ def latest_session(path: Path | None = None) -> tuple[str, float]:
     path = path or default_path()
     best_id, best_ts = "", 0.0
     try:
-        lines = path.read_text().splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return best_id, best_ts
     for line in lines:
@@ -190,7 +190,7 @@ def summary(
     toks: set[str] = set()
     corrupt = 0
     legacy = 0
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:

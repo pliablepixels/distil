@@ -173,10 +173,10 @@ def calibrate_from_scores(
         candidates: ``(name, score_path, gate_recent)`` per candidate operating point.
         margin: tolerated absolute pass-rate drop (proportion).
     """
-    base = resolved_map(json.loads(Path(baseline_path).read_text()))
+    base = resolved_map(json.loads(Path(baseline_path).read_text(encoding="utf-8")))
     points: list[OperatingPoint] = []
     for name, path, gate_recent in candidates:
-        cand = resolved_map(json.loads(Path(path).read_text()))
+        cand = resolved_map(json.loads(Path(path).read_text(encoding="utf-8")))
         losses, gains, n = paired_discordant(base, cand)
         points.append(OperatingPoint(name, gate_recent, losses, gains, n))
     return calibrate_operating_point(points, margin=margin)

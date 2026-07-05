@@ -156,7 +156,7 @@ def load_tau_bench(path: str | Path, *, model: str = "claude-opus-4-8") -> list[
     the gold decision is that tool call's ``{name, primary-arg}``. No marker, no
     directive — the model must read the observation to choose the call.
     """
-    raw = json.loads(Path(path).read_text())
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
     episodes = raw if isinstance(raw, list) else raw.get("episodes") or raw.get("results") or [raw]
     entries: list[CorpusEntry] = []
 
@@ -280,7 +280,7 @@ def load_swe_bench(path: str | Path, *, model: str = "claude-opus-4-8") -> list[
     # a single file may hold one trajectory (dict) or many (list) — normalize to a list
     raws: list[tuple[dict, str]] = []
     for f in files:
-        doc = json.loads(f.read_text())
+        doc = json.loads(f.read_text(encoding="utf-8"))
         if isinstance(doc, list):
             raws += [(d, f.stem) for d in doc]
         else:

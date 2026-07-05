@@ -286,7 +286,7 @@ def train_transformer(
         "onnx_path": onnx_path,
         "tokenizer_dir": str(out_path),
     }
-    (out_path / "metrics.json").write_text(json.dumps(metrics, indent=2))
+    (out_path / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
     print(
         f"Exported ONNX to {onnx_path}\n"

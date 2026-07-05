@@ -145,7 +145,7 @@ def write_raw(report: FrontierReport, out_dir: str, stamp: str) -> str:
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"frontier-{stamp}.jsonl"
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         for p in report.points:
             f.write(
                 json.dumps(

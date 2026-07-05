@@ -859,7 +859,9 @@ def test_default_corpus_dir_env_override(monkeypatch):
     from distil import corpus as _corpus_mod
 
     result = _corpus_mod._default_corpus_dir()
-    assert str(result) == "/fake/corpus"
+    from pathlib import Path
+
+    assert result == Path("/fake/corpus")
 
 
 def test_default_corpus_dir_fallback_to_cwd(monkeypatch, tmp_path):

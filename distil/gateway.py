@@ -166,7 +166,7 @@ class GatewayState:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp = path.with_name(path.name + ".tmp")
-            tmp.write_text(json.dumps(data))
+            tmp.write_text(json.dumps(data), encoding="utf-8")
             os.replace(tmp, path)
         except OSError:
             pass  # best-effort — never let a failed save crash shutdown
@@ -175,7 +175,7 @@ class GatewayState:
         """Restore per-tenant counters written by :meth:`save` (best-effort)."""
         path = path or _state_path()
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return
         tenants = data.get("tenants", {}) if isinstance(data, dict) else {}

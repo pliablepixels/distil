@@ -77,7 +77,7 @@ class Trajectory:
 
     @staticmethod
     def load(path: str | Path) -> "Trajectory":
-        return Trajectory.from_dict(json.loads(Path(path).read_text()))
+        return Trajectory.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def to_dict(self) -> dict:
         return {
