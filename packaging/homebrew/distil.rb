@@ -1,24 +1,23 @@
 # Homebrew formula for Distil (PyPI: distil-llm).
 #
-# To use this formula:
+# CANONICAL COPY: https://github.com/dshakes/homebrew-tap (Formula/distil.rb).
+# CI's `bump-homebrew` release job rewrites the tap on every v* tag, so the tap
+# is always current; this in-repo copy is a reference snapshot and may lag.
+#
+# To install:
 #   brew tap dshakes/tap
 #   brew install dshakes/tap/distil
 #
-# Or clone this file into your own tap at:
-#   $(brew --repo)/Library/Taps/<yourname>/homebrew-tap/Formula/distil.rb
-#
-# RELEASE STEP: after pushing the v1.0.0 tag, recompute and paste the sha256 below:
-#   curl -sL https://github.com/dshakes/distil/archive/refs/tags/v1.0.0.tar.gz | shasum -a 256
-# (the placeholder sha256 will make `brew install` fail loudly until filled — by design,
-#  so a stale checksum can never silently install the wrong version.)
+# sha256 is for the v1.9.1 source tarball. To recompute for a new version:
+#   curl -sL https://github.com/dshakes/distil/archive/refs/tags/vX.Y.Z.tar.gz | shasum -a 256
 
 class Distil < Formula
   desc "Compression with a quality contract — context compression for LLM agentic runtimes"
   homepage "https://github.com/dshakes/distil"
-  url "https://github.com/dshakes/distil/archive/refs/tags/v1.0.0.tar.gz"
-  sha256 "REPLACE_WITH_v1.0.0_TARBALL_SHA256"
+  url "https://github.com/dshakes/distil/archive/refs/tags/v1.9.1.tar.gz"
+  sha256 "46a1da746d91fb59dbc8372d67326542dfcdb33b548fca1c30ecaa83bce34d9f"
   license "Apache-2.0"
-  version "1.0.0"
+  version "1.9.1"
 
   depends_on "python@3.12"
 
