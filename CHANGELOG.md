@@ -3,6 +3,15 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.10.1] — 2026-07-05 — Review follow-ups
+
+### Fixed
+- **No more 0-savings ledger rows.** A flush window that saved nothing (typical under `--lossless-only`) no longer writes a ledger row — session ledgers stay signal-only. Request accounting elsewhere is unchanged.
+- **Dedup markers are expand-recoverable.** The `«repeat of earlier tool output …»` marker now carries the `handle=` form that `distil expand` keys on, resolving to the byte-exact original.
+
+### Changed
+- **One statusline label for decision-equivalence.** `de 12/25` while collecting → `✓de 99.5% (n)` at 25+ samples (was `eq` for the rate form).
+
 ## [1.10.0] — 2026-07-05 — Production hardening: truly lossless, honest accounting, lifecycle fixes
 
 ### Fixed
