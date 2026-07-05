@@ -63,6 +63,7 @@ def simulate(
     name = strategy if isinstance(strategy, str) else getattr(strategy, "__name__", "custom")
 
     prev_hashes: list[str] | None = None
+    written: set[str] = set()  # block hashes already paid for at the cache-write price
     per_turn: list[TurnCost] = []
     total = 0.0
     total_input = 0
@@ -83,12 +84,21 @@ def simulate(
         read = sum(toks[:lcp])
         write = 0
         fresh = 0
-        for b, t in zip(blocks[lcp:], toks[lcp:]):
-            # cacheable blocks past the matched prefix are written to cache;
-            # volatile blocks are billed as plain fresh input.
+        for b, t, h in zip(blocks[lcp:], toks[lcp:], hashes[lcp:]):
             if caching and b.stability is not Stability.VOLATILE:
-                write += t
+                # write-once-then-read: a cacheable block pays the cache-WRITE price only
+                # the first turn its bytes appear; on later turns the same bytes are served
+                # at the cache-READ price, not re-written every turn. Billing write each
+                # turn inflated the baseline (and therefore the reported savings).
+                # ponytail: set-membership cache model — assumes entries live for the
+                #           simulated horizon, which holds for a per-trajectory sim.
+                if h in written:
+                    read += t
+                else:
+                    write += t
+                    written.add(h)
             else:
+                # volatile blocks are billed as plain fresh input.
                 fresh += t
 
         cost = (

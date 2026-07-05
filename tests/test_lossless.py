@@ -58,6 +58,26 @@ def test_tier1_digest_preserves_decision_lines():
     assert len(dtext) < len(text)
 
 
+def test_tier1_digest_keeps_high_salience_failure_lines():
+    """FIX 5: the salience net keeps failure/diagnostic lines byte-exact, not just
+    DECISION: markers — an agent usually needs these verbatim to react."""
+    text = "\n".join(
+        ["header noise line"] * 3
+        + [
+            "Traceback (most recent call last):",
+            "ValueError: bad input",
+            "WARNING: retry exhausted",
+        ]
+        + ["more noise"] * 6
+    )
+    dtext, changed = digest(text)
+    assert changed
+    assert "Traceback (most recent call last):" in dtext
+    assert "ValueError: bad input" in dtext
+    assert "WARNING: retry exhausted" in dtext
+    assert len(dtext) < len(text)  # still compresses the surrounding noise
+
+
 def test_tier1_keeps_full_original_behind_handle():
     text = "first\nsecond\nthird\nDECISION: keep\n" + "\n".join(f"noise{i}" for i in range(20))
     blocks = [Block("o", Kind.TOOL_OUTPUT, text, Stability.VOLATILE)]

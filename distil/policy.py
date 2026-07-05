@@ -7,7 +7,12 @@ violate provider terms (injected retrieval tools the user never authorized,
 rewritten history). So the *mode* gates which strategies are even allowed:
 
   * PAYG          — full toolbox, including lossy strategies and tool injection.
-  * SUBSCRIPTION  — lossless-only. No lossy compression, no tool injection.
+  * SUBSCRIPTION  — lossless-only. No lossy compression, no tool injection — and
+                    therefore no Tier-1 digest stubs either: with no expand tool
+                    injected the agent could never recover a stub, so it would be
+                    irreversibly lossy in context. lossless-only forces Tier-0-only
+                    (verbatim) at every proxy entry point (see build_handler /
+                    make_app / build_gateway_handler).
 
 This is a tightening boundary: a project can never loosen it.
 """

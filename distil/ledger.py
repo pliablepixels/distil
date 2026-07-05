@@ -12,16 +12,27 @@ from __future__ import annotations
 
 import html as _html
 import json
+import os
 import re
+import shutil
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    import fcntl  # POSIX advisory locking; absent on Windows
+
+    _HAVE_FCNTL = True
+except ImportError:  # pragma: no cover - Windows
+    _HAVE_FCNTL = False
+
+# Back up the ledger once it has grown this much past the last .bak (cheap, bounded).
+_BACKUP_GROWTH_BYTES = 256 * 1024
 
 
 def default_path() -> Path:
     """The ledger path, honoring ``DISTIL_HOME`` at call time (configurable
     deployments; isolated tests) — same contract as shadow/learn state."""
-    import os
 
     return Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil"))) / "savings.jsonl"
 
@@ -42,6 +53,9 @@ class SavingsRecord:
     tokenizer: str
     ts: float
     session: str = ""  # proxy-process session id — lets the statusline show THIS session
+    # Accounting-schema era: 2 = record-after-2xx (failed/retried requests excluded);
+    # absent/1 = legacy pre-1.10 accounting whose savings may be overstated.
+    acct: int = 2
 
     @property
     def dollars_saved(self) -> float:
@@ -79,9 +93,37 @@ def record(
     )
     path = path or default_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    _maybe_backup(path)
     with path.open("a") as f:
+        if _HAVE_FCNTL:
+            # Serialize appends from concurrent proxies (advisory; released on close)
+            # so interleaved writes can't corrupt a line.
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         f.write(json.dumps(asdict(rec)) + "\n")
     return rec
+
+
+def _maybe_backup(path: Path) -> None:
+    """Copy-then-atomic-rename the ledger to ``.bak`` once it has grown a
+    threshold past the last backup. Crash-safe: a reader never sees a half
+    file (the rename is atomic), and a failed copy leaves the old .bak intact."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return
+    bak = path.with_name(path.name + ".bak")
+    try:
+        bak_size = bak.stat().st_size
+    except OSError:
+        bak_size = 0
+    if size < bak_size + _BACKUP_GROWTH_BYTES:
+        return
+    tmp = path.with_name(path.name + ".bak.tmp")
+    try:
+        shutil.copy2(path, tmp)
+        os.replace(tmp, bak)
+    except OSError:
+        tmp.unlink(missing_ok=True)
 
 
 @dataclass
@@ -98,6 +140,12 @@ class LedgerSummary:
     # Which tokenizers produced the counts — so callers can caveat heuristic
     # (non-billing-grade) numbers instead of presenting them as exact.
     tokenizers: frozenset[str] = frozenset()
+    # Ledger lines that failed to parse (corruption/partial writes) — surfaced so
+    # a truncated file is visible, not silently under-counted.
+    corrupt_lines: int = 0
+    # Rows written before the record-after-2xx fix (acct absent/<2): still counted,
+    # but their savings may be overstated (failed/retried requests were booked).
+    legacy_records: int = 0
 
 
 def latest_session(path: Path | None = None) -> tuple[str, float]:
@@ -106,16 +154,20 @@ def latest_session(path: Path | None = None) -> tuple[str, float]:
     path = path or default_path()
     best_id, best_ts = "", 0.0
     try:
-        for line in path.read_text().splitlines():
-            if not line.strip():
-                continue
+        lines = path.read_text().splitlines()
+    except OSError:
+        return best_id, best_ts
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
             d = json.loads(line)
             sid = d.get("session") or ""
             ts = d.get("ts", 0.0)
-            if sid and ts >= best_ts:
-                best_id, best_ts = sid, ts
-    except OSError:
-        pass
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            continue  # skip a corrupt/partial line rather than crash the status line
+        if sid and ts >= best_ts:
+            best_id, best_ts = sid, ts
     return best_id, best_ts
 
 
@@ -136,26 +188,48 @@ def summary(
     dist_usd = 0.0
     by_traj: dict[str, float] = {}
     toks: set[str] = set()
+    corrupt = 0
+    legacy = 0
     for line in path.read_text().splitlines():
         if not line.strip():
             continue
-        d = json.loads(line)
-        if since is not None and d.get("ts", 0.0) < since:
-            continue
-        if session is not None and (d.get("session") or "") != session:
+        try:
+            d = json.loads(line)
+            if since is not None and d.get("ts", 0.0) < since:
+                continue
+            if session is not None and (d.get("session") or "") != session:
+                continue
+            saved = d["baseline_dollars"] - d["distil_dollars"]
+            base_in = d["baseline_input_tokens"]
+            dist_in = d["distil_input_tokens"]
+            traj = d["trajectory_id"]
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            corrupt += 1  # partial/corrupt line — count it so truncation is visible
             continue
         runs += 1
+        acct = d.get("acct")
+        if not isinstance(acct, int) or acct < 2:
+            legacy += 1  # pre-1.10 accounting era (missing/old acct schema)
         toks.add(d.get("tokenizer", "heuristic"))
-        saved = d["baseline_dollars"] - d["distil_dollars"]
         dollars += saved
-        tokens += d["baseline_input_tokens"] - d["distil_input_tokens"]
-        base_tok += d["baseline_input_tokens"]
-        dist_tok += d["distil_input_tokens"]
+        tokens += base_in - dist_in
+        base_tok += base_in
+        dist_tok += dist_in
         base_usd += d["baseline_dollars"]
         dist_usd += d["distil_dollars"]
-        by_traj[d["trajectory_id"]] = by_traj.get(d["trajectory_id"], 0.0) + saved
+        by_traj[traj] = by_traj.get(traj, 0.0) + saved
     return LedgerSummary(
-        runs, dollars, tokens, by_traj, base_tok, dist_tok, base_usd, dist_usd, frozenset(toks)
+        runs,
+        dollars,
+        tokens,
+        by_traj,
+        base_tok,
+        dist_tok,
+        base_usd,
+        dist_usd,
+        frozenset(toks),
+        corrupt,
+        legacy,
     )
 
 
@@ -184,6 +258,11 @@ def render_html(
         if live
         else "Run <code>distil proxy</code> to record genuine savings from real traffic."
     )
+    if s.legacy_records:
+        note += (
+            f" Includes {s.legacy_records:,} record(s) from pre-1.10 accounting "
+            "— savings for those may be overstated."
+        )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Distil — your savings</title><style>
@@ -360,4 +439,11 @@ def render_dashboard(
             out.append(row(f"{label:<17}{c('36', _bar(val / mx, 12))}{tail}"))
 
     out.append(bot)
+    if s.legacy_records:
+        out.append(
+            c(
+                "90",
+                f"{s.legacy_records:,} record(s) from pre-1.10 accounting — savings may be overstated",
+            )
+        )
     return "\n".join(out)

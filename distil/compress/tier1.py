@@ -14,6 +14,7 @@ auditable, not a blind truncation.
 from __future__ import annotations
 
 import hashlib
+import re
 
 from ..trajectory import Block, Kind
 from .base import CompressResult
@@ -25,8 +26,21 @@ def _handle(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:8]
 
 
+# Heuristic salience net, pending the learned per-content-type salience model the
+# module docstring describes. Beyond explicit DECISION: markers, keep the lines an
+# agent most often needs verbatim to react: errors, exceptions, tracebacks,
+# failures, warnings, panics. Substring + case-insensitive so camelCase exception
+# names ("ValueError") and variants ("failed", "errors", "warn") all match — for a
+# salience net a stray keep (a rare "terror") only costs a little compression, while
+# a miss costs the agent the line, so we deliberately bias toward over-keeping.
+_KEEP_RE = re.compile(
+    r"error|exception|traceback|fail|warn|panic|fatal",
+    re.IGNORECASE,
+)
+
+
 def _must_keep(line: str) -> bool:
-    return "DECISION:" in line
+    return "DECISION:" in line or _KEEP_RE.search(line) is not None
 
 
 def digest(text: str, head: int = 3, tail: int = 1) -> tuple[str, bool]:

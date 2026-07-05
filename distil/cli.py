@@ -633,6 +633,11 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     else ("✗", "38;5;196")
                 )
                 parts.append(c(hue, f"{glyph}eq {eq * 100:.1f}%") + c("38;5;73", f" ({n_str})"))
+            elif led.samples > 0:
+                # Below 25 samples we don't claim a rate (a % over a handful is noise),
+                # but we do show collection progress so decision-equivalence reads as
+                # "warming up" rather than absent. ponytail: skip the 0-sample case.
+                parts.append(c("38;5;73", f"de {led.samples}/25"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
@@ -646,6 +651,34 @@ def cmd_version(args: argparse.Namespace) -> int:
     (argparse's --version flag stays too)."""
     print(f"distil {__version__}")
     return 0
+
+
+def _warn_running_proxies() -> None:
+    """Warn if a distil proxy/wrap/gateway is running before an in-place upgrade.
+
+    An upgrade swaps the package files under any live process, which then keeps its
+    already-loaded (now stale) modules and can hit version skew if it lazily imports
+    a post-upgrade file mid-serve. Best-effort: pgrep may be absent (Windows) or
+    fail — never let that break the upgrade."""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["pgrep", "-f", "distil (wrap|proxy|gateway|serve)"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        hits = out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:  # noqa: BLE001 — pgrep missing/unsupported; skip the check
+        return
+    if hits:
+        n = len(hits.splitlines())
+        print(
+            f"⚠ {n} running distil proxy process(es) detected — restart them after the "
+            "upgrade so they pick up the new code (a live proxy keeps the old modules "
+            "and can hit version skew mid-request)."
+        )
 
 
 def cmd_upgrade(args: argparse.Namespace) -> int:
@@ -671,6 +704,7 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
     if cmd.strip().startswith("#") or "inside your venv" in cmd:
         print("  run that yourself in the right environment.")
         return 0
+    _warn_running_proxies()
     rc = subprocess.run(cmd, shell=True).returncode
     if rc == 0:
         print("✓ upgraded — run `distil version` to confirm")
@@ -2145,6 +2179,12 @@ def main(argv: list[str] | None = None) -> int:
     except json.JSONDecodeError as e:
         path = getattr(args, "trajectory", None) or getattr(args, "outcomes", None) or "input"
         print(f"distil {getattr(args, 'cmd', '')}: {path} is not valid JSON — {e}", file=sys.stderr)
+        return 2
+    except OSError as e:
+        # e.g. EADDRINUSE when a proxy/gateway port is already taken, or any other
+        # OS-level failure the specific handlers above didn't catch — a one-line
+        # message beats a full traceback for what is almost always a user setup issue.
+        print(f"distil {getattr(args, 'cmd', '')}: {e}", file=sys.stderr)
         return 2
 
     # The status line is piped to a consumer (Claude Code) that may close the

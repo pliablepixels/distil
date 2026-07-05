@@ -37,9 +37,10 @@ EXPAND_TOOL: dict[str, Any] = {
     "name": EXPAND_TOOL_NAME,
     "description": (
         "Recover the full original content of a context block that Distil digested to "
-        "save tokens. Digested blocks appear as a marker like "
-        "'<< +N lines, handle=XXXXXXXX >>' (or a «…» columnar/template marker). Call this "
-        "with that handle whenever you need detail that was elided to make your decision."
+        "save tokens. A digested block carries a marker containing 'handle=XXXXXXXX' — "
+        "e.g. '<< +N lines, handle=XXXXXXXX >>', a «… handle=XXXXXXXX» columnar/template "
+        "marker, or '<<distil elided, handle=XXXXXXXX>>' for a skeletonized block. Call "
+        "this with that handle whenever you need detail that was elided to decide."
     ),
     "input_schema": {
         "type": "object",

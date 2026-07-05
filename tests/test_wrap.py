@@ -17,6 +17,8 @@ tr = "get_logs()\n" + "\n".join("info: verbose log line %d" % i for i in range(4
 body = json.dumps({"model": "claude-opus-4-8", "messages": [
     {"role": "user", "content": "go"},
     {"role": "user", "content": [{"type": "tool_result", "content": tr}]},
+    {"role": "user", "content": "next"},
+    {"role": "user", "content": "next"},
 ]}).encode()
 req = urllib.request.Request(base + "/v1/messages", data=body,
                             headers={"Content-Type": "application/json"}, method="POST")
@@ -87,3 +89,29 @@ def test_cmd_wrap_strips_separator_and_rejects_empty():
         pricing="claude-opus-4-8",
     )
     assert cmd_wrap(ns) == 2  # only the separator → nothing to run
+
+
+def test_wrap_run_restores_terminal_on_child_exit(monkeypatch):
+    """FIX 3: wrap_run restores the tty mode after the child exits, so an agent that
+    dies in raw mode never leaves the user's shell wedged."""
+    import termios
+
+    sentinel = ["saved-termios-state"]
+    calls: list = []
+
+    class _FakeStdin:
+        def isatty(self) -> bool:
+            return True
+
+        def fileno(self) -> int:
+            return 0
+
+    monkeypatch.setattr(sys, "stdin", _FakeStdin())
+    monkeypatch.setattr(termios, "tcgetattr", lambda fd: sentinel)
+    monkeypatch.setattr(
+        termios, "tcsetattr", lambda fd, when, attrs: calls.append((fd, when, attrs))
+    )
+
+    rc = proxy.wrap_run(["true"], record=False)
+    assert rc == 0
+    assert calls == [(0, termios.TCSADRAIN, sentinel)]  # restored once, with saved state

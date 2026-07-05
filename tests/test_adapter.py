@@ -34,6 +34,11 @@ LONG_TOOL_RESULT = "\n".join(
 
 SHORT_TOOL_RESULT = "\n".join(["line one", "line two", "line three"])  # 3 lines — below threshold
 
+# Two trailing user turns push an earlier tool_result out of the recency-exempt
+# window (anthropic._RECENCY_KEEP_TURNS = 2), so it is eligible for Tier-1 digestion
+# again. The most recent K turns are always kept verbatim (see test_recency_*).
+_PAD = [{"role": "user", "content": "next"}, {"role": "user", "content": "next"}]
+
 
 def _make_tool_result_message(content: str | list) -> dict:
     return {
@@ -73,7 +78,8 @@ class TestRestoreStore:
 class TestCompressMessagesLongToolResult:
     def setup_method(self) -> None:
         self.msg = _make_tool_result_message(LONG_TOOL_RESULT)
-        self.new_messages, self.store = compress_messages([self.msg])
+        # _PAD keeps self.msg out of the recency-exempt window so it still digests.
+        self.new_messages, self.store = compress_messages([self.msg, *_PAD])
 
     def test_output_is_new_list(self) -> None:
         assert self.new_messages != [self.msg]
@@ -205,7 +211,7 @@ class TestVerbatimParam:
     def test_default_does_digest(self) -> None:
         """Default mode keeps the aggressive reversible digest — the moat."""
         msg = _make_tool_result_message(LONG_TOOL_RESULT)
-        _new, store = compress_messages([msg], verbatim=False)
+        _new, store = compress_messages([msg, *_PAD], verbatim=False)
         assert len(store.handles) == 1  # digested, recoverable via the store
 
 
@@ -218,7 +224,7 @@ class TestListToolResultContent:
     def test_long_list_content_digested(self) -> None:
         content_list = [{"type": "text", "text": LONG_TOOL_RESULT}]
         msg = _make_tool_result_message(content_list)
-        new_messages, store = compress_messages([msg])
+        new_messages, store = compress_messages([msg, *_PAD])
         compressed_sub = new_messages[0]["content"][0]["content"][0]["text"]
         assert "handle=" in compressed_sub
         assert len(store.handles) == 1
@@ -226,7 +232,7 @@ class TestListToolResultContent:
     def test_original_recoverable_from_list_content(self) -> None:
         content_list = [{"type": "text", "text": LONG_TOOL_RESULT}]
         msg = _make_tool_result_message(content_list)
-        _, store = compress_messages([msg])
+        _, store = compress_messages([msg, *_PAD])
         handle = next(iter(store.handles))
         assert store.expand(handle) == LONG_TOOL_RESULT
 
@@ -299,20 +305,37 @@ class TestWrap:
         assert result["id"] == "msg_fake"
         assert len(fake._calls) == 1  # type: ignore[attr-defined]
 
-    def test_wrap_compresses_before_delegating(self) -> None:
+    def test_wrap_compresses_verbatim_no_unrecoverable_stub(self) -> None:
+        # wrap() runs in verbatim mode: it must NEVER emit a Tier-1 digest stub, since
+        # the in-process wrapper has no server-side expand loop to recover it (F2). Plain
+        # text (no lossless transform applies) is therefore passed through byte-exact.
         fake = self._make_fake_client()
         client = wrap(fake)
         long_msg = _make_tool_result_message(LONG_TOOL_RESULT)
         client.messages.create(
             model="claude-opus-4-5",
             max_tokens=1024,
-            messages=[long_msg],
+            messages=[long_msg, *_PAD],
         )
         received_msgs = fake._calls[0]["messages"]  # type: ignore[attr-defined]
         compressed_content = received_msgs[0]["content"][0]["content"]
-        # The long tool_result should have been digested.
-        assert "handle=" in compressed_content
-        assert len(compressed_content) < len(LONG_TOOL_RESULT)
+        assert "handle=" not in compressed_content  # no unrecoverable digest stub
+        assert compressed_content == LONG_TOOL_RESULT  # verbatim: byte-exact passthrough
+
+    def test_wrap_applies_lossless_tier0(self) -> None:
+        # Verbatim still shrinks where it is provably lossless: a whitespace-padded JSON
+        # tool_result is minified (semantically identical, fewer tokens), never stubbed.
+        fake = self._make_fake_client()
+        client = wrap(fake)
+        padded = '{\n    "a": 1,\n    "b": [1, 2, 3]\n}'
+        msg = _make_tool_result_message(padded)
+        client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=1024,
+            messages=[msg, *_PAD],
+        )
+        received = fake._calls[0]["messages"][0]["content"][0]["content"]  # type: ignore[attr-defined]
+        assert received == '{"a":1,"b":[1,2,3]}'
 
     def test_wrap_applies_cache_control_when_system_present(self) -> None:
         fake = self._make_fake_client()
@@ -352,6 +375,7 @@ def test_openai_tool_message_is_digested_and_reversible():
     messages = [
         {"role": "user", "content": "investigate"},
         {"role": "tool", "tool_call_id": "c1", "content": long},
+        *_PAD,  # keep the tool turn out of the recency-exempt window so it digests
     ]
     out, store = compress_messages(messages)
     tool_msg = out[1]
@@ -369,3 +393,71 @@ def test_tier0_never_inflates_tokens_on_blank_runs():
     new_messages, _store = compress_messages([{"role": "user", "content": text}], verbatim=True)
     seen = new_messages[0]["content"]
     assert _tok.count(seen) <= _tok.count(text)  # never inflates
+
+
+# ---------------------------------------------------------------------------
+# FIX 1 — recency exemption: latest tool outputs are never digested
+# ---------------------------------------------------------------------------
+
+
+def _tr(tid: str, content: str) -> dict:
+    return {
+        "role": "user",
+        "content": [{"type": "tool_result", "tool_use_id": tid, "content": content}],
+    }
+
+
+def _has_handle(msg: dict) -> bool:
+    c = msg["content"][0]["content"]
+    return isinstance(c, str) and "handle=" in c
+
+
+def _log_body(tag: str) -> str:
+    return "\n".join(f"{tag} verbose log line {i}" for i in range(20))
+
+
+def test_recent_toolresults_kept_verbatim_older_are_digested() -> None:
+    """The last _RECENCY_KEEP_TURNS tool-output turns must stay byte-exact so the
+    agent always sees its most recent outputs; older ones still digest."""
+    asst = {"role": "assistant", "content": [{"type": "text", "text": "thinking"}]}
+    msgs = [
+        _tr("t1", _log_body("t1")),
+        asst,
+        _tr("t2", _log_body("t2")),
+        asst,
+        _tr("t3", _log_body("t3")),
+        asst,
+        _tr("t4", _log_body("t4")),
+    ]  # tool turns at indices 0, 2, 4, 6; the last two (4, 6) are recency-exempt
+    out, store = compress_messages(msgs)
+    assert _has_handle(out[0]) and _has_handle(out[2])  # older → digested
+    assert not _has_handle(out[4]) and not _has_handle(out[6])  # recent → verbatim
+    assert out[6]["content"][0]["content"] == _log_body("t4")  # byte-exact
+
+
+def test_recency_helper_counts_only_user_and_tool_turns() -> None:
+    from distil.adapters.anthropic import _RECENCY_KEEP_TURNS, _recent_verbatim_indices
+
+    msgs = [
+        {"role": "user", "content": "q"},
+        {"role": "assistant", "content": "a"},  # never counts toward recency
+        {"role": "user", "content": "b"},
+        {"role": "tool", "content": "c"},
+    ]
+    assert _recent_verbatim_indices(msgs, _RECENCY_KEEP_TURNS) == {2, 3}
+    assert _recent_verbatim_indices(msgs, 0) == set()
+
+
+def test_verbatim_never_emits_handles_across_all_turns() -> None:
+    """FIX 2: lossless-only maps to verbatim at every proxy; verbatim must yield
+    zero Tier-1 handles anywhere — no stub the agent cannot recover."""
+    asst = {"role": "assistant", "content": [{"type": "text", "text": "x"}]}
+    msgs = [
+        _tr("t1", _log_body("t1")),
+        asst,
+        _tr("t2", _log_body("t2")),
+        asst,
+        _tr("t3", _log_body("t3")),
+    ]
+    _out, store = compress_messages(msgs, verbatim=True)
+    assert store.handles == frozenset()

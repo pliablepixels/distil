@@ -12,7 +12,16 @@ BIG = "\n".join(f"row {i}: value_{i} status=ok detail=lorem" for i in range(40))
 
 
 def test_litellm_compress_compresses_messages():
-    kwargs = {"model": "x", "messages": [{"role": "tool", "content": BIG}]}
+    # Trailing turns keep the tool message out of the recency-exempt window (the
+    # adapter keeps the most recent turns verbatim) so it still digests.
+    kwargs = {
+        "model": "x",
+        "messages": [
+            {"role": "tool", "content": BIG},
+            {"role": "user", "content": "next"},
+            {"role": "user", "content": "next"},
+        ],
+    }
     out = dll.compress(kwargs)
     assert out["messages"][0]["content"] != BIG
     assert len(out["messages"][0]["content"]) < len(BIG)

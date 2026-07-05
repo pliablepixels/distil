@@ -104,7 +104,11 @@ def test_aproxy_openai_chat_completions_compressed() -> None:
                         {
                             "role": "user",
                             "content": [{"type": "tool_result", "content": _LONG_TOOL_RESULT}],
-                        }
+                        },
+                        # Two later turns keep the tool_result out of the
+                        # recency-exempt window so it still digests.
+                        {"role": "user", "content": "next"},
+                        {"role": "user", "content": "next"},
                     ],
                 }
                 resp = await client.post(

@@ -3,6 +3,23 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.10.0] — 2026-07-05 — Production hardening: truly lossless, honest accounting, lifecycle fixes
+
+### Fixed
+
+- **`--lossless-only` is now truly lossless (no Tier-1 stubs).** Previously a Tier-1 reversible digest stub could appear in a lossless-only session — but without an injected expand tool the agent could never recover it, making the stub effectively irreversible. The flag now folds directly into verbatim (Tier-0-only) at all three proxy entry points (`aproxy`, `proxy`, `gateway`). No separate `--verbatim` flag needed.
+- **Recoverable digests everywhere.** All four digest forms (Tier-1, columnar, template, skeleton) now emit `handle=` markers backed by the RestoreStore. Originals persist to `~/.distil/restore/` (respecting `DISTIL_HOME`) and survive proxy restarts — `distil expand <handle>` works across sessions.
+- **Honest savings accounting (numbers dip — that means they became correct).** Records are booked only after a confirmed 2xx response; failed or retried requests are no longer counted. New ledger rows carry `acct:2`; mixed-era ledgers print a footnote: "(includes N records from pre-1.10 accounting — savings may be overstated)". The cache simulator is now write-once-then-read, eliminating a double-counting path.
+- **Terminal corruption fixed.** `distil wrap` now saves and restores the terminal state (`termios`) on exit, so a wrapped agent that dies mid-output no longer leaves the terminal in raw mode.
+- **Upgrade version-skew warning.** `distil upgrade` now detects running proxy/wrap/gateway processes and warns to restart them — a live proxy loaded pre-upgrade modules can hit a version-skew crash on lazy import mid-request.
+- **Decision-equivalence in statusline.** The `✓/⚠/✗ eq <rate>% (n)` display now appears only at ≥ 25 shadow samples; below that threshold it is suppressed everywhere (statusline, leaderboard, doctor, dashboard) — a rate over a handful of samples is noise, not a guarantee.
+- **Ledger resilience.** Corrupt lines are tolerated (skipped with a warning rather than crashing the whole read), cross-process writes use advisory file locking, and a backup is kept on each write cycle.
+- **Gateway persistence and tenant cap enforced at state load.** Per-tenant accounting persists across restarts; the tenant cap is checked at state-load time, not only at request time.
+
+### Added
+
+- `tests/test_live_certified_equivalence.py` — pins the live proxy's compression decisions to the certified strategy, making any drift a visible, reviewed change. The one documented intentional delta: a recency carve-out keeps the last few tool-result turns verbatim so the agent always sees its freshest output byte-exact.
+
 ## [1.8.1] — 2026-07-04 — Believe-it UX + honest ▼0
 
 ### Fixed

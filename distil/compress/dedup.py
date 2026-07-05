@@ -30,7 +30,7 @@ def _handle(text: str) -> str:
 class StreamingDedup:
     def __init__(self, min_chars: int = 160) -> None:
         self.min_chars = min_chars
-        self._seen: dict[str, int] = {}
+        self._seen: dict[str, tuple[int, str]] = {}  # handle -> (first turn, exact text)
         self._last_turn = -1
 
     def reset(self) -> None:
@@ -52,14 +52,23 @@ class StreamingDedup:
             )
             if eligible:
                 h = _handle(b.text)
-                if h in self._seen:
-                    restore[h] = b.text  # byte-exact original, expandable
-                    out.append(
-                        b.copy_with(
-                            f"«repeat of earlier tool output {h} (first seen turn {self._seen[h]})»"
+                seen = self._seen.get(h)
+                if seen is not None:
+                    first_turn, seen_text = seen
+                    # Only claim a repeat if the bytes actually match. On an 8-hex
+                    # collision (same handle, different text) emitting the marker would
+                    # tell the model this block equals an unrelated earlier one — pass
+                    # it through verbatim instead.
+                    if seen_text == b.text:
+                        restore[h] = b.text  # byte-exact original, expandable
+                        out.append(
+                            b.copy_with(
+                                f"«repeat of earlier tool output {h} (first seen turn {first_turn})»"
+                            )
                         )
-                    )
+                        continue
+                    out.append(b)
                     continue
-                self._seen[h] = turn
+                self._seen[h] = (turn, b.text)
             out.append(b)
         return out, restore

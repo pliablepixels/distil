@@ -112,7 +112,12 @@ def test_compressible_path_digests_tool_result() -> None:
                                 "content": _LONG_TOOL_RESULT,
                             }
                         ],
-                    }
+                    },
+                    # Two later turns keep the tool_result out of the
+                    # recency-exempt window (adapter keeps the most recent
+                    # K turns verbatim) so it still digests.
+                    {"role": "user", "content": "next"},
+                    {"role": "user", "content": "next"},
                 ]
                 payload = {
                     "model": "claude-opus-4-5",

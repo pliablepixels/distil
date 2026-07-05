@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import threading
 import time
 from collections import deque
@@ -292,21 +293,19 @@ def decision_signature_from_body(raw: Any) -> str:
 
 
 class ShadowSampler:
-    """Deterministic 1-in-N sampling (even, testable, thread-safe). ``rate`` in
-    (0,1]; rate<=0 disables shadowing."""
+    """Probabilistic sampling: each request is shadowed independently with
+    probability ``rate`` (in (0,1]; rate<=0 disables shadowing). Pass a seeded
+    ``rng`` for deterministic tests. Independent draws avoid the phase-locking a
+    fixed 1-in-N stride can hit against periodic traffic."""
 
-    def __init__(self, rate: float) -> None:
+    def __init__(self, rate: float, *, rng: random.Random | None = None) -> None:
         self.rate = max(0.0, min(1.0, rate))
-        self._stride = int(round(1.0 / self.rate)) if self.rate > 0 else 0
-        self._n = 0
-        self._lock = threading.Lock()
+        self._rng = rng or random
 
     def should_sample(self) -> bool:
-        if self._stride <= 0:
+        if self.rate <= 0:
             return False
-        with self._lock:
-            self._n += 1
-            return self._n % self._stride == 0
+        return self._rng.random() < self.rate
 
 
 @dataclass

@@ -160,11 +160,18 @@ def test_compare_decisions():
     assert compare_decisions(text, text) is True
 
 
-def test_sampler_is_deterministic_one_in_n():
-    s = ShadowSampler(0.2)  # 1 in 5
-    hits = [s.should_sample() for _ in range(20)]
-    assert sum(hits) == 4  # exactly 20/5
+def test_sampler_is_probabilistic_and_seedable():
+    import random
+
+    # Same seed → identical draw sequence, so shadow tests stay deterministic.
+    a = ShadowSampler(0.2, rng=random.Random(42))
+    b = ShadowSampler(0.2, rng=random.Random(42))
+    assert [a.should_sample() for _ in range(50)] == [b.should_sample() for _ in range(50)]
+    # ~10 expected at rate 0.2 over 50 draws; wide band, just not degenerate.
+    c = ShadowSampler(0.2, rng=random.Random(7))
+    assert 2 <= sum(c.should_sample() for _ in range(50)) <= 18
     assert ShadowSampler(0.0).should_sample() is False  # disabled
+    assert all(ShadowSampler(1.0).should_sample() for _ in range(10))  # rate 1 always samples
 
 
 def test_ledger_records_and_rates(tmp_path):
@@ -194,8 +201,11 @@ def test_ledger_load_roundtrip(tmp_path):
 
 
 def _anthropic_edit(new_str: str) -> dict:
-    return {"content": [{"type": "tool_use", "name": "Edit",
-                         "input": {"path": "x.py", "new_str": new_str}}]}
+    return {
+        "content": [
+            {"type": "tool_use", "name": "Edit", "input": {"path": "x.py", "new_str": new_str}}
+        ]
+    }
 
 
 def test_edit_equivalence_ignores_formatting_and_comments():
@@ -212,17 +222,56 @@ def test_edit_equivalence_detects_real_logic_change():
 
 
 def test_non_code_inputs_still_distinguished():
-    s1 = decision_signature({"content": [{"type": "tool_use", "name": "weather", "input": {"city": "SF"}}]})
-    s2 = decision_signature({"content": [{"type": "tool_use", "name": "weather", "input": {"city": "NYC"}}]})
+    s1 = decision_signature(
+        {"content": [{"type": "tool_use", "name": "weather", "input": {"city": "SF"}}]}
+    )
+    s2 = decision_signature(
+        {"content": [{"type": "tool_use", "name": "weather", "input": {"city": "NYC"}}]}
+    )
     assert s1 != s2 and s1.startswith("tool:")
 
 
 def test_edit_equivalence_openai_arguments():
     import json as _j
-    a = decision_signature({"choices": [{"message": {"tool_calls": [
-        {"function": {"name": "Edit", "arguments": _j.dumps({"new_str": "def f():\n    return 1"})}}]}}]})
-    b = decision_signature({"choices": [{"message": {"tool_calls": [
-        {"function": {"name": "Edit", "arguments": _j.dumps({"new_str": "def f():\n\n    return 1  # x"})}}]}}]})
+
+    a = decision_signature(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "Edit",
+                                    "arguments": _j.dumps({"new_str": "def f():\n    return 1"}),
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    )
+    b = decision_signature(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "Edit",
+                                    "arguments": _j.dumps(
+                                        {"new_str": "def f():\n\n    return 1  # x"}
+                                    ),
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    )
     assert a == b
 
 
@@ -230,10 +279,10 @@ def test_edit_equivalence_holds_across_streaming():
     # Streamed and non-streamed forms of the same edit must still match (shared sig path).
     nonstream = decision_signature(_anthropic_edit("def f():\n    return 1"))
     sse = (
-        'event: content_block_start\n'
+        "event: content_block_start\n"
         'data: {"type":"content_block_start","index":0,'
         '"content_block":{"type":"tool_use","id":"t","name":"Edit","input":{}}}\n\n'
-        'event: content_block_delta\n'
+        "event: content_block_delta\n"
         'data: {"type":"content_block_delta","index":0,'
         '"delta":{"type":"input_json_delta","partial_json":"{\\"path\\": \\"x.py\\", \\"new_str\\": \\"def f():\\\\n    return 1\\"}"}}\n\n'
     )
@@ -244,18 +293,38 @@ def test_shadow_discriminates_changed_decision_cross_provider():
     """Shadow must flag a *changed* next action (not just confirm matches) for
     every provider's response shape — the basis of cross-provider validation."""
     # OpenAI — same tool, different target argument → changed
-    oa_a = {"choices": [{"message": {"tool_calls": [
-        {"function": {"name": "edit", "arguments": '{"path":"a.py"}'}}]}}]}
-    oa_b = {"choices": [{"message": {"tool_calls": [
-        {"function": {"name": "edit", "arguments": '{"path":"b.py"}'}}]}}]}
+    oa_a = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [{"function": {"name": "edit", "arguments": '{"path":"a.py"}'}}]
+                }
+            }
+        ]
+    }
+    oa_b = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [{"function": {"name": "edit", "arguments": '{"path":"b.py"}'}}]
+                }
+            }
+        ]
+    }
     assert compare_decisions(oa_a, oa_a) is True
     assert compare_decisions(oa_a, oa_b) is False
 
     # Gemini — different function name → changed
-    gm_a = {"candidates": [{"content": {"parts": [
-        {"functionCall": {"name": "read", "args": {"f": "x"}}}]}}]}
-    gm_b = {"candidates": [{"content": {"parts": [
-        {"functionCall": {"name": "write", "args": {"f": "x"}}}]}}]}
+    gm_a = {
+        "candidates": [
+            {"content": {"parts": [{"functionCall": {"name": "read", "args": {"f": "x"}}}]}}
+        ]
+    }
+    gm_b = {
+        "candidates": [
+            {"content": {"parts": [{"functionCall": {"name": "write", "args": {"f": "x"}}}]}}
+        ]
+    }
     assert compare_decisions(gm_a, gm_a) is True
     assert compare_decisions(gm_a, gm_b) is False
 

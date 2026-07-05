@@ -18,8 +18,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from distil.proxy import build_handler
 
 _DELAY = 0.6  # upstream pause between chunks; first byte must beat this
-_CHUNK1 = b'event: content_block_delta\ndata: {"delta":{"text":"hello"}}\n\n'
-_CHUNK2 = b"event: message_stop\ndata: {}\n\n"
+# Realistic Anthropic SSE deltas (with the `type` fields real streams carry) so the
+# decision signature reconstructs to a real "text" decision, not "none" — shadow
+# recording deliberately skips "none" signatures (transient/unparseable responses).
+_CHUNK1 = (
+    b"event: content_block_delta\n"
+    b'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}\n\n'
+)
+_CHUNK2 = b'event: message_stop\ndata: {"type":"message_stop"}\n\n'
 
 
 def _start_sse_upstream(delay: float = _DELAY) -> ThreadingHTTPServer:

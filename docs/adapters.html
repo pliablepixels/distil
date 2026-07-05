@@ -192,7 +192,7 @@ genai.configure(
       <tbody>
         <tr><td><code>--port</code></td><td><code>8788</code></td><td>Port to listen on</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL (no trailing slash)</td></tr>
-        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: Tier-0 verbatim only — no lossy output-shaping, no tool injection (<code>--expand</code>), no Tier-1 digest stubs. Folds directly into verbatim (no separate <code>--verbatim</code> needed). Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest entirely; Tier-0 only (JSON minify + collapse exact-duplicate runs). The model sees message content essentially verbatim. Use for interactive sessions or where <code>distil_expand</code> is unavailable. Lower savings.</td></tr>
       </tbody>
     </table>
@@ -311,7 +311,7 @@ distil proxy listening on http://127.0.0.1:8788
 
     <h3>Verbatim and lossless-only modes</h3>
     <p><code>--verbatim</code> is the Tier-0-only mode for all adapters, including Gemini: the Tier-1 digest is skipped entirely, so the model sees message content byte-for-byte (JSON minify + exact-duplicate-run collapse only). Use it for interactive (human-in-the-loop) sessions, out-of-distribution traffic, or anywhere <code>distil_expand</code> recovery is unavailable. Lower savings.</p>
-    <p><code>--lossless-only</code> is the policy mode: it restricts the proxy to lossless strategies — no lossy output-shaping, no tool injection (<code>--expand</code>) — but the reversible Tier-1 digest <em>still runs</em>. This is the correct flag for subscription or OAuth-gated deployments.</p>
+    <p><code>--lossless-only</code> is the policy mode: it restricts the proxy to Tier-0 verbatim — no lossy output-shaping, no tool injection (<code>--expand</code>), and no Tier-1 digest stubs either (without an expand tool the agent cannot recover a stub, so the flag folds directly into verbatim). This is the correct flag for subscription or OAuth-gated deployments; no separate <code>--verbatim</code> is needed.</p>
 
     <hr/>
 

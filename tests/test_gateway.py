@@ -62,7 +62,11 @@ def _messages_payload(tool_result_text: str = _LONG_TOOL_RESULT) -> dict[str, An
                         "content": tool_result_text,
                     }
                 ],
-            }
+            },
+            # Later turns keep the tool_result out of the recency-exempt window
+            # (the adapter keeps the most recent turns verbatim) so it still digests.
+            {"role": "user", "content": "next"},
+            {"role": "user", "content": "next"},
         ],
     }
 

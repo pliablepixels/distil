@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 from distil import ledger
 from distil.cli import cmd_statusline
@@ -21,6 +23,17 @@ def test_humanize_tokens():
     assert ledger._human(999) == "999"
     assert ledger._human(14_417) == "14.4K"
     assert ledger._human(1_200_000) == "1.2M"
+
+
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_env(monkeypatch, tmp_path):
+    """A real wrap session exports DISTIL_SESSION (switching the live slice to
+    session= lookups) and the de segment reads $DISTIL_HOME/shadow.jsonl — both
+    must be pinned or these tests' results depend on the developer's machine."""
+    monkeypatch.delenv("DISTIL_SESSION", raising=False)
+    monkeypatch.setenv("DISTIL_HOME", str(tmp_path / "distil-home"))
 
 
 def _run(monkeypatch, capsys, summary, recent=None, stdin="{}", no_color=True):
@@ -337,7 +350,8 @@ def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
     led.recent.append(1)
     monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
     _rc, out = _run(monkeypatch, capsys, s)
-    assert "eq" not in out
+    assert "eq" not in out  # no rate claimed below 25 samples
+    assert "de 1/25" in out  # FIX 6: but collection progress is shown ("warming up")
 
 
 def test_zero_savings_session_says_watching(monkeypatch, capsys, tmp_path):
@@ -390,6 +404,13 @@ def test_total_segment_identical_across_all_states(monkeypatch, capsys):
 
     monkeypatch.setenv("DISTIL_SUBSCRIPTION", "1")
     monkeypatch.setattr(led_mod, "latest_session", lambda *a, **k: ("", 0.0))
+    # Isolate the total-consistency invariant from the shadow segment: real on-disk
+    # samples would otherwise append eq/de after `total ▼`, which this test asserts is last.
+    import distil.shadow as _shadow
+
+    monkeypatch.setattr(
+        _shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _shadow.ShadowLedger())
+    )
     life = ledger.LedgerSummary(
         9,
         0.0,

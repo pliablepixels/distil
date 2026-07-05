@@ -167,7 +167,7 @@ GATE: PASS — every trajectory certified non-inferior; aggressive rejected on a
 
 Three results, all reproducible, all published with caveats:
 
-- **Live head-to-head** vs real `llmlingua` / `headroom-ai` (graded by `claude-opus-4-8`): **83.2% savings at 0% decision-change**, ~1,000× faster. → [benchmark](https://dshakes.github.io/distil/benchmark.html)
+- **Live head-to-head** vs real `llmlingua` / `headroom-ai` (graded by `claude-opus-4-8`): **83.2% savings at 0% decision-change**, ~1,000× faster. The live proxy behavior is pinned to the certified strategy by `tests/test_live_certified_equivalence.py`; the one reviewed delta is a recency carve-out that keeps the last few tool-result turns verbatim (an agent needs its freshest output byte-exact). → [benchmark](https://dshakes.github.io/distil/benchmark.html)
 - **E7 (SWE-bench Verified):** aggressive *lossy* compression **craters** task success (52% → 16%) — a per-step certificate doesn't transfer to multi-turn. The **reversible** tier survives (56% vs 52%). We publish it because it's true. → [E7](https://dshakes.github.io/distil/research.html#e7)
 - **E8–E14 (500-instance agent):** the reversible tier is the **only compressor non-inferior to full context**, generalizes across 5 models / 3 vendors, and the newest digest lands *above* full (42.0% vs 39.2%). → [E8–E14](https://dshakes.github.io/distil/research.html#e8)
 
@@ -287,7 +287,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 >
 > `▼` = tokens saved · `total` = lifetime · `✓eq` = decision-equivalence (shown past 25 shadow samples). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
 
-Rule of thumb: **subscription/interactive → `--lossless-only` (+`--verbatim`)** · **PAYG/autonomous → default digest (+`--expand`)** · **coding re-reads → add `--session-delta`**.
+Rule of thumb: **subscription/interactive → `--lossless-only`** (verbatim is implied; no separate flag needed) · **PAYG/autonomous → default digest (+`--expand`)** · **coding re-reads → add `--session-delta`**.
 
 ---
 
@@ -351,8 +351,8 @@ Full module-by-module map: [Architecture](https://dshakes.github.io/distil/archi
 
 - **Localhost-only by default** — the proxy binds `127.0.0.1` and forwards only to the single configured upstream (no SSRF).
 - **No secret/body logging** — request bodies and credentials are never logged.
-- **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions to lossless strategies and never injects tools (provider-ToS-safe); the reversible, certified digest still runs. Add `--verbatim` to skip the digest entirely (Tier-0 only) for interactive sessions.
-- **Stateless** — nothing is persisted; ZDR-compatible.
+- **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions to Tier-0 verbatim only: no Tier-1 digest stubs, no tool injection (provider-ToS-safe). Without an injected expand tool the agent cannot recover a stub, so `--lossless-only` folds directly into verbatim — no separate `--verbatim` flag needed.
+- **Minimal local persistence** — digest originals are written to `~/.distil/restore/` (respects `DISTIL_HOME`) so handles survive proxy restarts. For strict ZDR deployments, point `DISTIL_HOME` at an ephemeral path or clear that directory between sessions. No data is forwarded upstream.
 
 See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) for topologies (local sidecar, container sidecar, shared gateway) and the threat model.
 

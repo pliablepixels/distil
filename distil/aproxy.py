@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from typing import Any
 
 from .adapters.anthropic import compress_messages
@@ -86,8 +87,6 @@ def _tokens_saved(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> 
     return max(0, _count_msgs(before) - _count_msgs(after))
 
 
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -139,12 +138,37 @@ def make_app(
 
     _upstream = upstream.rstrip("/")
 
+    # lossless-only implies Tier-0-only: without an injected expand tool the agent
+    # cannot recover a Tier-1 digest stub, so a stub there would be irreversibly
+    # lossy. Fold it into verbatim (the flag that already disables Tier-1 digests).
+    from .policy import AuthMode, may_compress_lossy
+
+    # Route the lossy-allowed decision through policy as the single source of truth:
+    # subscription / OAuth sessions are lossless-only. Forces Tier-0-only (verbatim)
+    # and gates output shaping below.
+    _auth_mode = AuthMode.SUBSCRIPTION if lossless_only else AuthMode.PAYG
+    _lossy_ok = may_compress_lossy(_auth_mode)
+    verbatim = verbatim or not _lossy_ok
+
+    # Eager-load the request-path module the handler otherwise imports lazily, so
+    # an in-place upgrade never loads a post-upgrade .py mid-serve against the
+    # running interpreter (version skew). Warmed here at server setup; the
+    # per-request `from .output import ...` is then a module-cache hit.
+    from .output import shape_request as _shape_request  # noqa: F401
+
     # Generous but finite: connect fails fast; sock_read is an INACTIVITY timeout
     # (resets on every chunk), so long generations stream freely while a wedged
     # upstream can never hold a request open forever.
     _timeout = aiohttp.ClientTimeout(
         total=None, connect=30, sock_read=float(os.environ.get("DISTIL_UPSTREAM_TIMEOUT", "600"))
     )
+
+    from . import __version__ as _running_version
+    from .proxy import _warn_if_version_skew
+
+    # Version-skew guard: warn once if distil was upgraded on disk while this
+    # long-lived async proxy keeps running its old in-memory code (see proxy.py).
+    _version_state: dict[str, Any] = {"running": _running_version}
 
     # Typed key avoids NotAppKeyWarning and provides a stable reference for handlers.
     _client_key: web.AppKey[aiohttp.ClientSession] = web.AppKey("client", aiohttp.ClientSession)
@@ -176,6 +200,7 @@ def make_app(
         data: bytes | None,
         headers: dict[str, str],
         extras: dict[str, str] | None = None,
+        on_success: Callable[[], None] | None = None,
     ) -> web.StreamResponse:
         client: aiohttp.ClientSession = request.app[_client_key]
         try:
@@ -203,6 +228,10 @@ def make_app(
             except (aiohttp.ClientError, TimeoutError, ConnectionResetError):
                 pass  # mid-stream failure: headers are out; close what we have
             await sr.write_eof()
+            # Book savings only after a fully-relayed 2xx (P0-1): failed or
+            # SDK-retried upstream calls must not be counted as savings.
+            if on_success is not None and 200 <= resp.status < 300:
+                on_success()
             return sr
         finally:
             await resp_cm.__aexit__(None, None, None)
@@ -212,11 +241,14 @@ def make_app(
     # -----------------------------------------------------------------------
 
     async def _handle_compressible(request: web.Request) -> web.Response:
+        _warn_if_version_skew(_version_state)
         if safe_forward_path(request.path) is None:
             return web.json_response({"error": "invalid request path"}, status=400)
         raw = await request.read()
         fwd_headers = _filter_headers(request.headers)
         extras: dict[str, str] = {}
+        # Savings are booked only after a confirmed 2xx (P0-1): (before, after, model).
+        _pending_savings: tuple[int, int, str | None] | None = None
 
         try:
             body: dict[str, Any] = json.loads(raw)
@@ -235,7 +267,7 @@ def make_app(
                     "x-distil-compressed": "1",
                     "x-distil-tokens-saved": str(saved),
                 }
-                if shape_output != "off" and not lossless_only:
+                if shape_output != "off" and _lossy_ok:
                     from .output import shape_request
 
                     _shape = "anthropic" if request.path == "/v1/messages" else "openai"
@@ -243,8 +275,7 @@ def make_app(
                     extras["x-distil-output-shaping"] = shape_output
                 if savings is not None:
                     before = _count_msgs(original)
-                    savings.record(before, before - saved, model=body.get("model"))
-                    savings.maybe_flush()
+                    _pending_savings = (before, before - saved, body.get("model"))
 
             elif "contents" in body and isinstance(body["contents"], list):
                 # Gemini generateContent shape (reversible content compression).
@@ -259,14 +290,19 @@ def make_app(
                     "x-distil-tokens-saved": str(saved),
                 }
                 if savings is not None:
-                    savings.record(before_tok, before_tok - saved, model=None)
-                    savings.maybe_flush()
+                    _pending_savings = (before_tok, before_tok - saved, None)
 
             body_bytes = json.dumps(body).encode()
 
         url = _upstream + request.path
         if request.query_string:
             url = f"{url}?{request.query_string}"
+
+        def _book() -> None:
+            if savings is not None and _pending_savings is not None:
+                b, a, m = _pending_savings
+                savings.record(b, a, model=m)
+                savings.maybe_flush()
 
         return await _relay_streaming(
             request,
@@ -275,6 +311,7 @@ def make_app(
             body_bytes,
             {**fwd_headers, "content-length": str(len(body_bytes))},
             extras=extras,
+            on_success=_book,
         )
 
     # -----------------------------------------------------------------------

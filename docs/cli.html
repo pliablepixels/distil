@@ -322,7 +322,7 @@ by trajectory:
         <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Interface to bind on</td></tr>
         <tr><td><code>--port</code></td><td><code>8788</code></td><td>Port to listen on</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
-        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: Tier-0 verbatim only — no lossy output-shaping, no tool injection (<code>--expand</code>), no Tier-1 digest stubs. Folds directly into verbatim (no separate <code>--verbatim</code> needed). Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only (JSON minify + collapse exact-duplicate runs). Interactive-safe, lower savings. Use where <code>distil_expand</code> recovery is unavailable.</td></tr>
         <tr><td><code>--shape-output</code></td><td>off</td><td>Enable generation-side verbosity shaping: <code>light</code> (conservative) or <code>aggressive</code>. Injects a <code>role:"system"</code> directive before the request. Gated by <code>--lossless-only</code>: shaping is skipped when <code>--lossless-only</code> is set. No subscription key detection.</td></tr>
         <tr><td><code>--expand</code></td><td>off</td><td>Inject the <code>distil_expand</code> tool so the model can pull digested blocks back on demand</td></tr>
@@ -376,7 +376,7 @@ distil wrap → proxy http://127.0.0.1:54xxx (upstream https://api.anthropic.com
   → recording genuine savings → distil leaderboard
 <span class="d"># ... your command runs, every request compressed ...</span>
 
-<span class="d"># Lossless-only policy mode (no tool injection, digest still runs — for subscription / OAuth)</span>
+<span class="d"># Lossless-only policy mode (Tier-0 verbatim only, no tool injection, no Tier-1 stubs — for subscription / OAuth)</span>
 $ distil <span class="c">wrap</span> --lossless-only -- my-agent --task build</pre>
 
     <p>Everything after <code>--</code> is the command and its arguments, run verbatim. The child's exit code is propagated. Use <code>--env-var</code> to point a different variable at the proxy (e.g. an OpenAI-compatible tool), and the same <code>--upstream</code>, <code>--lossless-only</code>, <code>--verbatim</code>, <code>--shape-output</code>, <code>--pricing</code> and <code>--no-record</code> flags as <a href="#proxy">distil proxy</a>.</p>
@@ -388,7 +388,7 @@ $ distil <span class="c">wrap</span> --lossless-only -- my-agent --task build</p
         <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Bind address for the ephemeral proxy</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL to forward to</td></tr>
         <tr><td><code>--env-var</code></td><td><code>ANTHROPIC_BASE_URL</code></td><td>Environment variable to point at the proxy in the child process</td></tr>
-        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: Tier-0 verbatim only — no lossy output-shaping, no tool injection (<code>--expand</code>), no Tier-1 digest stubs. Folds directly into verbatim (no separate <code>--verbatim</code> needed). Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Interactive-safe, lower savings.</td></tr>
         <tr><td><code>--shape-output</code></td><td>off</td><td>Generation-side verbosity shaping (gated by <code>--lossless-only</code>)</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model used to price genuine dollar savings recorded to the ledger</td></tr>
@@ -485,7 +485,7 @@ distil performance benchmark
         <tr><td><code>--port</code></td><td><code>8789</code></td><td>Port to listen on.</td></tr>
         <tr><td><code>--upstream</code></td><td><code>https://api.anthropic.com</code></td><td>Real LLM API base URL (set once at startup, cannot be overridden per-request).</td></tr>
         <tr><td><code>--pricing</code></td><td><code>claude-opus-4-8</code></td><td>Model pricing key for per-tenant dollar accounting.</td></tr>
-        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: lossless strategies only — no lossy output-shaping, no tool injection (<code>--expand</code>). The reversible Tier-1 digest still runs. Use for subscription / OAuth sessions.</td></tr>
+        <tr><td><code>--lossless-only</code></td><td>off</td><td>Policy mode: Tier-0 verbatim only — no lossy output-shaping, no tool injection (<code>--expand</code>), no Tier-1 digest stubs. Folds directly into verbatim (no separate <code>--verbatim</code> needed). Use for subscription / OAuth sessions.</td></tr>
         <tr><td><code>--verbatim</code></td><td>off</td><td>Skip the Tier-1 digest; Tier-0 only. Interactive-safe, lower savings.</td></tr>
         <tr><td><code>--admin-token</code></td><td>unset (env <code>DISTIL_GATEWAY_TOKEN</code>)</td><td>Bearer token required for <code>/distil/stats</code> and <code>/distil/dashboard</code>. Mandatory for those routes on non-loopback binds — without it, <code>/distil/*</code> is disabled entirely rather than left open.</td></tr>
         <tr><td><code>--trust-tenant-header</code></td><td>off</td><td>Honor the client-supplied <code>x-distil-tenant</code> header for accounting. Off by default: tenant identity is derived from the credential hash, never a client-writable header, so no caller can book its traffic under another tenant's line.</td></tr>

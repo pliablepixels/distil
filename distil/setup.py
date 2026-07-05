@@ -8,9 +8,23 @@ other setting.
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 
 DEFAULT_COMMAND = "distil statusline"
+
+# An agent name is spliced verbatim into a shell alias/function written to the
+# user's rc file, so it must be a bare command token — never arbitrary shell.
+_AGENT_RE = re.compile(r"[\w.+-]+")
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write *text* to *path* atomically (tmp + os.replace) so an interrupted
+    write can't leave a half-written shell rc that breaks the next shell start."""
+    tmp = path.with_name(path.name + ".distil.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def default_settings_path() -> Path:
@@ -152,6 +166,11 @@ def default_shell_rc() -> Path:
 
 def alias_body(agent: str, mode: str, *, shell: str | None = None) -> str:
     """Strategy A — wrap the agent command on demand (fish/posix share `alias`)."""
+    if not _AGENT_RE.fullmatch(agent or ""):
+        raise ValueError(
+            f"invalid agent name {agent!r}: expected only letters, digits, '.', '+', '-', '_' "
+            "(it is spliced into a shell alias, so arbitrary strings are refused)"
+        )
     sh = shell if shell is not None else ("powershell" if _is_windows() else "")
     if sh == "powershell":
         return f"function {agent} {{ distil wrap --{mode} -- {agent} @args }}"
@@ -183,13 +202,13 @@ def write_managed(rc: Path, body: str) -> tuple[str, str]:
         if new == text:
             return ("exists", f"already configured in {rc}")
         rc.with_name(rc.name + ".bak").write_text(text, encoding="utf-8")
-        rc.write_text(new, encoding="utf-8")
+        _atomic_write(rc, new)
         return ("updated", f"updated the distil default in {rc}")
     rc.parent.mkdir(parents=True, exist_ok=True)
     if rc.exists():
         rc.with_name(rc.name + ".bak").write_text(text, encoding="utf-8")
     sep = "" if (not text or text.endswith("\n")) else "\n"
-    rc.write_text(text + sep + "\n" + block, encoding="utf-8")
+    _atomic_write(rc, text + sep + "\n" + block)
     return ("ok", f"configured the distil default in {rc}")
 
 
@@ -209,7 +228,7 @@ def remove_managed(rc: Path) -> tuple[str, str]:
         flags=re.S,
     )
     rc.with_name(rc.name + ".bak").write_text(text, encoding="utf-8")
-    rc.write_text(new, encoding="utf-8")
+    _atomic_write(rc, new)
     return ("ok", f"removed the distil default from {rc}")
 
 

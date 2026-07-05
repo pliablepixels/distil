@@ -27,8 +27,10 @@ import re
 import threading
 import urllib.error
 import urllib.request
+from collections import OrderedDict
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 from typing import Any
 
 from .adapters.anthropic import compress_messages
@@ -37,7 +39,13 @@ from .adapters.gemini import count_tokens as _gemini_count
 from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path
 from .pricing import Pricing, get as pricing_get
-from .proxy import _OPENER, _UPSTREAM_TIMEOUT, QuietHTTPServer
+from .proxy import (
+    _OPENER,
+    _UPSTREAM_TIMEOUT,
+    QuietHTTPServer,
+    _install_sigterm_flush,
+    _warn_if_version_skew,
+)
 from .tokenizer import DEFAULT as _tokenizer
 
 # Safe tenant label: bounded length, no markup / control characters.
@@ -95,23 +103,84 @@ class TenantStats:
 # ---------------------------------------------------------------------------
 
 
+# Cap the per-tenant map so a key-spraying client can't grow it without bound;
+# least-recently-active tenants are evicted first. Generous for real fleets.
+_MAX_TENANTS = 50_000
+
+
+def _state_path() -> Path:
+    """Where per-tenant accounting is persisted across restarts (honours DISTIL_HOME)."""
+    home = os.environ.get("DISTIL_HOME", str(Path.home() / ".distil"))
+    return Path(home) / "gateway_state.json"
+
+
 class GatewayState:
-    """Thread-safe in-memory map of tenant_id -> TenantStats."""
+    """Thread-safe, LRU-bounded map of tenant_id -> TenantStats, persistable to disk."""
 
     def __init__(self, price: Pricing) -> None:
         self._lock = threading.Lock()
-        self._tenants: dict[str, TenantStats] = {}
+        self._tenants: OrderedDict[str, TenantStats] = OrderedDict()
         self._price = price
 
     def record(self, tenant: str, baseline_tokens: int, compressed_tokens: int) -> None:
-        """Accumulate one request's worth of token counts for *tenant*."""
+        """Accumulate one request's worth of token counts for *tenant* (LRU-bounded)."""
         with self._lock:
-            if tenant not in self._tenants:
-                self._tenants[tenant] = TenantStats()
-            s = self._tenants[tenant]
+            s = self._tenants.get(tenant)
+            if s is None:
+                s = TenantStats()
+                self._tenants[tenant] = s
+                if len(self._tenants) > _MAX_TENANTS:
+                    self._tenants.popitem(last=False)  # evict least-recently-active
+            else:
+                self._tenants.move_to_end(tenant)  # mark active for LRU
             s.requests += 1
             s.tokens_baseline += baseline_tokens
             s.tokens_compressed += compressed_tokens
+
+    def save(self, path: Path | None = None) -> None:
+        """Atomically persist per-tenant counters so a restart/SIGTERM doesn't zero them."""
+        path = path or _state_path()
+        with self._lock:
+            data = {
+                "tenants": {
+                    tid: {
+                        "requests": s.requests,
+                        "tokens_baseline": s.tokens_baseline,
+                        "tokens_compressed": s.tokens_compressed,
+                    }
+                    for tid, s in self._tenants.items()
+                }
+            }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text(json.dumps(data))
+            os.replace(tmp, path)
+        except OSError:
+            pass  # best-effort — never let a failed save crash shutdown
+
+    def load(self, path: Path | None = None) -> None:
+        """Restore per-tenant counters written by :meth:`save` (best-effort)."""
+        path = path or _state_path()
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            return
+        tenants = data.get("tenants", {}) if isinstance(data, dict) else {}
+        with self._lock:
+            for tid, d in tenants.items():
+                try:
+                    s = TenantStats()
+                    s.requests = int(d["requests"])
+                    s.tokens_baseline = int(d["tokens_baseline"])
+                    s.tokens_compressed = int(d["tokens_compressed"])
+                except (KeyError, TypeError, ValueError):
+                    continue  # skip a corrupt tenant entry
+                self._tenants[tid] = s
+            # A pre-cap (or hand-edited) state file may exceed the ceiling;
+            # enforce the invariant at load, not just on record().
+            while len(self._tenants) > _MAX_TENANTS:
+                self._tenants.popitem(last=False)
 
     def snapshot(self) -> dict[str, Any]:
         """Return a serialisable dict with per-tenant stats and totals."""
@@ -457,6 +526,29 @@ def build_gateway_handler(
 
     _upstream = upstream.rstrip("/")
 
+    # lossless-only implies Tier-0-only: without an injected expand tool the agent
+    # cannot recover a Tier-1 digest stub, so a stub there would be irreversibly
+    # lossy. Fold it into verbatim (the flag that already disables Tier-1 digests).
+    from .policy import AuthMode, may_compress_lossy
+
+    # Route the lossy-allowed decision through policy (single source of truth):
+    # subscription / OAuth sessions are lossless-only, forcing Tier-0-only (verbatim).
+    _auth_mode = AuthMode.SUBSCRIPTION if lossless_only else AuthMode.PAYG
+    verbatim = verbatim or not may_compress_lossy(_auth_mode)
+
+    # Eager-load the streaming relay the handler otherwise imports lazily per
+    # request, so a gateway upgraded in place never loads a post-upgrade .py
+    # mid-serve against the running interpreter (version skew). Warmed here at
+    # server setup; the per-request `from .streamrelay import ...` is then a
+    # module-cache hit, and CLI cold start stays cheap.
+    from .streamrelay import stream_upstream as _stream_upstream  # noqa: F401
+
+    from . import __version__ as _running_version
+
+    # Version-skew guard: warn once if the gateway was upgraded on disk while this
+    # long-lived process keeps running its old in-memory code (see proxy.py).
+    _version_state: dict[str, Any] = {"running": _running_version}
+
     class _GatewayHandler(BaseHTTPRequestHandler):
         # HTTP/1.1 so streamed responses can use chunked transfer framing.
         protocol_version = "HTTP/1.1"
@@ -502,6 +594,7 @@ def build_gateway_handler(
             return False
 
         def do_POST(self) -> None:  # noqa: N802
+            _warn_if_version_skew(_version_state)
             # Strip query string for path matching
             path = self.path.split("?", 1)[0]
             if path in _COMPRESSIBLE_PATHS or is_gemini_path(path):
@@ -573,6 +666,8 @@ def build_gateway_handler(
             # explicit label — an anon-<hash> is a stable credential-derived
             # correlator that shouldn't ride response headers.
             extras: dict[str, str] = {}
+            # Tenant accounting is booked only after a confirmed 2xx (P0-1).
+            _pending_tenant_record: tuple[str, int, int] | None = None
             if not tenant.startswith("anon-"):
                 extras["x-distil-tenant"] = tenant
 
@@ -587,7 +682,7 @@ def build_gateway_handler(
                 compressed_tokens = _count_tokens(compressed)
                 tokens_saved = max(0, baseline_tokens - compressed_tokens)
 
-                state.record(tenant, baseline_tokens, compressed_tokens)
+                _pending_tenant_record = (tenant, baseline_tokens, compressed_tokens)
 
                 body = {**body, "messages": compressed}
                 extras["x-distil-tokens-saved"] = str(tokens_saved)
@@ -601,7 +696,7 @@ def build_gateway_handler(
                     pass
                 compressed_tokens = _gemini_count(body)
                 tokens_saved = max(0, baseline_tokens - compressed_tokens)
-                state.record(tenant, baseline_tokens, compressed_tokens)
+                _pending_tenant_record = (tenant, baseline_tokens, compressed_tokens)
                 extras["x-distil-tokens-saved"] = str(tokens_saved)
 
             new_raw = json.dumps(body).encode()
@@ -609,7 +704,7 @@ def build_gateway_handler(
             if bool(body.get("stream")) or ":streamGenerateContent" in self.path:
                 from .streamrelay import stream_upstream
 
-                stream_upstream(
+                status_s, _ = stream_upstream(
                     self,
                     _upstream + self.path,
                     new_raw,
@@ -618,8 +713,15 @@ def build_gateway_handler(
                     hop_by_hop=_HOP_BY_HOP,
                     extras=extras,
                 )
+                # Book tenant accounting only after a fully-relayed 2xx (P0-1).
+                if _pending_tenant_record is not None and 200 <= status_s < 300:
+                    state.record(*_pending_tenant_record)
                 return
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
+            # Book tenant accounting only after a confirmed 2xx (P0-1): failed or
+            # SDK-retried upstream calls must not inflate per-tenant savings.
+            if _pending_tenant_record is not None and 200 <= status < 300:
+                state.record(*_pending_tenant_record)
             self._relay(status, rhdrs, rbody, extras=extras)
 
         # ----------------------------------------------------------------
@@ -770,6 +872,7 @@ def serve_gateway(
     """
     price = pricing_get(pricing_model)
     state = GatewayState(price)
+    state.load()  # restore per-tenant accounting from a previous run
     loopback = host in ("127.0.0.1", "::1", "localhost")
     handler = build_gateway_handler(
         upstream,
@@ -787,11 +890,15 @@ def serve_gateway(
     if not loopback and not (admin_token or os.environ.get("DISTIL_GATEWAY_TOKEN")):
         print("  ! non-loopback bind without --admin-token: /distil/* routes are disabled")
     print(f"  → upstream: {upstream}")
+    # Turn SIGTERM (systemd stop / kill) into KeyboardInterrupt so the finally
+    # block persists tenant accounting instead of a kill zeroing it.
+    _install_sigterm_flush()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        state.save()  # persist tenant accounting across restarts
         server.server_close()
 
 

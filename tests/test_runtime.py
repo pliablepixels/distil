@@ -113,6 +113,10 @@ def test_proxy_records_genuine_savings_e2e(tmp_path):
                 "messages": [
                     {"role": "user", "content": "investigate"},
                     {"role": "user", "content": [{"type": "tool_result", "content": long}]},
+                    # Two later turns keep the tool_result out of the recency-exempt
+                    # window so it still digests and genuine savings are recorded.
+                    {"role": "user", "content": "next"},
+                    {"role": "user", "content": "next"},
                 ],
             }
         ).encode()

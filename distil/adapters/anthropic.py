@@ -31,11 +31,23 @@ import hashlib
 from typing import Any
 
 from ..compress.tier0 import collapse_runs, minify_json
+from ..mcp_server import load_restore as _load_restore
+from ..mcp_server import record_restore as _record_restore
 from ..compress.tier1 import digest as _tier1_digest
 from ..tokenizer import DEFAULT as _tokenizer
 
 # Minimum line count for a tool_result to be digested (matches Tier1Reversible default).
 _MIN_LINES = 6
+
+# Recency exemption: tool_result blocks in the last K user/tool turns are NEVER
+# digested — an agent must always see its most recent tool outputs byte-exact to
+# choose its next action, and a Tier-1 stub it may not be able to expand there
+# would break that. Digesting only OLDER turns is also strictly cache-safe here:
+# place_cache_control never puts message history in the cached prefix, and
+# compress_messages already re-digests the whole history every call, so exempting
+# recent turns only ever *reduces* what we rewrite — it never mutates bytes a
+# previous call already sent.
+_RECENCY_KEEP_TURNS = 2
 
 # Thread-local learned "keep byte-exact" predicate, scoped per compress_messages call
 # (ThreadingHTTPServer handles requests on separate threads, so this must be per-thread).
@@ -47,6 +59,19 @@ _keep_tls = _threading.local()
 def _active_keep(text: str) -> bool:
     fn = getattr(_keep_tls, "fn", None)
     return bool(fn and fn(text))
+
+
+def _recent_verbatim_indices(messages: list[dict[str, Any]], k: int) -> set[int]:
+    """Indices of the last *k* tool-output-bearing turns (role ``user``/``tool``),
+    whose tool_result blocks must stay verbatim. See ``_RECENCY_KEEP_TURNS``."""
+    if k <= 0:
+        return set()
+    idxs = [
+        i
+        for i, m in enumerate(messages)
+        if isinstance(m, dict) and m.get("role") in ("user", "tool")
+    ]
+    return set(idxs[-k:])
 
 
 # ---------------------------------------------------------------------------
@@ -68,8 +93,19 @@ class RestoreStore:
     # Internal (used by compress_messages)
     # ------------------------------------------------------------------
 
-    def _record(self, handle: str, original: str) -> None:
+    def _record(self, handle: str, original: str) -> bool:
+        """Record ``handle -> original``. Returns ``False`` on an 8-hex COLLISION —
+        the handle already maps to *different* text. The caller must then NOT emit a
+        digest stub for this block: its handle would resolve to the other block's
+        content, so an expand would return the wrong bytes. Keeping the block verbatim
+        is always safe. Idempotent re-records of the same text return ``True``.
+        """
+        existing = self._store.get(handle)
+        if existing is not None and existing != original:
+            return False
         self._store[handle] = original
+        _record_restore(handle, original)  # survive restarts; expandable cross-process
+        return True
 
     # ------------------------------------------------------------------
     # Public API
@@ -85,7 +121,14 @@ class RestoreStore:
 
         Raises KeyError if the handle is not in this store.
         """
-        return self._store[handle]
+        try:
+            return self._store[handle]
+        except KeyError:
+            original = _load_restore(handle)  # disk fallback: pre-restart handles
+            if original is None:
+                raise
+            self._store[handle] = original
+            return original
 
 
 # ---------------------------------------------------------------------------
@@ -147,8 +190,10 @@ def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = 
     digested, changed = _tier1_digest(text)
     if changed:
         h = _handle(text)
-        store._record(h, text)
-        return digested
+        if store._record(h, text):
+            return digested
+        # 8-hex collision with a different block — a stub here would expand to the
+        # wrong content, so keep this block byte-exact (lossless transforms only).
     return _apply_tier0(text)
 
 
@@ -292,11 +337,15 @@ def compress_messages(
     try:
         store = RestoreStore()
         new_messages: list[dict[str, Any]] = []
-        for msg in messages:
+        recent = _recent_verbatim_indices(messages, _RECENCY_KEEP_TURNS)
+        for idx, msg in enumerate(messages):
             if not isinstance(msg, dict):
                 new_messages.append(msg)  # malformed entry — pass through untouched
                 continue
-            new_messages.append(_compress_message(msg, store, verbatim))
+            # Force verbatim for the most recent turns so their tool_results are
+            # never replaced by a digest stub the agent must reason over blind.
+            msg_verbatim = verbatim or idx in recent
+            new_messages.append(_compress_message(msg, store, msg_verbatim))
         return new_messages, store
     finally:
         _keep_tls.fn = None
@@ -353,19 +402,35 @@ def place_cache_control(
 
 
 class _MessagesProxy:
-    """Thin proxy for ``client.messages`` that compresses before delegating."""
+    """Thin proxy for ``client.messages`` that compresses before delegating.
+
+    Compresses in **verbatim** mode: only in-context-lossless Tier-0 transforms
+    (minified JSON, collapsed duplicate runs) are applied — never a Tier-1 digest stub.
+
+    Why verbatim and not the higher-savings digest: recovering a digest stub needs the
+    server-side ``distil_expand`` loop (see :mod:`distil.expand`), which lives in the
+    proxy/gateway that own the full request→response→re-query cycle. This in-process SDK
+    wrapper delegates a single ``create`` call to the real client and hands the response
+    straight back to the caller's own loop; it never sees the model's follow-up turns, so
+    it cannot resolve an expand call. Emitting a stub here would leave the model looking at
+    content it cannot pull back — silent loss. Verbatim keeps the one-liner honest:
+    identical meaning in context, real (if smaller) savings, nothing unrecoverable. For
+    full digest savings, route through the proxy/gateway instead.
+    """
 
     def __init__(self, real_messages: Any) -> None:
         self._real = real_messages
 
     def create(self, **kwargs: Any) -> Any:
-        # Compress messages if present.
+        # Compress messages if present (verbatim: no unrecoverable stubs — see class doc).
         if "messages" in kwargs:
-            compressed, _store = compress_messages(kwargs["messages"])
+            compressed, _store = compress_messages(kwargs["messages"], verbatim=True)
             kwargs = {**kwargs, "messages": compressed}
 
-        # Apply cache_control if system is present.
-        if "system" in kwargs:
+        # Apply cache_control only when messages are also present: place_cache_control
+        # indexes the messages list, so guard against it being absent (the API requires
+        # messages anyway — let it raise the real error rather than a KeyError here).
+        if "system" in kwargs and "messages" in kwargs:
             cache_kwargs = place_cache_control(kwargs["system"], kwargs["messages"])
             kwargs = {**kwargs, **cache_kwargs}
 
@@ -392,6 +457,11 @@ def wrap(client: Any) -> _ClientProxy:
     The wrapper is a pure structural proxy — it imports nothing from the
     ``anthropic`` SDK and works with any duck-typed object that exposes a
     ``messages.create(**kwargs)`` method.
+
+    Compression is **verbatim** (in-context-lossless Tier-0 only): the model always sees
+    semantically identical content and never an unrecoverable digest stub, because the
+    in-process wrapper has no server-side ``distil_expand`` loop. Route through the
+    proxy/gateway for the higher-savings reversible digest. See :class:`_MessagesProxy`.
 
     Example
     -------
