@@ -2180,6 +2180,12 @@ def main(argv: list[str] | None = None) -> int:
         path = getattr(args, "trajectory", None) or getattr(args, "outcomes", None) or "input"
         print(f"distil {getattr(args, 'cmd', '')}: {path} is not valid JSON — {e}", file=sys.stderr)
         return 2
+    except OSError as e:
+        # e.g. EADDRINUSE when a proxy/gateway port is already taken, or any other
+        # OS-level failure the specific handlers above didn't catch — a one-line
+        # message beats a full traceback for what is almost always a user setup issue.
+        print(f"distil {getattr(args, 'cmd', '')}: {e}", file=sys.stderr)
+        return 2
 
     # The status line is piped to a consumer (Claude Code) that may close the
     # pipe the instant it has our one line. Flush under guard, then hard-exit so

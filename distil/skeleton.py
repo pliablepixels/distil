@@ -26,9 +26,16 @@ tier's contract). This is the digest the certified relevance-gate digests periph
 from __future__ import annotations
 
 import ast
+import hashlib
 
 # Markers an agent (or a human) can grep for; kept short to not eat the savings.
 _ELIDED = "..."  # body placeholder, emitted at the body's indentation
+
+
+def _handle(text: str) -> str:
+    """8-hex SHA-256 prefix — mirrors tier1._handle so a digest marker resolves
+    against the same restore key (build_restore / RestoreStore) the caller records."""
+    return hashlib.sha256(text.encode()).hexdigest()[:8]
 
 
 def _docstring_first_line(node: ast.AST) -> str | None:
@@ -173,11 +180,20 @@ def text_window(
 def smart_digest(text: str, *, head: int = 400, tail: int = 200) -> str:
     """Best available structure-preserving digest of one context block.
 
-    Code → skeleton (signatures kept, bodies elided); otherwise a head+tail window.
-    Deterministic and lossy *only at the surface* — callers keep the original behind a
-    content handle for recovery.
+    Code → skeleton (signatures kept, bodies elided), then a head/tail window over
+    the skeleton so the grade's ``head``/``tail`` budget actually bites on code:
+    without windowing the skeleton, a light grade (large budget) and a heavy grade
+    (small budget) produce the *identical* skeleton, collapsing the graded gate to a
+    binary one on source. Non-code → a head+tail window directly.
+
+    Deterministic and lossy *only at the surface*: when anything is elided the digest
+    ends with a single ``handle=<8hex>`` marker keying the byte-exact original, so the
+    caller (which records that same handle) can recover it. If nothing is elided the
+    text is returned unchanged — no marker, no empty recoverability promise.
     """
     sk = code_skeleton(text)
-    if sk is not None:
-        return sk
-    return text_window(text, head=head, tail=tail)
+    base = sk if sk is not None else text
+    body = text_window(base, head=head, tail=tail)
+    if body == text:
+        return text
+    return f"{body}\n<<distil elided, handle={_handle(text)}>>"

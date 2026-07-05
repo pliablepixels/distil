@@ -193,10 +193,12 @@ def protect(strategy: Strategy, **salience_kw) -> Strategy:
             if not missing:
                 fixed.append(c)
                 continue
-            # Keep leading whitespace: indentation is semantic in code/YAML, and a
-            # de-indented line misleads the model about scope. `missing` already
-            # excludes blank lines, so no stripping is needed.
-            patched = c.text + "\n⟦keep⟧ " + " ⟦keep⟧ ".join(missing)
+            # Re-inject each needle on its OWN line, verbatim. Indentation is semantic
+            # in code/YAML, and line structure carries meaning too — joining needles
+            # onto one line with separators would flatten multi-line context into a
+            # single misleading line. A single ⟦keep⟧ header marks the recovered region;
+            # `missing` already excludes blank lines, so nothing is stripped.
+            patched = c.text + "\n⟦keep⟧\n" + "\n".join(missing)
             # Guarantee the needle survives: if the patched form would exceed the
             # original (so re-injection saves nothing), fall back to the ORIGINAL
             # block byte-exact — never to ``c``, which has the salient line removed.

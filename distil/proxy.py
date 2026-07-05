@@ -145,6 +145,42 @@ def _model_from_path(path: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+_VERSION_CHECK_TTL = 30.0  # seconds between on-disk version re-checks (throttled, cheap)
+
+
+def _warn_if_version_skew(state: dict[str, Any]) -> None:
+    """Warn ONCE if distil was upgraded on disk while this long-lived proxy keeps
+    running its old in-memory code — a running interpreter can't reload itself, so
+    an in-place ``pip install -U`` leaves the proxy stale until it is restarted.
+
+    Throttled by ``_VERSION_CHECK_TTL`` so it costs ~nothing per request. ``state``
+    carries ``{"running": <version at start>, "checked": ts, "warned": bool}``.
+    """
+    import sys
+    import time
+
+    if state.get("warned"):
+        return
+    now = time.monotonic()
+    if now - state.get("checked", 0.0) < _VERSION_CHECK_TTL:
+        return
+    state["checked"] = now
+    try:
+        from importlib.metadata import version as _pkg_version
+
+        installed = _pkg_version("distil-llm")
+    except Exception:  # noqa: BLE001 — a version check must never affect a request
+        return
+    running = state.get("running")
+    if running and installed != running:
+        state["warned"] = True
+        print(
+            f"distil: upgraded on disk to {installed}; this proxy still runs {running} "
+            "— restart wrap to pick up the new version.",
+            file=sys.stderr,
+        )
+
+
 def build_handler(
     upstream: str,
     *,
@@ -183,7 +219,14 @@ def build_handler(
     # agent can never recover a Tier-1 digest stub, so a stub there is irreversibly
     # lossy. Force Tier-0-only (verbatim) whenever lossless_only is set. The label
     # above stays distinct so x-distil-mode still reports which of the two it is.
-    verbatim = verbatim or lossless_only
+    from .policy import AuthMode, may_compress_lossy
+
+    # Route the lossy-allowed decision through policy as the single source of truth:
+    # subscription / OAuth sessions are lossless-only (a tightening boundary a project
+    # can never loosen). This forces Tier-0-only (verbatim) and gates output shaping.
+    _auth_mode = AuthMode.SUBSCRIPTION if lossless_only else AuthMode.PAYG
+    _lossy_ok = may_compress_lossy(_auth_mode)
+    verbatim = verbatim or not _lossy_ok
 
     # Learning flywheel state (loaded once when expand is on): the learned
     # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
@@ -218,6 +261,13 @@ def build_handler(
     _shadow_sampler = None
     _shadow_ledger = None
     _shadow_threads: list[threading.Thread] = []
+    _shadow_threads_lock = threading.Lock()
+    from . import __version__ as _running_version
+
+    # Version-skew guard: a long-lived wrap proxy keeps running the code it started
+    # with, even after an in-place upgrade. Stamp the running version; the request
+    # path re-checks the installed version (throttled) and warns once on drift.
+    _version_state: dict[str, Any] = {"running": _running_version}
     if shadow_rate and shadow_rate > 0:
         from .shadow import ShadowLedger, ShadowSampler
 
@@ -241,6 +291,7 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def do_POST(self) -> None:  # noqa: N802
+            _warn_if_version_skew(_version_state)
             p = strip_query(self.path)
             if p in _COMPRESSIBLE_PATHS or is_gemini_path(p):
                 self._handle_compressible()
@@ -372,6 +423,8 @@ def build_handler(
             headers = self._client_headers(identity=True)
             extras: dict[str, str] = {}
             store: Any = None  # RestoreStore once messages are compressed (for expand)
+            # Savings are booked only after a confirmed 2xx (P0-1): (before, after, model).
+            _pending_savings: tuple[int, int, str | None] | None = None
 
             try:
                 body: dict[str, Any] = json.loads(raw)
@@ -449,10 +502,9 @@ def build_handler(
                 # Accumulate GENUINE savings from real traffic into the ledger,
                 # priced per the model THIS request names (agents mix models).
                 if savings is not None:
-                    savings.record(before_tok, after_tok, model=body.get("model"))
-                    savings.maybe_flush(every=flush_every)
+                    _pending_savings = (before_tok, after_tok, body.get("model"))
                 # Output compression: gated by lossless_only (only on PAYG-style).
-                if shape_output != "off" and not lossless_only:
+                if shape_output != "off" and _lossy_ok:
                     from .output import shape_request
 
                     _shape = "anthropic" if strip_query(self.path) == "/v1/messages" else "openai"
@@ -485,8 +537,7 @@ def build_handler(
                 }
                 if savings is not None:
                     # Gemini requests carry the model in the URL path, not the body.
-                    savings.record(before_tok, after_tok, model=_model_from_path(self.path))
-                    savings.maybe_flush(every=flush_every)
+                    _pending_savings = (before_tok, after_tok, _model_from_path(self.path))
 
             new_raw = json.dumps(body).encode()
 
@@ -505,7 +556,7 @@ def build_handler(
             if want_stream and not (expand and getattr(store, "handles", None)):
                 from .streamrelay import stream_upstream
 
-                rbody_opt = stream_upstream(
+                status_s, rbody_opt = stream_upstream(
                     self,
                     _upstream + self.path,
                     new_raw,
@@ -513,9 +564,15 @@ def build_handler(
                     timeout=_UPSTREAM_TIMEOUT,
                     hop_by_hop=_HOP_BY_HOP,
                     extras=extras,
+                    want_body=shadow_sampled,  # only buffer the body when shadow needs it
                 )
                 if _learn_stats is not None:
                     _learn_stats.save()
+                # Book savings only after a fully-relayed 2xx (P0-1).
+                if savings is not None and _pending_savings is not None and 200 <= status_s < 300:
+                    _bt, _at, _m = _pending_savings
+                    savings.record(_bt, _at, model=_m)
+                    savings.maybe_flush(every=flush_every)
                 if shadow_sampled and rbody_opt:
                     self._spawn_shadow(raw, headers, rbody_opt)
                 return
@@ -555,6 +612,12 @@ def build_handler(
             # signal on real traffic. Never blocks the client's response.
             if shadow_sampled:
                 self._spawn_shadow(raw, headers, rbody)
+            # Book savings only after a confirmed 2xx (P0-1): failed or SDK-retried
+            # upstream calls must not be counted as savings.
+            if savings is not None and _pending_savings is not None and 200 <= status < 300:
+                _bt, _at, _m = _pending_savings
+                savings.record(_bt, _at, model=_m)
+                savings.maybe_flush(every=flush_every)
             self._relay(status, rhdrs, rbody, extras=extras)
 
         def _spawn_shadow(
@@ -573,7 +636,10 @@ def build_handler(
                     # Codex / Gemini sessions, which stream their responses.
                     comp_sig = decision_signature_from_body(compressed)
                     orig_sig = decision_signature_from_body(orig_rbody)
-                    if _shadow_ledger is not None:
+                    # "none" means no decision could be extracted (transient upstream
+                    # error or empty/unparseable body). Recording it as agreement or
+                    # change would inflate the decision-equivalence rate on noise.
+                    if _shadow_ledger is not None and "none" not in (comp_sig, orig_sig):
                         _shadow_ledger.record(comp_sig == orig_sig)
                 except Exception:  # noqa: BLE001 — shadow must never affect the request
                     pass
@@ -582,9 +648,13 @@ def build_handler(
             # killed on process exit, which loses the sample on a quick run
             # (e.g. `claude -p`) or right after the last turn. Prune finished
             # ones first so the list stays bounded on long sessions.
-            _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
             _t = threading.Thread(target=_shadow_compare, daemon=True)
-            _shadow_threads.append(_t)
+            with _shadow_threads_lock:
+                # Prune finished threads and append under one lock — concurrent
+                # sampled requests otherwise race here and drop a thread, which
+                # _drain_shadow would then miss on shutdown.
+                _shadow_threads[:] = [t for t in _shadow_threads if t.is_alive()]
+                _shadow_threads.append(_t)
             _t.start()
 
         # ----------------------------------------------------------------
@@ -611,6 +681,7 @@ def build_handler(
             )
 
     _DistilHandler.shadow_threads = _shadow_threads  # type: ignore[attr-defined]  # drained on shutdown
+    _DistilHandler.shadow_lock = _shadow_threads_lock  # type: ignore[attr-defined]
     return _DistilHandler
 
 
@@ -643,7 +714,13 @@ def _drain_shadow(handler: type, budget: float = 6.0) -> None:
     Bounded by ``budget`` seconds total so a hung upstream can't block teardown."""
     import time
 
-    threads = [t for t in getattr(handler, "shadow_threads", []) or [] if t.is_alive()]
+    lock = getattr(handler, "shadow_lock", None)
+    src = getattr(handler, "shadow_threads", []) or []
+    if lock is not None:
+        with lock:  # consistent snapshot vs a concurrent spawn prune+append
+            threads = [t for t in src if t.is_alive()]
+    else:
+        threads = [t for t in src if t.is_alive()]
     if not threads:
         return
     deadline = time.monotonic() + budget
@@ -822,8 +899,11 @@ def wrap_run(
     proc_holder: list = []
     _install_sigterm_flush(proc_holder)
     try:
-        proc = subprocess.Popen(command, env=child_env)
-        proc_holder.append(proc)
+        # Reserve the slot before Popen so a SIGTERM in the spawn window still
+        # finds the child: the handler no-ops on the None placeholder, then the
+        # single-statement store binds the real proc as tightly as possible.
+        proc_holder.append(None)
+        proc_holder[0] = proc = subprocess.Popen(command, env=child_env)
         code = proc.wait()
     except FileNotFoundError:
         print(f"distil wrap: command not found: {command[0]}", file=sys.stderr)

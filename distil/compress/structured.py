@@ -18,6 +18,7 @@ existing Tier-0/Tier-1 path.
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 # NOTE: None is deliberately EXCLUDED. In the columnar form a null cell and a
@@ -27,6 +28,12 @@ import json
 _SCALAR = (str, int, float, bool)
 _SEP = "\t"
 _HDR = "«"  # « — an unambiguous, rare marker so the compact form is recognisable
+
+
+def _handle(text: str) -> str:
+    """8-hex SHA-256 prefix — mirrors tier1._handle so a folded marker resolves
+    against the same restore key the caller (Tier1Reversible.compress) records."""
+    return hashlib.sha256(text.encode()).hexdigest()[:8]
 
 
 def _scalar(v: object) -> bool:
@@ -75,7 +82,13 @@ def fold(text: str) -> str | None:
             return None
         rows.append(_SEP.join(cells))
 
-    compact = f"{_HDR}rows={len(obj)} cols={','.join(cols)}{_HDR}\n" + "\n".join(rows)
+    # Embed the recovery handle in the marker so the model (and the offline grader's
+    # _HANDLE_IN_TEXT regex) can expand the fold. The handle keys the byte-exact
+    # original that Tier1Reversible.compress records under _handle(b.text) == this.
+    compact = (
+        f"{_HDR}rows={len(obj)} cols={','.join(cols)} handle={_handle(text)}{_HDR}\n"
+        + "\n".join(rows)
+    )
     return compact if len(compact) < len(s) else None
 
 
@@ -122,7 +135,7 @@ def template_fold(text: str, min_run: int = 5) -> str | None:
         run = j - i
         if run >= min_run and _SLOT in m:
             rows = [" ".join(_VAR.findall(lines[k])) for k in range(i, j)]
-            out.append(f"{_HDR}{run}× {m}{_HDR}")
+            out.append(f"{_HDR}{run}× {m} handle={_handle(text)}{_HDR}")
             out.append("vars: " + " | ".join(rows))
             changed = True
         else:

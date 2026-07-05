@@ -305,7 +305,10 @@ class TestWrap:
         assert result["id"] == "msg_fake"
         assert len(fake._calls) == 1  # type: ignore[attr-defined]
 
-    def test_wrap_compresses_before_delegating(self) -> None:
+    def test_wrap_compresses_verbatim_no_unrecoverable_stub(self) -> None:
+        # wrap() runs in verbatim mode: it must NEVER emit a Tier-1 digest stub, since
+        # the in-process wrapper has no server-side expand loop to recover it (F2). Plain
+        # text (no lossless transform applies) is therefore passed through byte-exact.
         fake = self._make_fake_client()
         client = wrap(fake)
         long_msg = _make_tool_result_message(LONG_TOOL_RESULT)
@@ -316,9 +319,23 @@ class TestWrap:
         )
         received_msgs = fake._calls[0]["messages"]  # type: ignore[attr-defined]
         compressed_content = received_msgs[0]["content"][0]["content"]
-        # The long tool_result should have been digested.
-        assert "handle=" in compressed_content
-        assert len(compressed_content) < len(LONG_TOOL_RESULT)
+        assert "handle=" not in compressed_content  # no unrecoverable digest stub
+        assert compressed_content == LONG_TOOL_RESULT  # verbatim: byte-exact passthrough
+
+    def test_wrap_applies_lossless_tier0(self) -> None:
+        # Verbatim still shrinks where it is provably lossless: a whitespace-padded JSON
+        # tool_result is minified (semantically identical, fewer tokens), never stubbed.
+        fake = self._make_fake_client()
+        client = wrap(fake)
+        padded = '{\n    "a": 1,\n    "b": [1, 2, 3]\n}'
+        msg = _make_tool_result_message(padded)
+        client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=1024,
+            messages=[msg, *_PAD],
+        )
+        received = fake._calls[0]["messages"][0]["content"][0]["content"]  # type: ignore[attr-defined]
+        assert received == '{"a":1,"b":[1,2,3]}'
 
     def test_wrap_applies_cache_control_when_system_present(self) -> None:
         fake = self._make_fake_client()

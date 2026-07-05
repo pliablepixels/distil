@@ -47,12 +47,17 @@ def stream_upstream(
     timeout: float,
     hop_by_hop: frozenset[str],
     extras: dict[str, str] | None = None,
-) -> bytes | None:
+    want_body: bool = False,
+) -> tuple[int, bytes | None]:
     """Send the request and relay the response to *handler* incrementally.
 
-    Returns the complete response body (buffered as it streamed) so callers
-    can run post-hoc accounting, or ``None`` when the request failed before
-    any response headers were relayed (an error response was already sent).
+    When ``want_body`` is set, returns the complete response body (buffered as
+    it streamed) so callers can run post-hoc accounting (shadow sampling); when
+    it is not, the body is relayed but never accumulated — N concurrent large
+    streams would otherwise pin N full responses in memory. Always returns the
+    relayed HTTP status (a synthetic 502/504 on connection failure) as the first
+    element so callers can book accounting only on a confirmed 2xx; the body is
+    ``None`` unless ``want_body`` was set and a response was read.
     Once streaming has begun, a mid-stream failure closes the connection —
     there is no valid way to append an error to a partially-delivered body.
     """
@@ -81,7 +86,7 @@ def stream_upstream(
         handler.send_header("Content-Length", str(len(rbody)))
         handler.end_headers()
         handler.wfile.write(rbody)
-        return rbody
+        return exc.code, None  # non-2xx relayed to client; not a bookable success
     except urllib.error.URLError as exc:
         status = 504 if _is_timeout(exc) else 502
         _error(
@@ -90,10 +95,10 @@ def stream_upstream(
                 {"error": "upstream connection failed", "detail": str(exc.reason)[:200]}
             ).encode(),
         )
-        return None
+        return status, None
     except TimeoutError:
         _error(504, b'{"error":"upstream timed out"}')
-        return None
+        return 504, None
 
     with resp:
         length = resp.headers.get("Content-Length")
@@ -119,7 +124,8 @@ def stream_upstream(
                 chunk = resp.read1(_CHUNK)
                 if not chunk:
                     break
-                buf += chunk
+                if want_body:
+                    buf += chunk
                 if chunked:
                     handler.wfile.write(f"{len(chunk):X}\r\n".encode() + chunk + b"\r\n")
                 else:
@@ -133,4 +139,4 @@ def stream_upstream(
             # can be appended once bytes have flowed — drop the connection but
             # keep what streamed for accounting.
             handler.close_connection = True
-        return bytes(buf)
+        return resp.status, (bytes(buf) if want_body else None)
