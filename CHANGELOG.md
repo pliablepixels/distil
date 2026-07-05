@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.11.0] — 2026-07-05 — Ops-ready: debuggable fail-open, crash-safe accounting, health probes; claims audit
 
 ### Added
 - **`GET /distil/health`** on all three entry points (sync proxy, async proxy, gateway): unauthenticated liveness probe for load balancers / k8s readiness checks. Answers locally — never touches the billed upstream.
