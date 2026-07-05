@@ -1676,10 +1676,15 @@ def test_stats_text_warns_on_legacy_records(tmp_path, monkeypatch, capsys) -> No
 
     p = tmp_path / "savings.jsonl"
     rec = {
-        "trajectory_id": "live-proxy", "model": "m", "turns": 1,
-        "baseline_dollars": 1.0, "distil_dollars": 0.5,
-        "baseline_input_tokens": 1000, "distil_input_tokens": 500,
-        "tokenizer": "heuristic", "ts": 1.0,
+        "trajectory_id": "live-proxy",
+        "model": "m",
+        "turns": 1,
+        "baseline_dollars": 1.0,
+        "distil_dollars": 0.5,
+        "baseline_input_tokens": 1000,
+        "distil_input_tokens": 500,
+        "tokenizer": "heuristic",
+        "ts": 1.0,
     }  # no "acct" key -> legacy era
     p.write_text(_json.dumps(rec) + "\n", encoding="utf-8")
     monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
@@ -1695,10 +1700,15 @@ def test_cmd_reset_archives_ledger(tmp_path, monkeypatch, capsys) -> None:
 
     p = tmp_path / "savings.jsonl"
     rec = {
-        "trajectory_id": "live-proxy", "model": "m", "turns": 1,
-        "baseline_dollars": 1.0, "distil_dollars": 0.5,
-        "baseline_input_tokens": 1000, "distil_input_tokens": 500,
-        "tokenizer": "heuristic", "ts": 1.0,
+        "trajectory_id": "live-proxy",
+        "model": "m",
+        "turns": 1,
+        "baseline_dollars": 1.0,
+        "distil_dollars": 0.5,
+        "baseline_input_tokens": 1000,
+        "distil_input_tokens": 500,
+        "tokenizer": "heuristic",
+        "ts": 1.0,
     }
     p.write_text(_json.dumps(rec) + "\n", encoding="utf-8")
     monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
@@ -1720,14 +1730,24 @@ def test_statusline_says_off_when_session_not_routed(tmp_path, monkeypatch, caps
 
     p = tmp_path / "savings.jsonl"
     rec = {
-        "trajectory_id": "live-proxy", "model": "m", "turns": 1,
-        "baseline_dollars": 1.0, "distil_dollars": 0.5,
-        "baseline_input_tokens": 1000, "distil_input_tokens": 500,
-        "tokenizer": "heuristic", "ts": 1.0,
+        "trajectory_id": "live-proxy",
+        "model": "m",
+        "turns": 1,
+        "baseline_dollars": 1.0,
+        "distil_dollars": 0.5,
+        "baseline_input_tokens": 1000,
+        "distil_input_tokens": 500,
+        "tokenizer": "heuristic",
+        "ts": 1.0,
     }
     p.write_text(_json.dumps(rec) + "\n", encoding="utf-8")
     monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
-    for var in ("DISTIL_SESSION", "ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL"):
+    for var in (
+        "DISTIL_SESSION",
+        "ANTHROPIC_BASE_URL",
+        "OPENAI_BASE_URL",
+        "GOOGLE_GEMINI_BASE_URL",
+    ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
@@ -1738,3 +1758,75 @@ def test_statusline_says_off_when_session_not_routed(tmp_path, monkeypatch, caps
     monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
     assert "✓ on" in capsys.readouterr().out
+
+
+def test_statusline_empty_ledger_respects_routed_session(tmp_path, monkeypatch, capsys) -> None:
+    """A wrapped session with zero recorded runs must not be told to run `distil wrap`."""
+    from distil import ledger as ledger_mod
+
+    monkeypatch.setattr(ledger_mod, "default_path", lambda: tmp_path / "savings.jsonl")
+    for var in (
+        "DISTIL_SESSION",
+        "ANTHROPIC_BASE_URL",
+        "OPENAI_BASE_URL",
+        "GOOGLE_GEMINI_BASE_URL",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("DISTIL_STATUSLINE", raising=False)
+
+    # Unrouted + empty ledger: keep the actionable wrap hint.
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
+    out = capsys.readouterr().out
+    assert "distil wrap -- <agent>" in out and "✓ on" not in out
+
+    # Routed (wrap env) + empty ledger: honest "on", no wrap hint.
+    monkeypatch.setenv("DISTIL_SESSION", "s123")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
+    out = capsys.readouterr().out
+    assert "✓ on" in out and "no savings yet" in out and "distil wrap -- <agent>" not in out
+
+    # Minimal mode, routed + empty ledger: "on", not the wrap hint.
+    monkeypatch.setenv("DISTIL_STATUSLINE", "minimal")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert cli.cmd_statusline(argparse.Namespace(no_color=True)) == 0
+    out = capsys.readouterr().out
+    assert "on" in out and "wrap -- <agent>" not in out
+
+
+def test_default_alias_verify_hint_does_not_mention_env_var(tmp_path, monkeypatch, capsys) -> None:
+    """Alias mode never exports ANTHROPIC_BASE_URL to the shell, so the printed
+    verification step must not tell users to echo it there."""
+    import distil.setup as setup_mod
+    from distil import onboard
+
+    rc_file = tmp_path / ".zshrc"
+    rc_file.write_text("# rc\n", encoding="utf-8")
+    monkeypatch.setattr(setup_mod, "detect_shell", lambda: ("zsh", rc_file))
+    monkeypatch.setattr(
+        onboard,
+        "detect",
+        lambda: onboard.Env(
+            os_name="Darwin",
+            agents=[("claude", "Claude Code")],
+            subscription=False,
+        ),
+    )
+    assert (
+        cli.cmd_default(
+            argparse.Namespace(
+                rc=None,
+                agent="claude",
+                mode="lossless-only",
+                port=8788,
+                undo=False,
+                always_on=False,
+                no_start=False,
+            )
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "type claude" in out
+    assert "echo $ANTHROPIC_BASE_URL" not in out

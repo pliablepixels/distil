@@ -137,7 +137,9 @@ def cmd_reset(args: argparse.Namespace) -> int:
         src.rename(dst)
         legacy = f" ({s.legacy_records:,} pre-1.10 records)" if s.legacy_records else ""
         print(f"savings ledger archived → {dst}")
-        print(f"  {s.runs} runs, {s.total_tokens_saved:,} tokens saved{legacy} — kept for audit, no longer counted")
+        print(
+            f"  {s.runs} runs, {s.total_tokens_saved:,} tokens saved{legacy} — kept for audit, no longer counted"
+        )
         reset_any = True
     if getattr(args, "shadow", False):
         from .shadow import _state_dir
@@ -603,12 +605,25 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         except Exception:  # noqa: BLE001 — live slice is best-effort
             return ledger.LedgerSummary(0, 0.0, 0, {})
 
+    # "on" must mean THIS session's requests route through distil: wrap sets
+    # DISTIL_SESSION in the agent's env; always-on setups point the base URL
+    # at loopback. Neither present -> requests go direct, say so honestly.
+    # Checked BEFORE the empty-ledger branch too: a freshly wrapped session has
+    # zero recorded runs, and telling it to run `distil wrap` would be a lie.
+    _routed = bool(os.environ.get("DISTIL_SESSION")) or any(
+        h in os.environ.get(v, "")
+        for v in ("ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL")
+        for h in ("127.0.0.1", "localhost")
+    )
+
     # MINIMAL is opt-in (DISTIL_STATUSLINE=minimal|lite|compact) — a two-fact
     # segment for crowded composite lines: this session's saving + lifetime.
     if os.environ.get("DISTIL_STATUSLINE", "").lower() in ("minimal", "lite", "compact"):
         mseg = [c("1;38;5;79", "distil")]
         if s is None or s.runs == 0:
-            mseg.append(c("38;5;73", "wrap -- <agent> to start"))
+            mseg.append(
+                c("1;38;5;84", "on") if _routed else c("38;5;73", "wrap -- <agent> to start")
+            )
         else:
             live_saved = _live().total_tokens_saved
             if live_saved > 0:
@@ -630,7 +645,10 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     # Full breakdown: distil stats / dashboard.
     parts = [c("1;38;5;79", "distil")]
     if s is None or s.runs == 0:
-        parts.append(c("38;5;73", "no savings yet · distil wrap -- <agent>"))
+        if _routed:
+            parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · no savings yet"))
+        else:
+            parts.append(c("38;5;73", "no savings yet · distil wrap -- <agent>"))
     else:
         from .doctor import subscription_mode
 
@@ -641,14 +659,6 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         #          = ✓ on   (set up, idle — no traffic this session)
         # LIVE = THIS session under `distil wrap` (DISTIL_SESSION), so each
         # terminal shows only its own; total = lifetime across all sessions.
-        # "on" must mean THIS session's requests route through distil: wrap sets
-        # DISTIL_SESSION in the agent's env; always-on setups point the base URL
-        # at loopback. Neither present -> requests go direct, say so honestly.
-        _routed = bool(os.environ.get("DISTIL_SESSION")) or any(
-            h in os.environ.get(v, "")
-            for v in ("ANTHROPIC_BASE_URL", "OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL")
-            for h in ("127.0.0.1", "localhost")
-        )
         recent = _live()
         if not _routed:
             parts.append(c("38;5;178", "off — session not routed"))
@@ -1083,7 +1093,10 @@ def cmd_default(args: argparse.Namespace) -> int:
     print(f"     1. reload this shell:   source {rc}")
     print(f"     2. RESTART {agent}:       any {agent} already running was launched")
     print("        before the alias, so it bypasses distil. Start a fresh one.")
-    print("     verify it's routed:     echo $ANTHROPIC_BASE_URL   (should not be empty)")
+    # alias mode sets the base URL only inside the wrapped agent's env — the
+    # shell's $ANTHROPIC_BASE_URL stays empty by design, so verify via the
+    # alias, not the env var (env-var verify belongs to --always-on only).
+    print(f"     verify it's routed:     type {agent}   (should show the distil wrap alias)")
     print("\n  Undo anytime: distil default --undo")
     return 0
 
