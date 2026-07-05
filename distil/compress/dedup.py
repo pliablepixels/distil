@@ -63,7 +63,7 @@ class StreamingDedup:
                         restore[h] = b.text  # byte-exact original, expandable
                         out.append(
                             b.copy_with(
-                                f"«repeat of earlier tool output {h} (first seen turn {first_turn})»"
+                                f"«repeat of earlier tool output handle={h} (first seen turn {first_turn})»"
                             )
                         )
                         continue

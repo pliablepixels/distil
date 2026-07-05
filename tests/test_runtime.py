@@ -146,3 +146,17 @@ def test_render_html_uses_real_ledger_numbers(tmp_path):
     html = ledger.render_html(ledger.summary(led))
     assert "savings" in html.lower()
     assert "live-proxy" in html  # the real source label, not dummy data
+
+
+def test_zero_savings_window_writes_no_ledger_row(tmp_path):
+    """A verbatim/lossless-only window (before == after) must not add 0-rows."""
+    led = tmp_path / "savings.jsonl"
+    rs = RuntimeSavings(model="claude-opus-4-8", ledger_path=led)
+    rs.record(1000, 1000)
+    rs.record(500, 500)
+    rs.flush()
+    assert not led.exists() or led.read_text() == ""
+    # A window that DID save still writes.
+    rs.record(1000, 600)
+    assert rs.flush() is True
+    assert ledger.summary(led).total_tokens_saved == 400

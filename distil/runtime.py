@@ -113,6 +113,8 @@ class RuntimeSavings:
             for mid, (n, before, after) in self.by_model.items():
                 if before == 0:
                     continue  # nothing measured — a zero-baseline record is noise
+                if before <= after:
+                    continue  # nothing saved (e.g. a verbatim/lossless-only window) — a 0-row is noise
                 price = pricing.resolve(mid)
                 per_tok = price.input if price is not None else 0.0
                 ledger.record(

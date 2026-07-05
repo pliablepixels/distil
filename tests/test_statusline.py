@@ -126,7 +126,7 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
             shadow.ShadowLedger, "load", classmethod(lambda cls, *a, _l=led_with(changes), **k: _l)
         )
         _rc, out = _run(monkeypatch, capsys, s, no_color=False)
-        assert f"{code}eq " in out, out
+        assert f"{code}de " in out, out
 
 
 def test_run_counts_not_in_line(monkeypatch, capsys):
@@ -341,7 +341,7 @@ def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
 
 
 def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
-    """eq 100.0% over 1 sample is noise wearing a number — suppressed until 25."""
+    """de 100.0% (a rate) over 1 sample is noise wearing a number — suppressed until 25."""
     import distil.shadow as shadow
 
     s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
@@ -350,7 +350,7 @@ def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
     led.recent.append(1)
     monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
     _rc, out = _run(monkeypatch, capsys, s)
-    assert "eq" not in out  # no rate claimed below 25 samples
+    assert "%" not in out  # no rate claimed below 25 samples
     assert "de 1/25" in out  # FIX 6: but collection progress is shown ("warming up")
 
 

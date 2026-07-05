@@ -43,3 +43,17 @@ def test_reset_on_new_pass():
     # a non-increasing turn index signals a fresh measurement pass → clean memory
     out, r = dd.compress([_block(_BIG)], 0)
     assert out[0].text == _BIG and not r
+
+
+def test_repeat_marker_is_expand_recoverable():
+    """The «repeat» marker must carry the handle= form the expand path keys on."""
+    from distil.replay.expand_runner import _HANDLE_IN_TEXT
+
+    dd = StreamingDedup()
+    dd.compress([_block(_BIG)], 0)
+    out, restore = dd.compress([_block(_BIG)], 1)
+    marker = out[0].text
+    assert "repeat of earlier tool output" in marker
+    m = _HANDLE_IN_TEXT.search(marker)
+    assert m, f"expand regex must match the repeat marker: {marker!r}"
+    assert restore[m.group(1)] == _BIG  # handle resolves to the byte-exact original
