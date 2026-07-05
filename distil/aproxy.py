@@ -24,6 +24,7 @@ import os
 from collections.abc import Callable
 from typing import Any
 
+from ._log import log
 from .adapters.anthropic import compress_messages
 from .adapters.gemini import compress_generate_request
 from .adapters.gemini import count_tokens as _gemini_count
@@ -260,6 +261,7 @@ def make_app(
                 try:
                     compressed, _store = compress_messages(original, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
+                    log.debug("compress_messages failed; forwarding uncompressed", exc_info=True)
                     compressed = original
                 saved = _tokens_saved(original, compressed)
                 body = {**body, "messages": compressed}
@@ -283,7 +285,7 @@ def make_app(
                 try:
                     body, _store = compress_generate_request(body, verbatim=verbatim)
                 except Exception:  # noqa: BLE001 — compression must never break a request
-                    pass
+                    log.debug("gemini compression failed; forwarding uncompressed", exc_info=True)
                 saved = max(0, before_tok - _gemini_count(body))
                 extras = {
                     "x-distil-compressed": "1",
@@ -355,6 +357,12 @@ def make_app(
     app = web.Application(client_max_size=MAX_BODY_BYTES)
     app.on_startup.append(_on_startup)
     app.on_cleanup.append(_on_cleanup)
+
+    async def _health(request: web.Request) -> web.Response:  # noqa: ARG001
+        # Liveness probe: answers locally, never touches the billed upstream.
+        return web.json_response({"status": "ok"})
+
+    app.router.add_get("/distil/health", _health)
 
     # Register compressible POST paths explicitly; everything else hits the wildcard.
     for path in _COMPRESSIBLE_PATHS:

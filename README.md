@@ -46,11 +46,11 @@
 <tr><td><b>Distil</b> (gated + surprise digest, v1.7)</td><td align="center"><b>42.0%</b></td><td align="center">✅ <b>+2.8pp over full</b> <sub>(CI −0.6..+6.2)</sub></td><td align="center">✅</td></tr>
 <tr><td><b>Distil</b> (relevance-gated, E8)</td><td align="center"><b>36.8%</b></td><td align="center">✅</td><td align="center">✅</td></tr>
 <tr><td>Headroom <sub>(lossy)</sub></td><td align="center">32.6%</td><td align="center">❌ −6.6pp</td><td align="center">❌</td></tr>
-<tr><td>LLMLingua-2 <sub>(lossy)</sub></td><td align="center">2.4%</td><td align="center">❌ −36.8pp</td><td align="center">❌</td></tr>
+<tr><td>LLMLingua-2 <sub>(lossy — only 16/500 runs completed)</sub></td><td align="center">2.4%</td><td align="center">❌ −36.8pp</td><td align="center">❌</td></tr>
 <tr><td>no compression <sub>(full)</sub></td><td align="center">39.2%</td><td align="center">—</td><td align="center">—</td></tr>
 </table>
 
-<p align="center"><b>Distil is the only compressor statistically tied with full context — and its v1.7 surprise-preserving digest lands <i>above</i> full context (42.0% vs 39.2%, paired non-inferiority certified)</b> while every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool. <a href="#-the-proof">Full breakdown ↓</a></p>
+<p align="center"><b>Distil is the only compressor statistically tied with full context — and its v1.7 surprise-preserving digest lands <i>above</i> full context (42.0% vs 39.2%, paired non-inferiority certified)</b> while every lossy tool craters. And on the live head-to-head above (graded by <code>claude-opus-4-8</code>), it certifies <b>83.2% savings at a 0% decision-change rate</b>, ~1,000× faster than the nearest tool <sub>(distil is pure-Python heuristics — no local ML model; competitors run transformer inference)</sub>. <a href="#-the-proof">Full breakdown ↓</a></p>
 
 ---
 
@@ -124,7 +124,7 @@ You don't need byte-equivalence — you need **decision-equivalence**: your agen
 - **Compounds on outcomes** — expansions and matched failures teach the policy what to protect (signatures only, never content) — always *more* conservative.
 - **Streams like it isn't there** — SSE relays chunk-by-chunk; TTFT preserved.
 
-> **Fidelity tiers:** lossless (`--verbatim`) · reversible (byte-recoverable on demand — default) · lossy (every other tool). Only Distil offers and certifies the reversible tier.
+> **Fidelity tiers:** lossless (`--verbatim`) · reversible (byte-recoverable on demand — default) · lossy (every other tool). Only Distil *certifies* the reversible tier (Headroom ships an uncertified retrieve; Distil's recovery is agent-facing — the model expands mid-task — and gated by the decision-equivalence certificate).
 
 ---
 
@@ -167,7 +167,7 @@ GATE: PASS — every trajectory certified non-inferior; aggressive rejected on a
 
 Three results, all reproducible, all published with caveats:
 
-- **Live head-to-head** vs real `llmlingua` / `headroom-ai` (graded by `claude-opus-4-8`): **83.2% savings at 0% decision-change**, ~1,000× faster. The live proxy behavior is pinned to the certified strategy by `tests/test_live_certified_equivalence.py`; the one reviewed delta is a recency carve-out that keeps the last few tool-result turns verbatim (an agent needs its freshest output byte-exact). → [benchmark](https://dshakes.github.io/distil/benchmark.html)
+- **Live head-to-head** vs real `llmlingua` / `headroom-ai` (graded by `claude-opus-4-8`): **83.2% savings at 0% decision-change**, ~1,000× faster (no ML model loaded vs. competitors' local transformer inference). The live proxy behavior is pinned to the certified strategy by `tests/test_live_certified_equivalence.py`; the one reviewed delta is a recency carve-out that keeps the last few tool-result turns verbatim (an agent needs its freshest output byte-exact). → [benchmark](https://dshakes.github.io/distil/benchmark.html)
 - **E7 (SWE-bench Verified):** aggressive *lossy* compression **craters** task success (52% → 16%) — a per-step certificate doesn't transfer to multi-turn. The **reversible** tier survives (56% vs 52%). We publish it because it's true. → [E7](https://dshakes.github.io/distil/research.html#e7)
 - **E8–E14 (500-instance agent):** the reversible tier is the **only compressor non-inferior to full context**, generalizes across 5 models / 3 vendors, and the newest digest lands *above* full (42.0% vs 39.2%). → [E8–E14](https://dshakes.github.io/distil/research.html#e8)
 
@@ -343,7 +343,7 @@ It refuses to certify on small samples, states its exchangeability assumptions i
 
 ## 🧩 What's inside
 
-40+ shipped capabilities, all real (no stubs): the cache-aware cost engine, causal pruning, the TOST gate + conformal certificate, the proxy + Anthropic/OpenAI/Gemini adapters, an MCP server, LiteLLM/LangChain/LangGraph hooks, learned keep-models, output compression, and a Rust hot-path core — with **zero runtime dependencies** in the core.
+40+ shipped capabilities, all real (no stubs): the cache-aware cost engine, causal pruning, the TOST gate + conformal certificate, the proxy + Anthropic/OpenAI/Gemini adapters, an MCP server, LiteLLM/LangChain/LangGraph hooks, learned keep-models, output compression, and an optional Rust hot-path core (build-from-source via `maturin`; published wheels run the pure-Python engine, same API) — with **zero runtime dependencies** in the core.
 
 Full module-by-module map: [Architecture](https://dshakes.github.io/distil/architecture.html) · [Techniques](https://dshakes.github.io/distil/techniques.html) · [CLI reference](https://dshakes.github.io/distil/cli.html).
 
@@ -352,7 +352,8 @@ Full module-by-module map: [Architecture](https://dshakes.github.io/distil/archi
 - **Localhost-only by default** — the proxy binds `127.0.0.1` and forwards only to the single configured upstream (no SSRF).
 - **No secret/body logging** — request bodies and credentials are never logged.
 - **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions to Tier-0 verbatim only: no Tier-1 digest stubs, no tool injection (provider-ToS-safe). Without an injected expand tool the agent cannot recover a stub, so `--lossless-only` folds directly into verbatim — no separate `--verbatim` flag needed.
-- **Minimal local persistence** — digest originals are written to `~/.distil/restore/` (respects `DISTIL_HOME`) so handles survive proxy restarts. For strict ZDR deployments, point `DISTIL_HOME` at an ephemeral path or clear that directory between sessions. No data is forwarded upstream.
+- **Minimal local persistence** — digest originals are written to `~/.distil/restore/` (respects `DISTIL_HOME`) so handles survive proxy restarts, and age out after `DISTIL_RESTORE_TTL_DAYS` (default 14). For strict ZDR deployments, point `DISTIL_HOME` at an ephemeral path or clear that directory between sessions. No data is forwarded upstream.
+- **Ops-ready** — unauthenticated `GET /distil/health` liveness probe on every entry point (never touches the billed upstream); gateway accounting checkpoints to disk every 30 s (crash-safe, not just on graceful shutdown); `DISTIL_DEBUG=1` surfaces everything the fail-open compression path swallows.
 
 See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) for topologies (local sidecar, container sidecar, shared gateway) and the threat model.
 

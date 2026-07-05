@@ -251,13 +251,18 @@ distil gateway listening on http://127.0.0.1:8789
         <p>Returns a JSON snapshot of per-tenant and aggregate token/dollar savings. Suitable for polling from CI, alerting systems, or a cost dashboard.</p>
       </div>
       <div class="card">
+        <div class="tag">Liveness</div>
+        <h3><code>GET /distil/health</code></h3>
+        <p>Unauthenticated liveness probe for load balancers and Kubernetes readiness checks. Answers <code>{"status":"ok"}</code> locally on the proxy, the async proxy, and the gateway — it never touches the (billed) upstream and leaks nothing but "up".</p>
+      </div>
+      <div class="card">
         <div class="tag">Live dashboard</div>
         <h3><code>GET /distil/dashboard</code></h3>
         <p>Self-contained dark HTML page that auto-refreshes every 5 seconds. Served inline — no CDN or external assets. Shows per-tenant requests, tokens saved, dollars saved, and compression rate.</p>
       </div>
     </div>
 
-    <p>Both endpoints are gated by <code>_admin_authorized()</code>: open with no restriction on a loopback bind and no token configured (single-operator local use); everywhere else — including any non-loopback bind — a valid <code>Authorization: Bearer &lt;admin-token&gt;</code> is required, or the route replies <code>403</code>/<code>401</code> rather than serving per-tenant usage data to the network.</p>
+    <p><code>/distil/health</code> is deliberately exempt from auth. The stats and dashboard endpoints are gated by <code>_admin_authorized()</code>: open with no restriction on a loopback bind and no token configured (single-operator local use); everywhere else — including any non-loopback bind — a valid <code>Authorization: Bearer &lt;admin-token&gt;</code> is required, or the route replies <code>403</code>/<code>401</code> rather than serving per-tenant usage data to the network.</p>
 
     <pre class="term"><span class="d"># Non-loopback bind without a token: /distil/* is refused, not silently open</span>
 <span class="d">$ distil gateway --host 0.0.0.0 --port 8789 --upstream https://api.anthropic.com</span>
@@ -323,6 +328,17 @@ distil gateway listening on http://0.0.0.0:8789
 
     <pre class="term"><span class="d"># Give a slow upstream more room before the proxy gives up</span>
 <span class="d">$ DISTIL_UPSTREAM_TIMEOUT=120 distil proxy --upstream https://api.anthropic.com</span></pre>
+
+    <hr/>
+
+    <h2 id="observability">Debugging in production</h2>
+
+    <p>Compression is <strong>fail-open</strong>: any error in the compression path is swallowed and the request is forwarded uncompressed — a compression bug must never break an agent session. The flip side is that a silently failing compressor looks like "savings trending to zero". Set <code>DISTIL_DEBUG=1</code> (or <code>DISTIL_LOG_LEVEL=DEBUG</code>) and every swallowed exception is written to stderr with a traceback via the <code>distil</code> logger. Handlers attach to the <code>distil</code> logger only, never the root logger, so embedding applications are unaffected.</p>
+
+    <pre class="term"><span class="d"># See exactly what the fail-open paths are swallowing</span>
+<span class="d">$ DISTIL_DEBUG=1 distil wrap -- claude</span></pre>
+
+    <p><strong>Crash-safe accounting.</strong> The gateway checkpoints per-tenant token/dollar counters to disk at most every 30&nbsp;seconds during traffic (atomic replace), in addition to the save on graceful shutdown — a <code>kill -9</code> or container OOM loses at most 30&nbsp;seconds of accounting, not the whole day. <strong>Restore-store retention:</strong> digest originals age out after <code>DISTIL_RESTORE_TTL_DAYS</code> (default 14, <code>0</code> disables) on top of the 500-file count cap, so plaintext agent content never sits on disk indefinitely.</p>
 
     <hr/>
 

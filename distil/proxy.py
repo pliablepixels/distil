@@ -29,6 +29,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from ._log import log
 from .adapters.anthropic import compress_messages
 from .adapters.gemini import compress_generate_request
 from .adapters.gemini import count_tokens
@@ -299,7 +300,20 @@ def build_handler(
                 self._passthrough()
 
         def do_GET(self) -> None:  # noqa: N802
+            if strip_query(self.path) == "/distil/health":
+                self._respond_health()
+                return
             self._passthrough()
+
+        def _respond_health(self) -> None:
+            # Liveness probe for load balancers/k8s: answers locally, never
+            # touches the (billed) upstream and needs no auth.
+            payload = b'{"status":"ok"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
 
         def do_PUT(self) -> None:  # noqa: N802
             self._passthrough()
@@ -449,10 +463,12 @@ def build_handler(
                         _sess = get_session(session_key(original))
                         pre, _dstore, _dstats = delta_encode(original, session=_sess)
                     except Exception:  # noqa: BLE001 — never break a request
+                        log.debug("cache-delta encode failed", exc_info=True)
                         pre, _dstore, _dstats = original, None, None
                 try:
                     compressed, store = compress_messages(pre, verbatim=verbatim, keep=_learn_keep)
                 except Exception:  # noqa: BLE001 — compression must never break a request
+                    log.debug("compress_messages failed; forwarding uncompressed", exc_info=True)
                     compressed, store = pre, None
                 # Merge cache-delta references into the store so distil_expand recovers them.
                 if _dstore is not None and store is not None:
@@ -469,7 +485,7 @@ def build_handler(
                         try:
                             _learn_stats.record_digest(signature(store.expand(h)))
                         except Exception:  # noqa: BLE001 — learning never breaks a request
-                            pass
+                            log.debug("learning tally failed", exc_info=True)
                 before_tok = _count_messages(original)
                 after_tok = _count_messages(compressed)
                 saved = max(0, before_tok - after_tok)
@@ -520,6 +536,7 @@ def build_handler(
                         body, verbatim=verbatim, keep=_learn_keep
                     )
                 except Exception:  # noqa: BLE001 — compression must never break a request
+                    log.debug("gemini compression failed; forwarding uncompressed", exc_info=True)
                     store = None
                 if _learn_stats is not None and getattr(store, "handles", None):
                     from .learn import signature
@@ -528,7 +545,7 @@ def build_handler(
                         try:
                             _learn_stats.record_digest(signature(store.expand(h)))
                         except Exception:  # noqa: BLE001 — learning never breaks a request
-                            pass
+                            log.debug("learning tally failed", exc_info=True)
                 after_tok = count_tokens(body)
                 saved = max(0, before_tok - after_tok)
                 extras = {
@@ -642,7 +659,7 @@ def build_handler(
                     if _shadow_ledger is not None and "none" not in (comp_sig, orig_sig):
                         _shadow_ledger.record(comp_sig == orig_sig)
                 except Exception:  # noqa: BLE001 — shadow must never affect the request
-                    pass
+                    log.debug("shadow compare failed", exc_info=True)
 
             # Track the thread so teardown can drain it: a daemon thread is
             # killed on process exit, which loses the sample on a quick run
@@ -863,7 +880,22 @@ def wrap_run(
     )
     server = QuietHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
     base = f"http://{host}:{server.server_address[1]}"
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    def _serve_resilient() -> None:
+        # Self-heal: if serve_forever ever dies, the wrapped agent would get
+        # connection-refused for the rest of the session with no signal. Log
+        # loudly and re-enter the accept loop; the socket stays bound.
+        import sys as _sys
+
+        while True:
+            try:
+                server.serve_forever()
+                return  # clean shutdown()
+            except Exception:  # noqa: BLE001 — keep the session alive
+                log.warning("wrap proxy accept loop crashed; restarting", exc_info=True)
+                print("distil: proxy accept loop crashed — restarting", file=_sys.stderr)
+
+    threading.Thread(target=_serve_resilient, daemon=True).start()
 
     child_env = dict(os.environ)
     child_env[env_var] = base

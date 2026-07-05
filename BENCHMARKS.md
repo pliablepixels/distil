@@ -9,18 +9,18 @@
 ## TL;DR
 
 On a realistic, decision-determined agent corpus (5 domains, 120 turns, 4.5–6.5 KB/turn),
-graded live by `claude-opus-4-8`:
+graded live by `claude-opus-4-8` (run **2026-07-05**, raw output committed at [`docs/paper/results/derc_live_compare.2026-07-05.log`](docs/paper/results/derc_live_compare.2026-07-05.log)):
 
 | method | token savings | live decision-change | certifies ≤5% @ 95%? | compression latency / turn |
 |---|---:|---:|:--:|---:|
 | **Distil** (causal-prune + reversible) | **83.2%** | **0.0%** | ✅ **yes** | **0.026 ms** |
-| LLMLingua-2 (`llmlingua` 0.2.2) | 53.1% | 20.0% | ❌ no | ~1,480 ms |
-| Headroom (`headroom-ai` 0.27.0) | 35.3% | 0.0% | ✅ yes | 26 ms |
+| LLMLingua-2 (`llmlingua` 0.2.2) | 53.1% | 12.5% | ❌ no | ~1,480 ms |
+| Headroom (`headroom-ai` 0.27.0) | 39.7% | 0.0% | ✅ yes | 26 ms |
 | RTK (`rtk-py` 0.42.4.1) | — | — | excluded | — |
 
 **Distil is the only method that is simultaneously the most aggressive, fully
 decision-equivalent, and the lowest latency.** Headroom is decision-safe but
-2.4× less aggressive; LLMLingua-2 is aggressive but flips 1-in-5 decisions;
+2.1× less aggressive; LLMLingua-2 is aggressive but flips 1-in-8 decisions;
 RTK operates at a different layer (see below).
 
 ---
@@ -162,17 +162,17 @@ Decision-aware: keeps `decision_relevant` blocks byte-exact, prunes causally-ine
 blocks (the ablation thesis), losslessly compacts the rest. Highest certified
 savings, zero decision change, sub-millisecond.
 
-### Headroom (`headroom-ai` 0.27.0) — 35.3% savings, 0.0% decision-change ✅
+### Headroom (`headroom-ai` 0.27.0) — 39.7% savings, 0.0% decision-change ✅
 Real package, invoked fairly: blocks presented as a `tool_use → tool_result`
 conversation with `optimize=True` (the per-block seam silently no-ops it — that's
 an integration trap, not Headroom's fault). **Decision-safe** — it preserved the
 exact target ID on every turn — but **2.4× less aggressive** than Distil, and it
 loads a ModernBERT scorer (26 ms/turn vs Distil's 0.026 ms).
 
-### LLMLingua-2 (`llmlingua` 0.2.2) — 53.1% savings, 20.0% decision-change ❌
+### LLMLingua-2 (`llmlingua` 0.2.2) — 53.1% savings, 12.5% decision-change ❌
 Real package (`microsoft/llmlingua-2-xlm-roberta-large-meetingbank`, CPU,
 rate=0.5). Aggressive extractive token classification — but **decision-unaware**:
-it drops/garbles the load-bearing ID on **1-in-5** turns, so it **fails the gate**.
+it drops/garbles the load-bearing ID on **1-in-8** turns, so it **fails the gate**.
 This is the decision-equivalence thesis vindicated against the canonical academic
 compressor. Also ~1,480 ms/turn (transformer inference on CPU).
 

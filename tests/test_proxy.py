@@ -266,3 +266,18 @@ def test_build_handler_eager_loads_request_path_modules() -> None:
     build_handler("http://127.0.0.1:1")
     assert "distil.streamrelay" in sys.modules
     assert "distil.compress.guideline" in sys.modules
+
+
+# ---------------------------------------------------------------------------
+# Health endpoint: answers locally, never hits upstream
+# ---------------------------------------------------------------------------
+
+
+def test_health_endpoint_answers_locally(servers: Any) -> None:
+    proxy_port, _ = servers
+    with urllib.request.urlopen(f"http://127.0.0.1:{proxy_port}/distil/health") as resp:
+        assert resp.status == 200
+        assert json.loads(resp.read()) == {"status": "ok"}
+    # A non-health GET still passes through to the upstream (echoes its path).
+    with urllib.request.urlopen(f"http://127.0.0.1:{proxy_port}/v1/models") as resp:
+        assert resp.read() == b"/v1/models"

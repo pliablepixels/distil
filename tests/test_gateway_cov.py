@@ -453,3 +453,30 @@ def test_gateway_explicit_tenant_echoed_in_response(gw: Any) -> None:
     )
     assert status == 200
     assert resp.headers.get("x-distil-tenant") == "myteam"
+
+
+# ---------------------------------------------------------------------------
+# Health endpoint + crash-safety checkpoint
+# ---------------------------------------------------------------------------
+
+
+def test_gateway_health_unauthenticated(gw: Any) -> None:
+    gw_port, _state = gw
+    status, _resp, data = _req("GET", gw_port, "/distil/health")
+    assert status == 200
+    assert json.loads(data) == {"status": "ok"}
+
+
+def test_state_record_checkpoints_periodically(tmp_path: Any, monkeypatch: Any) -> None:
+    """record() persists to disk once the checkpoint interval has elapsed —
+    a kill -9 must not zero more than _CHECKPOINT_SECS of tenant accounting."""
+    import distil.gateway as gwmod
+
+    monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+    price = pricing_get("claude-opus-4-8")
+    state = GatewayState(price)
+    state._last_save -= gwmod._CHECKPOINT_SECS + 1  # pretend the interval elapsed
+    state.record("tenant-a", 100, 40)
+    fresh = GatewayState(price)
+    fresh.load()  # reads what record() checkpointed, no explicit save()
+    assert fresh.snapshot()["tenants"][0]["requests"] == 1

@@ -3,6 +3,22 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`GET /distil/health`** on all three entry points (sync proxy, async proxy, gateway): unauthenticated liveness probe for load balancers / k8s readiness checks. Answers locally — never touches the billed upstream.
+- **Debug escape hatch for fail-open paths.** `DISTIL_DEBUG=1` (or `DISTIL_LOG_LEVEL=<level>`) logs every swallowed compression/learning/shadow exception to stderr with a traceback, via a `distil` logger that never touches the root logger. Silent-by-default is unchanged.
+- **Restore-store TTL.** Digest originals in `~/.distil/restore/` now age out after `DISTIL_RESTORE_TTL_DAYS` (default 14, `0` disables), on top of the existing 500-file count cap — plaintext agent content no longer sits on disk indefinitely under low traffic.
+- Windows CI job (`windows-latest`, 3.12) — the classifier says OS Independent; now the fcntl/termios/SIGPIPE guards are actually exercised.
+
+### Fixed
+- **Gateway accounting is crash-safe.** Per-tenant counters now checkpoint to disk at most every 30 s during traffic (atomic replace), not only in the graceful-shutdown path — a `kill -9`/OOM loses ≤ 30 s of accounting instead of everything since startup.
+- **MCP store race.** Two concurrent `distil_compress` tool calls could interleave load/save and silently drop one handle (later `distil_expand` on it failed). The read-modify-write now runs under an advisory lock, same pattern as the savings ledger.
+- **`distil wrap` proxy self-heals.** If the embedded proxy's accept loop ever crashes, it logs and restarts instead of leaving the wrapped agent with connection-refused for the rest of the session.
+
+### Changed
+- **Claims tightened to what the artifacts back** (audit follow-up): "only Distil *certifies* the reversible tier" (Headroom ships an uncertified retrieve — the old wording overclaimed "offers"); the ~1,000× speed multiple now carries its no-ML-model-vs-transformer-inference framing at first mention; LLMLingua-2's SWE-bench row notes only 16/500 runs completed; the Rust core is labeled build-from-source (published wheels run the pure-Python engine).
+
 ## [1.10.1] — 2026-07-05 — Review follow-ups
 
 ### Fixed

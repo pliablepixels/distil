@@ -108,3 +108,52 @@ def test_serve_loop_over_stdio():
     out_lines = [json.loads(line) for line in stdout.getvalue().splitlines() if line.strip()]
     # initialize + tools/list answered; the notification produced no line.
     assert [o["id"] for o in out_lines] == [1, 2]
+
+
+def test_concurrent_compress_calls_do_not_drop_handles():
+    """Two racing distil_compress calls must both survive in the store —
+    the unlocked load/load/save/save interleaving used to drop one."""
+    import threading
+
+    from distil.mcp_server import _load_store, _tool_compress
+
+    texts = [
+        "\n".join(f"alpha line {i} of stream A with some padding text" for i in range(30)),
+        "\n".join(f"beta line {i} of stream B with some padding text" for i in range(30)),
+    ]
+    results: list[str] = []
+    barrier = threading.Barrier(2)
+
+    def go(t: str) -> None:
+        barrier.wait()
+        results.append(_tool_compress({"text": t}))
+
+    threads = [threading.Thread(target=go, args=(t,)) for t in texts]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    handles = [json.loads(r)["handle"] for r in results]
+    assert all(handles)
+    store = _load_store()
+    for h in handles:
+        assert h in store
+
+
+def test_record_restore_expires_by_age(tmp_path, monkeypatch):
+    """Restore originals older than the TTL are pruned even under the count cap."""
+    import os
+    import time as _time
+
+    import distil.mcp_server as m
+
+    monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+    monkeypatch.setattr(m, "_RESTORE_TTL_DAYS", 14.0)
+    m.record_restore("aaaaaaaa", "old content")
+    old_file = m._restore_dir() / "aaaaaaaa"
+    ancient = _time.time() - 15 * 86400
+    os.utime(old_file, (ancient, ancient))
+    m.record_restore("bbbbbbbb", "new content")
+    assert not old_file.exists()
+    assert (m._restore_dir() / "bbbbbbbb").exists()

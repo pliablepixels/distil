@@ -22,8 +22,10 @@ server config as a stdio command. The protocol is newline-delimited JSON-RPC 2.0
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +46,35 @@ def _store_path() -> Path:
 
     base = Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil")))
     return base / "mcp_store.json"
+
+
+try:
+    import fcntl  # POSIX advisory locking; absent on Windows
+
+    _HAVE_FCNTL = True
+except ImportError:  # pragma: no cover - Windows
+    _HAVE_FCNTL = False
+
+
+def _store_add(handle: str, text: str) -> None:
+    """Read-modify-write the store under an advisory lock.
+
+    Two concurrent ``distil_compress`` calls (e.g. two agent sessions sharing
+    this MCP server's store) would otherwise race load/load/save/save and
+    silently drop one handle — a later ``distil_expand`` on it then fails.
+    Locks a sidecar file so the save itself can stay a simple rewrite.
+    """
+    lock_path = _store_path().with_suffix(".lock")
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("w") as lk:
+            if _HAVE_FCNTL:
+                fcntl.flock(lk.fileno(), fcntl.LOCK_EX)
+            store = _load_store()
+            store[handle] = text
+            _save_store(store)
+    except OSError:
+        pass  # best-effort; never crash a tool call
 
 
 def _load_store() -> dict[str, str]:
@@ -76,6 +107,10 @@ def _save_store(store: dict[str, str]) -> None:
 _RESTORE_CAP = (
     500  # ponytail: FIFO-by-mtime cap; raise or make configurable if long sessions outgrow it
 )
+# Age cap on top of the count cap: digest originals are real agent content
+# (can include secrets/PII), so a low-traffic store must not hold them forever.
+# 0 disables. Expired handles simply fail to expand — same as capped-out ones.
+_RESTORE_TTL_DAYS = float(os.environ.get("DISTIL_RESTORE_TTL_DAYS", "14") or 0)
 _HANDLE_RE = re.compile(r"[0-9a-f]{8}")
 
 
@@ -95,6 +130,10 @@ def record_restore(handle: str, original: str) -> None:
         p.write_text(original)
         p.chmod(0o600)  # plaintext content at rest — owner-only
         stale = sorted(d.iterdir(), key=lambda f: f.stat().st_mtime)[:-_RESTORE_CAP]
+        if _RESTORE_TTL_DAYS > 0:
+            cutoff = time.time() - _RESTORE_TTL_DAYS * 86400
+            fresh = sorted(d.iterdir(), key=lambda f: f.stat().st_mtime)[-_RESTORE_CAP:]
+            stale += [f for f in fresh if f.stat().st_mtime < cutoff]
         for old in stale:
             old.unlink()
     except OSError:
@@ -154,9 +193,7 @@ def _tool_compress(args: dict[str, Any]) -> str:
     if not changed:
         return json.dumps({"compressed": text, "handle": None, "tokens_saved": 0})
     h = _handle(text)
-    store = _load_store()
-    store[h] = text
-    _save_store(store)
+    _store_add(h, text)
     saved = max(0, _tokenizer.count(text) - _tokenizer.count(digested))
     return json.dumps({"compressed": digested, "handle": h, "tokens_saved": saved})
 
