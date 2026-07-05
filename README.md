@@ -284,6 +284,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 > | **saving** | `distil · ▼12.0K · 40% smaller · $0.31 · total ▼27.0M · ✓eq 99%` | compressing your recent traffic (last 15 min, all terminals) |
 > | **watching** | `distil · ✓ on · waiting for a large read · total ▼27.0M` | on, but no large content yet — savings come from big file/command output |
 > | **idle** | `distil · ✓ on · total ▼27.0M` | set up and on, no recent traffic |
+> | **not routed** | `distil · off — session not routed · total ▼27.0M` | this session's requests go straight to the provider — start it with `distil wrap` (or the always-on env) to compress |
 >
 > `▼` = tokens saved · `total` = lifetime · `✓eq` = decision-equivalence (shown past 25 shadow samples). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
 

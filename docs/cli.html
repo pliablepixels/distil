@@ -283,9 +283,17 @@ holdout A/B savings measurement (deterministic partition + bootstrap CI)
 
     <hr/>
 
+    <!-- reset -->
+    <h2 id="reset">distil reset</h2>
+    <p>Archives the savings ledger to <code>savings.jsonl.reset-&lt;utc-timestamp&gt;</code> (non-destructive — history stays on disk for audit) so the statusline and <code>distil stats</code> restart from zero on current accounting (records booked only after a confirmed upstream 2xx). Use it when a ledger is dominated by pre-1.10 records, whose savings may be overstated — <code>distil stats</code> warns when that is the case. <code>--shadow</code> also archives and resets the decision-equivalence counter.</p>
+    <pre class="term"><span class="d">$ distil reset</span>
+savings ledger archived → ~/.distil/savings.jsonl.reset-20260705-213313Z
+  651 runs, 114,079,320 tokens saved (643 pre-1.10 records) — kept for audit, no longer counted
+fresh start: all new records use post-1.10 accounting (booked only after upstream 2xx).</pre>
+
     <!-- leaderboard -->
     <h2 id="leaderboard">distil leaderboard</h2>
-    <p>Shows cumulative savings from all runs recorded via <code>--record</code> flags on <code>savings</code> and <code>bench</code>, plus genuine traffic recorded by <code>distil proxy</code>/<code>wrap</code>. Local-first; no data leaves the machine unless you opt in to community sharing (not currently enabled). Aliased as <code>distil stats</code> — both names run the identical command.</p>
+    <p>Shows cumulative savings from all runs recorded via <code>--record</code> flags on <code>savings</code> and <code>bench</code>, plus genuine traffic recorded by <code>distil proxy</code>/<code>wrap</code>. Local-first; no data leaves the machine unless you opt in to community sharing (not currently enabled). Aliased as <code>distil stats</code> — both names run the identical command. If the ledger contains pre-1.10 records (booked before upstream success — savings may be overstated), the output says so and points to <a href="#reset"><code>distil reset</code></a>.</p>
 
     <h3>Flags</h3>
     <table>
