@@ -22,6 +22,7 @@ server config as a stdio command. The protocol is newline-delimited JSON-RPC 2.0
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,44 @@ def _save_store(store: dict[str, str]) -> None:
         p.chmod(0o600)  # plaintext content at rest — owner-only
     except OSError:
         pass  # best-effort; never crash a tool call
+
+
+_RESTORE_CAP = (
+    500  # ponytail: FIFO-by-mtime cap; raise or make configurable if long sessions outgrow it
+)
+_HANDLE_RE = re.compile(r"[0-9a-f]{8}")
+
+
+def _restore_dir() -> Path:
+    return _store_path().parent / "restore"
+
+
+def record_restore(handle: str, original: str) -> None:
+    """Persist a digest original to disk so handles survive proxy restarts/upgrades
+    and can be expanded from other processes (e.g. this MCP server)."""
+    if not _HANDLE_RE.fullmatch(handle):
+        return
+    try:
+        d = _restore_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        p = d / handle
+        p.write_text(original)
+        p.chmod(0o600)  # plaintext content at rest — owner-only
+        stale = sorted(d.iterdir(), key=lambda f: f.stat().st_mtime)[:-_RESTORE_CAP]
+        for old in stale:
+            old.unlink()
+    except OSError:
+        pass  # best-effort; never crash a compress call
+
+
+def load_restore(handle: str) -> str | None:
+    """Return the persisted original for *handle*, or None."""
+    if not _HANDLE_RE.fullmatch(handle):  # untrusted MCP arg — no path traversal
+        return None
+    try:
+        return (_restore_dir() / handle).read_text()
+    except OSError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +166,8 @@ def _tool_expand(args: dict[str, Any]) -> str:
     if not isinstance(handle, str):
         return "error: 'handle' must be a string"
     original = _load_store().get(handle)
+    if original is None:
+        original = load_restore(handle)  # proxy-side digests persisted by record_restore
     if original is None:
         return f"error: no original found for handle {handle!r}"
     return original
