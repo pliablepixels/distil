@@ -285,6 +285,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 > | **watching** | `distil · ✓ on · waiting for a large read · total ▼27.0M` | on, but no large content yet — savings come from big file/command output |
 > | **idle** | `distil · ✓ on · total ▼27.0M` | set up and on, no recent traffic |
 > | **not routed** | `distil · off — session not routed · total ▼27.0M` | this session's requests go straight to the provider — start it with `distil wrap` (or the always-on env) to compress |
+> | **bypassing** | `distil · ⚠ wrapped, agent bypassing proxy · total ▼27.0M` | the wrap is up but zero requests reached its proxy in 3+ minutes — the agent pinned its own endpoint. **Fix: restart the wrap.** Seen mostly with claude.ai-subscription (OAuth) sessions; routing those through a custom base URL is undocumented upstream, and a session occasionally ignores it. `scripts/soak-report.sh` captures evidence if it persists |
 >
 > `▼` = tokens saved · `total` = lifetime · `✓eq` = decision-equivalence (shown past 25 shadow samples). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
 

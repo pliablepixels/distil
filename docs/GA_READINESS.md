@@ -54,6 +54,17 @@ binary and checkable; opinions don't count, evidence does.
   the copy: compression aggressiveness is calibrated per agent, never marketed as
   universally safe untuned.
 
+### Risk register (external dependencies, tracked not gated)
+
+- **Subscription-agent interception is undocumented upstream.** Claude Code
+  subscription (OAuth) traffic honors `ANTHROPIC_BASE_URL` in practice today (verified
+  live 2026-07-06: two OAuth sessions, 6.1M tokens saved), but Anthropic documents no
+  such contract, some OAuth endpoints are hardcoded (anthropics/claude-code #23022,
+  #48011), and per-session bypass has been observed once (frequency unmeasured until
+  soak markers accumulate — `scripts/soak-report.sh`). A Claude Code update could break
+  interception for subscription users; we can detect it (statusline ⚠ + marker rate)
+  but not prevent it. Mitigation: beta cohort reports auth type + marker data.
+
 ## Closed
 
 | Item | Evidence |
