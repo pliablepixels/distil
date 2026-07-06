@@ -80,11 +80,10 @@ ok "on main"
 ok "working tree clean"
 
 # version agreement across every surface that ships a version string
-INIT_V="$(grep -E '__version__' distil/__init__.py | sed -E 's/.*"([^"]+)".*/\1/')"
+# (distil/__init__.py is single-sourced from pyproject since 5e1173b — no literal to check)
 CITE_V="$(grep -E '^version:' CITATION.cff | sed -E 's/.*: *([0-9][^ ]*).*/\1/')"
-[ "$INIT_V" = "$VERSION" ] || die "distil/__init__.py is $INIT_V, pyproject is $VERSION"
 [ "$CITE_V" = "$VERSION" ] || die "CITATION.cff is $CITE_V, pyproject is $VERSION"
-ok "version $VERSION consistent (pyproject, __init__, CITATION)"
+ok "version $VERSION consistent (pyproject, CITATION)"
 
 git rev-parse "$TAG" >/dev/null 2>&1 && die "tag $TAG already exists — bump the version or delete the tag"
 ok "tag $TAG is free"

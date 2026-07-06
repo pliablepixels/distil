@@ -3,6 +3,12 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.11.3] — 2026-07-05 — Ctrl+C fix, take two: the wrap parent is now immune to SIGINT entirely
+
+### Fixed
+- **Rapid Ctrl+C could still kill a wrapped session (escape path in the 1.11.2 fix).** 1.11.2 caught the Ctrl+C `KeyboardInterrupt` only while blocked in `proc.wait()`; a press landing while the parent was executing the except clause itself (users mash Ctrl+C — Claude Code literally prompts "press ctrl-c again", and a held key auto-repeats) escaped the loop, tore the proxy down under the live agent, and killed the session on its next API call. Reproduced under a SIGINT hammer: the 1.11.2 structure died after ~1.7k signals with the agent still alive; the new one survived 1.7M. The wrap parent now installs a no-op SIGINT handler for its lifetime — immune to any number and timing of presses. A Python-level handler (unlike `SIG_IGN`) resets to default across `exec`, so the agent still receives its Ctrl+C normally (verified empirically). SIGTERM keeps terminate-child + flush-savings + exit semantics.
+- `scripts/release.sh`: dropped the stale `distil/__init__.py` version-literal check — the literal was removed when the version became single-sourced from `pyproject.toml`, so the check could only fail.
+
 ## [1.11.2] — 2026-07-05 — Ctrl+C no longer kills wrapped sessions; fresh-install statusline honesty
 
 ### Fixed
