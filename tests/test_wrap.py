@@ -98,7 +98,9 @@ def test_wrap_survives_ctrl_c_while_child_lives(tmp_path):
     """A terminal Ctrl+C hits the whole foreground group. Agents like Claude Code
     swallow the first SIGINT (it cancels the turn, not the app) — the wrap must
     keep the proxy alive underneath them instead of exiting 130 and leaving the
-    agent pointed at a dead port."""
+    agent pointed at a dead port. A rapid BURST of presses must survive too:
+    catching KeyboardInterrupt only around proc.wait() loses the race when a
+    second press lands inside the except clause (the v1.11.2 escape path)."""
     import os
     import signal
     import subprocess
@@ -130,7 +132,9 @@ def test_wrap_survives_ctrl_c_while_child_lives(tmp_path):
         start_new_session=True,  # own group, like a terminal foreground job
     )
     time.sleep(1.5)
-    os.killpg(os.getpgid(wrap.pid), signal.SIGINT)
+    for _ in range(5):  # rapid repeated presses, like a user mashing Ctrl+C
+        os.killpg(os.getpgid(wrap.pid), signal.SIGINT)
+        time.sleep(0.05)
     out, _ = wrap.communicate(timeout=20)
     # Child got HTTP 404 from the still-alive proxy root (any response beats
     # connection-refused); it exits nonzero on urllib.HTTPError — accept that,
