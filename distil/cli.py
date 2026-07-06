@@ -605,6 +605,24 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         except Exception:  # noqa: BLE001 — live slice is best-effort
             return ledger.LedgerSummary(0, 0.0, 0, {})
 
+    def _bypass_suspected() -> bool:
+        """Wrapped session whose proxy has seen zero requests after a grace
+        period: the agent is sending its traffic to the provider directly
+        (e.g. an OAuth-pinned endpoint that ignores the injected base URL).
+        Marker written by wrap_run, flipped to "1" by the proxy's first POST;
+        the grace period keeps a just-started wrap reading "✓ on"."""
+        import time as _t
+
+        mp = ledger.session_marker_path()
+        try:
+            return (
+                mp is not None
+                and mp.read_text(encoding="utf-8").strip() == "0"
+                and _t.time() - mp.stat().st_mtime > 180
+            )
+        except OSError:
+            return False
+
     # "on" must mean THIS session's requests route through distil: wrap sets
     # DISTIL_SESSION in the agent's env; always-on setups point the base URL
     # at loopback. Neither present -> requests go direct, say so honestly.
@@ -621,13 +639,18 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     if os.environ.get("DISTIL_STATUSLINE", "").lower() in ("minimal", "lite", "compact"):
         mseg = [c("1;38;5;79", "distil")]
         if s is None or s.runs == 0:
-            mseg.append(
-                c("1;38;5;84", "on") if _routed else c("38;5;73", "wrap -- <agent> to start")
-            )
+            if _bypass_suspected():
+                mseg.append(c("38;5;220", "⚠ bypassed"))
+            else:
+                mseg.append(
+                    c("1;38;5;84", "on") if _routed else c("38;5;73", "wrap -- <agent> to start")
+                )
         else:
             live_saved = _live().total_tokens_saved
             if live_saved > 0:
                 mseg.append(c("1;38;5;84", f"▼{ledger._human(live_saved)}"))
+            elif _bypass_suspected():
+                mseg.append(c("38;5;220", "⚠ bypassed"))
             mseg.append(c("38;5;73", f"{ledger._human(s.total_tokens_saved)} total"))
         if model:
             mseg.append(c("38;5;73", model))
@@ -645,10 +668,12 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     # Full breakdown: distil stats / dashboard.
     parts = [c("1;38;5;79", "distil")]
     if s is None or s.runs == 0:
-        if _routed:
-            parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · no savings yet"))
-        else:
+        if not _routed:
             parts.append(c("38;5;73", "no savings yet · distil wrap -- <agent>"))
+        elif _bypass_suspected():
+            parts.append(c("38;5;220", "⚠ wrapped, agent bypassing proxy"))
+        else:
+            parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · no savings yet"))
     else:
         from .doctor import subscription_mode
 
@@ -670,6 +695,10 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 parts.append(c("1;38;5;114", f"${recent.total_dollars_saved:,.2f}"))
         elif recent.runs and recent.total_baseline_tokens:
             parts.append(c("1;38;5;84", "✓ on") + c("38;5;80", " · waiting for a large read"))
+        elif _bypass_suspected():
+            # Routed env but zero requests ever reached this session's proxy —
+            # "✓ on" here would be the 1.11.1 lie in a new costume.
+            parts.append(c("38;5;220", "⚠ wrapped, agent bypassing proxy"))
         else:
             parts.append(c("1;38;5;84", "✓ on"))
         # TOTAL (lifetime) — identical format in every state.

@@ -25,8 +25,6 @@ def test_humanize_tokens():
     assert ledger._human(1_200_000) == "1.2M"
 
 
-
-
 @pytest.fixture(autouse=True)
 def _hermetic_env(monkeypatch, tmp_path):
     """A real wrap session exports DISTIL_SESSION (switching the live slice to
@@ -46,7 +44,8 @@ def _run(monkeypatch, capsys, summary, recent=None, stdin="{}", no_color=True):
     empty = ledger.LedgerSummary(0, 0.0, 0, {})
 
     def _summary(*a, **k):
-        return (recent if recent is not None else empty) if k.get("since") is not None else summary
+        live = k.get("since") is not None or k.get("session")  # _live() slice, either form
+        return (recent if recent is not None else empty) if live else summary
 
     monkeypatch.setattr(ledger, "summary", _summary)
     monkeypatch.setattr(ledger, "latest_session", lambda *a, **k: ("", 0.0))
@@ -485,3 +484,79 @@ def test_per_session_via_distil_session_env(monkeypatch, tmp_path):
     assert "▼30.0K" in a and "60% smaller" in a  # session A sees its own savings
     assert "✓ on" in b and "▼" not in b.split("total")[0]  # session B: none of its own
     assert "total ▼30.0K" in a and "total ▼30.0K" in b  # shared lifetime total
+
+
+# ---------------------------------------------------------------------------
+# Bypass detection: "✓ on" must mean traffic actually flows through the proxy.
+# A wrapped OAuth agent can keep the env vars while sending its model calls
+# straight to the provider — the marker (written "0" by wrap_run, flipped "1"
+# by the proxy's first POST) is how the statusline tells the two apart.
+# ---------------------------------------------------------------------------
+
+
+def _mk_marker(value: str, age_s: float = 600.0) -> Path:
+    import os
+    import time
+
+    mp = ledger.session_marker_path()
+    assert mp is not None
+    mp.parent.mkdir(parents=True, exist_ok=True)
+    mp.write_text(value, encoding="utf-8")
+    old = time.time() - age_s
+    os.utime(mp, (old, old))
+    return mp
+
+
+def test_bypass_warning_when_marker_stays_zero(monkeypatch, capsys):
+    monkeypatch.setenv("DISTIL_SESSION", "sTEST-bypass")
+    _mk_marker("0")
+    rc, out = _run(monkeypatch, capsys, ledger.LedgerSummary(0, 0.0, 0, {}))
+    assert rc == 0
+    assert "bypassing" in out
+    assert "✓ on" not in out
+
+
+def test_no_bypass_warning_within_grace_period(monkeypatch, capsys):
+    monkeypatch.setenv("DISTIL_SESSION", "sTEST-fresh")
+    _mk_marker("0", age_s=10.0)  # wrap just started — agent hasn't called yet
+    rc, out = _run(monkeypatch, capsys, ledger.LedgerSummary(0, 0.0, 0, {}))
+    assert rc == 0
+    assert "✓ on" in out
+    assert "bypassing" not in out
+
+
+def test_no_bypass_warning_once_traffic_flows(monkeypatch, capsys):
+    monkeypatch.setenv("DISTIL_SESSION", "sTEST-flows")
+    _mk_marker("1")  # proxy saw a request
+    rc, out = _run(monkeypatch, capsys, ledger.LedgerSummary(0, 0.0, 0, {}))
+    assert rc == 0
+    assert "✓ on" in out
+    assert "bypassing" not in out
+
+
+def test_bypass_warning_replaces_idle_on_with_lifetime_total(monkeypatch, capsys):
+    """Populated lifetime ledger + idle bypassed session: warn, keep the total."""
+    monkeypatch.setenv("DISTIL_SESSION", "sTEST-idle")
+    _mk_marker("0")
+    s = ledger.LedgerSummary(
+        3,
+        0.04,
+        21_600,
+        {"live-proxy": 0.04},
+        total_baseline_tokens=50_000,
+        total_distil_tokens=28_400,
+    )
+    rc, out = _run(monkeypatch, capsys, s)  # recent slice empty → idle branch
+    assert rc == 0
+    assert "bypassing" in out
+    assert "total ▼21.6K" in out
+    assert "✓ on" not in out
+
+
+def test_bypass_warning_minimal_mode(monkeypatch, capsys):
+    monkeypatch.setenv("DISTIL_STATUSLINE", "minimal")
+    monkeypatch.setenv("DISTIL_SESSION", "sTEST-min")
+    _mk_marker("0")
+    rc, out = _run(monkeypatch, capsys, ledger.LedgerSummary(0, 0.0, 0, {}))
+    assert rc == 0
+    assert "⚠ bypassed" in out

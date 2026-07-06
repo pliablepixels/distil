@@ -41,6 +41,21 @@ def default_path() -> Path:
 DEFAULT_PATH = default_path()
 
 
+def session_marker_path(sid: str | None = None) -> Path | None:
+    """Traffic marker for a wrap session (statusline bypass detection).
+
+    ``distil wrap`` writes ``"0"`` at startup; the first agent request that
+    actually reaches its proxy rewrites it to ``"1"``. A marker still at "0"
+    minutes into a session means the wrapped agent is talking to the provider
+    directly (e.g. an OAuth-pinned endpoint that ignores the injected base
+    URL) — the statusline says so instead of a false "✓ on".
+    """
+    sid = sid or os.environ.get("DISTIL_SESSION")
+    if not sid or "/" in sid or "\\" in sid or ".." in sid:
+        return None  # session ids are wrap-minted; refuse anything path-like
+    return default_path().parent / "sessions" / sid
+
+
 @dataclass
 class SavingsRecord:
     trajectory_id: str

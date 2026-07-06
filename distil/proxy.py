@@ -182,6 +182,21 @@ def _warn_if_version_skew(state: dict[str, Any]) -> None:
         )
 
 
+def _mark_session_traffic() -> None:
+    """Flip this wrap session's traffic marker to "1" — agent traffic reaches
+    the proxy. Only acts when the marker exists (i.e. wrap_run created it), so
+    a standalone `distil proxy` that happens to inherit DISTIL_SESSION never
+    fabricates one."""
+    from .ledger import session_marker_path
+
+    mp = session_marker_path()
+    try:
+        if mp is not None and mp.exists():
+            mp.write_text("1", encoding="utf-8")
+    except OSError:
+        pass
+
+
 def build_handler(
     upstream: str,
     *,
@@ -275,6 +290,10 @@ def build_handler(
         _shadow_sampler = ShadowSampler(shadow_rate)
         _shadow_ledger = ShadowLedger()
 
+    # First-POST latch for the session traffic marker: only the 0→1 transition
+    # matters, so after one write the check is a single list lookup.
+    _traffic_seen = [False]
+
     class _DistilHandler(BaseHTTPRequestHandler):
         # HTTP/1.1 so streamed responses can use chunked transfer framing
         # (every non-streaming response still carries an exact Content-Length).
@@ -292,6 +311,9 @@ def build_handler(
         # ----------------------------------------------------------------
 
         def do_POST(self) -> None:  # noqa: N802
+            if not _traffic_seen[0]:
+                _traffic_seen[0] = True
+                _mark_session_traffic()
             _warn_if_version_skew(_version_state)
             p = strip_query(self.path)
             if p in _COMPRESSIBLE_PATHS or is_gemini_path(p):
@@ -862,6 +884,23 @@ def wrap_run(
     # status line the agent spawns — see the same value and can attribute
     # savings to this exact session. Each terminal's wrap gets its own.
     os.environ.setdefault("DISTIL_SESSION", f"s{int(time.time())}-{os.getpid()}")
+
+    # Statusline bypass detection: marker starts at "0" (wrapped, no request has
+    # reached the proxy yet); the first proxied POST flips it to "1". One file
+    # per session, single writer — no locking needed.
+    from .ledger import session_marker_path
+
+    marker = session_marker_path()
+    if marker is not None:
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            now = time.time()
+            for old in marker.parent.iterdir():  # opportunistic 7-day TTL sweep
+                if now - old.stat().st_mtime > 7 * 86400:
+                    old.unlink()
+            marker.write_text("0", encoding="utf-8")
+        except OSError:
+            pass  # marker is best-effort; never block the wrap over it
 
     savings = None
     if record:

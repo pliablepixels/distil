@@ -197,3 +197,28 @@ def test_wrap_run_restores_terminal_on_child_exit(monkeypatch):
     rc = proxy.wrap_run(["true"], record=False)
     assert rc == 0
     assert calls == [(0, termios.TCSADRAIN, sentinel)]  # restored once, with saved state
+
+
+def test_wrap_marker_flips_to_one_when_traffic_flows(tmp_path, monkeypatch):
+    """wrap_run writes the session marker "0"; the child's request through the
+    proxy flips it to "1" — the signal the statusline's bypass check reads."""
+    upstream = _start_echo_upstream()
+    up_url = f"http://127.0.0.1:{upstream.server_address[1]}"
+    try:
+        code = proxy.wrap_run([sys.executable, "-c", _CHILD], upstream=up_url, record=False)
+        assert code == 0
+        mp = ledger.session_marker_path()  # env still carries the wrap-minted sid
+        assert mp is not None
+        assert mp.read_text(encoding="utf-8") == "1"
+    finally:
+        upstream.shutdown()
+
+
+def test_wrap_marker_stays_zero_when_child_never_calls(tmp_path):
+    """A child that bypasses the proxy leaves the marker at "0" — that is the
+    bypass signature, not an error."""
+    code = proxy.wrap_run([sys.executable, "-c", "pass"], record=False)
+    assert code == 0
+    mp = ledger.session_marker_path()
+    assert mp is not None
+    assert mp.read_text(encoding="utf-8") == "0"

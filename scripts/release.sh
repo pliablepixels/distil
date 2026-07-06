@@ -88,8 +88,12 @@ ok "working tree clean"
 # version agreement across every surface that ships a version string
 # (distil/__init__.py is single-sourced from pyproject since 5e1173b — no literal to check)
 CITE_V="$(grep -E '^version:' CITATION.cff | sed -E 's/.*: *([0-9][^ ]*).*/\1/')"
-[ "$CITE_V" = "$VERSION" ] || die "CITATION.cff is $CITE_V, pyproject is $VERSION"
-ok "version $VERSION consistent (pyproject, CITATION)"
+if [ "$IS_RC" -eq 1 ]; then
+  info "rc release — CITATION.cff stays at the last citable final ($CITE_V)"
+else
+  [ "$CITE_V" = "$VERSION" ] || die "CITATION.cff is $CITE_V, pyproject is $VERSION"
+  ok "version $VERSION consistent (pyproject, CITATION)"
+fi
 
 git rev-parse "$TAG" >/dev/null 2>&1 && die "tag $TAG already exists — bump the version or delete the tag"
 ok "tag $TAG is free"

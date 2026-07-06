@@ -3,6 +3,28 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.12.0] — soaking as 1.12.0rc1 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
+
+First release through the new rc + soak pipeline (runtime code → rc first).
+
+### Fixed
+- **"✓ on" no longer trusts env vars alone — a wrapped agent that bypasses the proxy is
+  called out.** Found live: a claude.ai-subscription (OAuth) Claude Code session keeps
+  `DISTIL_SESSION` and the loopback `ANTHROPIC_BASE_URL` in its env yet sends model calls
+  straight to api.anthropic.com (verified with lsof: direct TLS to the provider, zero
+  ledger rows, proxy healthy). The 1.11.1 honesty fix checked routing *setup*; this one
+  checks routing *reality*. `distil wrap` now writes a per-session traffic marker
+  (`~/.distil/sessions/<sid>`, "0" at start), the proxy's first proxied request flips it
+  to "1", and a marker still at "0" after a 3-minute grace shows
+  **"⚠ wrapped, agent bypassing proxy"** (minimal mode: "⚠ bypassed") instead of "✓ on".
+  Markers are single-writer (no locking), best-effort (never block the wrap), swept
+  after 7 days, and standalone `distil proxy` never fabricates one.
+
+### Added
+- Test-env hygiene: `tests/conftest.py` sandboxes `DISTIL_HOME` and strips the inherited
+  `DISTIL_SESSION` for every test — dogfooding developers run the suite from wrapped
+  terminals, and no test may touch the real `~/.distil`.
+
 ## [1.11.4] — 2026-07-05 — Release hardening: chaos suite in CI, rc + soak policy, launch gate
 
 No runtime code changed in this release — it hardens the process that ships the runtime.
