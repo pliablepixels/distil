@@ -14,6 +14,30 @@ GitHub release artifacts, and publishes to PyPI.
    *Actions* → *Variables* → set `PUBLISH_TO_PYPI = true`.
    (Until this is set, a tag still ships GitHub artifacts but skips the PyPI upload — safe.)
 
+## Release candidates and the soak window
+
+The 1.10.0→1.11.3 day — six releases, each fixing the previous — is the failure mode
+this policy exists to prevent. Fixes were correct in review and wrong under real use;
+the missing ingredient was bake time, not more review.
+
+**Any release that changes runtime behavior soaks as an rc first:**
+
+1. Bump `pyproject.toml` to `X.Y.ZrcN` (PEP 440; the tag becomes `vX.Y.ZrcN`). Write the
+   CHANGELOG entry under the **final** version `X.Y.Z` — the rc soaks for it.
+2. `./scripts/release.sh` as usual. rc tags are handled automatically: the GitHub
+   release is marked prerelease, Homebrew and the Docker image are skipped, and PyPI
+   gets the rc (pip ignores prereleases unless asked — safe).
+3. **Soak**: run the rc yourself on real work (`distil wrap` around your daily agent
+   sessions) for **at least 3 days**. Beta users install with
+   `pipx install --pip-args=--pre distil-llm`.
+4. Any P0/P1 found → fix, cut `rcN+1`, restart the clock. A same-day follow-up final
+   is the anti-pattern; a same-day follow-up rc is the system working.
+5. Soak clean → bump to `X.Y.Z` on the same tree and release. That final is
+   byte-identical code to the last rc plus only the version bump.
+
+**Exempt from soak** (may go straight to a final): releases touching only docs, tests,
+CI, or packaging metadata — nothing a running proxy/wrap/gateway executes.
+
 ## Cutting a release
 
 The version is single-sourced from the installed package's metadata

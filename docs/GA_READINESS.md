@@ -28,6 +28,32 @@ Verified + τ-bench to more domains and models. The design is domain-agnostic; c
 *running it at scale*, not building more. We mark them honestly rather than claim them — and we
 ship 1.0 because the contract that protects you (certify-or-fall-back) is itself complete.
 
+## Launch gate (marketing / "grand release")
+
+Engineering GA (above) and *telling the world* are different bars. 1.10.0→1.11.3 shipped
+six same-day releases, each fixing the previous — all found internally, which is the good
+news, and the reason to launch only when the checklist below is green. Every item is
+binary and checkable; opinions don't count, evidence does.
+
+- [x] **Chaos suite in CI** — the bug classes that shipped (signal races, accept-loop
+  death, crash-lost accounting) are pinned by tests that run on every push
+  (`tests/test_chaos.py`, `tests/test_wrap.py`, `tests/test_gateway_cov.py`).
+- [x] **rc + soak release policy in force** — runtime-behavior releases bake as an rc
+  for ≥ 3 days of real use before the final (RELEASING.md).
+- [ ] **14 consecutive days at head with zero P0/P1** — a same-day fix release resets
+  the clock.
+- [ ] **External beta** — ≥ 10 real users wrapping real agents for ≥ 1 week, with a
+  feedback channel; no open P0/P1 from the cohort.
+- [ ] **Live decision-equivalence evidence** — shadow-mode ✓de ≥ 99% at n ≥ 25 on the
+  maintainer's own daily traffic *and* from at least 3 beta users.
+- [ ] **Fresh-install first-run verified on all three OSes** — pipx/brew install →
+  `distil wrap` → first savings visible, walked end-to-end on macOS, Linux, Windows
+  (CI covers the test matrix; this item is the *human* walkthrough).
+- [ ] **Claims re-audit at launch commit** — every README/site/docs claim re-checked
+  against a committed artifact (last full audit: 1.11.0). E7's scope limit stays in
+  the copy: compression aggressiveness is calibrated per agent, never marketed as
+  universally safe untuned.
+
 ## Closed
 
 | Item | Evidence |

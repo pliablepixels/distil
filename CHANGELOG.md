@@ -3,6 +3,36 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.11.4] — 2026-07-05 — Release hardening: chaos suite in CI, rc + soak policy, launch gate
+
+No runtime code changed in this release — it hardens the process that ships the runtime.
+The 1.10.0→1.11.3 day (six releases, each fixing the previous, all correct in review and
+wrong under real use) showed the release gate was blind to signal/lifecycle chaos and had
+no bake time. Both gaps close here. (Per the new soak policy this release is soak-exempt:
+tests/CI/docs/tooling only.)
+
+### Added
+- **Chaos suite in CI** (`tests/test_chaos.py`): the ad-hoc harnesses used to verify the
+  1.11.3 Ctrl+C fix are now permanent, bounded tests that run on every push —
+  a ~400-signal sustained SIGINT hammer against `distil wrap` with a live child (pins the
+  1.11.3 immune-parent property; the 1.11.2 structure fails this), and a
+  crash-the-accept-loop test proving the wrap proxy self-heals and keeps answering on the
+  same port (the 1.11.0 self-heal path was previously untested).
+- **rc + soak release policy** (RELEASING.md): any release that changes runtime behavior
+  ships as `X.Y.ZrcN` first and bakes ≥ 3 days on real traffic before the final. rc tags
+  are fully wired: GitHub release marked prerelease, PyPI gets the rc (pip ignores
+  prereleases unless `--pre`), Homebrew and the Docker image skip rcs, `release.sh`
+  detects rc versions and adjusts its preflight (changelog entry lives under the final).
+- **Launch gate** (docs/GA_READINESS.md): a binary, evidence-based checklist separating
+  engineering GA from the marketing launch — 14 quiet days at head, external beta, live
+  decision-equivalence at n ≥ 25 from multiple users, human fresh-install walkthrough on
+  all three OSes, claims re-audit at the launch commit.
+
+### Fixed
+- **`release.yml` would have served an rc to everyone.** A `v*rc*` tag previously bumped
+  the Homebrew tap and pushed the Docker image as `latest` — both now final-only, and the
+  GitHub release for an rc is marked prerelease.
+
 ## [1.11.3] — 2026-07-05 — Ctrl+C fix, take two: the wrap parent is now immune to SIGINT entirely
 
 ### Fixed

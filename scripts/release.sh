@@ -66,6 +66,12 @@ VERSION="$(grep -E '^version *= *"' pyproject.toml | head -1 | sed -E 's/.*"([^"
 TAG="v$VERSION"
 TARBALL_URL="https://github.com/dshakes/distil/archive/refs/tags/${TAG}.tar.gz"
 
+# rc = soak candidate (see RELEASING.md): GitHub release is marked prerelease by
+# CI, no Homebrew bump, no Docker image. Promote by re-tagging the same commit
+# with the final version after the soak window.
+IS_RC=0
+case "$VERSION" in *rc*) IS_RC=1 ;; esac
+
 bold "Distil release — ${TAG}$([ "$DRY_RUN" -eq 1 ] && echo '  (dry-run)')"
 echo
 
@@ -88,8 +94,16 @@ ok "version $VERSION consistent (pyproject, CITATION)"
 git rev-parse "$TAG" >/dev/null 2>&1 && die "tag $TAG already exists — bump the version or delete the tag"
 ok "tag $TAG is free"
 
-grep -q "## \[$VERSION\]" CHANGELOG.md || die "CHANGELOG.md has no '## [$VERSION]' entry"
-ok "CHANGELOG has a [$VERSION] entry"
+if [ "$IS_RC" -eq 1 ]; then
+  # rc: the changelog entry is written once, under the final version it soaks for
+  FINAL="${VERSION%%rc*}"
+  grep -q "## \[$FINAL\]\|## \[$VERSION\]" CHANGELOG.md \
+    || die "CHANGELOG.md has no '## [$FINAL]' entry (rc soaks for the final)"
+  ok "CHANGELOG has the [$FINAL] entry this rc soaks for"
+else
+  grep -q "## \[$VERSION\]" CHANGELOG.md || die "CHANGELOG.md has no '## [$VERSION]' entry"
+  ok "CHANGELOG has a [$VERSION] entry"
+fi
 
 if [ "$SKIP_TESTS" -eq 1 ]; then
   info "skipping tests (--skip-tests)"
@@ -166,7 +180,9 @@ echo
 # ---- refresh Homebrew sha256 -------------------------------------------------
 bold "5/6  Refresh Homebrew formula sha256"
 FORMULA="packaging/homebrew/distil.rb"
-if confirm "fetch $TAG tarball and patch the sha256 in $FORMULA?"; then
+if [ "$IS_RC" -eq 1 ]; then
+  info "rc release — skipping Homebrew (brew serves finals only)"
+elif confirm "fetch $TAG tarball and patch the sha256 in $FORMULA?"; then
   if [ "$DRY_RUN" -eq 1 ]; then
     info "[dry-run] would curl $TARBALL_URL and shasum it"
   else
