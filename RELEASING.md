@@ -28,8 +28,10 @@ the missing ingredient was bake time, not more review.
    release is marked prerelease, Homebrew and the Docker image are skipped, and PyPI
    gets the rc (pip ignores prereleases unless asked — safe).
 3. **Soak**: run the rc yourself on real work (`distil wrap` around your daily agent
-   sessions) for **at least 3 days**. Beta users install with
-   `pipx install --pip-args=--pre distil-llm`.
+   sessions) for **at least 3 days**. Getting the rc:
+   `pipx upgrade --pip-args=--pre distil-llm` (existing install) or
+   `pipx install --pip-args=--pre distil-llm` (fresh). Never `pipx install --force` —
+   uv-backed pipx refuses to recreate an existing venv.
 4. Any P0/P1 found → fix, cut `rcN+1`, restart the clock. A same-day follow-up final
    is the anti-pattern; a same-day follow-up rc is the system working.
 5. Soak clean → bump to `X.Y.Z` on the same tree and release. That final is
