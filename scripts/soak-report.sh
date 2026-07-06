@@ -25,8 +25,11 @@ fi
 
 total=0 bypassed=0 young=0
 for m in "${markers[@]}"; do
+  case "$m" in *.exit) continue ;; esac  # exit breadcrumbs, shown inline below
   sid=$(basename "$m")
   val=$(cat "$m" 2>/dev/null || echo "?")
+  ex=""
+  [ -f "$m.exit" ] && ex="  child_exit=[$(head -c 60 "$m.exit" | tr -d '\n')]"
   mtime=$(stat -f %m "$m" 2>/dev/null || stat -c %Y "$m")
   age=$((now - mtime))
   rows=0
@@ -37,13 +40,13 @@ for m in "${markers[@]}"; do
   kill -0 "$pid" 2>/dev/null && alive=" [wrap alive]"
   total=$((total + 1))
   if [ "$val" = "1" ] || [ "$rows" -gt 0 ]; then
-    echo "ROUTED    $sid  ledger_rows=$rows$alive"
+    echo "ROUTED    $sid  ledger_rows=$rows$alive$ex"
   elif [ "$age" -lt "$GRACE" ]; then
     young=$((young + 1))
-    echo "TOO-YOUNG $sid  age=${age}s (grace ${GRACE}s)$alive"
+    echo "TOO-YOUNG $sid  age=${age}s (grace ${GRACE}s)$alive$ex"
   else
     bypassed=$((bypassed + 1))
-    echo "BYPASSED  $sid  age=${age}s ledger_rows=0$alive"
+    echo "BYPASSED  $sid  age=${age}s ledger_rows=0$alive$ex"
     if [ -n "$alive" ]; then
       # Live specimen — capture the evidence that dies with the process.
       cap="$HOME_DIR/bypass-capture-$sid.txt"

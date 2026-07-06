@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.12.0] — soaking as 1.12.0rc1 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
+## [1.12.0] — soaking as 1.12.0rc2 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
 
 First release through the new rc + soak pipeline (runtime code → rc first).
 
@@ -21,6 +21,15 @@ First release through the new rc + soak pipeline (runtime code → rc first).
   after 7 days, and standalone `distil proxy` never fabricates one.
 
 ### Added
+- **Child-exit breadcrumb (rc2).** Soak day 1 hit a recurring silent agent quit — no
+  crash report, no error in the transcript, no way to tell an OOM abort from a clean
+  exit after the fact. The wrap is the only witness, so it now records how the child
+  ended (`~/.distil/sessions/<sid>.exit`: "exit code N" / "signal NAME" + timestamp);
+  `scripts/soak-report.sh` prints it per session.
+- **Terminal private-mode reset on wrap exit (rc2).** A crashed TUI leaves xterm modes
+  on that `tcsetattr` can't undo — mouse reporting (the `65;76;9M` junk on click),
+  bracketed paste, the alternate screen, a hidden cursor. The wrap's restore now resets
+  them explicitly; all idempotent on clean exits.
 - Test-env hygiene: `tests/conftest.py` sandboxes `DISTIL_HOME` and strips the inherited
   `DISTIL_SESSION` for every test — dogfooding developers run the suite from wrapped
   terminals, and no test may touch the real `~/.distil`.

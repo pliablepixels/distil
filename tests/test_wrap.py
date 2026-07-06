@@ -222,3 +222,24 @@ def test_wrap_marker_stays_zero_when_child_never_calls(tmp_path):
     mp = ledger.session_marker_path()
     assert mp is not None
     assert mp.read_text(encoding="utf-8") == "0"
+
+
+def test_wrap_records_child_exit_code(tmp_path):
+    """The wrap is the only witness to how the agent died — a silent quit is
+    undiagnosable without this breadcrumb. Clean exit and signal death both."""
+    code = proxy.wrap_run([sys.executable, "-c", "raise SystemExit(3)"], record=False)
+    assert code == 3
+    mp = ledger.session_marker_path()
+    exit_file = mp.with_name(mp.name + ".exit")
+    assert "exit code 3" in exit_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signal death semantics")
+def test_wrap_records_child_signal_death(tmp_path, monkeypatch):
+    monkeypatch.delenv("DISTIL_SESSION", raising=False)  # fresh sid, fresh files
+    child = "import os, signal; os.kill(os.getpid(), signal.SIGKILL)"
+    code = proxy.wrap_run([sys.executable, "-c", child], record=False)
+    assert code == -9
+    mp = ledger.session_marker_path()
+    exit_file = mp.with_name(mp.name + ".exit")
+    assert "signal SIGKILL" in exit_file.read_text(encoding="utf-8")

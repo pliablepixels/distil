@@ -1009,8 +1009,40 @@ def wrap_run(
                 import termios
 
                 termios.tcsetattr(_saved_tty[0], termios.TCSADRAIN, _saved_tty[1])
+                # tcsetattr can't undo xterm private modes a crashed TUI leaves
+                # on: mouse reporting (shows as "65;76;9M" junk on click),
+                # bracketed paste, the alternate screen, a hidden cursor. Reset
+                # them explicitly — all idempotent on a clean exit.
+                os.write(
+                    _saved_tty[0],
+                    b"\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l"  # mouse off
+                    b"\x1b[?2004l"  # bracketed paste off
+                    b"\x1b[?1049l"  # leave alternate screen
+                    b"\x1b[?25h",  # cursor visible
+                )
             except Exception:  # noqa: BLE001 — best-effort; child may have closed the tty
                 pass
+
+    # Post-mortem breadcrumb: how the child ended. A silent agent quit (e.g. a
+    # runtime OOM abort) is undiagnosable after the fact — the wrap is the only
+    # witness to the exit status. scripts/soak-report.sh surfaces this file.
+    try:
+        mp = session_marker_path()
+        if mp is not None and mp.parent.is_dir():
+            if code < 0:
+                import signal as _signal
+
+                try:
+                    desc = f"signal {_signal.Signals(-code).name}"
+                except ValueError:
+                    desc = f"signal {-code}"
+            else:
+                desc = f"exit code {code}"
+            mp.with_name(mp.name + ".exit").write_text(
+                f"{desc} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n", encoding="utf-8"
+            )
+    except OSError:
+        pass
     return code
 
 
