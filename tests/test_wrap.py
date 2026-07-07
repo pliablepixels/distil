@@ -243,3 +243,28 @@ def test_wrap_records_child_signal_death(tmp_path, monkeypatch):
     mp = ledger.session_marker_path()
     exit_file = mp.with_name(mp.name + ".exit")
     assert "signal SIGKILL" in exit_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="SIGHUP is POSIX")
+def test_wrap_breadcrumbs_sighup_group_kill(tmp_path):
+    """Terminal tab close = SIGHUP to the group: the wrap dies WITH the child,
+    so the wrap itself must breadcrumb the signal — it's the only trace."""
+    import os
+    import signal
+    import subprocess
+    import time
+
+    wrap = subprocess.Popen(
+        [sys.executable, "-m", "distil.cli", "wrap", "--no-record", "--",
+         sys.executable, "-c", "import time; time.sleep(30)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    time.sleep(1.5)  # let the wrap install handlers and write the marker
+    os.kill(wrap.pid, signal.SIGHUP)
+    wrap.wait(timeout=15)
+    sessions = os.path.join(os.environ["DISTIL_HOME"], "sessions")
+    exits = [f for f in os.listdir(sessions) if f.endswith(".exit")]
+    assert exits, os.listdir(sessions)
+    with open(os.path.join(sessions, exits[0]), encoding="utf-8") as f:
+        assert "wrap received SIGHUP" in f.read()

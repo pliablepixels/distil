@@ -29,7 +29,7 @@ for m in "${markers[@]}"; do
   sid=$(basename "$m")
   val=$(cat "$m" 2>/dev/null || echo "?")
   ex=""
-  [ -f "$m.exit" ] && ex="  child_exit=[$(head -c 60 "$m.exit" | tr -d '\n')]"
+  [ -f "$m.exit" ] && ex="  exit=[$(head -c 160 "$m.exit" | tr '\n' ';' | sed 's/;$//')]"
   mtime=$(stat -f %m "$m" 2>/dev/null || stat -c %Y "$m")
   age=$((now - mtime))
   rows=0

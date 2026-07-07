@@ -728,10 +728,19 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                 # reads as one metric maturing: de 12/25 → ✓de 99.5% (30).
                 parts.append(c(hue, f"{glyph}de {eq * 100:.1f}%") + c("38;5;73", f" ({n_str})"))
             elif led.samples > 0:
-                # Below 25 samples we don't claim a rate (a % over a handful is noise),
-                # but we do show collection progress so decision-equivalence reads as
-                # "warming up" rather than absent. ponytail: skip the 0-sample case.
-                parts.append(c("38;5;73", f"de {led.samples}/25"))
+                # Below 25 samples we don't claim a rate (a % over a handful is noise).
+                # Distinguish "warming up" (a sampler fed the ledger recently) from
+                # "idle" (nothing sampling in >24h) — a frozen "de 1/25" reads as
+                # live measurement, which is honesty gap #3.
+                import time as _t
+
+                from .shadow import _state_dir
+
+                try:
+                    fresh = _t.time() - (_state_dir() / "shadow.jsonl").stat().st_mtime < 86400
+                except OSError:
+                    fresh = False
+                parts.append(c("38;5;73", f"de {led.samples}/25" if fresh else "de idle"))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:
@@ -2183,11 +2192,12 @@ def build_parser() -> argparse.ArgumentParser:
     wr.add_argument(
         "--shadow",
         type=float,
-        default=0.0,
+        default=0.02,
         metavar="RATE",
-        help="shadow-mode live decision-equivalence: sample this fraction (e.g. 0.1) "
-        "and also run it uncompressed to measure the decision-change rate "
-        "(distil shadow-stats)",
+        help="shadow-mode live decision-equivalence: sample this fraction and also run "
+        "it uncompressed to measure the decision-change rate (distil shadow-stats). "
+        "On by default at 0.02 (2%% extra tokens on sampled requests) so the ✓de "
+        "evidence accrues without opt-in; --shadow 0 disables",
     )
     wr.add_argument(
         "command",

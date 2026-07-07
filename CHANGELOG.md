@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.12.0] — soaking as 1.12.0rc2 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
+## [1.12.0] — soaking as 1.12.0rc3 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
 
 First release through the new rc + soak pipeline (runtime code → rc first).
 
@@ -21,6 +21,18 @@ First release through the new rc + soak pipeline (runtime code → rc first).
   after 7 days, and standalone `distil proxy` never fabricates one.
 
 ### Added
+- **Shadow decision-equivalence sampling is on by default (rc3): 2% of wrap requests.**
+  It was opt-in (`--shadow`, default 0) — so nobody ran it, the statusline's `de 1/25`
+  counter sat frozen for a week implying live measurement, and the launch gate's
+  "✓de ≥ 99% at n ≥ 25" evidence could never accrue. Per the intelligence-is-the-default
+  rule the flag is now an opt-out: `--shadow 0` disables, `--shadow 0.1` collects faster.
+  Cost is explicit: a sampled request is re-run uncompressed for comparison, so the
+  default adds ~2% tokens.
+- **Wrap-signal breadcrumbs (rc3).** Tonight's quit produced no `.exit` file — because
+  the killer took out the wrap *with* the child (process-group kill; terminal-tab SIGHUP),
+  so the child-exit path never ran. The wrap's SIGTERM/SIGHUP handler now appends
+  "wrap received SIGNAME" to the `.exit` file before dying — the only trace a group kill
+  leaves. Both lines together read as a story: `wrap received SIGTERM; child exit 143`.
 - **Child-exit breadcrumb (rc2).** Soak day 1 hit a recurring silent agent quit — no
   crash report, no error in the transcript, no way to tell an OOM abort from a clean
   exit after the fact. The wrap is the only witness, so it now records how the child
@@ -60,6 +72,13 @@ tests/CI/docs/tooling only.)
   all three OSes, claims re-audit at the launch commit.
 
 ### Fixed
+- **Statusline `de` honesty (rc3, honesty gap #3).** A sub-25 sample count now shows
+  `de n/25` only while the shadow ledger was fed within the last 24h; otherwise
+  `de idle` — a frozen counter must not read as live measurement.
+- **Signal-handler breadcrumb wrote an empty file (rc3).** `_signal_breadcrumb` used
+  `time.strftime` but `proxy.py` only imported `time` inside `wrap_run` — the NameError
+  was swallowed by the handler's best-effort except, leaving a created-but-empty `.exit`.
+  Caught by the new SIGHUP test; `time` is now a module-level import.
 - **`release.yml` would have served an rc to everyone.** A `v*rc*` tag previously bumped
   the Homebrew tap and pushed the Docker image as `latest` — both now final-only, and the
   GitHub release for an rc is marked prerelease.

@@ -352,6 +352,9 @@ def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
     led.samples = 1
     led.recent.append(1)
     monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
+    sj = shadow._state_dir() / "shadow.jsonl"  # sampler is live: file freshly fed
+    sj.parent.mkdir(parents=True, exist_ok=True)
+    sj.write_text('{"equivalent": true}\n', encoding="utf-8")
     _rc, out = _run(monkeypatch, capsys, s)
     assert "%" not in out  # no rate claimed below 25 samples
     assert "de 1/25" in out  # FIX 6: but collection progress is shown ("warming up")
@@ -560,3 +563,39 @@ def test_bypass_warning_minimal_mode(monkeypatch, capsys):
     rc, out = _run(monkeypatch, capsys, ledger.LedgerSummary(0, 0.0, 0, {}))
     assert rc == 0
     assert "⚠ bypassed" in out
+
+
+def test_de_shows_progress_only_while_sampler_is_live(monkeypatch, capsys):
+    """Honesty gap #3: a frozen sub-25 counter must read "de idle", not imply
+    active measurement; a recently-fed shadow ledger shows real progress."""
+    import os
+    import time
+
+    import distil.shadow as shadow
+
+    led = shadow.ShadowLedger()
+    led.samples = 3
+    monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
+    s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
+
+    sj = shadow._state_dir() / "shadow.jsonl"
+    sj.parent.mkdir(parents=True, exist_ok=True)
+    sj.write_text('{"equivalent": true}\n', encoding="utf-8")
+
+    _rc, out = _run(monkeypatch, capsys, s, recent=s)
+    assert "de 3/25" in out  # fresh file → genuinely collecting
+
+    old = time.time() - 2 * 86400
+    os.utime(sj, (old, old))
+    _rc, out = _run(monkeypatch, capsys, s, recent=s)
+    assert "de idle" in out  # stale >24h → no sampler feeding it
+    assert "3/25" not in out
+
+
+def test_wrap_shadow_defaults_on():
+    """Intelligence is the default: decision-equivalence sampling runs at 2%
+    unless explicitly disabled (--shadow 0 is the opt-out)."""
+    from distil.cli import build_parser
+
+    ns = build_parser().parse_args(["wrap", "--", "echo", "hi"])
+    assert ns.shadow == 0.02

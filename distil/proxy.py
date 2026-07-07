@@ -24,6 +24,7 @@ import json
 import os
 import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -724,14 +725,36 @@ def build_handler(
     return _DistilHandler
 
 
+def _signal_breadcrumb(name: str) -> None:
+    """Append a wrap-level signal record to the session's ``.exit`` file.
+
+    A process-group kill (terminal tab close = SIGHUP, plain ``kill`` = SIGTERM)
+    takes the wrap down WITH the child, so the child-exit breadcrumb never gets
+    written — this line is the only post-mortem trace of what happened."""
+    try:
+        from .ledger import session_marker_path
+
+        mp = session_marker_path()
+        if mp is not None and mp.parent.is_dir():
+            with open(mp.with_name(mp.name + ".exit"), "a", encoding="utf-8") as f:
+                f.write(f"wrap received {name} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    except OSError:
+        pass
+
+
 def _install_sigterm_flush(proc_holder: list | None = None) -> None:
-    """Turn SIGTERM into KeyboardInterrupt so the caller's ``finally`` block
-    (savings flush, shadow drain) runs on a plain ``kill`` instead of dropping
-    up to a flush-window of recorded savings. Forwards the signal to a wrapped
-    child process first, if one is registered in *proc_holder*."""
+    """Turn SIGTERM/SIGHUP into KeyboardInterrupt so the caller's ``finally``
+    block (savings flush, shadow drain) runs on a plain ``kill`` or a closed
+    terminal tab instead of dropping up to a flush-window of recorded savings.
+    Writes a signal breadcrumb first (the group kill may not leave time for
+    more), then forwards to a wrapped child if one is registered."""
     import signal
 
     def _on_term(signum: int, frame: object) -> None:  # noqa: ARG001
+        try:
+            _signal_breadcrumb(signal.Signals(signum).name)
+        except Exception:  # noqa: BLE001 — dying; breadcrumb is best-effort
+            pass
         if proc_holder:
             try:
                 proc_holder[0].terminate()
@@ -739,10 +762,13 @@ def _install_sigterm_flush(proc_holder: list | None = None) -> None:
                 pass
         raise KeyboardInterrupt
 
-    try:
-        signal.signal(signal.SIGTERM, _on_term)
-    except ValueError:
-        pass  # not the main thread (embedded use) — finally-blocks still cover Ctrl+C
+    for sig in (signal.SIGTERM, getattr(signal, "SIGHUP", None)):
+        if sig is None:
+            continue  # Windows has no SIGHUP
+        try:
+            signal.signal(sig, _on_term)
+        except ValueError:
+            pass  # not the main thread (embedded use) — finally-blocks still cover Ctrl+C
 
 
 def _drain_shadow(handler: type, budget: float = 6.0) -> None:
@@ -899,6 +925,9 @@ def wrap_run(
                 if now - old.stat().st_mtime > 7 * 86400:
                     old.unlink()
             marker.write_text("0", encoding="utf-8")
+            # A nested wrap can inherit the sid — don't let a previous life's
+            # exit breadcrumb masquerade as this session's.
+            marker.with_name(marker.name + ".exit").unlink(missing_ok=True)
         except OSError:
             pass  # marker is best-effort; never block the wrap over it
 
@@ -1038,9 +1067,10 @@ def wrap_run(
                     desc = f"signal {-code}"
             else:
                 desc = f"exit code {code}"
-            mp.with_name(mp.name + ".exit").write_text(
-                f"{desc} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n", encoding="utf-8"
-            )
+            # Append — a signal breadcrumb may already be in the file, and both
+            # lines together tell the story (e.g. SIGTERM → child exit 143).
+            with open(mp.with_name(mp.name + ".exit"), "a", encoding="utf-8") as f:
+                f.write(f"child {desc} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
     except OSError:
         pass
     return code
