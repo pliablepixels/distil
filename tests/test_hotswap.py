@@ -359,3 +359,121 @@ def test_dead_worker_respawns_and_session_survives(tmp_path):
         upstream.shutdown()
         if wrap.poll() is None:
             wrap.kill()
+
+
+# ---------------------------------------------------------------------------
+# In-process supervisor tests: the e2e tests above run the supervisor inside a
+# wrap *subprocess*, which coverage can't see. These drive ProxySupervisor
+# directly in this process — same real workers, deterministic branch coverage
+# for handover, rollback, and drain-reaping.
+# ---------------------------------------------------------------------------
+
+
+def _inproc_supervisor(tmp_path, monkeypatch, upstream_port: int):
+    from distil.hotswap import ProxySupervisor
+
+    monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+    return ProxySupervisor(
+        WorkerConfig(upstream=f"http://127.0.0.1:{upstream_port}", record=False)
+    )
+
+
+def test_supervisor_inprocess_handover_and_reap(tmp_path, monkeypatch):
+    upstream = _start_upstream()
+    sup = _inproc_supervisor(tmp_path, monkeypatch, upstream.server_address[1])
+    try:
+        sup.start()
+        v1 = sup.worker_version
+        assert _post(sup.port, _payload()).status == 200
+        old_worker = sup._worker
+        sup._handover(reason="test")  # direct call: no watch-thread wait
+        assert sup.worker_version == v1  # same code on disk, fresh worker
+        assert sup._worker is not old_worker
+        assert _post(sup.port, _payload()).status == 200  # new worker serves
+        assert old_worker.wait(timeout=30) == 0  # old worker drained clean
+        sup._reap_drained()
+        assert sup._draining == []
+    finally:
+        sup.shutdown()
+        upstream.shutdown()
+    assert sup._worker is not None and sup._worker.poll() is not None
+
+
+def test_supervisor_inprocess_rollback_keeps_old_worker(tmp_path, monkeypatch):
+    upstream = _start_upstream()
+    fail_marker = tmp_path / "break-replacements"
+    monkeypatch.setenv("DISTIL_HOTSWAP_TEST_FAIL_READY", str(fail_marker))
+    monkeypatch.setenv("DISTIL_WORKER_READY_TIMEOUT", "5")
+    sup = _inproc_supervisor(tmp_path, monkeypatch, upstream.server_address[1])
+    try:
+        sup.start()  # marker absent: worker #1 healthy
+        survivor = sup._worker
+        fail_marker.write_text("x")  # every worker from now on dies pre-READY
+        sup._handover(reason="test")  # must roll back, not raise
+        assert sup._worker is survivor  # old worker untouched
+        assert _post(sup.port, _payload()).status == 200  # and still serving
+    finally:
+        sup.shutdown()
+        upstream.shutdown()
+
+
+def test_await_ready_times_out_and_kills(tmp_path):
+    from distil.hotswap import ProxySupervisor
+
+    proc = subprocess.Popen(  # never prints READY
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdout=subprocess.PIPE,
+    )
+    with pytest.raises(RuntimeError, match="did not report ready"):
+        ProxySupervisor._await_ready(proc, timeout=0.5)
+    assert proc.poll() is not None  # the impostor was killed, not leaked
+
+
+def test_watch_thread_handles_manual_trigger_and_respawn(tmp_path, monkeypatch):
+    """Drive the watch thread itself (not _handover directly): request_handover
+    wakes it for a manual swap; a SIGKILLed worker is respawned on the next
+    wake. Waits are on observable state changes, not sleeps."""
+    upstream = _start_upstream()
+    sup = _inproc_supervisor(tmp_path, monkeypatch, upstream.server_address[1])
+    try:
+        sup.start()
+        first = sup._worker
+        sup.request_handover()  # manual: watch thread wakes and swaps
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and sup._worker is first:
+            time.sleep(0.05)
+        assert sup._worker is not first, "watch thread never performed the swap"
+        assert _post(sup.port, _payload()).status == 200
+
+        crashed = sup._worker
+        crashed.kill()  # simulate worker crash/OOM
+        crashed.wait(timeout=10)
+        sup.request_handover()  # wake the watch: dead-check runs before swap
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and (
+            sup._worker is crashed or sup._worker.poll() is not None
+        ):
+            time.sleep(0.05)
+        assert sup._worker is not crashed and sup._worker.poll() is None
+        assert _post(sup.port, _payload()).status == 200  # respawned and serving
+    finally:
+        sup.shutdown()
+        upstream.shutdown()
+
+
+def test_reap_kills_a_wedged_drain(tmp_path, monkeypatch):
+    """A draining worker stuck past the cap gets SIGKILLed, not leaked."""
+    upstream = _start_upstream()
+    sup = _inproc_supervisor(tmp_path, monkeypatch, upstream.server_address[1])
+    wedged = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
+    try:
+        wedged._drain_t0 = time.monotonic() - 10_000  # long past _DRAIN_CAP_S
+        sup._draining.append(wedged)
+        sup._reap_drained()
+        assert wedged.wait(timeout=10) != 0  # killed
+        assert sup._draining == []
+    finally:
+        if wedged.poll() is None:
+            wedged.kill()
+        sup.shutdown()
+        upstream.shutdown()

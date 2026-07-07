@@ -114,7 +114,10 @@ def installed_version() -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def worker_main() -> int:
+def worker_main() -> int:  # pragma: no cover — subprocess entry point: exercised
+    # end-to-end by every test in tests/test_hotswap.py (READY handshake, serve,
+    # mid-stream drain, rollback exit), but always in a child process where
+    # in-process coverage cannot trace it.
     """Entry point for the proxy worker subprocess.
 
     Rebuilds the exact proxy the in-thread path would have built, on the
@@ -347,6 +350,7 @@ class ProxySupervisor:
             self._failed_version = None
             if old is not None and old.poll() is None:
                 old.terminate()  # SIGTERM → drain: finish in-flight, flush, exit
+                old._drain_t0 = time.monotonic()  # type: ignore[attr-defined]
                 self._draining.append(old)
             print(
                 f"distil wrap: proxy hot-swapped v{old_version} → "
@@ -355,17 +359,16 @@ class ProxySupervisor:
             )
 
     def _reap_drained(self) -> None:
+        now = time.monotonic()
         still = []
         for proc in self._draining:
             if proc.poll() is None:
                 # A wedged drain must not linger forever next to a live session.
-                if time.monotonic() - getattr(proc, "_drain_t0", self._stamp(proc)) > _DRAIN_CAP_S:
+                # _drain_t0 is stamped once at handover; a plain-attribute read
+                # here on purpose — an eager default would restart the clock
+                # every poll and the cap would never fire.
+                if now - getattr(proc, "_drain_t0", now) > _DRAIN_CAP_S:
                     proc.kill()
                 else:
                     still.append(proc)
         self._draining = still
-
-    @staticmethod
-    def _stamp(proc: subprocess.Popen[bytes]) -> float:
-        proc._drain_t0 = time.monotonic()  # type: ignore[attr-defined]
-        return proc._drain_t0  # type: ignore[attr-defined]

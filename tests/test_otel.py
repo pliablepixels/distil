@@ -137,3 +137,40 @@ def test_proxy_round_trip_emits_span_with_sdk(monkeypatch):
     spans = exporter.get_finished_spans()
     assert len(spans) == 1
     assert spans[0].attributes["gen_ai.request.model"] == "claude-opus-4-8"
+
+
+def test_otel_failures_never_break_the_request_path(monkeypatch):
+    """Every guard in the module: a tracer that explodes at span start, a span
+    that explodes on set_attribute/end — the caller must never see any of it."""
+    from distil import otel
+
+    class _Bomb:
+        def start_as_current_span(self, *a, **k):
+            raise RuntimeError("exporter down")
+
+    monkeypatch.setattr(otel, "_ENABLED", True)
+    monkeypatch.setattr(otel, "_tracer", _Bomb())
+    with otel.request_span("claude-opus-4-8", "/v1/messages") as span:
+        assert span is None  # start failed silently → no-op span
+        otel.set_result_attrs(span, original_tokens=1)  # None-span: no-op
+
+    class _BadSpan:
+        def set_attribute(self, *a):
+            raise RuntimeError("attr")
+
+    class _BadCM:
+        def __enter__(self):
+            return _BadSpan()
+
+        def __exit__(self, *a):
+            raise RuntimeError("exit")
+
+    class _BadTracer:
+        def start_as_current_span(self, *a, **k):
+            return _BadCM()
+
+    monkeypatch.setattr(otel, "_tracer", _BadTracer())
+    with otel.request_span("claude-opus-4-8", "/v1/messages") as span:
+        assert span is not None  # started, but every method on it explodes
+        otel.set_result_attrs(span, original_tokens=2, compressed=True)  # swallowed
+    # reaching here without an exception IS the assertion
