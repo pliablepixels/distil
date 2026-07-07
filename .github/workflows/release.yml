@@ -40,6 +40,13 @@ jobs:
         run: uv build
       - name: Build single-file executable
         run: bash scripts/build_pyz.sh
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist/distil.cyclonedx.json
+          upload-release-assets: false # this workflow attaches assets itself below, not via a `release` event
       - name: Create the GitHub release (+ tag v<version>) and attach artifacts
         # `gh release create` reliably creates the tag + release + uploads assets on
         # ANY trigger (including manual workflow_dispatch), unlike action-gh-release
@@ -54,9 +61,9 @@ jobs:
           PRE=""
           case "$V" in *rc*) PRE="--prerelease" ;; esac
           if gh release view "$V" >/dev/null 2>&1; then
-            gh release upload "$V" dist/*.whl dist/*.tar.gz dist/distil.pyz --clobber
+            gh release upload "$V" dist/*.whl dist/*.tar.gz dist/distil.pyz dist/distil.cyclonedx.json --clobber
           else
-            gh release create "$V" dist/*.whl dist/*.tar.gz dist/distil.pyz \
+            gh release create "$V" dist/*.whl dist/*.tar.gz dist/distil.pyz dist/distil.cyclonedx.json \
               --target "${{ github.sha }}" --title "$V" $PRE \
               --notes "Release $V — see CHANGELOG.md. Install: pipx install distil-llm (PyPI), or download the wheel/distil.pyz below if PyPI is blocked."
           fi
