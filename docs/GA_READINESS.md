@@ -79,6 +79,7 @@ binary and checkable; opinions don't count, evidence does.
 | **Supply chain: attestations + SBOM + Scorecard** | PEP 740 Sigstore attestations active (trusted publishing, `gh-action-pypi-publish@release/v1` ≥ v1.11); CycloneDX SBOM attached to GitHub releases (`release.yml`); weekly OpenSSF Scorecard (`scorecard.yml`) |
 | **Shared-state writes locked across concurrent sessions** | `shadow.jsonl` append now flocked like `ledger.json`/`mcp_store.json`; cross-process torn-row hammer test in `tests/test_shadow.py` |
 | **CI signal tests deflaked (red-main root cause)** | readiness-marker sync replaces fixed sleeps in the wrap signal tests — red CI on `main` since 1.11.2 was test-side races on loaded runners, not product regressions |
+| **Upgrades apply to live sessions (hot-swap)** | wrap supervises the proxy as a subprocess on a shared listener FD; upgrade → new worker, same port, old worker drains in-flight streams; health-checked with rollback and dead-worker respawn (`distil/hotswap.py`, `tests/test_hotswap.py`: e2e handover, mid-stream drain, rollback — 20/20 deterministic) |
 
 ## Open (tracked GA items)
 

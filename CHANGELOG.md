@@ -3,6 +3,31 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.13.0] — 1.13.0rc1 — seamless hot-swap: upgrades apply to live sessions, no restart
+
+### Added
+
+- **Seamless proxy hot-swap** (POSIX, on by default): `distil wrap` now runs the
+  proxy as a supervised subprocess on a wrap-owned listener FD. When
+  `pipx upgrade` (or pip) puts a new version on disk, the wrap spawns a fresh
+  worker — new code, same socket, same port — health-checks it, then drains the
+  old one: in-flight requests (including long LLM streams) finish on the old
+  worker while new requests land on the new one. The agent session never
+  restarts and its `ANTHROPIC_BASE_URL` never changes.
+  - Zero request-path overhead: supervision is out-of-band; the upgrade poll is
+    one metadata read every 30 s in a daemon thread.
+  - Fail-safe twice over: a worker that doesn't report ready is discarded and
+    the old one keeps serving; a supervisor that can't start falls back to the
+    historical in-thread proxy. The feature can never cost a session.
+  - A worker that *dies* mid-session (crash/OOM) is respawned automatically —
+    the same self-heal contract the in-thread accept loop had.
+  - Manual trigger: `kill -USR1 <wrap pid>`. Opt out: `DISTIL_HOT_SWAP=0`.
+  - Windows keeps the in-thread proxy and the existing skew warning (FD
+    inheritance is POSIX-only — same accepted platform split as file locking).
+- `distil proxy-worker` (internal) — the supervised worker entry point.
+- `distil upgrade` now says which sessions hot-swap on their own instead of
+  telling you to restart everything.
+
 ## [1.12.0] — soaking as 1.12.0rc4 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
 
 First release through the new rc + soak pipeline (runtime code → rc first).
