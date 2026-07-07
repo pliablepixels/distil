@@ -36,6 +36,7 @@ from .adapters.gemini import compress_generate_request
 from .adapters.gemini import count_tokens
 from .adapters.gemini import is_gemini_path
 from .httpguard import parse_content_length, safe_forward_path, strip_query
+from .otel import request_span, set_result_attrs
 from .tokenizer import DEFAULT as _tokenizer
 
 # ---------------------------------------------------------------------------
@@ -460,6 +461,8 @@ def build_handler(
             headers = self._client_headers(identity=True)
             extras: dict[str, str] = {}
             store: Any = None  # RestoreStore once messages are compressed (for expand)
+            before_tok: int | None = None  # set only if a messages/gemini branch below runs
+            after_tok: int | None = None
             # Savings are booked only after a confirmed 2xx (P0-1): (before, after, model).
             _pending_savings: tuple[int, int, str | None] | None = None
 
@@ -580,6 +583,7 @@ def build_handler(
                     _pending_savings = (before_tok, after_tok, _model_from_path(self.path))
 
             new_raw = json.dumps(body).encode()
+            _span_model = body.get("model") or _model_from_path(self.path) or "unknown"
 
             # Decide shadow sampling BEFORE relaying so the marker header can be
             # sent on the streaming path too (headers go out before the body).
@@ -596,16 +600,27 @@ def build_handler(
             if want_stream and not (expand and getattr(store, "handles", None)):
                 from .streamrelay import stream_upstream
 
-                status_s, rbody_opt = stream_upstream(
-                    self,
-                    _upstream + self.path,
-                    new_raw,
-                    headers,
-                    timeout=_UPSTREAM_TIMEOUT,
-                    hop_by_hop=_HOP_BY_HOP,
-                    extras=extras,
-                    want_body=shadow_sampled,  # only buffer the body when shadow needs it
-                )
+                with request_span(_span_model, self.path) as _span:
+                    status_s, rbody_opt = stream_upstream(
+                        self,
+                        _upstream + self.path,
+                        new_raw,
+                        headers,
+                        timeout=_UPSTREAM_TIMEOUT,
+                        hop_by_hop=_HOP_BY_HOP,
+                        extras=extras,
+                        want_body=shadow_sampled,  # only buffer the body when shadow needs it
+                    )
+                    set_result_attrs(
+                        _span,
+                        original_tokens=before_tok,
+                        compressed_tokens=after_tok,
+                        compression_ratio=(
+                            after_tok / before_tok if before_tok and after_tok is not None else None
+                        ),
+                        compressed="x-distil-compressed" in extras,
+                        shadow_sampled=shadow_sampled,
+                    )
                 if _learn_stats is not None:
                     _learn_stats.save()
                 # Book savings only after a fully-relayed 2xx (P0-1).
@@ -617,7 +632,18 @@ def build_handler(
                     self._spawn_shadow(raw, headers, rbody_opt, compressed_raw=new_raw)
                 return
 
-            status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
+            with request_span(_span_model, self.path) as _span:
+                status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
+                set_result_attrs(
+                    _span,
+                    original_tokens=before_tok,
+                    compressed_tokens=after_tok,
+                    compression_ratio=(
+                        after_tok / before_tok if before_tok and after_tok is not None else None
+                    ),
+                    compressed="x-distil-compressed" in extras,
+                    shadow_sampled=shadow_sampled,
+                )
 
             # Transparent expand loop: resolve any distil_expand tool calls against
             # the local store and re-query, invisibly, before returning to the agent.
