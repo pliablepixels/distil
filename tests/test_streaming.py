@@ -202,10 +202,13 @@ def test_sync_proxy_streaming_records_savings_and_shadow(tmp_path, monkeypatch):
 
         deadline = time.monotonic() + 30
         led = ShadowLedger.load()
-        while led.samples == 0 and time.monotonic() < deadline:
+        # rc4 split sampling: 1/3 of draws replay A/A (ledger.aa_samples), the
+        # rest A/B (ledger.samples) — a streamed request must produce a row of
+        # EITHER kind; asserting on .samples alone fails on every A/A draw
+        while led.samples + led.aa_samples == 0 and time.monotonic() < deadline:
             time.sleep(0.05)
             led = ShadowLedger.load()
-        assert led.samples >= 1  # streamed request still produced a shadow sample
+        assert led.samples + led.aa_samples >= 1  # streamed request produced a shadow row
         assert (tmp_path / "savings.jsonl").exists()  # savings flushed
     finally:
         proxy.shutdown()
