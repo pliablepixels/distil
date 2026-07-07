@@ -472,6 +472,6 @@ def diagnose() -> list[Check]:
             checks.append(Check(fn.__name__.replace("_check_", ""), FAIL, f"check errored — {exc}"))
     try:
         checks.extend(_check_claude_code())
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 — a check must never crash doctor
+        checks.append(Check("claude_code", FAIL, f"check errored — {exc}"))
     return checks
