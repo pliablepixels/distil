@@ -7,6 +7,31 @@ All notable changes to Distil are documented here. Format loosely follows
 
 First release through the new rc + soak pipeline (runtime code → rc first).
 
+### Added (post-rc4, headed for rc5)
+
+- **OpenTelemetry GenAI spans** (opt-in): `pip install 'distil-llm[otel]'` emits
+  `gen_ai.*` semantic-convention spans per proxied request with
+  `distil.tokens.original/compressed`, `distil.compression.ratio`, and
+  `distil.shadow.sampled` attributes. Strict no-op without the extra; an OTel
+  failure can never break the request path. Core stays zero-dependency.
+- **Supply chain**: CycloneDX SBOM attached to GitHub releases; weekly OpenSSF
+  Scorecard on `main`; PEP 740 Sigstore attestations confirmed active.
+- **docs/EVALUATION.md**: the evaluation methodology — why compression ratio
+  without a task-success delta is meaningless, the E7 negative result, the A/A
+  nondeterminism baseline, and what the trajectory certificate does/doesn't prove.
+
+### Fixed (post-rc4, headed for rc5)
+
+- **CI red on `main` since 1.11.2 — test-side, not product**: the wrap signal
+  tests synchronized on fixed sleeps and lost the race on loaded CI runners
+  (SIGTERM landing before the handler installs kills the wrap raw). Children
+  now write a readiness marker after arming; tests wait on it.
+- **`shadow.jsonl` appends now flocked** like `ledger.json` — shadow is
+  on-by-default since rc3 and rc4 rows exceed the size where bare appends are
+  atomic; concurrent sessions can no longer tear rows.
+- `distil doctor` no longer silently drops a crashed Claude Code check —
+  it reports FAIL like every other check.
+
 ### Fixed
 - **"✓ on" no longer trusts env vars alone — a wrapped agent that bypasses the proxy is
   called out.** Found live: a claude.ai-subscription (OAuth) Claude Code session keeps

@@ -340,6 +340,10 @@ distil gateway listening on http://0.0.0.0:8789
 
     <p><strong>Crash-safe accounting.</strong> The gateway checkpoints per-tenant token/dollar counters to disk at most every 30&nbsp;seconds during traffic (atomic replace), in addition to the save on graceful shutdown — a <code>kill -9</code> or container OOM loses at most 30&nbsp;seconds of accounting, not the whole day. <strong>Restore-store retention:</strong> digest originals age out after <code>DISTIL_RESTORE_TTL_DAYS</code> (default 14, <code>0</code> disables) on top of the 500-file count cap, so plaintext agent content never sits on disk indefinitely.</p>
 
+    <p><strong>OpenTelemetry GenAI spans (opt-in).</strong> <code>pip install 'distil-llm[otel]'</code> and every proxied request emits an <a href="https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/" target="_blank" rel="noopener">GenAI semantic-convention</a> span — <code>gen_ai.request.model</code>, <code>gen_ai.usage.input_tokens</code> — plus what compression did to the request: <code>distil.tokens.original</code> vs <code>distil.tokens.compressed</code>, <code>distil.compression.ratio</code>, <code>distil.shadow.sampled</code>. Without the extra it is a single boolean check; an OTel failure can never break the request path. There is deliberately <em>no</em> metrics endpoint — the unauthenticated-<code>/metrics</code> data-leak class is structurally absent.</p>
+
+    <p><strong>Supply chain.</strong> PyPI releases carry <a href="https://peps.python.org/pep-0740/" target="_blank" rel="noopener">PEP 740 Sigstore attestations</a> (trusted publishing) and a CycloneDX SBOM is attached to every GitHub release; <a href="https://github.com/ossf/scorecard" target="_blank" rel="noopener">OpenSSF Scorecard</a> runs weekly against <code>main</code>.</p>
+
     <hr/>
 
     <h2 id="mcp-store">MCP server local store</h2>

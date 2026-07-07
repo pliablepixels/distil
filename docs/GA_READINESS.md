@@ -75,6 +75,10 @@ binary and checkable; opinions don't count, evidence does.
 | **Cross-model generality demonstrated** | E11: non-inferiority transfers to DeepSeek-V3 (different vendor, far stronger) at a capability-appropriate point |
 | **Engineering maturity** | v1.0.0, 700+ tests, full CI (ci/pages/paper-build/release), zero-dependency stdlib core, packaged (`distil` entrypoint) |
 | **Per-turn + trajectory certificates, validated out-of-sample** | E2 (coverage 96.6–100%), E10 (trajectory, coverage 95.4/96.7%) |
+| **Observability: OTel GenAI spans (opt-in `[otel]` extra)** | `distil/otel.py` emits `gen_ai.*` semconv spans + `distil.tokens.original/compressed`, `distil.compression.ratio`, `distil.shadow.sampled`; no-op boolean guard without the extra; `tests/test_otel.py`. No metrics endpoint exists → the unauthenticated-metrics leak class is structurally absent |
+| **Supply chain: attestations + SBOM + Scorecard** | PEP 740 Sigstore attestations active (trusted publishing, `gh-action-pypi-publish@release/v1` ≥ v1.11); CycloneDX SBOM attached to GitHub releases (`release.yml`); weekly OpenSSF Scorecard (`scorecard.yml`) |
+| **Shared-state writes locked across concurrent sessions** | `shadow.jsonl` append now flocked like `ledger.json`/`mcp_store.json`; cross-process torn-row hammer test in `tests/test_shadow.py` |
+| **CI signal tests deflaked (red-main root cause)** | readiness-marker sync replaces fixed sleeps in the wrap signal tests — red CI on `main` since 1.11.2 was test-side races on loaded runners, not product regressions |
 
 ## Open (tracked GA items)
 

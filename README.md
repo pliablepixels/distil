@@ -130,7 +130,7 @@ You don't need byte-equivalence — you need **decision-equivalence**: your agen
 
 ## ⚡ Prove the numbers yourself — no API key
 
-Don't take the table above on faith. `distil bench` re-certifies savings *and* decision-equivalence on a bundled 7-domain corpus, offline, in seconds — the same gate that runs in CI:
+Don't take the table above on faith. `distil bench` re-certifies savings *and* decision-equivalence on a bundled 7-domain corpus, offline, in seconds — the same gate that runs in CI. How we evaluate — and why a compression ratio without a task-success delta is meaningless — is written up in [docs/EVALUATION.md](docs/EVALUATION.md), including our own negative result:
 
 ```bash
 uvx --from distil-llm distil bench   # certify savings + quality across 7 domains, in seconds
@@ -362,6 +362,8 @@ Full module-by-module map: [Architecture](https://dshakes.github.io/distil/archi
 - **Auth-mode gating** — `--lossless-only` keeps subscription/OAuth sessions to Tier-0 verbatim only: no Tier-1 digest stubs, no tool injection (provider-ToS-safe). Without an injected expand tool the agent cannot recover a stub, so `--lossless-only` folds directly into verbatim — no separate `--verbatim` flag needed.
 - **Minimal local persistence** — digest originals are written to `~/.distil/restore/` (respects `DISTIL_HOME`) so handles survive proxy restarts, and age out after `DISTIL_RESTORE_TTL_DAYS` (default 14). For strict ZDR deployments, point `DISTIL_HOME` at an ephemeral path or clear that directory between sessions. No data is forwarded upstream.
 - **Ops-ready** — unauthenticated `GET /distil/health` liveness probe on every entry point (never touches the billed upstream); gateway accounting checkpoints to disk every 30 s (crash-safe, not just on graceful shutdown); `DISTIL_DEBUG=1` surfaces everything the fail-open compression path swallows.
+- **OpenTelemetry GenAI spans (opt-in)** — `pip install 'distil-llm[otel]'` and every proxied call emits a [GenAI semantic-convention](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/) span (`gen_ai.request.model`, `gen_ai.usage.input_tokens`) plus distil's own story: `distil.tokens.original` vs `distil.tokens.compressed`, `distil.compression.ratio`, `distil.shadow.sampled` — your existing OTel backend sees exactly what compression did to each request. Without the extra installed it's a single boolean check, zero overhead, and an OTel failure can never break the request path. No metrics endpoint exists — the [LiteLLM unauthenticated-`/metrics` leak](https://github.com/BerriAI/litellm/issues/13644) class of bug is structurally absent.
+- **Supply-chain hardening** — releases carry [PEP 740 Sigstore attestations](https://peps.python.org/pep-0740/) (via PyPI trusted publishing) and a CycloneDX SBOM attached to every GitHub release; [OpenSSF Scorecard](https://github.com/ossf/scorecard) runs weekly on `main`.
 
 See [Deploy & security](https://dshakes.github.io/distil/deploy-security.html) for topologies (local sidecar, container sidecar, shared gateway) and the threat model.
 

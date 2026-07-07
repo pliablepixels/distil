@@ -1,0 +1,113 @@
+# Evaluation methodology
+
+How we measure whether distil is safe to ship, and why the obvious metric
+(compression ratio) is not the one we report against.
+
+## 1. Compression ratio alone is meaningless
+
+Token reduction and task success are not linearly related, and the relationship
+can cliff-edge: a setting that looks fine on average can collapse resolution
+rate outright. "On Problems of Implicit Context Compression for SE Agents"
+([arxiv.org/pdf/2605.11051](https://arxiv.org/pdf/2605.11051)) found that 4x
+compression collapsed SWE-bench resolution from 86% to 7% — not a gradual
+decline, a cliff. Factory.ai makes the same point from the practitioner side
+([factory.ai/news/evaluating-compression](https://factory.ai/news/evaluating-compression)):
+compression has to be graded on whether it changes the agent's *next action*,
+not on how small the context got.
+
+Distil's rule follows from this: **every compression claim we publish reports
+token savings and task-success delta together, at the setting we actually ship**,
+never a peak ratio measured in isolation. A number like "38% smaller" with no
+paired success-rate number next to it is not a result, it's an invitation to
+find the cliff the hard way, in production.
+
+## 2. distil's own cliff-edge: E7
+
+We hit this failure mode ourselves. E7, an internal SWE-bench Verified
+end-to-end experiment (`benchmarks/swe_bench_e2e/`), ran the full agent loop —
+not a single-step proxy — under distil's *aggressive* lossy compression tier
+and measured actual task resolution: **52% → 16%**. The **reversible** tier,
+by contrast, held (56% vs. 52% full-context baseline). Per-step
+decision-equivalence had passed; end-to-end task success still cratered under
+the aggressive tier. That's the exact failure the literature above describes,
+reproduced on our own harness.
+
+We publish E7 as evidence, not confession. It's the reason the trajectory-risk
+certificate and the fail-safe gate exist, and why distil's shipped default is
+the conservative/reversible tier rather than the tier that scores best on a
+compression-ratio leaderboard. If you turn off the safety machinery, E7 is
+what you get back.
+
+## 3. Live decision-equivalence: shadow mode
+
+The trajectory certificate (below) is offline, run against a fixed corpus.
+Shadow mode (`distil/shadow.py`) is the live check: it runs continuously on
+real traffic, replaying **2% of requests** by default (`distil wrap --shadow`,
+`0` opts out).
+
+Each shadow sample is one of two kinds, at a 2:1 ratio:
+
+- **A/B (2/3 of samples)** — replay the same turn with the original context
+  and with the compressed context, and compare the model's decision signature
+  (tool call + args, or response digest) between the two. This is the number
+  people want: did compression change what the model decided to do?
+- **A/A (1/3 of samples)** — replay the *same already-compressed* request
+  twice and compare its decision signature against itself. This is not a
+  compression measurement at all — it's the model's own sampling
+  nondeterminism, measured on live traffic with a live model.
+
+The reason A/A exists: a raw A/B agreement number is uninterpretable on its
+own. If the model only agrees with itself 90% of the time under identical
+input (temperature, tool-choice noise, provider-side nondeterminism), an A/B
+agreement rate of 88% is not a 12-point compression problem — it's within the
+model's own noise floor. `distil shadow-stats` reports the decomposition
+explicitly: **raw A/B rate, A/A baseline rate, and the adjusted rate** (A/B
+agreement relative to the A/A baseline), so a regression in the adjusted rate
+means compression, not the provider having a noisy day.
+
+Every shadow row is content-free by construction: a digest and both decision
+signatures, never the underlying prompt or completion.
+
+This A/A self-agreement control is ahead of current published practice.
+ACON ([arxiv.org/abs/2510.00615](https://arxiv.org/abs/2510.00615)), Context
+Codec ([arxiv.org/abs/2605.17304](https://arxiv.org/abs/2605.17304)), and
+Decision-Aware Memory Cards
+([arxiv.org/abs/2606.08151](https://arxiv.org/abs/2606.08151)) all evaluate
+decision-equivalence, but none of them measure or subtract out the model's own
+sampling nondeterminism first — which means a fraction of the harm they
+attribute to compression is actually the model disagreeing with itself.
+
+## 4. Trajectory-risk certificates
+
+`distil certify-trajectories` (`distil/certify/trajectory_risk.py`) is the
+offline statistical gate: run your eval suite twice, full context and
+compressed, on the same tasks; feed in the matched pass/fail pairs; it returns
+a distribution-free bound of the form **P(degradation ≤ α) ≥ 1 − δ**, refusing
+to certify below a minimum sample size, and states its exchangeability
+assumption in the certificate itself.
+
+What it proves: on *this measured workload*, compression is very unlikely to
+have cost you more than α percentage points of task success, at confidence
+1 − δ. What it does not prove: that the same bound holds on a workload you
+haven't measured. Transfer across workloads is not guaranteed — E7 is the
+concrete demonstration of why that caveat is load-bearing, not boilerplate:
+per-step certification on one workload does not imply end-to-end safety on
+another. An anytime-valid drift monitor
+(`distil.certify.trajectory_risk.drift_monitor`) flags when live traffic has
+moved far enough from the certified distribution that the certificate should
+be considered stale and re-run.
+
+## 5. How to reproduce
+
+- `distil shadow-stats` — live decision-equivalence, raw/baseline/adjusted
+  decomposition, from real traffic collected by `distil wrap --shadow`.
+- `distil certify-trajectories` — offline trajectory-risk certificate from a
+  matched full-vs-compressed outcome file; see `distil certify-trajectories -h`
+  for the input format.
+- `benchmarks/swe_bench_e2e/` — the E7 harness (`run_all_agents.sh`,
+  `run_all_scores.sh`, `aggregate.py`): runs the full SWE-bench Verified agent
+  loop under each compression tier and scores real resolution, not a proxy.
+- `benchmarks/PROVE.md` (`prove.py`) — decision-equivalence measured against
+  real agent traces graded by a real model, avoiding the circularity of
+  self-graded `DECISION:` markers.
+- `BENCHMARKS.md` — the live-graded head-to-head numbers and how they're run.
