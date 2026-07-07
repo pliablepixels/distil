@@ -512,6 +512,15 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_proxy_worker(args: argparse.Namespace) -> int:
+    """Internal: the proxy worker `distil wrap` supervises for seamless
+    hot-swap on upgrade. Configured via environment, not flags — see
+    distil/hotswap.py for the protocol."""
+    from .hotswap import worker_main
+
+    return worker_main()
+
+
 def cmd_shadow_stats(args: argparse.Namespace) -> int:
     """Show the live decision-equivalence measured by shadow mode on real traffic."""
     from .shadow import ShadowLedger
@@ -802,9 +811,10 @@ def _warn_running_proxies() -> None:
     if hits:
         n = len(hits.splitlines())
         print(
-            f"⚠ {n} running distil proxy process(es) detected — restart them after the "
-            "upgrade so they pick up the new code (a live proxy keeps the old modules "
-            "and can hit version skew mid-request)."
+            f"ℹ {n} running distil proxy process(es) detected — wrap sessions started "
+            "on 1.13+ hot-swap to the new code automatically within ~30s "
+            "(kill -USR1 <wrap pid> to force it now). Older wraps, standalone "
+            "`distil proxy`, and gateways still need a restart to pick it up."
         )
 
 
@@ -2062,6 +2072,12 @@ def build_parser() -> argparse.ArgumentParser:
         "edits sent as a diff), cache-monotonic and reversible (sync proxy only)",
     )
     px.set_defaults(func=cmd_proxy)
+
+    pw = sub.add_parser(
+        "proxy-worker",
+        help="internal: proxy worker spawned by `distil wrap` (hot-swap); not for direct use",
+    )
+    pw.set_defaults(func=cmd_proxy_worker)
 
     ss = sub.add_parser(
         "shadow-stats", help="show live decision-equivalence measured by shadow mode"

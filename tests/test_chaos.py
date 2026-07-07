@@ -88,7 +88,12 @@ def test_wrap_proxy_accept_loop_self_heals(monkeypatch, capsys):
 
     Simulated by a server whose first serve_forever() dies immediately; the
     child then proves the *restarted* loop answers on the same port.
+
+    In-thread mechanics by design (the CrashOnce patch can't cross a process
+    boundary); the hot-swap path's equivalent contract — worker respawn — is
+    covered in test_hotswap.py.
     """
+    monkeypatch.setenv("DISTIL_HOT_SWAP", "0")
 
     class CrashOnce(proxy.QuietHTTPServer):
         crashed = False

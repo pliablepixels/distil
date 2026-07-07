@@ -987,39 +987,77 @@ def wrap_run(
         except OSError:
             pass  # marker is best-effort; never block the wrap over it
 
+    # Hot-swap (POSIX default): the proxy runs as a supervised subprocess on a
+    # listener FD the wrap owns, so a `pipx upgrade` mid-session swaps in a
+    # fresh worker (new code, same port) without touching the agent. Windows
+    # and DISTIL_HOT_SWAP=0 keep the historical in-thread proxy; a supervisor
+    # start failure falls back to it too — the feature can never cost a session.
+    supervisor = None
+    if os.name == "posix" and os.environ.get("DISTIL_HOT_SWAP", "1") != "0":
+        from .hotswap import ProxySupervisor, WorkerConfig
+
+        try:
+            supervisor = ProxySupervisor(
+                WorkerConfig(
+                    upstream=upstream,
+                    lossless_only=lossless_only,
+                    verbatim=verbatim,
+                    shape_output=shape_output,
+                    record=record,
+                    pricing_model=pricing_model,
+                    expand=expand,
+                    session_delta=session_delta,
+                    shadow_rate=shadow_rate,
+                ),
+                host=host,
+            )
+            supervisor.start()
+        except Exception:  # noqa: BLE001 — fall back rather than lose the session
+            log.warning("hot-swap supervisor failed; using in-thread proxy", exc_info=True)
+            supervisor = None
+
     savings = None
-    if record:
-        from .runtime import RuntimeSavings
+    handler = None
+    server = None
+    if supervisor is not None:
+        base = f"http://{host}:{supervisor.port}"
+    else:
+        if record:
+            from .runtime import RuntimeSavings
 
-        savings = RuntimeSavings(model=pricing_model)
-    handler = build_handler(
-        upstream,
-        lossless_only=lossless_only,
-        verbatim=verbatim,
-        shape_output=shape_output,
-        savings=savings,
-        expand=expand,
-        session_delta=session_delta,
-        shadow_rate=shadow_rate,
-    )
-    server = QuietHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
-    base = f"http://{host}:{server.server_address[1]}"
+            savings = RuntimeSavings(model=pricing_model)
+        handler = build_handler(
+            upstream,
+            lossless_only=lossless_only,
+            verbatim=verbatim,
+            shape_output=shape_output,
+            savings=savings,
+            expand=expand,
+            session_delta=session_delta,
+            shadow_rate=shadow_rate,
+        )
+        server = QuietHTTPServer((host, 0), handler)  # port 0 → OS picks a free port
+        base = f"http://{host}:{server.server_address[1]}"
 
-    def _serve_resilient() -> None:
-        # Self-heal: if serve_forever ever dies, the wrapped agent would get
-        # connection-refused for the rest of the session with no signal. Log
-        # loudly and re-enter the accept loop; the socket stays bound.
-        import sys as _sys
+    if server is not None:
 
-        while True:
-            try:
-                server.serve_forever()
-                return  # clean shutdown()
-            except Exception:  # noqa: BLE001 — keep the session alive
-                log.warning("wrap proxy accept loop crashed; restarting", exc_info=True)
-                print("distil: proxy accept loop crashed — restarting", file=_sys.stderr)
+        def _serve_resilient() -> None:
+            # Self-heal: if serve_forever ever dies, the wrapped agent would get
+            # connection-refused for the rest of the session with no signal. Log
+            # loudly and re-enter the accept loop; the socket stays bound.
+            # (The hot-swap path has the same contract: the supervisor respawns
+            # a worker that dies underneath the session.)
+            import sys as _sys
 
-    threading.Thread(target=_serve_resilient, daemon=True).start()
+            while True:
+                try:
+                    server.serve_forever()
+                    return  # clean shutdown()
+                except Exception:  # noqa: BLE001 — keep the session alive
+                    log.warning("wrap proxy accept loop crashed; restarting", exc_info=True)
+                    print("distil: proxy accept loop crashed — restarting", file=_sys.stderr)
+
+        threading.Thread(target=_serve_resilient, daemon=True).start()
 
     child_env = dict(os.environ)
     child_env[env_var] = base
@@ -1029,8 +1067,13 @@ def wrap_run(
         print("  → lossless-only (no shaping / no tool injection)")
     if verbatim:
         print("  → verbatim (Tier-0 only, no digest)")
-    if savings is not None:
+    if record:  # savings recorder lives in-process or in the worker, same meaning
         print("  → recording genuine savings → distil leaderboard")
+    if supervisor is not None:
+        print(
+            f"  → hot-swap: upgrades apply live (worker v{supervisor.worker_version}, "
+            "kill -USR1 to force)"
+        )
     if shadow_rate and shadow_rate > 0:
         print(
             f"  → shadow-mode live decision-equivalence: sampling "
@@ -1069,6 +1112,13 @@ def wrap_run(
         signal.signal(signal.SIGINT, lambda *_: None)
     except ValueError:
         pass  # not the main thread (embedded use) — finally-block still covers teardown
+    if supervisor is not None:
+        try:
+            # Manual hot-swap: `kill -USR1 <wrap pid>` — handler only sets an
+            # event; the supervisor's watch thread does the actual work.
+            signal.signal(signal.SIGUSR1, lambda *_: supervisor.request_handover())
+        except (ValueError, AttributeError):
+            pass  # not the main thread, or platform without SIGUSR1
     try:
         # Reserve the slot before Popen so a SIGTERM in the spawn window still
         # finds the child: the handler no-ops on the None placeholder, then the
@@ -1082,11 +1132,17 @@ def wrap_run(
     except KeyboardInterrupt:
         code = 130  # SIGTERM, translated by _install_sigterm_flush (child already terminated)
     finally:
-        server.shutdown()
-        _drain_shadow(handler)
-        if savings is not None:
-            savings.flush()  # SIGTERM lands here too — no savings are ever dropped
-        server.server_close()
+        if supervisor is not None:
+            # Worker owns the flushes: its SIGTERM drain finishes in-flight
+            # requests, drains shadow, and flushes savings before exiting.
+            supervisor.shutdown()
+        else:
+            assert server is not None and handler is not None  # in-thread mode
+            server.shutdown()
+            _drain_shadow(handler)
+            if savings is not None:
+                savings.flush()  # SIGTERM lands here too — no savings are ever dropped
+            server.server_close()
         if _saved_tty is not None:
             # Restore the terminal even if the child died mid-raw-mode. TCSADRAIN
             # waits for pending output to flush first.

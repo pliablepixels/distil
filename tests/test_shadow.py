@@ -405,7 +405,11 @@ def test_record_persists_content_free_evidence(tmp_path):
 
 def test_proxy_aa_replay_records_baseline_e2e(monkeypatch, tmp_path):
     """Force the A/A branch (random → 0): the proxy replays the SAME compressed
-    request and books a kind="aa" self-agreement row with evidence fields."""
+    request and books a kind="aa" self-agreement row with evidence fields.
+
+    Pinned to the in-thread proxy: forcing the RNG needs the handler in this
+    process. The shadow machinery is identical in a hot-swap worker."""
+    monkeypatch.setenv("DISTIL_HOT_SWAP", "0")
     import http.server
     import json as _json
     import os
