@@ -484,7 +484,13 @@ def test_concurrent_cross_process_appends_stay_intact(tmp_path):
     >PIPE_BUF line can interleave with another writer's and tear both rows —
     every line must parse and every row must survive."""
     import json as _json
+    import sys
     from concurrent.futures import ProcessPoolExecutor
+
+    import pytest
+
+    if sys.platform == "win32":
+        pytest.skip("fcntl advisory locking is POSIX-only; unlocked on Windows by design")
 
     p = tmp_path / "shadow.jsonl"
     workers, rows_each = 4, 25
