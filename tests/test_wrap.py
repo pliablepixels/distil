@@ -10,6 +10,22 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from distil import ledger, proxy
 
+
+def _await_file(path, timeout=60.0):
+    """Readiness sync for slow CI runners — a fixed sleep loses the race there.
+
+    The wrap installs its signal handlers before spawning the child, so a marker
+    written by the child proves the whole stack is armed before we signal it."""
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists():
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"ready marker {path} not written within {timeout}s")
+
+
 # Child program: reads ANTHROPIC_BASE_URL from env, drives a real request through
 # the wrapped proxy, and exits 0 only if Distil actually saved tokens on it.
 _CHILD = r"""
@@ -108,10 +124,12 @@ def test_wrap_survives_ctrl_c_while_child_lives(tmp_path):
 
     # Child mimics claude: ignores SIGINT, then proves the proxy still answers.
     child = tmp_path / "child.py"
+    ready = tmp_path / "ready"
     child.write_text(
         "import os, signal, time, urllib.request\n"
         "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
-        "time.sleep(3)\n"  # outlive the SIGINT sent at ~1s
+        f"open({str(ready)!r}, 'w').write('r')\n"  # armed — test may fire now
+        "time.sleep(3)\n"  # outlive the SIGINT burst sent at ready
         "urllib.request.urlopen(os.environ['ANTHROPIC_BASE_URL'] + '/', timeout=2)\n",
         encoding="utf-8",
     )
@@ -131,11 +149,11 @@ def test_wrap_survives_ctrl_c_while_child_lives(tmp_path):
         text=True,
         start_new_session=True,  # own group, like a terminal foreground job
     )
-    time.sleep(1.5)
+    _await_file(ready)  # child armed ⇒ wrap handlers installed (they precede spawn)
     for _ in range(5):  # rapid repeated presses, like a user mashing Ctrl+C
         os.killpg(os.getpgid(wrap.pid), signal.SIGINT)
         time.sleep(0.05)
-    out, _ = wrap.communicate(timeout=20)
+    out, _ = wrap.communicate(timeout=60)
     # Child got HTTP 404 from the still-alive proxy root (any response beats
     # connection-refused); it exits nonzero on urllib.HTTPError — accept that,
     # reject only the pre-fix signature: wrap exit 130 with the child orphaned.
@@ -149,8 +167,8 @@ def test_wrap_still_exits_on_sigterm(tmp_path):
     import os
     import signal
     import subprocess
-    import time
 
+    ready = tmp_path / "ready"
     wrap = subprocess.Popen(
         [
             sys.executable,
@@ -161,15 +179,15 @@ def test_wrap_still_exits_on_sigterm(tmp_path):
             "--",
             sys.executable,
             "-c",
-            "import time; time.sleep(30)",
+            f"import time; open({str(ready)!r}, 'w').write('r'); time.sleep(30)",
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    time.sleep(1.5)
+    _await_file(ready)  # child armed ⇒ wrap's SIGTERM handler installed
     os.kill(wrap.pid, signal.SIGTERM)
-    assert wrap.wait(timeout=10) == 130
+    assert wrap.wait(timeout=30) == 130
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="termios is POSIX-only")
@@ -252,17 +270,26 @@ def test_wrap_breadcrumbs_sighup_group_kill(tmp_path):
     import os
     import signal
     import subprocess
-    import time
 
+    ready = tmp_path / "ready"
     wrap = subprocess.Popen(
-        [sys.executable, "-m", "distil.cli", "wrap", "--no-record", "--",
-         sys.executable, "-c", "import time; time.sleep(30)"],
+        [
+            sys.executable,
+            "-m",
+            "distil.cli",
+            "wrap",
+            "--no-record",
+            "--",
+            sys.executable,
+            "-c",
+            f"import time; open({str(ready)!r}, 'w').write('r'); time.sleep(30)",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    time.sleep(1.5)  # let the wrap install handlers and write the marker
+    _await_file(ready)  # child armed ⇒ handlers installed and marker written
     os.kill(wrap.pid, signal.SIGHUP)
-    wrap.wait(timeout=15)
+    wrap.wait(timeout=30)
     sessions = os.path.join(os.environ["DISTIL_HOME"], "sessions")
     exits = [f for f in os.listdir(sessions) if f.endswith(".exit")]
     assert exits, os.listdir(sessions)

@@ -195,10 +195,12 @@ def test_sync_proxy_streaming_records_savings_and_shadow(tmp_path, monkeypatch):
         _t, body, headers, _f = _stream_request(proxy.server_address[1], payload)
         assert _CHUNK2 in body
         assert headers.get("x-distil-shadow") == "sampled"
-        # shadow thread records asynchronously — give it a moment
+        # shadow thread records asynchronously — the replay itself re-drives the
+        # SSE upstream (~2s of chunk delays), so a loaded CI runner needs far
+        # more headroom than a fast local box; the poll exits early when healthy
         from distil.shadow import ShadowLedger
 
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 30
         led = ShadowLedger.load()
         while led.samples == 0 and time.monotonic() < deadline:
             time.sleep(0.05)

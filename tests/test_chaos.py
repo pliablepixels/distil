@@ -33,9 +33,11 @@ def test_wrap_survives_sigint_hammer(tmp_path):
     import time
 
     child = tmp_path / "child.py"
+    ready = tmp_path / "ready"
     child.write_text(
         "import os, signal, time, urllib.request\n"
         "signal.signal(signal.SIGINT, signal.SIG_IGN)\n"  # agent swallows Ctrl+C
+        f"open({str(ready)!r}, 'w').write('r')\n"  # armed — hammer may start now
         "time.sleep(4)\n"  # outlive the 2s hammer
         "r = urllib.request.urlopen(\n"
         "    os.environ['ANTHROPIC_BASE_URL'] + '/distil/health', timeout=2)\n"
@@ -58,7 +60,14 @@ def test_wrap_survives_sigint_hammer(tmp_path):
         text=True,
         start_new_session=True,  # own group, like a terminal foreground job
     )
-    time.sleep(1.5)  # let the proxy bind and the child start
+    # Readiness marker, not a fixed sleep: on loaded CI runners wrap startup can
+    # exceed any constant, and a SIGINT landing before the no-op handler is
+    # installed kills the wrap raw. Child armed ⇒ handlers installed (they
+    # precede spawn) ⇒ the hammer tests the property, not the runner's speed.
+    deadline = time.monotonic() + 60.0
+    while time.monotonic() < deadline and not ready.exists():
+        time.sleep(0.05)
+    assert ready.exists(), "child never armed within 60s"
     pgid = os.getpgid(wrap.pid)
     deadline = time.monotonic() + 2.0
     sent = 0
@@ -66,7 +75,7 @@ def test_wrap_survives_sigint_hammer(tmp_path):
         os.killpg(pgid, signal.SIGINT)
         sent += 1
         time.sleep(0.005)
-    out, _ = wrap.communicate(timeout=30)
+    out, _ = wrap.communicate(timeout=60)
     assert wrap.returncode == 0, (
         f"wrap died under {sent} SIGINTs while child lived (exit {wrap.returncode}):\n{out}"
     )
