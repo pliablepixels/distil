@@ -25,11 +25,16 @@ fi
 
 total=0 bypassed=0 young=0
 for m in "${markers[@]}"; do
-  case "$m" in *.exit) continue ;; esac  # exit breadcrumbs, shown inline below
+  case "$m" in *.exit | *.hb) continue ;; esac  # breadcrumbs/heartbeats, shown inline below
   sid=$(basename "$m")
   val=$(cat "$m" 2>/dev/null || echo "?")
   ex=""
   [ -f "$m.exit" ] && ex="  exit=[$(head -c 160 "$m.exit" | tr '\n' ';' | sed 's/;$//')]"
+  # No exit breadcrumb = SIGKILL-class death (nothing could be written at the
+  # moment of death); the last heartbeat is the posthumous memory witness.
+  if [ ! -f "$m.exit" ] && [ -f "$m.hb" ]; then
+    ex="  last-hb=[$(head -c 160 "$m.hb" | tr -d '\n')]"
+  fi
   mtime=$(stat -f %m "$m" 2>/dev/null || stat -c %Y "$m")
   age=$((now - mtime))
   rows=0

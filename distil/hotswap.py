@@ -96,6 +96,41 @@ class WorkerConfig:
         return cls(**json.loads(os.environ[_CONFIG_ENV]))
 
 
+def memory_evidence() -> str:
+    """One line of memory context: swap + this process's peak RSS.
+
+    Motivated by a real soak day: agent sessions died SIGKILL-style under swap
+    exhaustion and the exit breadcrumbs couldn't say why. This line rides the
+    breadcrumb and the heartbeat so the next silent kill is self-diagnosing."""
+    parts = []
+    try:
+        import resource
+
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # ru_maxrss is bytes on macOS, kilobytes on Linux
+        parts.append(f"wrap_maxrss_mb={maxrss >> (20 if sys.platform == 'darwin' else 10)}")
+    except Exception:  # noqa: BLE001 — evidence is best-effort
+        pass
+    try:
+        if sys.platform == "darwin":
+            out = subprocess.run(
+                ["sysctl", "-n", "vm.swapusage"], capture_output=True, text=True, timeout=5
+            ).stdout
+            # "total = 11264.00M  used = 10968.75M  free = 295.25M ..."
+            for k in ("used", "free"):
+                if f"{k} = " in out:
+                    parts.append(f"swap_{k}_mb={out.split(f'{k} = ')[1].split('M')[0].strip()}")
+        else:
+            with open("/proc/meminfo", encoding="ascii") as f:
+                mi = dict(line.split(":", 1) for line in f if ":" in line)
+            for k, label in (("SwapFree", "swap_free_mb"), ("MemAvailable", "mem_avail_mb")):
+                if k in mi:
+                    parts.append(f"{label}={int(mi[k].split()[0]) >> 10}")
+    except Exception:  # noqa: BLE001 — evidence is best-effort
+        pass
+    return " ".join(parts)
+
+
 def installed_version() -> str | None:
     """The distil version currently on disk (not the one this interpreter runs).
 
@@ -303,13 +338,15 @@ class ProxySupervisor:
         return result[0]
 
     def _watch(self) -> None:
-        """Upgrade poll + manual-trigger wait + dead-worker respawn."""
+        """Upgrade poll + manual-trigger wait + dead-worker respawn + heartbeat."""
+        self._heartbeat()  # first beat immediately: short sessions get one too
         while not self._stopping.is_set():
             self._handover_asked.wait(_POLL_INTERVAL_S)
             if self._stopping.is_set():
                 return
             manual = self._handover_asked.is_set()
             self._handover_asked.clear()
+            self._heartbeat()
             self._reap_drained()
             try:
                 if self._worker is not None and self._worker.poll() is not None:
@@ -357,6 +394,27 @@ class ProxySupervisor:
                 f"v{self.worker_version} ({reason}) — session uninterrupted",
                 flush=True,  # announced from a thread; stdout may be a pipe
             )
+
+    def _heartbeat(self) -> None:
+        """Overwrite sessions/<sid>.hb with a timestamped memory snapshot.
+
+        A SIGKILL (kernel swap-exhaustion kill) leaves no exit breadcrumb —
+        nothing *can* be written at death. The heartbeat is the posthumous
+        witness: a session with no .exit and a stale .hb died silently, and
+        the .hb says what the machine looked like ≤30s before."""
+        try:
+            from .ledger import session_marker_path
+
+            mp = session_marker_path()
+            if mp is None:
+                return
+            mp.parent.mkdir(parents=True, exist_ok=True)
+            mp.with_name(mp.name + ".hb").write_text(
+                f"alive {time.strftime('%Y-%m-%d %H:%M:%S')} {memory_evidence()}\n",
+                encoding="utf-8",
+            )
+        except Exception:  # noqa: BLE001 — a heartbeat must never hurt the session
+            pass
 
     def _reap_drained(self) -> None:
         now = time.monotonic()

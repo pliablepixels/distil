@@ -477,3 +477,32 @@ def test_reap_kills_a_wedged_drain(tmp_path, monkeypatch):
             wedged.kill()
         sup.shutdown()
         upstream.shutdown()
+
+
+def test_memory_evidence_is_one_parseable_line():
+    from distil.hotswap import memory_evidence
+
+    line = memory_evidence()
+    assert "\n" not in line
+    assert "wrap_maxrss_mb=" in line  # rusage works on every POSIX box
+    for token in line.split():
+        assert "=" in token  # strictly key=value, greppable by soak-report
+
+
+def test_supervisor_writes_heartbeat_immediately(tmp_path, monkeypatch):
+    """A session that dies to SIGKILL leaves no exit breadcrumb — the heartbeat
+    is the posthumous witness, so it must exist within seconds of start."""
+    upstream = _start_upstream()
+    sid = f"s999-{os.getpid()}"
+    monkeypatch.setenv("DISTIL_SESSION", sid)
+    sup = _inproc_supervisor(tmp_path, monkeypatch, upstream.server_address[1])
+    try:
+        sup.start()
+        hb = tmp_path / "sessions" / f"{sid}.hb"
+        _await_file(hb, timeout=10)  # first beat is immediate, not 30s away
+        content = hb.read_text()
+        assert content.startswith("alive ")
+        assert "wrap_maxrss_mb=" in content
+    finally:
+        sup.shutdown()
+        upstream.shutdown()

@@ -1181,8 +1181,14 @@ def wrap_run(
                 desc = f"exit code {code}"
             # Append — a signal breadcrumb may already be in the file, and both
             # lines together tell the story (e.g. SIGTERM → child exit 143).
+            from .hotswap import memory_evidence
+
+            # Memory context rides along: on the 2026-07-07 soak day agents
+            # died under swap exhaustion and bare exit codes couldn't say why.
             with open(mp.with_name(mp.name + ".exit"), "a", encoding="utf-8") as f:
-                f.write(f"child {desc} at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(
+                    f"child {desc} at {time.strftime('%Y-%m-%d %H:%M:%S')} | {memory_evidence()}\n"
+                )
     except OSError:
         pass
     return code
