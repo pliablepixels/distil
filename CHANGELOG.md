@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.12.0] — soaking as 1.12.0rc3 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
+## [1.12.0] — soaking as 1.12.0rc4 since 2026-07-06 — statusline honesty round 3: "✓ on" means traffic actually flows
 
 First release through the new rc + soak pipeline (runtime code → rc first).
 
@@ -21,6 +21,16 @@ First release through the new rc + soak pipeline (runtime code → rc first).
   after 7 days, and standalone `distil proxy` never fabricates one.
 
 ### Added
+- **A/A noise baseline makes the de number interpretable (rc4).** Soak found raw
+  compressed-vs-full agreement at 47% — alarming until you notice the comparator's bar
+  is "same tool with identical normalized arguments" under live sampling: the model
+  disagrees with *itself* on identical requests (a Bash command worded two ways is a
+  "changed decision" with zero compression involvement). A third of shadow samples now
+  replay the SAME compressed request twice, measuring self-agreement; the statusline
+  de rate is reported relative to that baseline, and `distil shadow-stats` shows the
+  full decomposition (raw / self-agreement / adjusted). Shadow rows also carry
+  content-free evidence now — request digest + both decision signatures — so any
+  divergence is diagnosable instead of a bare `false`.
 - **Shadow decision-equivalence sampling is on by default (rc3): 2% of wrap requests.**
   It was opt-in (`--shadow`, default 0) — so nobody ran it, the statusline's `de 1/25`
   counter sat frozen for a week implying live measurement, and the launch gate's

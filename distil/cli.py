@@ -525,6 +525,10 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
                     "changes": led.changes,
                     "decision_change_rate": led.rate(),
                     "decision_equivalence": 1 - led.rate(),
+                    "aa_samples": led.aa_samples,
+                    "aa_self_agreement": led.aa_agreement(),
+                    "adjusted_change_rate": led.adjusted_rate(),
+                    "adjusted_equivalence": 1 - led.adjusted_rate(),
                 },
                 indent=2,
             )
@@ -549,8 +553,24 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
         return 0
     print(f"  shadowed requests : {led.samples}")
     print(f"  decision changes  : {led.changes}")
-    print(f"  decision-change rate (rolling): {change * 100:.2f}%")
-    print(f"  decision-equivalence          : {(1 - change) * 100:.2f}%")
+    print(f"  raw agreement, compressed vs full     : {(1 - change) * 100:.2f}%")
+    base = led.aa_agreement()
+    if base is not None:
+        adj = 1 - led.adjusted_rate()
+        print(f"  model self-agreement (A/A, n={led.aa_samples})   : {base * 100:.2f}%")
+        print(f"  decision-equivalence, noise-adjusted  : {adj * 100:.2f}%")
+        print(
+            "\n  Raw agreement is capped by the model's own nondeterminism — it disagrees"
+            f"\n  with ITSELF on identical requests {(1 - base) * 100:.1f}% of the time. The adjusted"
+            "\n  number is what compression adds on top of that."
+        )
+    else:
+        print(f"  decision-equivalence (unadjusted)     : {(1 - change) * 100:.2f}%")
+        print(
+            f"\n  No A/A noise baseline yet ({led.aa_samples}/10 self-agreement samples) — the raw"
+            "\n  number conflates compression harm with sampling nondeterminism; treat it"
+            "\n  as a floor, not a verdict."
+        )
     print(
         "\n  Each sampled request was run BOTH compressed and uncompressed; "
         "equivalence\n  means the agent chose the same next action. Numbers only, never content."
@@ -712,7 +732,11 @@ def cmd_statusline(args: argparse.Namespace) -> int:
             if led.samples >= 25:
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
-                eq = 1 - led.rate()
+                # Noise-adjusted when an A/A baseline exists: agreement judged
+                # relative to the model's self-agreement on identical requests,
+                # so sampling nondeterminism doesn't read as compression harm.
+                # `distil shadow-stats` shows the full decomposition.
+                eq = 1 - led.adjusted_rate()
                 # Explicit 256-color hues (basic ANSI is terminal-theme roulette —
                 # 'magenta' renders as unreadable purple on many dark themes) and a
                 # health GLYPH so the state reads even without color: ✓ proven-safe,

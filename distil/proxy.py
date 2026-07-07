@@ -614,7 +614,7 @@ def build_handler(
                     savings.record(_bt, _at, model=_m)
                     savings.maybe_flush(every=flush_every)
                 if shadow_sampled and rbody_opt:
-                    self._spawn_shadow(raw, headers, rbody_opt)
+                    self._spawn_shadow(raw, headers, rbody_opt, compressed_raw=new_raw)
                 return
 
             status, rhdrs, rbody = self._post_upstream(self.path, new_raw, headers)
@@ -651,7 +651,7 @@ def build_handler(
             # the background and record whether it matched — a live decision-change
             # signal on real traffic. Never blocks the client's response.
             if shadow_sampled:
-                self._spawn_shadow(raw, headers, rbody)
+                self._spawn_shadow(raw, headers, rbody, compressed_raw=new_raw)
             # Book savings only after a confirmed 2xx (P0-1): failed or SDK-retried
             # upstream calls must not be counted as savings.
             if savings is not None and _pending_savings is not None and 200 <= status < 300:
@@ -661,26 +661,56 @@ def build_handler(
             self._relay(status, rhdrs, rbody, extras=extras)
 
         def _spawn_shadow(
-            self, orig_raw: bytes, headers: dict[str, str], compressed: bytes
+            self,
+            orig_raw: bytes,
+            headers: dict[str, str],
+            compressed: bytes,
+            compressed_raw: bytes | None = None,
         ) -> None:
-            """Re-run the request uncompressed in the background and record whether
-            the agent's decision matched. Never blocks the client's response."""
+            """Re-run a sampled request in the background and record whether the
+            agent's decision matched. Never blocks the client's response.
+
+            Two sample kinds (see ShadowLedger): most replays are A/B (original,
+            uncompressed request — did compression change the decision?); a
+            third are A/A (the SAME compressed request again — how often does
+            the model disagree with itself on identical input?). Without the
+            A/A baseline, sampling nondeterminism reads as compression harm."""
+            import hashlib
+            import random as _random
+
+            is_aa = (
+                compressed_raw is not None and _random.random() < 1 / 3
+            )  # ponytail: fixed 1/3 split; make configurable if the baseline needs tuning
 
             def _shadow_compare() -> None:
                 try:
                     from .shadow import decision_signature_from_body
 
-                    _s, _h, orig_rbody = self._post_upstream(self.path, orig_raw, headers)
+                    replay_raw = (
+                        compressed_raw if is_aa and compressed_raw is not None else orig_raw
+                    )
+                    _s, _h, replay_rbody = self._post_upstream(self.path, replay_raw, headers)
                     # decision_signature_from_body handles both JSON and streamed
                     # (SSE / chunk-array) bodies, so this works for Claude Code /
                     # Codex / Gemini sessions, which stream their responses.
                     comp_sig = decision_signature_from_body(compressed)
-                    orig_sig = decision_signature_from_body(orig_rbody)
+                    replay_sig = decision_signature_from_body(replay_rbody)
                     # "none" means no decision could be extracted (transient upstream
                     # error or empty/unparseable body). Recording it as agreement or
                     # change would inflate the decision-equivalence rate on noise.
-                    if _shadow_ledger is not None and "none" not in (comp_sig, orig_sig):
-                        _shadow_ledger.record(comp_sig == orig_sig)
+                    if _shadow_ledger is not None and "none" not in (comp_sig, replay_sig):
+                        _shadow_ledger.record(
+                            comp_sig == replay_sig,
+                            kind="aa" if is_aa else "ab",
+                            # Evidence for diagnosing divergences: which request
+                            # (digest) produced which pair of decisions. All three
+                            # values are content-free hashes/signatures.
+                            evidence={
+                                "digest": hashlib.sha256(orig_raw).hexdigest()[:16],
+                                "sig_served": comp_sig,
+                                "sig_replay": replay_sig,
+                            },
+                        )
                 except Exception:  # noqa: BLE001 — shadow must never affect the request
                     log.debug("shadow compare failed", exc_info=True)
 

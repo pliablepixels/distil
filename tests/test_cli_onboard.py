@@ -614,36 +614,32 @@ def test_cmd_shadow_stats_collecting(monkeypatch, capsys) -> None:
 def test_cmd_shadow_stats_ready(monkeypatch, capsys) -> None:
     from distil import shadow as shadow_mod
 
-    class _Ready:
-        samples = 50
-        changes = 2
-
-        def rate(self):
-            return 0.04
-
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Ready()))
+    led = shadow_mod.ShadowLedger()
+    led.samples, led.changes = 50, 2
+    for i in range(50):
+        led.recent.append(0 if i < 2 else 1)  # rate() = 0.04
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
     rc = cli.cmd_shadow_stats(argparse.Namespace(json=False))
     assert rc == 0
     out = capsys.readouterr().out
     assert "decision-equivalence" in out
     assert "96.00%" in out
+    assert "No A/A noise baseline yet" in out  # rc4: raw number labeled a floor
 
 
 def test_cmd_shadow_stats_json(monkeypatch, capsys) -> None:
     from distil import shadow as shadow_mod
 
-    class _Ready:
-        samples = 30
-        changes = 1
-
-        def rate(self):
-            return 1 / 30
-
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Ready()))
+    led = shadow_mod.ShadowLedger()
+    led.samples, led.changes = 30, 1
+    for i in range(30):
+        led.recent.append(0 if i < 1 else 1)
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
     rc = cli.cmd_shadow_stats(argparse.Namespace(json=True))
     assert rc == 0
     data = json.loads(capsys.readouterr().out)
     assert "samples" in data and "decision_equivalence" in data
+    assert "aa_self_agreement" in data and "adjusted_equivalence" in data
 
 
 # --------------------------------------------------------------------------- #
@@ -882,14 +878,11 @@ def test_cmd_statusline_rich_with_shadow(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
     monkeypatch.delenv("DISTIL_STATUSLINE", raising=False)
 
-    class _Ready:
-        samples = 50
-        recent = [1, 0, 1, 1, 0]
-
-        def rate(self):
-            return 0.01
-
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Ready()))
+    led = shadow_mod.ShadowLedger()
+    led.samples = 50
+    for i in range(100):
+        led.recent.append(0 if i < 1 else 1)  # rate() = 0.01
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
     rc = cli.cmd_statusline(argparse.Namespace(no_color=True))
     assert rc == 0
     out = capsys.readouterr().out

@@ -310,35 +310,85 @@ class ShadowSampler:
 
 @dataclass
 class ShadowLedger:
-    """Rolling, content-free live decision-equivalence stats."""
+    """Rolling, content-free live decision-equivalence stats.
+
+    Two sample kinds:
+      * ``ab`` — compressed vs uncompressed (the classic shadow compare).
+      * ``aa`` — the SAME compressed request replayed: the model's
+        self-agreement on identical input. Raw A/B disagreement conflates
+        compression harm with sampling nondeterminism (a Bash command worded
+        two ways is a "changed decision" with zero compression involvement);
+        the A/A baseline is what makes the A/B number interpretable.
+    """
 
     window: int = 1000
-    samples: int = 0
+    samples: int = 0  # A/B only — the meaning is unchanged from earlier versions
     changes: int = 0
     recent: deque = field(default_factory=lambda: deque(maxlen=1000))
+    aa_samples: int = 0
+    aa_changes: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def record(self, equivalent: bool, *, path: Path | None = None) -> None:
+    def record(
+        self,
+        equivalent: bool,
+        *,
+        kind: str = "ab",
+        evidence: dict[str, str] | None = None,
+        path: Path | None = None,
+    ) -> None:
         with self._lock:
-            self.samples += 1
-            if not equivalent:
-                self.changes += 1
-            self.recent.append(1 if equivalent else 0)
-        self._append(equivalent, path)
+            if kind == "aa":
+                self.aa_samples += 1
+                if not equivalent:
+                    self.aa_changes += 1
+            else:
+                self.samples += 1
+                if not equivalent:
+                    self.changes += 1
+                self.recent.append(1 if equivalent else 0)
+        self._append(equivalent, kind, evidence, path)
 
     def rate(self) -> float:
-        """Live decision-CHANGE rate over the rolling window (0.0 = fully equivalent)."""
+        """Live A/B decision-CHANGE rate over the rolling window (0.0 = fully equivalent)."""
         with self._lock:
             if not self.recent:
                 return 0.0
             return 1.0 - (sum(self.recent) / len(self.recent))
 
-    def _append(self, equivalent: bool, path: Path | None) -> None:
+    def aa_agreement(self) -> float | None:
+        """Model self-agreement on identical requests, or None below n=10
+        (a baseline built on a handful of coin flips is worse than none)."""
+        with self._lock:
+            if self.aa_samples < 10:
+                return None
+            return 1.0 - (self.aa_changes / self.aa_samples)
+
+    def adjusted_rate(self) -> float:
+        """A/B change rate with the model's own nondeterminism factored out:
+        agreement is judged relative to how often the model agrees with
+        ITSELF on the identical request. Falls back to the raw rate when no
+        A/A baseline exists yet."""
+        base = self.aa_agreement()
+        if base is None or base <= 0.0:
+            return self.rate()
+        return max(0.0, 1.0 - min(1.0, (1.0 - self.rate()) / base))
+
+    def _append(
+        self,
+        equivalent: bool,
+        kind: str,
+        evidence: dict[str, str] | None,
+        path: Path | None,
+    ) -> None:
         try:
             p = path or (_state_dir() / "shadow.jsonl")
             p.parent.mkdir(parents=True, exist_ok=True)
+            rec: dict[str, Any] = {"equivalent": bool(equivalent), "ts": time.time(), "kind": kind}
+            if evidence:
+                rec.update(evidence)  # content-free: signatures are _canon hashes
             with p.open("a", encoding="utf-8") as f:
-                f.write(json.dumps({"equivalent": bool(equivalent), "ts": time.time()}) + "\n")
+                f.write(json.dumps(rec) + "\n")
         except OSError:
             pass  # telemetry must never break the request path
 
@@ -356,10 +406,15 @@ class ShadowLedger:
                 except (json.JSONDecodeError, ValueError):
                     continue
                 eq = bool(rec.get("equivalent", True))
-                led.samples += 1
-                if not eq:
-                    led.changes += 1
-                led.recent.append(1 if eq else 0)
+                if rec.get("kind", "ab") == "aa":
+                    led.aa_samples += 1
+                    if not eq:
+                        led.aa_changes += 1
+                else:  # pre-rc4 rows carry no kind — they were all A/B
+                    led.samples += 1
+                    if not eq:
+                        led.changes += 1
+                    led.recent.append(1 if eq else 0)
         except OSError:
             pass
         return led

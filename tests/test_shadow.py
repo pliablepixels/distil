@@ -333,3 +333,128 @@ def test_shadow_discriminates_changed_decision_cross_provider():
     an_b = {"content": [{"type": "tool_use", "name": "bash", "input": {"cmd": "rm"}}]}
     assert compare_decisions(an_a, an_a) is True
     assert compare_decisions(an_a, an_b) is False
+
+
+# --- A/A noise baseline (rc4): raw A/B disagreement conflates compression ---
+# harm with sampling nondeterminism; the baseline is what makes it readable.
+
+
+def test_ledger_aa_kind_counts_separately(tmp_path):
+    p = tmp_path / "shadow.jsonl"
+    led = ShadowLedger()
+    led.record(True, path=p)  # default kind: ab
+    led.record(False, kind="aa", path=p)
+    led.record(True, kind="aa", path=p)
+    assert (led.samples, led.changes) == (1, 0)  # ab meaning unchanged
+    assert (led.aa_samples, led.aa_changes) == (2, 1)
+    reloaded = ShadowLedger.load(p)
+    assert (reloaded.samples, reloaded.aa_samples, reloaded.aa_changes) == (1, 2, 1)
+
+
+def test_ledger_load_pre_rc4_rows_count_as_ab(tmp_path):
+    p = tmp_path / "shadow.jsonl"
+    p.write_text('{"equivalent": false, "ts": 1.0}\n', encoding="utf-8")  # no "kind"
+    led = ShadowLedger.load(p)
+    assert (led.samples, led.changes, led.aa_samples) == (1, 1, 0)
+
+
+def test_aa_agreement_needs_ten_samples(tmp_path):
+    led = ShadowLedger()
+    p = tmp_path / "shadow.jsonl"
+    for _ in range(9):
+        led.record(True, kind="aa", path=p)
+    assert led.aa_agreement() is None
+    led.record(True, kind="aa", path=p)
+    assert led.aa_agreement() == 1.0
+
+
+def test_adjusted_rate_factors_out_model_nondeterminism(tmp_path):
+    """47% raw agreement against a 52% self-agreement baseline ≈ compression
+    adds ~10% — the exact confusion the raw number invites."""
+    led = ShadowLedger()
+    p = tmp_path / "shadow.jsonl"
+    for i in range(100):
+        led.record(i < 47, path=p)  # ab: 47% equivalent
+    for i in range(100):
+        led.record(i < 52, kind="aa", path=p)  # aa: model agrees with itself 52%
+    assert abs(led.rate() - 0.53) < 1e-9
+    assert abs(led.aa_agreement() - 0.52) < 1e-9
+    assert abs(led.adjusted_rate() - (1 - 0.47 / 0.52)) < 1e-9
+    # and a perfect baseline changes nothing
+    led2 = ShadowLedger()
+    for i in range(100):
+        led2.record(i < 47, path=p)
+    assert led2.aa_agreement() is None
+    assert led2.adjusted_rate() == led2.rate()  # no baseline → raw
+
+
+def test_record_persists_content_free_evidence(tmp_path):
+    import json as _json
+
+    p = tmp_path / "shadow.jsonl"
+    ShadowLedger().record(
+        False,
+        kind="ab",
+        evidence={"digest": "ab12", "sig_served": "tool:x1", "sig_replay": "tool:y2"},
+        path=p,
+    )
+    rec = _json.loads(p.read_text().strip())
+    assert rec["kind"] == "ab" and rec["digest"] == "ab12"
+    assert rec["sig_served"] != rec["sig_replay"]  # the divergence is now diagnosable
+
+
+def test_proxy_aa_replay_records_baseline_e2e(monkeypatch, tmp_path):
+    """Force the A/A branch (random → 0): the proxy replays the SAME compressed
+    request and books a kind="aa" self-agreement row with evidence fields."""
+    import http.server
+    import json as _json
+    import os
+    import sys
+    import threading
+    from pathlib import Path
+
+    from distil import proxy as proxy_mod
+
+    RESP = _json.dumps({"content": [{"type": "tool_use", "name": "t", "input": {"x": 1}}]}).encode()
+
+    class Up(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(RESP)))
+            self.end_headers()
+            self.wfile.write(RESP)
+
+        def log_message(self, *a):  # noqa: ANN002
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Up)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setattr("random.random", lambda: 0.0)  # sampler fires AND aa branch taken
+
+    child = (
+        "import os, json, urllib.request\n"
+        "base = os.environ['ANTHROPIC_BASE_URL']\n"
+        "body = json.dumps({'model': 'claude-opus-4-8', 'messages': "
+        "[{'role': 'user', 'content': 'go'}]}).encode()\n"
+        "req = urllib.request.Request(base + '/v1/messages', data=body,"
+        " headers={'Content-Type': 'application/json'}, method='POST')\n"
+        "urllib.request.urlopen(req, timeout=5)\n"
+    )
+    try:
+        code = proxy_mod.wrap_run(
+            [sys.executable, "-c", child],
+            upstream=f"http://127.0.0.1:{srv.server_address[1]}",
+            record=False,
+            shadow_rate=1.0,
+        )
+    finally:
+        srv.shutdown()
+    assert code == 0
+    sj = Path(os.environ["DISTIL_HOME"]) / "shadow.jsonl"
+    rows = [_json.loads(line) for line in sj.read_text().splitlines() if line.strip()]
+    aa = [r for r in rows if r.get("kind") == "aa"]
+    assert aa, rows  # the A/A branch actually ran and recorded
+    assert aa[0]["equivalent"] is True  # fixed upstream → identical decision
+    assert aa[0]["digest"] and aa[0]["sig_served"] == aa[0]["sig_replay"]
