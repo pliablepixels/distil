@@ -35,6 +35,13 @@ import json
 import random
 import threading
 import time
+
+try:
+    import fcntl  # POSIX advisory locking; absent on Windows
+
+    _HAVE_FCNTL = True
+except ImportError:  # pragma: no cover - windows
+    _HAVE_FCNTL = False
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -388,7 +395,17 @@ class ShadowLedger:
             if evidence:
                 rec.update(evidence)  # content-free: signatures are _canon hashes
             with p.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(rec) + "\n")
+                # Concurrent wrap sessions append here (shadow is on by default);
+                # lock like ledger.py does — rc4 rows carry two signatures and can
+                # exceed the pipe-atomicity size a bare append silently relies on.
+                if _HAVE_FCNTL:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                try:
+                    f.write(json.dumps(rec) + "\n")
+                    f.flush()
+                finally:
+                    if _HAVE_FCNTL:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
         except OSError:
             pass  # telemetry must never break the request path
 

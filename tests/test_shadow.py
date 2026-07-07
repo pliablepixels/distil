@@ -458,3 +458,40 @@ def test_proxy_aa_replay_records_baseline_e2e(monkeypatch, tmp_path):
     assert aa, rows  # the A/A branch actually ran and recorded
     assert aa[0]["equivalent"] is True  # fixed upstream → identical decision
     assert aa[0]["digest"] and aa[0]["sig_served"] == aa[0]["sig_replay"]
+
+
+def _hammer_append(args):
+    """Worker for the cross-process append test (must be module-level to pickle)."""
+    path_str, worker_id, n_rows = args
+    from pathlib import Path
+
+    from distil.shadow import ShadowLedger
+
+    led = ShadowLedger()
+    fat = f"sig-{worker_id}-" + "x" * 4096  # well past PIPE_BUF atomicity
+    for i in range(n_rows):
+        led.record(
+            i % 2 == 0,
+            kind="ab",
+            evidence={"digest": f"d{worker_id}-{i}", "sig_served": fat, "sig_replay": fat},
+            path=Path(path_str),
+        )
+    return worker_id
+
+
+def test_concurrent_cross_process_appends_stay_intact(tmp_path):
+    """Multiple wrap sessions append to one shadow.jsonl. Without the flock a
+    >PIPE_BUF line can interleave with another writer's and tear both rows —
+    every line must parse and every row must survive."""
+    import json as _json
+    from concurrent.futures import ProcessPoolExecutor
+
+    p = tmp_path / "shadow.jsonl"
+    workers, rows_each = 4, 25
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        list(ex.map(_hammer_append, [(str(p), w, rows_each) for w in range(workers)]))
+
+    lines = [line for line in p.read_text().splitlines() if line.strip()]
+    assert len(lines) == workers * rows_each  # nothing lost
+    for line in lines:
+        _json.loads(line)  # nothing torn
