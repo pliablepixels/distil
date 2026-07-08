@@ -111,6 +111,10 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
 
     def led_with(changes: int, samples: int = 100):
         led = shadow.ShadowLedger()
+        # Perfect A/A baseline (10 self-agreements, 0 changes) so adjusted_rate()
+        # == rate() and the verdict path runs — the point of THIS test.
+        led.aa_samples = 10
+        led.aa_changes = 0
         for i in range(samples):
             led.samples += 1
             eq = i >= changes
@@ -130,6 +134,34 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
         )
         _rc, out = _run(monkeypatch, capsys, s, no_color=False)
         assert f"{code}de " in out, out
+
+
+def test_no_verdict_glyph_before_aa_baseline(monkeypatch, capsys, tmp_path):
+    """25+ A/B samples but no A/A noise baseline → show 'de baseline N/10',
+    NOT a red ✗ verdict. adjusted_rate() falls back to the raw rate when the
+    baseline is missing; painting a degraded glyph over it reads sampling
+    nondeterminism as compression harm (the false-alarm bug)."""
+    import distil.shadow as shadow
+
+    s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
+
+    led = shadow.ShadowLedger()
+    led.aa_samples = 3  # baseline not ready (< 10)
+    for i in range(30):  # plenty of A/B samples, 40% of them changes
+        led.samples += 1
+        eq = i >= 12
+        if not eq:
+            led.changes += 1
+        led.recent.append(1 if eq else 0)
+
+    # fresh shadow.jsonl so the segment isn't "de idle"
+    (tmp_path / "shadow.jsonl").write_text("{}\n")
+    monkeypatch.setattr("distil.shadow._state_dir", lambda: tmp_path)
+    monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, _l=led, **k: _l))
+
+    _rc, out = _run(monkeypatch, capsys, s, no_color=False)
+    assert "✗" not in out, out  # no false degraded verdict
+    assert "de baseline 3/10" in out, out
 
 
 def test_run_counts_not_in_line(monkeypatch, capsys):

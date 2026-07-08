@@ -374,8 +374,15 @@ class ShadowLedger:
     def adjusted_rate(self) -> float:
         """A/B change rate with the model's own nondeterminism factored out:
         agreement is judged relative to how often the model agrees with
-        ITSELF on the identical request. Falls back to the raw rate when no
-        A/A baseline exists yet."""
+        ITSELF on the identical request.
+
+        WARNING: falls back to the RAW rate when no A/A baseline exists yet
+        (aa_agreement() is None). In that state the return value is NOT
+        noise-adjusted and conflates sampling nondeterminism with real harm.
+        Any caller that renders a verdict (a health glyph, an "adjusted_*"
+        field, a pass/fail) MUST gate on `aa_agreement() is not None` first —
+        see cmd_statusline. This method stays total (returns a float) on
+        purpose so best-effort display callers don't have to None-check."""
         base = self.aa_agreement()
         if base is None or base <= 0.0:
             return self.rate()

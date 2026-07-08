@@ -536,8 +536,15 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
                     "decision_equivalence": 1 - led.rate(),
                     "aa_samples": led.aa_samples,
                     "aa_self_agreement": led.aa_agreement(),
-                    "adjusted_change_rate": led.adjusted_rate(),
-                    "adjusted_equivalence": 1 - led.adjusted_rate(),
+                    # null until the A/A baseline exists — do NOT emit the raw
+                    # fallback under an "adjusted" label; a consumer would read
+                    # sampling noise as compression harm.
+                    "adjusted_change_rate": (
+                        led.adjusted_rate() if led.aa_agreement() is not None else None
+                    ),
+                    "adjusted_equivalence": (
+                        1 - led.adjusted_rate() if led.aa_agreement() is not None else None
+                    ),
                 },
                 indent=2,
             )
@@ -737,8 +744,13 @@ def cmd_statusline(args: argparse.Namespace) -> int:
 
             led = ShadowLedger.load()
             # Only claim an equivalence rate once there is evidence behind it —
-            # a percentage over a handful of samples is noise wearing a number.
-            if led.samples >= 25:
+            # a percentage over a handful of samples is noise wearing a number,
+            # AND the A/A noise baseline must exist. Without it, adjusted_rate()
+            # silently returns the RAW rate, so a red ✗ verdict gets painted over
+            # a figure shadow-stats itself refuses to call a verdict — sampling
+            # nondeterminism read as compression harm. aa_agreement() is None
+            # until the 10-sample baseline lands; gate the verdict on it.
+            if led.samples >= 25 and led.aa_agreement() is not None:
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
                 # Noise-adjusted when an A/A baseline exists: agreement judged
@@ -773,7 +785,15 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     fresh = _t.time() - (_state_dir() / "shadow.jsonl").stat().st_mtime < 86400
                 except OSError:
                     fresh = False
-                parts.append(c("38;5;73", f"de {led.samples}/25" if fresh else "de idle"))
+                if not fresh:
+                    label = "de idle"
+                elif led.samples >= 25:
+                    # Enough A/B samples, but the A/A noise baseline is the real
+                    # blocker — show ITS progress, not a frozen "de 25/25".
+                    label = f"de baseline {led.aa_samples}/10"
+                else:
+                    label = f"de {led.samples}/25"
+                parts.append(c("38;5;73", label))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
     if model:

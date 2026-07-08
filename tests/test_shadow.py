@@ -388,6 +388,36 @@ def test_adjusted_rate_factors_out_model_nondeterminism(tmp_path):
     assert led2.adjusted_rate() == led2.rate()  # no baseline → raw
 
 
+def test_shadow_stats_json_nulls_adjusted_without_baseline(tmp_path, monkeypatch, capsys):
+    """shadow-stats --json must NOT emit the raw fallback under an 'adjusted_*'
+    label when the A/A baseline is missing — a consumer would read sampling
+    noise as compression harm. Null until the baseline exists; real once it does."""
+    import argparse
+    import json
+    import distil.shadow as shadow
+    from distil import cli
+
+    p = tmp_path / "shadow.jsonl"
+    led = shadow.ShadowLedger()
+    for i in range(30):
+        led.record(i < 18, path=p)  # A/B samples, no A/A baseline yet
+    monkeypatch.setattr(shadow.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
+
+    cli.cmd_shadow_stats(argparse.Namespace(json=True))
+    out = json.loads(capsys.readouterr().out)
+    assert out["aa_self_agreement"] is None
+    assert out["adjusted_change_rate"] is None
+    assert out["adjusted_equivalence"] is None
+
+    # baseline lands → the adjusted fields become real numbers
+    for i in range(20):
+        led.record(i < 10, kind="aa", path=p)
+    cli.cmd_shadow_stats(argparse.Namespace(json=True))
+    out2 = json.loads(capsys.readouterr().out)
+    assert out2["adjusted_change_rate"] is not None
+    assert out2["adjusted_equivalence"] is not None
+
+
 def test_record_persists_content_free_evidence(tmp_path):
     import json as _json
 
