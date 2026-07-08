@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.13.0] — 1.13.0rc4 — seamless hot-swap: upgrades apply to live sessions, no restart
+## [1.13.0] — 1.13.0rc5 — seamless hot-swap: upgrades apply to live sessions, no restart
 
 ### Fixed
 
