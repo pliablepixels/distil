@@ -525,7 +525,9 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
     """Show the live decision-equivalence measured by shadow mode on real traffic."""
     from .shadow import ShadowLedger
 
-    led = ShadowLedger.load()
+    # Default to the current signature algorithm so these numbers match the status
+    # line verdict; --all reads every row (incl. old-version) for auditing.
+    led = ShadowLedger.load(current_only=not getattr(args, "all", False))
     if getattr(args, "json", False):
         print(
             json.dumps(
@@ -740,17 +742,16 @@ def cmd_statusline(args: argparse.Namespace) -> int:
         # TOTAL (lifetime) — identical format in every state.
         parts.append(c("38;5;73", f"total ▼{ledger._human(s.total_tokens_saved)}"))
         try:
-            from .shadow import ShadowLedger
+            from .shadow import VERDICT_MIN_AA, VERDICT_MIN_AB, ShadowLedger
 
-            led = ShadowLedger.load()
-            # Only claim an equivalence rate once there is evidence behind it —
-            # a percentage over a handful of samples is noise wearing a number,
-            # AND the A/A noise baseline must exist. Without it, adjusted_rate()
-            # silently returns the RAW rate, so a red ✗ verdict gets painted over
-            # a figure shadow-stats itself refuses to call a verdict — sampling
-            # nondeterminism read as compression harm. aa_agreement() is None
-            # until the 10-sample baseline lands; gate the verdict on it.
-            if led.samples >= 25 and led.aa_agreement() is not None:
+            # Scope to the current signature algorithm: old-version rows are not
+            # comparable and must not drag a live verdict (see ADR: signature v2).
+            led = ShadowLedger.load(current_only=True)
+            # Only claim an equivalence rate once evidence is ROBUST — a percentage
+            # over a handful of samples is noise wearing a number, and the noise-
+            # adjusted rate divides by the A/A self-agreement, itself unstable at
+            # small n. Require both a solid A/B sample and a solid A/A baseline.
+            if led.samples >= VERDICT_MIN_AB and led.aa_samples >= VERDICT_MIN_AA:
                 n = led.samples
                 n_str = f"{n / 1000:.1f}k" if n >= 1000 else str(n)
                 # Noise-adjusted when an A/A baseline exists: agreement judged
@@ -787,12 +788,12 @@ def cmd_statusline(args: argparse.Namespace) -> int:
                     fresh = False
                 if not fresh:
                     label = "de idle"
-                elif led.samples >= 25:
+                elif led.samples >= VERDICT_MIN_AB:
                     # Enough A/B samples, but the A/A noise baseline is the real
-                    # blocker — show ITS progress, not a frozen "de 25/25".
-                    label = f"de baseline {led.aa_samples}/10"
+                    # blocker — show ITS progress, not a frozen "de 50/50".
+                    label = f"de baseline {led.aa_samples}/{VERDICT_MIN_AA}"
                 else:
-                    label = f"de {led.samples}/25"
+                    label = f"de {led.samples}/{VERDICT_MIN_AB}"
                 parts.append(c("38;5;73", label))
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
@@ -2103,6 +2104,12 @@ def build_parser() -> argparse.ArgumentParser:
         "shadow-stats", help="show live decision-equivalence measured by shadow mode"
     )
     ss.add_argument("--json", action="store_true", help="machine-readable output")
+    ss.add_argument(
+        "--all",
+        action="store_true",
+        help="include rows from older signature-algorithm versions (auditing; "
+        "default scopes to the current algorithm, matching the status line)",
+    )
     ss.set_defaults(func=cmd_shadow_stats)
 
     dash = sub.add_parser(

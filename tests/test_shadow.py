@@ -129,6 +129,58 @@ def test_decision_signature_anthropic_tool_use():
     assert decision_signature(a).startswith("tool:")
 
 
+def test_signature_v2_normalizes_argument_whitespace():
+    """v2: formatting-whitespace jitter in a tool argument is NOT a decision change,
+    but genuinely different arguments still are. This is the fix for the ~27% A/A
+    self-noise that made identical replayed requests read as 'decision changed'."""
+    from distil.shadow import SIG_VERSION
+
+    assert SIG_VERSION >= 2
+
+    def call(cmd):
+        return {"content": [{"type": "tool_use", "name": "bash", "input": {"command": cmd}}]}
+
+    # Same command, different spacing / trailing whitespace → SAME decision.
+    assert decision_signature(call("ls -la")) == decision_signature(call("ls   -la"))
+    assert decision_signature(call("ls -la")) == decision_signature(call("  ls -la\n"))
+    # Genuinely different command → still a different decision (no over-coarsening).
+    assert decision_signature(call("ls -la")) != decision_signature(call("rm -rf x"))
+
+
+def test_rows_stamped_with_sig_version(tmp_path):
+    """Every recorded row carries the signature-algorithm version and build, so
+    load(current_only=True) can scope a verdict to comparable evidence."""
+    import json as _json
+    from distil.shadow import SIG_VERSION, ShadowLedger
+
+    p = tmp_path / "shadow.jsonl"
+    ShadowLedger().record(True, path=p)
+    row = _json.loads(p.read_text().splitlines()[0])
+    assert row["sig"] == SIG_VERSION
+    assert "v" in row  # build attribution present
+
+
+def test_load_current_only_excludes_old_signature_rows(tmp_path):
+    """A verdict must not mix signature algorithms: current_only drops rows whose
+    sig != current (and legacy rows with no sig at all)."""
+    import json as _json
+    from distil.shadow import SIG_VERSION, ShadowLedger
+
+    p = tmp_path / "shadow.jsonl"
+    rows = [
+        {"equivalent": False, "ts": 1.0, "kind": "ab"},  # legacy, no sig
+        {"equivalent": False, "ts": 2.0, "kind": "ab", "sig": SIG_VERSION - 1},  # old algo
+        {"equivalent": True, "ts": 3.0, "kind": "ab", "sig": SIG_VERSION},  # current
+        {"equivalent": True, "ts": 4.0, "kind": "ab", "sig": SIG_VERSION},  # current
+    ]
+    p.write_text("\n".join(_json.dumps(r) for r in rows) + "\n")
+
+    assert ShadowLedger.load(p).samples == 4  # unscoped: everything
+    scoped = ShadowLedger.load(p, current_only=True)
+    assert scoped.samples == 2  # only the two current-sig rows
+    assert scoped.changes == 0  # and their equivalence, not the old rows'
+
+
 def test_decision_signature_openai_tool_call():
     a = {
         "choices": [

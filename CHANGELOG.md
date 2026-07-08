@@ -7,6 +7,20 @@ All notable changes to Distil are documented here. Format loosely follows
 
 ### Fixed
 
+- Shadow decision-equivalence is trustworthy again (decision-signature **v2**, see
+  `docs/adr/0001-shadow-decision-signature-v2.md`). The v1 signature hashed tool
+  arguments verbatim (normalizing only Python code), so wording jitter — `ls -la`
+  vs `ls  -la`, re-serialized JSON — read as a *changed decision*, inflating the
+  measured divergence for both compressed and self-replay traffic (a live ledger
+  showed only 72.7% A/A self-agreement). v2 canonicalizes formatting whitespace on
+  all arguments without merging genuinely different tokens. The signature algorithm
+  is now versioned (`SIG_VERSION`); ledger rows are stamped with `sig`+build and the
+  verdict scopes to the current algorithm (`shadow-stats --all` reads every row), so
+  old-version rows can no longer drag a live verdict. The status-line verdict now
+  requires robust evidence (≥50 A/B, ≥30 A/A samples) before showing ✓/✗, warming as
+  `de baseline N/30` otherwise. Alarm thresholds are unchanged — the sample gate, not
+  a looser threshold, stops false alarms, so real degradation still trips it.
+
 - Hot-swap supervisor no longer cries wolf when a worker dies during a
   non-atomic reinstall. `pip`/`uv --force-reinstall` deletes the package files
   before rewriting them; a worker spawned in that ~1s window dies importing

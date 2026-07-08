@@ -111,9 +111,9 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
 
     def led_with(changes: int, samples: int = 100):
         led = shadow.ShadowLedger()
-        # Perfect A/A baseline (10 self-agreements, 0 changes) so adjusted_rate()
+        # Perfect A/A baseline (30 self-agreements, 0 changes) so adjusted_rate()
         # == rate() and the verdict path runs — the point of THIS test.
-        led.aa_samples = 10
+        led.aa_samples = 30
         led.aa_changes = 0
         for i in range(samples):
             led.samples += 1
@@ -137,7 +137,7 @@ def test_equivalence_health_color(monkeypatch, capsys, tmp_path):
 
 
 def test_no_verdict_glyph_before_aa_baseline(monkeypatch, capsys, tmp_path):
-    """25+ A/B samples but no A/A noise baseline → show 'de baseline N/10',
+    """Enough A/B samples but no robust A/A noise baseline → show 'de baseline N/30',
     NOT a red ✗ verdict. adjusted_rate() falls back to the raw rate when the
     baseline is missing; painting a degraded glyph over it reads sampling
     nondeterminism as compression harm (the false-alarm bug)."""
@@ -146,10 +146,10 @@ def test_no_verdict_glyph_before_aa_baseline(monkeypatch, capsys, tmp_path):
     s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
 
     led = shadow.ShadowLedger()
-    led.aa_samples = 3  # baseline not ready (< 10)
-    for i in range(30):  # plenty of A/B samples, 40% of them changes
+    led.aa_samples = 3  # baseline not ready (< 30)
+    for i in range(60):  # A/B sample count clears the gate, so baseline is the blocker
         led.samples += 1
-        eq = i >= 12
+        eq = i >= 24
         if not eq:
             led.changes += 1
         led.recent.append(1 if eq else 0)
@@ -161,7 +161,7 @@ def test_no_verdict_glyph_before_aa_baseline(monkeypatch, capsys, tmp_path):
 
     _rc, out = _run(monkeypatch, capsys, s, no_color=False)
     assert "✗" not in out, out  # no false degraded verdict
-    assert "de baseline 3/10" in out, out
+    assert "de baseline 3/30" in out, out
 
 
 def test_run_counts_not_in_line(monkeypatch, capsys):
@@ -376,7 +376,7 @@ def test_lifetime_fallback_when_session_stale(monkeypatch, capsys, tmp_path):
 
 
 def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
-    """de 100.0% (a rate) over 1 sample is noise wearing a number — suppressed until 25."""
+    """de 100.0% (a rate) over 1 sample is noise wearing a number — suppressed until the gate."""
     import distil.shadow as shadow
 
     s = ledger.LedgerSummary(1, 0.01, 100, {}, total_baseline_tokens=1000, total_distil_tokens=600)
@@ -388,8 +388,8 @@ def test_eq_suppressed_below_min_samples(monkeypatch, capsys):
     sj.parent.mkdir(parents=True, exist_ok=True)
     sj.write_text('{"equivalent": true}\n', encoding="utf-8")
     _rc, out = _run(monkeypatch, capsys, s)
-    assert "%" not in out  # no rate claimed below 25 samples
-    assert "de 1/25" in out  # FIX 6: but collection progress is shown ("warming up")
+    assert "%" not in out  # no rate claimed below the sample gate
+    assert "de 1/50" in out  # but collection progress is shown ("warming up")
 
 
 def test_zero_savings_session_says_watching(monkeypatch, capsys, tmp_path):
@@ -615,13 +615,13 @@ def test_de_shows_progress_only_while_sampler_is_live(monkeypatch, capsys):
     sj.write_text('{"equivalent": true}\n', encoding="utf-8")
 
     _rc, out = _run(monkeypatch, capsys, s, recent=s)
-    assert "de 3/25" in out  # fresh file → genuinely collecting
+    assert "de 3/50" in out  # fresh file → genuinely collecting
 
     old = time.time() - 2 * 86400
     os.utime(sj, (old, old))
     _rc, out = _run(monkeypatch, capsys, s, recent=s)
     assert "de idle" in out  # stale >24h → no sampler feeding it
-    assert "3/25" not in out
+    assert "3/50" not in out
 
 
 def test_wrap_shadow_defaults_on():

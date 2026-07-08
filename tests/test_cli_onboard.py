@@ -589,7 +589,7 @@ def test_cmd_shadow_stats_no_samples(monkeypatch, capsys) -> None:
         def rate(self):
             return 0.0
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Empty()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Empty()))
     rc = cli.cmd_shadow_stats(argparse.Namespace(json=False))
     assert rc == 0
     assert "No shadow samples" in capsys.readouterr().out
@@ -605,7 +605,7 @@ def test_cmd_shadow_stats_collecting(monkeypatch, capsys) -> None:
         def rate(self):
             return 0.1
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Few()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Few()))
     rc = cli.cmd_shadow_stats(argparse.Namespace(json=False))
     assert rc == 0
     assert "collecting" in capsys.readouterr().out
@@ -618,7 +618,7 @@ def test_cmd_shadow_stats_ready(monkeypatch, capsys) -> None:
     led.samples, led.changes = 50, 2
     for i in range(50):
         led.recent.append(0 if i < 2 else 1)  # rate() = 0.04
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
     rc = cli.cmd_shadow_stats(argparse.Namespace(json=False))
     assert rc == 0
     out = capsys.readouterr().out
@@ -634,7 +634,7 @@ def test_cmd_shadow_stats_json(monkeypatch, capsys) -> None:
     led.samples, led.changes = 30, 1
     for i in range(30):
         led.recent.append(0 if i < 1 else 1)
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
     rc = cli.cmd_shadow_stats(argparse.Namespace(json=True))
     assert rc == 0
     data = json.loads(capsys.readouterr().out)
@@ -793,7 +793,7 @@ def test_cmd_leaderboard_text_live_proxy(tmp_path, monkeypatch, capsys) -> None:
         def rate(self):
             return 0.02
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Ready()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Ready()))
     rc = cli.cmd_leaderboard(argparse.Namespace(badge=False, json=False, html=None))
     assert rc == 0
     out = capsys.readouterr().out
@@ -825,7 +825,7 @@ def test_cmd_leaderboard_text_collecting_shadow(tmp_path, monkeypatch, capsys) -
         def rate(self):
             return 0.0
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Few()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Few()))
     rc = cli.cmd_leaderboard(argparse.Namespace(badge=False, json=False, html=None))
     assert rc == 0
     assert "collecting" in capsys.readouterr().out
@@ -882,11 +882,11 @@ def test_cmd_statusline_rich_with_shadow(tmp_path, monkeypatch, capsys) -> None:
 
     led = shadow_mod.ShadowLedger()
     led.samples = 50
-    led.aa_samples = 10  # perfect A/A baseline → adjusted_rate() == rate()
+    led.aa_samples = 30  # robust A/A baseline → adjusted_rate() == rate()
     led.aa_changes = 0
     for i in range(100):
         led.recent.append(0 if i < 1 else 1)  # rate() = 0.01 → eq 99%
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
     rc = cli.cmd_statusline(argparse.Namespace(no_color=True))
     assert rc == 0
     out = capsys.readouterr().out
@@ -925,7 +925,7 @@ def test_cmd_dashboard_frame_with_shadow_session(tmp_path, monkeypatch, capsys) 
         def rate(self):
             return 0.03
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Ready()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Ready()))
     rc = cli.cmd_dashboard(argparse.Namespace(once=True, interval=2.0))
     assert rc == 0
     assert "distil" in capsys.readouterr().out
@@ -1045,7 +1045,7 @@ def test_cmd_leaderboard_json_shadow_exception(tmp_path, monkeypatch, capsys) ->
     monkeypatch.setattr(
         shadow_mod.ShadowLedger,
         "load",
-        classmethod(lambda cls: (_ for _ in ()).throw(OSError("no shadow"))),
+        classmethod(lambda cls, *a, **k: (_ for _ in ()).throw(OSError("no shadow"))),
     )
     rc = cli.cmd_leaderboard(argparse.Namespace(badge=False, json=True, html=None))
     assert rc == 0
@@ -1078,7 +1078,7 @@ def test_cmd_leaderboard_html_with_shadow_and_session(tmp_path, monkeypatch, cap
         def rate(self):
             return 0.02
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Ready()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Ready()))
     rc = cli.cmd_leaderboard(argparse.Namespace(badge=False, json=False, html=str(out_html)))
     assert rc == 0
     assert out_html.exists()
@@ -1186,7 +1186,7 @@ def test_cmd_dashboard_session_exception(tmp_path, monkeypatch, capsys) -> None:
         def rate(self):
             return 0.0
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Empty()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Empty()))
 
     def _bad(*a, **k):
         raise OSError("no session")
@@ -1399,7 +1399,7 @@ def test_cmd_leaderboard_html_session_exc(tmp_path, monkeypatch, capsys) -> None
         def rate(self):
             return 0.0
 
-    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: _Empty()))
+    monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls, *a, **k: _Empty()))
     monkeypatch.setattr(
         ledger_mod, "latest_session", lambda: (_ for _ in ()).throw(OSError("no session"))
     )

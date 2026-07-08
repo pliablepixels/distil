@@ -54,6 +54,22 @@ def _state_dir() -> Path:
     return Path(os.environ.get("DISTIL_HOME", str(Path.home() / ".distil")))
 
 
+# Decision-signature algorithm version. Bump on ANY change to how a signature is
+# computed. Rows and certificates are stamped with this; v1 and v2 signatures are
+# NEVER compared (a wording-jitter fix must not silently invalidate old evidence).
+# v1: tool name + full input, only Python-code strings AST-normalized.
+# v2: + formatting-whitespace canonicalized on all strings (and non-Python code),
+#     so `ls -la` == `ls  -la` and re-serialization jitter isn't a "decision change".
+SIG_VERSION = 2
+
+# A verdict (✓/⚠/✗) is only rendered once evidence is robust — a percentage over a
+# handful of samples is noise wearing a number, and the noise-adjusted rate divides
+# by the A/A self-agreement, which is itself unstable at small n. Below these, the
+# status line shows a neutral warming state instead of a colored verdict.
+VERDICT_MIN_AB = 50  # A/B (compressed-vs-original) samples
+VERDICT_MIN_AA = 30  # A/A (self-agreement noise-baseline) samples
+
+
 def _canon(obj: Any) -> str:
     """A short, stable hash of a JSON-able object — content-free in the ledger."""
     try:
@@ -61,6 +77,29 @@ def _canon(obj: Any) -> str:
     except (TypeError, ValueError):
         blob = str(obj)
     return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+
+def _current_version() -> str:
+    """The running distil version, for stamping ledger rows. Lazy-imported to
+    avoid a shadow<->hotswap import cycle; never raises (a stamp must not break
+    recording) — falls back to "?" if the version can't be determined."""
+    try:
+        from .hotswap import installed_version
+
+        return installed_version() or "?"
+    except Exception:  # noqa: BLE001 — best-effort provenance only
+        return "?"
+
+
+def _canon_ws(s: str) -> str:
+    """Collapse formatting whitespace: strip ends, runs of whitespace → one space.
+
+    Kills wording/serialization jitter (`ls -la` vs `ls  -la`, pretty-printed vs
+    minified JSON, trailing newlines) WITHOUT merging genuinely different tokens —
+    different content still differs. This is the v2 fix for the ~27% A/A self-noise
+    that made identical replayed requests read as "decision changed".
+    """
+    return " ".join(s.split())
 
 
 # ---------------------------------------------------------------------------
@@ -90,13 +129,15 @@ def _normalize_code(s: str) -> str:
     try:
         return "py:" + _ast.dump(_ast.parse(s))
     except (SyntaxError, ValueError):
-        return s
+        return _canon_ws(s)  # not Python — at least strip formatting jitter (v2)
 
 
 def _normalize_decision(value: Any) -> Any:
-    """Recursively replace code-shaped strings with their AST-normalized form."""
+    """Recursively normalize decision inputs: AST-normalize code-shaped strings,
+    and canonicalize formatting whitespace on plain strings (v2) so identical
+    replayed decisions don't read as changed just from wording/serialization."""
     if isinstance(value, str):
-        return _normalize_code(value) if _looks_like_code(value) else value
+        return _normalize_code(value) if _looks_like_code(value) else _canon_ws(value)
     if isinstance(value, dict):
         return {k: _normalize_decision(v) for k, v in value.items()}
     if isinstance(value, list):
@@ -398,7 +439,13 @@ class ShadowLedger:
         try:
             p = path or (_state_dir() / "shadow.jsonl")
             p.parent.mkdir(parents=True, exist_ok=True)
-            rec: dict[str, Any] = {"equivalent": bool(equivalent), "ts": time.time(), "kind": kind}
+            rec: dict[str, Any] = {
+                "equivalent": bool(equivalent),
+                "ts": time.time(),
+                "kind": kind,
+                "sig": SIG_VERSION,  # scope verdicts to the current algorithm
+                "v": _current_version(),  # attribute the row to a build
+            }
             if evidence:
                 rec.update(evidence)  # content-free: signatures are _canon hashes
             with p.open("a", encoding="utf-8") as f:
@@ -417,7 +464,22 @@ class ShadowLedger:
             pass  # telemetry must never break the request path
 
     @classmethod
-    def load(cls, path: Path | None = None) -> ShadowLedger:
+    def load(
+        cls,
+        path: Path | None = None,
+        *,
+        current_only: bool = False,
+        since_ts: float | None = None,
+    ) -> ShadowLedger:
+        """Read the shadow ledger.
+
+        With ``current_only``, count ONLY rows written under the current
+        ``SIG_VERSION`` — old-algorithm signatures are not comparable and must not
+        drag a live verdict (a wording-jitter fix bumps the version, see ADR). Rows
+        without a ``sig`` (pre-v2/legacy) are excluded when scoped. ``since_ts``
+        drops rows older than a rolling window. Unscoped (default) reads everything,
+        for auditing and backward compatibility with the certificate path.
+        """
         led = cls()
         try:
             p = path or (_state_dir() / "shadow.jsonl")
@@ -428,6 +490,10 @@ class ShadowLedger:
                 try:
                     rec = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
+                    continue
+                if current_only and rec.get("sig") != SIG_VERSION:
+                    continue  # v1/legacy row — not comparable to current signatures
+                if since_ts is not None and float(rec.get("ts", 0.0)) < since_ts:
                     continue
                 eq = bool(rec.get("equivalent", True))
                 if rec.get("kind", "ab") == "aa":
