@@ -3,7 +3,19 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.13.0] — 1.13.0rc1 — seamless hot-swap: upgrades apply to live sessions, no restart
+## [1.13.0] — 1.13.0rc3 — seamless hot-swap: upgrades apply to live sessions, no restart
+
+### Fixed
+
+- Shadow health no longer shows a red `✗` degraded verdict before the A/A noise
+  baseline exists. `adjusted_rate()` silently falls back to the raw, un-adjusted
+  rate when there is no baseline, so the status line was painting sampling
+  nondeterminism as compression harm (e.g. a scary `✗de 36.0%` over 25 samples
+  with a 3/10 baseline). The verdict glyph now gates on `aa_agreement()` and
+  shows a neutral `de baseline N/10` while warming; `shadow-stats --json` nulls
+  its `adjusted_*` fields until the baseline lands instead of labelling raw
+  values "adjusted". Display-only — never affected routing, compression, or
+  savings.
 
 ### Added
 

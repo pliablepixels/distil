@@ -861,7 +861,9 @@ def test_cmd_statusline_minimal_with_runs(tmp_path, monkeypatch, capsys) -> None
 
 
 def test_cmd_statusline_rich_with_shadow(tmp_path, monkeypatch, capsys) -> None:
-    """Rich statusline + ≥25 shadow samples → shadow equivalence segment (632-633)."""
+    """Rich statusline + ≥25 shadow samples AND an A/A baseline → shadow
+    equivalence segment (632-633). Without the baseline the verdict is
+    correctly suppressed to 'de baseline N/10' (see test_statusline)."""
     from distil import ledger as ledger_mod, shadow as shadow_mod
 
     p = tmp_path / "savings.jsonl"
@@ -880,8 +882,10 @@ def test_cmd_statusline_rich_with_shadow(tmp_path, monkeypatch, capsys) -> None:
 
     led = shadow_mod.ShadowLedger()
     led.samples = 50
+    led.aa_samples = 10  # perfect A/A baseline → adjusted_rate() == rate()
+    led.aa_changes = 0
     for i in range(100):
-        led.recent.append(0 if i < 1 else 1)  # rate() = 0.01
+        led.recent.append(0 if i < 1 else 1)  # rate() = 0.01 → eq 99%
     monkeypatch.setattr(shadow_mod.ShadowLedger, "load", classmethod(lambda cls: led))
     rc = cli.cmd_statusline(argparse.Namespace(no_color=True))
     assert rc == 0
