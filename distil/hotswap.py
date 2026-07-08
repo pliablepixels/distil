@@ -68,6 +68,8 @@ _READY_PREFIX = "DISTIL-WORKER-READY "
 # workload ever streams longer.
 _DRAIN_CAP_S = 15 * 60.0
 _POLL_INTERVAL_S = 30.0
+# ponytail: a non-atomic reinstall window lasts ~1s; wait a beat, don't tight-loop.
+_UPGRADE_SETTLE_S = 2.0
 
 
 @dataclass
@@ -353,7 +355,21 @@ class ProxySupervisor:
                     # Worker died underneath us (crash/OOM): the agent would get
                     # connection-refused for the rest of the session. Respawn —
                     # same self-heal contract as the old in-thread accept loop.
-                    log.warning("proxy worker died (exit=%s); respawning", self._worker.poll())
+                    exit_code = self._worker.poll()
+                    # A non-atomic reinstall (pip/uv --force-reinstall) deletes the
+                    # package files before rewriting them; a worker spawned in that
+                    # window dies importing half-gone code. Don't cry wolf or tight-
+                    # loop: if the version is momentarily unreadable, let the install
+                    # settle, then respawn from the (now complete) code on disk.
+                    if installed_version() is None:
+                        log.info(
+                            "proxy worker died (exit=%s) during a package upgrade "
+                            "window; waiting for it to settle",
+                            exit_code,
+                        )
+                        self._stopping.wait(_UPGRADE_SETTLE_S)
+                    else:
+                        log.warning("proxy worker died (exit=%s); respawning", exit_code)
                     self._worker, self.worker_version = self._spawn_worker()
                     continue
                 disk = installed_version()

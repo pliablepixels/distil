@@ -373,9 +373,7 @@ def _inproc_supervisor(tmp_path, monkeypatch, upstream_port: int):
     from distil.hotswap import ProxySupervisor
 
     monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
-    return ProxySupervisor(
-        WorkerConfig(upstream=f"http://127.0.0.1:{upstream_port}", record=False)
-    )
+    return ProxySupervisor(WorkerConfig(upstream=f"http://127.0.0.1:{upstream_port}", record=False))
 
 
 def test_supervisor_inprocess_handover_and_reap(tmp_path, monkeypatch):
@@ -456,6 +454,43 @@ def test_watch_thread_handles_manual_trigger_and_respawn(tmp_path, monkeypatch):
             time.sleep(0.05)
         assert sup._worker is not crashed and sup._worker.poll() is None
         assert _post(sup.port, _payload()).status == 200  # respawned and serving
+    finally:
+        sup.shutdown()
+        upstream.shutdown()
+
+
+def test_respawn_during_upgrade_window_is_quiet(tmp_path, monkeypatch, caplog):
+    """A worker that dies while the package is mid-reinstall (installed_version()
+    momentarily None, e.g. pip/uv --force-reinstall) is respawned WITHOUT a scary
+    WARNING and without tight-looping — the non-atomic reinstall thrash guard."""
+    import logging
+    import distil.hotswap as hs
+
+    upstream = _start_upstream()
+    sup = _inproc_supervisor(tmp_path, monkeypatch, upstream.server_address[1])
+    try:
+        sup.start()
+        # Simulate the reinstall window: package version unreadable, settle fast.
+        monkeypatch.setattr(hs, "installed_version", lambda: None)
+        monkeypatch.setattr(hs, "_UPGRADE_SETTLE_S", 0.05)
+        crashed = sup._worker
+        crashed.kill()
+        crashed.wait(timeout=10)
+        with caplog.at_level(logging.INFO, logger="distil"):
+            sup.request_handover()  # wake the watch: dead-check runs
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline and (
+                sup._worker is crashed or sup._worker.poll() is not None
+            ):
+                time.sleep(0.05)
+        assert sup._worker is not crashed and sup._worker.poll() is None
+        assert _post(sup.port, _payload()).status == 200  # respawned and serving
+        died = [r for r in caplog.records if "died" in r.getMessage()]
+        assert died, "no death was logged"
+        # every death log during the window is INFO, never WARNING+
+        assert all(r.levelno == logging.INFO for r in died), [
+            (r.levelno, r.getMessage()) for r in died
+        ]
     finally:
         sup.shutdown()
         upstream.shutdown()
