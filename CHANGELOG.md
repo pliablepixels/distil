@@ -3,9 +3,18 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.13.0] — 1.13.0rc3 — seamless hot-swap: upgrades apply to live sessions, no restart
+## [1.13.0] — 1.13.0rc4 — seamless hot-swap: upgrades apply to live sessions, no restart
 
 ### Fixed
+
+- Hot-swap supervisor no longer cries wolf when a worker dies during a
+  non-atomic reinstall. `pip`/`uv --force-reinstall` deletes the package files
+  before rewriting them; a worker spawned in that ~1s window dies importing
+  half-gone code, and the supervisor logged a scary `WARNING proxy worker died;
+  respawning` and tight-looped. It already self-heals once the install
+  completes — now, when `installed_version()` is momentarily unreadable, it logs
+  at INFO and waits `_UPGRADE_SETTLE_S` before respawning. (Surfaced by
+  reinstalling a shared pipx venv under live `distil wrap` sessions.)
 
 - Shadow health no longer shows a red `✗` degraded verdict before the A/A noise
   baseline exists. `adjusted_rate()` silently falls back to the raw, un-adjusted
