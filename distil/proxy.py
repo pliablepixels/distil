@@ -232,6 +232,10 @@ def build_handler(
     # reversible digest (savings come only from lossless whitespace/JSON), so
     # ▼0 there is the mode, not a bug.
     _mode_label = "verbatim" if verbatim else ("lossless-only" if lossless_only else "digest")
+    # Stamp the recorder so every savings row records the mode it was produced under
+    # — answers "why was ▼ low?" from the ledger instead of by inference.
+    if savings is not None:
+        savings.mode = _mode_label
 
     # lossless-only is a hard safety boundary: with no injected expand tool the
     # agent can never recover a Tier-1 digest stub, so a stub there is irreversibly

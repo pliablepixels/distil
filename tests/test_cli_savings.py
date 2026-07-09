@@ -106,6 +106,39 @@ class TestCmdSavings:
         assert "baseline_dollars" in rec
         assert rec["baseline_dollars"] > 0
 
+    def test_record_stamps_compression_mode(self, tmp_path):
+        """Each row records the mode it was produced under, so 'why was ▼ low?'
+        is answerable from the ledger (lossless-only vs digest) not by inference."""
+        from distil import ledger
+
+        p = tmp_path / "savings.jsonl"
+        ledger.record(
+            trajectory_id="t",
+            model="claude-opus-4-8",
+            turns=2,
+            baseline_dollars=1.0,
+            distil_dollars=0.6,
+            baseline_input_tokens=1000,
+            distil_input_tokens=600,
+            session="s1",
+            mode="lossless-only",
+            path=p,
+        )
+        assert json.loads(p.read_text().splitlines()[0])["mode"] == "lossless-only"
+        # mode is optional — omitting it stays backward-compatible (empty string)
+        ledger.record(
+            trajectory_id="t2",
+            model="m",
+            turns=1,
+            baseline_dollars=1.0,
+            distil_dollars=1.0,
+            baseline_input_tokens=10,
+            distil_input_tokens=5,
+            session="s2",
+            path=p,
+        )
+        assert json.loads(p.read_text().splitlines()[1])["mode"] == ""
+
 
 # ---------------------------------------------------------------------------
 # cmd_leaderboard / stats

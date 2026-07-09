@@ -68,6 +68,9 @@ class SavingsRecord:
     tokenizer: str
     ts: float
     session: str = ""  # proxy-process session id — lets the statusline show THIS session
+    # Compression mode this row was produced under — answers "why was saving low?"
+    # directly instead of by inference: verbatim / lossless-only / digest (empty = pre-1.13).
+    mode: str = ""
     # Accounting-schema era: 2 = record-after-2xx (failed/retried requests excluded);
     # absent/1 = legacy pre-1.10 accounting whose savings may be overstated.
     acct: int = 2
@@ -92,6 +95,7 @@ def record(
     distil_input_tokens: int,
     tokenizer: str = "heuristic",
     session: str = "",
+    mode: str = "",
     path: Path | None = None,
 ) -> SavingsRecord:
     rec = SavingsRecord(
@@ -105,6 +109,7 @@ def record(
         tokenizer,
         time.time(),
         session,
+        mode=mode,
     )
     path = path or default_path()
     path.parent.mkdir(parents=True, exist_ok=True)

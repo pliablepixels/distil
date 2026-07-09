@@ -32,6 +32,7 @@ class RuntimeSavings:
 
     model: str = "claude-opus-4-8"
     session_id: str = ""  # set in __post_init__; stamps every ledger record
+    mode: str = ""  # compression mode (verbatim/lossless-only/digest); stamps rows
     requests: int = 0
     tokens_before: int = 0
     tokens_after: int = 0
@@ -126,6 +127,7 @@ class RuntimeSavings:
                     baseline_input_tokens=before,
                     distil_input_tokens=after,
                     session=self.session_id,
+                    mode=self.mode,
                     path=self.ledger_path or ledger.default_path(),
                 )
             self.requests = 0
