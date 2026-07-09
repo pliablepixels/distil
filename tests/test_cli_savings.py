@@ -193,15 +193,15 @@ class TestCmdLeaderboard:
 
         # cmd_leaderboard does `from .shadow import ShadowLedger; led = ShadowLedger.load()`
         # so patching the class method on the real class is the right intercept point.
-        monkeypatch.setattr(ShadowLedger, "load", classmethod(lambda cls: led))
+        monkeypatch.setattr(ShadowLedger, "load", classmethod(lambda cls, *a, **k: led))
 
         self._write_ledger(tmp_path)
         rc = cmd_leaderboard(_ns())
         assert rc == 0
         out = capsys.readouterr().out
-        # Must say "collecting" or "need 25" — must NOT print a bare percentage rate
+        # Must say "collecting" — must NOT print a bare percentage rate
         assert "decision-equivalence:" in out
-        assert "collecting" in out or "need 25" in out
+        assert "collecting" in out
         import re
 
         assert not re.search(r"decision-equivalence:\s+\d+\.\d+%\s+\(", out)

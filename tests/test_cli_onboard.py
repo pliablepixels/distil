@@ -786,9 +786,13 @@ def test_cmd_leaderboard_text_live_proxy(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(ledger_mod, "default_path", lambda: p)
     monkeypatch.setenv("DISTIL_SUBSCRIPTION", "0")
 
-    # give ≥25 shadow samples so the decision-equivalence line is printed
+    # clear the robust gate (≥50 A/B, ≥30 A/A) so the equivalence line is printed
     class _Ready:
-        samples = 30
+        samples = 50
+        aa_samples = 30
+
+        def adjusted_rate(self):
+            return 0.02
 
         def rate(self):
             return 0.02
@@ -821,6 +825,7 @@ def test_cmd_leaderboard_text_collecting_shadow(tmp_path, monkeypatch, capsys) -
 
     class _Few:
         samples = 5
+        aa_samples = 2
 
         def rate(self):
             return 0.0

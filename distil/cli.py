@@ -179,11 +179,13 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         d = asdict(s)
         d["tokenizers"] = sorted(s.tokenizers)
         try:
-            from .shadow import ShadowLedger
+            from .shadow import VERDICT_MIN_AA, VERDICT_MIN_AB, ShadowLedger
 
-            led = ShadowLedger.load()
-            if led.samples:
-                d["decision_equivalence"] = 1 - led.rate()
+            # Scope to the current signature algorithm + require robust evidence, and
+            # report the noise-ADJUSTED rate — consistent with the status line verdict.
+            led = ShadowLedger.load(current_only=True)
+            if led.samples >= VERDICT_MIN_AB and led.aa_samples >= VERDICT_MIN_AA:
+                d["decision_equivalence"] = 1 - led.adjusted_rate()
                 d["shadow_samples"] = led.samples
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
@@ -194,12 +196,12 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
         samples = 0
         sess = None
         try:
-            from .shadow import ShadowLedger
+            from .shadow import VERDICT_MIN_AA, VERDICT_MIN_AB, ShadowLedger
 
-            led = ShadowLedger.load()
+            led = ShadowLedger.load(current_only=True)
             samples = led.samples
-            if samples:
-                change_rate = led.rate()
+            if samples >= VERDICT_MIN_AB and led.aa_samples >= VERDICT_MIN_AA:
+                change_rate = led.adjusted_rate()  # noise-adjusted, like the verdict
         except Exception:  # noqa: BLE001 — shadow stats are best-effort
             pass
         try:
@@ -243,20 +245,22 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
     else:
         print(f"total dollars saved:  ${s.total_dollars_saved:,.2f}")
     try:
-        from .shadow import ShadowLedger
+        from .shadow import VERDICT_MIN_AA, VERDICT_MIN_AB, ShadowLedger
 
-        led = ShadowLedger.load()
-        if led.samples >= 25:
-            # Only claim a rate with evidence behind it — the same 25-sample floor
-            # the status line uses; a rate over a handful is noise.
+        # Scope to the current signature algorithm and require a robust baseline,
+        # then report the noise-ADJUSTED rate — identical gate to the status line, so
+        # this line can't show a stale/un-adjusted number the verdict disowns.
+        led = ShadowLedger.load(current_only=True)
+        if led.samples >= VERDICT_MIN_AB and led.aa_samples >= VERDICT_MIN_AA:
             print(
-                f"decision-equivalence: {(1 - led.rate()) * 100:.1f}% "
-                f"({led.samples:,} shadowed request{'s' if led.samples != 1 else ''})"
+                f"decision-equivalence: {(1 - led.adjusted_rate()) * 100:.1f}% "
+                f"({led.samples:,} shadowed request"
+                f"{'s' if led.samples != 1 else ''}, noise-adjusted)"
             )
         elif led.samples:
             print(
-                f"decision-equivalence: collecting — {led.samples} "
-                f"sample{'s' if led.samples != 1 else ''} (need 25 for a rate)"
+                f"decision-equivalence: collecting — {led.samples} A/B, "
+                f"{led.aa_samples} A/A (need {VERDICT_MIN_AB}/{VERDICT_MIN_AA})"
             )
     except Exception:  # noqa: BLE001 — shadow stats are best-effort
         pass
