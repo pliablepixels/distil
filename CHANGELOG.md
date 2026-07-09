@@ -3,9 +3,22 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.13.0] — 1.13.0rc5 — seamless hot-swap: upgrades apply to live sessions, no restart
+## [1.13.0] — 1.13.0rc6 — seamless hot-swap: upgrades apply to live sessions, no restart
+
+### Added
+
+- Savings ledger rows are stamped with the compression `mode`
+  (verbatim / lossless-only / digest), so "why was ▼ low on this session?" is
+  answerable directly from `savings.jsonl` instead of by inference — a
+  lossless-only row saving ~0% is subscription safety working as designed; a
+  digest row saving ~0% is genuinely low-redundancy content. Optional; pre-1.13
+  rows read as unknown mode.
 
 ### Fixed
+
+- `distil stats` / leaderboard decision-equivalence now scopes to the current
+  signature version and reports the noise-adjusted rate (like the status line),
+  instead of the stale, un-adjusted v1 number.
 
 - Shadow decision-equivalence is trustworthy again (decision-signature **v2**, see
   `docs/adr/0001-shadow-decision-signature-v2.md`). The v1 signature hashed tool
