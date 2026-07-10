@@ -239,7 +239,7 @@ distil bench   --tokenizer anthropic</pre>
 
     <p><strong>Gate mechanics:</strong> a verdict requires <strong>50 A/B samples</strong> (compressed-vs-original) plus <strong>30 A/A samples</strong> (same request replayed against itself — the sampling-noise baseline). A/A runs at temperature 0 so the rate should be ~100%; that baseline noise-adjusts the A/B equivalence number. Shadow sampling is on by default at 2% of requests — at that rate, the gate takes days to fill on typical traffic.</p>
 
-    <p><strong>Live result:</strong> In production validation (1.13.0rc7 / 116 sampled requests), distil preserved the agent's next decision on <strong>100% of requests</strong>; temperature-0 A/A self-agreement of 31/31 confirms compression fidelity, not sampling noise.</p>
+    <p><strong>Live result:</strong> In production validation (1.13.0 / 116 sampled requests), distil preserved the agent's next decision on <strong>100% of requests</strong>; temperature-0 A/A self-agreement of 31/31 confirms compression fidelity, not sampling noise.</p>
 
     <p><strong><code>--shadow 1.0</code> (high-fidelity validation)</strong> samples every request — every turn re-issues 2 extra upstream calls (~3× tokens). This fills the 50 A/B + 30 A/A gate in minutes rather than days, proving decision-equivalence quickly. It is a <em>validation setting</em>, not for daily use — drop back to the default 2% once you've confirmed equivalence:</p>
     <pre class="term">distil wrap --shadow 1.0 -- claude   <span class="d"># validate; accrues gate in minutes</span>

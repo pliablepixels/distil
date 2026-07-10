@@ -3,7 +3,22 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [1.13.0] — 1.13.0rc7 — trustworthy shadow gate: deterministic (temp-0) decision-equivalence
+## [1.13.0] — trustworthy shadow gate: deterministic decision-equivalence + mode visibility
+
+Promoted to GA on live validation: **100% decision-equivalence over 116 sampled
+production requests** (0 decision changes), with a temperature-0 A/A self-agreement
+baseline of **31/31** confirming the result is compression fidelity, not sampling
+noise. (Prerelease train: rc1–rc7.)
+
+### Added
+
+- **Status-line mode chip** — the compression mode is now visible at a glance:
+  `⬢ digest` · `◇ lossless` · `▪ verbatim`, rendered right after `distil`. Read from
+  the ledger's most recent row via `ledger.latest_mode()`.
+- **Docs** — plain-English + technical mode explanations (digest / expand /
+  lossless-only / verbatim), the billing→mode auto-default (`distil default`/onboard),
+  corrected shadow-gate mechanics (50 A/B + 30 A/A), `--shadow 1.0` high-fidelity
+  validation, and a validated decision-equivalence callout, across README and the docs site.
 
 ### Fixed
 
@@ -16,7 +31,7 @@ All notable changes to Distil are documented here. Format loosely follows
   response. A/A collapses toward ~100%, so the A/B rate becomes a real compression
   signal instead of noise. Signature methodology bumps to **v3**; v2 samples are
   scoped out (never averaged with v3), so the gate restarts on a clean baseline.
-  Do not promote 1.13.0 GA until v3 A/A ≈ 100% and A/B clears target.
+  This GA ships with the v3 gate passed (see the validation note above).
 - As a side effect, the streaming path no longer buffers the upstream response
   body for shadow (it re-issues its own calls), removing that per-request copy.
 

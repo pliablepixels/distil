@@ -294,7 +294,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 > samples every request — proves equivalence in minutes at ~3× token cost, then drop
 > back to the default 2%).
 >
-> **Measured:** In live validation (signature v3 / 1.13.0rc7), distil preserved the
+> **Measured:** In live validation (signature v3 / 1.13.0), distil preserved the
 > agent's next decision on **100% of 116 sampled production requests** (0 changes);
 > temperature-0 A/A self-agreement of 31/31 confirms this is compression fidelity,
 > not sampling noise. Validated result — not a guarantee for all workloads.
