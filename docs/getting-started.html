@@ -153,13 +153,23 @@ pip install distil-llm</pre>
     <h2>Use it on your agent <span class="g">— the 30-second path</span></h2>
     <p><strong>Easiest:</strong> let <code>distil onboard</code> set you up and hand you the exact commands for your environment — it detects your agent and billing, wires the status line, and prints a guided tour:</p>
     <pre class="term">distil onboard   <span class="d"># one command: detects your setup, wires the status line, guides you</span></pre>
-    <p>Or do it by hand. <code>distil wrap</code> launches your coding agent with its API traffic routed through compression — <strong>no config, no code change</strong>.</p>
-    <pre class="term"><span class="d"># Claude Code on a metered API key — saves real $$:</span>
+    <p>Or do it by hand. <code>distil wrap</code> launches your coding agent with its API traffic routed through compression — <strong>no config, no code change</strong>. <code>distil default</code> (run by onboard) picks the right mode for your billing automatically — override any time with an explicit flag:</p>
+    <pre class="term"><span class="d"># metered / API-key billing — expand mode (PAYG auto-default):</span>
 distil wrap --expand -- claude
-<span class="d"># Claude Code on a Pro/Max subscription — flat-rate, ToS-safe (trims context, not $):</span>
+<span class="d"># Pro/Max subscription — lossless-only mode (subscription auto-default):</span>
 distil wrap --lossless-only -- claude
 <span class="d"># Codex, Gemini CLI, or any agent — same pattern:</span>
 distil wrap --expand -- codex</pre>
+
+    <table>
+      <thead><tr><th>Mode flag</th><th>What it does</th><th>Savings</th><th>Safety</th><th>Auto-selected when</th></tr></thead>
+      <tbody>
+        <tr><td><code>--expand</code></td><td>Digest + injected expand tool so the model recovers content on demand</td><td>Most</td><td>Lossy-but-recoverable</td><td>Metered / API-key (PAYG)</td></tr>
+        <tr><td><em>(no flag)</em> digest</td><td>Tier-1 digest only — no tool injection</td><td>High</td><td>Reversible via RestoreStore</td><td>Default if no flag passed</td></tr>
+        <tr><td><code>--lossless-only</code> / <code>--safe</code></td><td>Lossless transforms only — no digests, no tool injection</td><td>Fewer</td><td>Zero unrecoverable content</td><td>Subscription / flat-rate</td></tr>
+        <tr><td><code>--verbatim</code></td><td>Whitespace + JSON normalization only</td><td>Minimal</td><td>Most conservative</td><td>Debugging / auditing</td></tr>
+      </tbody>
+    </table>
     <p>Then watch genuine, measured savings from <em>your</em> traffic (not estimates):</p>
     <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger (alias: distil stats)</span>
 distil dashboard            <span class="d"># live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit</span>
@@ -186,10 +196,15 @@ distil savings --tokenizer anthropic
 distil certify --runner anthropic</pre>
 
     <h3>Validate it preserved your outcomes</h3>
-    <p>Compression is only safe if your agent makes <em>the same decision</em> it would have on full context. <code>--shadow</code> proves that on your live traffic: it samples a fraction of requests and runs each one <strong>twice — once compressed, once with the full prompt</strong> — then compares the <strong>agent's chosen next action</strong> (the tool call it decides to make), not the prose. The two are <em>decision-equivalent</em> when those signatures match.</p>
-    <pre class="term">distil wrap --shadow 0.1 -- claude   <span class="d"># one command: wraps your agent + shadows 10%</span>
+    <p>Compression is only safe if your agent makes <em>the same decision</em> it would have on full context. Shadow mode proves that on your live traffic: it samples a fraction of requests and runs each one <strong>twice — once compressed, once with the full prompt</strong> — then compares the <strong>agent's chosen next action</strong> (the tool call it decides to make), not the prose. The two are <em>decision-equivalent</em> when those signatures match.</p>
+    <p><strong>Shadow is on by default at 2% of requests</strong> (opt-out with <code>--shadow 0</code>). Raise the rate to collect evidence faster; use <code>--shadow 1.0</code> to sample every request — proves equivalence in minutes at ~3× token cost, then drop back.</p>
+    <pre class="term">distil wrap -- claude                <span class="d"># shadow on at 2% by default</span>
+distil wrap --shadow 0.1 -- claude   <span class="d"># raise to 10% to collect evidence faster</span>
+distil wrap --shadow 1.0 -- claude   <span class="d"># full-sampling: proves equivalence quickly (~3× tokens)</span>
+distil wrap --shadow 0 -- claude     <span class="d"># disable shadow entirely</span>
 distil shadow-stats                  <span class="d"># live decision-equivalence rate (or /distil-shadow)</span></pre>
-    <p>The rate also shows in the <a href="deploy-security.html">status line</a> once shadow has samples — read it as <em>"of the requests I checked, N% produced the identical next action with vs without compression."</em> Start at <code>0.1</code>; if equivalence holds high, dial compression up — if it dips, back off. Distil fails safe to full context.</p>
+    <p>The <code>de</code> segment in the <a href="deploy-security.html">status line</a> shows <code>de n/50</code> while collecting, then a ✓/⚠/✗ verdict once <strong>50 A/B + 30 A/A samples</strong> accrue (A/B = compressed-vs-original; A/A = same request replayed against itself — the noise baseline). Read it as <em>"of the requests I shadow-checked, N% produced the identical next action with vs without compression."</em> Distil fails safe to full context.</p>
+    <p><strong>Live result:</strong> In production validation (1.13.0rc7 / 116 sampled requests), distil preserved the agent's next decision on <strong>100% of requests</strong>; temperature-0 A/A self-agreement of 31/31 confirms compression fidelity, not sampling noise. Not a universal guarantee — your workload may differ.</p>
     <p style="font-size:13px;opacity:.85"><strong>Honest scope:</strong> this certifies <strong>next-action equivalence — a proxy</strong>, not end-to-end task success. On <a href="research.html#e7">real SWE-bench Verified (E7)</a> the proxy does not fully transfer once compression gets aggressive — which is exactly why you monitor the live rate and keep the gate conservative.</p>
 
     <h3>Certify the level that matters: task outcomes</h3>

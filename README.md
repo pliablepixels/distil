@@ -281,21 +281,36 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 >
 > | state | you see | means |
 > |---|---|---|
-> | **saving** | `distil · ▼12.0K · 40% smaller · $0.31 · total ▼27.0M · ✓eq 99%` | compressing your recent traffic (last 15 min, all terminals) |
+> | **saving** | `distil · ⬢ digest · ▼12.0K · 40% smaller · $0.31 · total ▼27.0M · de 99%` | compressing (mode chip: `⬢ digest` · `◇ lossless` · `▪ verbatim`; `de` = decision-equivalence) |
 > | **watching** | `distil · ✓ on · waiting for a large read · total ▼27.0M` | on, but no large content yet — savings come from big file/command output |
 > | **idle** | `distil · ✓ on · total ▼27.0M` | set up and on, no recent traffic |
 > | **not routed** | `distil · off — session not routed · total ▼27.0M` | this session's requests go straight to the provider — start it with `distil wrap` (or the always-on env) to compress |
 > | **bypassing** | `distil · ⚠ wrapped, agent bypassing proxy · total ▼27.0M` | the wrap is up but zero requests reached its proxy in 3+ minutes — the agent pinned its own endpoint. **Fix: restart the wrap.** Seen mostly with claude.ai-subscription (OAuth) sessions; routing those through a custom base URL is undocumented upstream, and a session occasionally ignores it. `scripts/soak-report.sh` captures evidence if it persists |
 >
-> The `de` segment is live decision-equivalence evidence: a ✓/⚠/✗ rate once 25 shadow
-> samples accrue, `de n/25` while collecting, and `de idle` when nothing has sampled in
-> over a day. Shadow sampling is on by default at 2% of requests (each sample re-runs
-> that request uncompressed to compare outcomes — that's the cost of the evidence);
-> `--shadow 0` disables, `--shadow 0.1` collects faster.
+> The `de` segment is live decision-equivalence evidence: a ✓/⚠/✗ rate once **50 A/B
+> samples + 30 A/A samples** accrue (A/B = compressed-vs-original; A/A = same request
+> replayed against itself — the sampling-noise baseline), `de n/50` while collecting.
+> Shadow sampling is **on by default at 2%** (`--shadow 0` disables; `--shadow 1.0`
+> samples every request — proves equivalence in minutes at ~3× token cost, then drop
+> back to the default 2%).
 >
-> `▼` = tokens saved · `total` = lifetime · `✓eq` = decision-equivalence (shown past 25 shadow samples). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
+> **Measured:** In live validation (signature v3 / 1.13.0rc7), distil preserved the
+> agent's next decision on **100% of 116 sampled production requests** (0 changes);
+> temperature-0 A/A self-agreement of 31/31 confirms this is compression fidelity,
+> not sampling noise. Validated result — not a guarantee for all workloads.
+>
+> `▼` = tokens saved · `total` = lifetime · `de` = decision-equivalence (verdict once 50 A/B + 30 A/A shadow samples accrue). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
 
-Rule of thumb: **subscription/interactive → `--lossless-only`** (verbatim is implied; no separate flag needed) · **PAYG/autonomous → default digest (+`--expand`)** · **coding re-reads → add `--session-delta`**.
+**Compression modes** — `distil default` (run by `distil onboard`) auto-detects your billing and writes the right flag to your shell RC. Override any time with an explicit flag.
+
+| Mode | What it does | Savings | Safety | Auto-selected when |
+|---|---|---|---|---|
+| `--expand` | Digest + injected expand tool so the model recovers content on demand | Most | Lossy-but-recoverable | Metered / API-key (PAYG) |
+| _(default)_ `digest` | Tier-1 digest only — no tool injection | High | Reversible via RestoreStore | No flag passed |
+| `--lossless-only` / `--safe` | Lossless transforms only — no digests, no tool injection | Fewer | Zero unrecoverable content | Subscription / flat-rate |
+| `--verbatim` | Whitespace + JSON normalization only | Minimal | Most conservative | Debugging / auditing |
+
+Subscription users should not force `--expand`; it crosses the lossless safety boundary. Coding re-reads? Add `--session-delta` either way.
 
 ---
 

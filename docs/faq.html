@@ -206,6 +206,39 @@ distil bench   --tokenizer anthropic</pre>
 
     <hr/>
 
+    <h2>"Which compression mode should I use?"</h2>
+
+    <p><code>distil onboard</code> / <code>distil default</code> picks the mode for you automatically based on detected billing — <strong>subscription/flat-rate → <code>--lossless-only</code></strong>, <strong>metered/API-key (PAYG) → <code>--expand</code></strong>. Override per-session with an explicit flag.</p>
+
+    <table>
+      <thead><tr><th>Mode flag</th><th>What it does</th><th>Savings</th><th>Safety</th><th>Auto-selected when</th></tr></thead>
+      <tbody>
+        <tr><td><code>--expand</code></td><td>Digest + injected expand tool so the model recovers content on demand</td><td>Most</td><td>Lossy-but-recoverable</td><td>Metered / API-key (PAYG)</td></tr>
+        <tr><td><em>(no flag)</em> digest</td><td>Tier-1 digest only — no tool injection</td><td>High</td><td>Reversible via RestoreStore</td><td>Default if no flag passed</td></tr>
+        <tr><td><code>--lossless-only</code> / <code>--safe</code></td><td>Lossless transforms only — no digests, no tool injection</td><td>Fewer</td><td>Zero unrecoverable content</td><td>Subscription / flat-rate</td></tr>
+        <tr><td><code>--verbatim</code></td><td>Whitespace + JSON normalization only</td><td>Minimal</td><td>Most conservative</td><td>Debugging / auditing</td></tr>
+      </tbody>
+    </table>
+
+    <p>Subscription users should not force <code>--expand</code> — it crosses the lossless safety boundary. Coding re-reads? Add <code>--session-delta</code> regardless of mode.</p>
+
+    <hr/>
+
+    <h2>"What does <code>de</code> / decision-equivalence mean, and when should I run <code>--shadow 1.0</code>?"</h2>
+
+    <p><code>de</code> is the decision-equivalence rate — the fraction of shadow-checked requests where the agent made the <em>same next action</em> (tool call) with and without compression. It appears in the <a href="cli.html#statusline">status line</a> as <code>de n/50</code> while collecting samples, then as a ✓/⚠/✗ percentage once enough data has accrued.</p>
+
+    <p><strong>Gate mechanics:</strong> a verdict requires <strong>50 A/B samples</strong> (compressed-vs-original) plus <strong>30 A/A samples</strong> (same request replayed against itself — the sampling-noise baseline). A/A runs at temperature 0 so the rate should be ~100%; that baseline noise-adjusts the A/B equivalence number. Shadow sampling is on by default at 2% of requests — at that rate, the gate takes days to fill on typical traffic.</p>
+
+    <p><strong>Live result:</strong> In production validation (1.13.0rc7 / 116 sampled requests), distil preserved the agent's next decision on <strong>100% of requests</strong>; temperature-0 A/A self-agreement of 31/31 confirms compression fidelity, not sampling noise.</p>
+
+    <p><strong><code>--shadow 1.0</code> (high-fidelity validation)</strong> samples every request — every turn re-issues 2 extra upstream calls (~3× tokens). This fills the 50 A/B + 30 A/A gate in minutes rather than days, proving decision-equivalence quickly. It is a <em>validation setting</em>, not for daily use — drop back to the default 2% once you've confirmed equivalence:</p>
+    <pre class="term">distil wrap --shadow 1.0 -- claude   <span class="d"># validate; accrues gate in minutes</span>
+distil shadow-stats                  <span class="d"># check the de rate</span>
+<span class="d"># once equivalence is confirmed, remove --shadow 1.0 and use the 2% default</span></pre>
+
+    <hr/>
+
     <h2>"Where can I see community savings?"</h2>
 
     <p>By design, savings are <strong>local-first and privacy-preserving</strong> — Distil never sends your prompts or responses anywhere. Three views:</p>
