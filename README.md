@@ -301,7 +301,16 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 >
 > `▼` = tokens saved · `total` = lifetime · `de` = decision-equivalence (verdict once 50 A/B + 30 A/A shadow samples accrue). Sharing the line with git/cwd/model? `DISTIL_STATUSLINE=minimal` → `distil ▼7.8K · 27M total`. On a flat-rate **subscription**, dollars are notional and auto-hidden (`DISTIL_SUBSCRIPTION=0/1`).
 
-**Compression modes** — `distil default` (run by `distil onboard`) auto-detects your billing and writes the right flag to your shell RC. Override any time with an explicit flag.
+**Compression modes — in plain English**
+
+You usually don't need to pick. `distil onboard` detects your billing and sets the right mode for you — it writes it into your setup so every session just works. Pass a flag to override for a specific session.
+
+- **digest** (the default) — Distil shortens long things (big files, command output, past steps) into short summaries, and can pull back the full original the moment the AI needs it. You save the most, and nothing is truly gone — originals are kept and restored automatically. *Most people should just use this.*
+- **expand** — Same shortening as digest, but Distil also gives the AI a "show me the full version" button it can press on its own. Best when the AI runs for a long time autonomously (e.g. long coding sessions). *Picked automatically if you pay per use (API key).*
+- **lossless-only** (a.k.a. `--safe`) — The cautious setting: Distil only trims things it can rebuild perfectly (like extra blank space), and never summarizes. You save less, but there's zero chance of losing any detail. *Picked automatically on a flat monthly subscription.*
+- **verbatim** — The lightest touch: just tidies formatting, changes nothing else. Almost no savings. Use it when you want to see or audit exactly what's being sent.
+
+For the technical breakdown:
 
 | Mode | What it does | Savings | Safety | Auto-selected when |
 |---|---|---|---|---|

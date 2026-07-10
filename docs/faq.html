@@ -208,14 +208,23 @@ distil bench   --tokenizer anthropic</pre>
 
     <h2>"Which compression mode should I use?"</h2>
 
-    <p><code>distil onboard</code> / <code>distil default</code> picks the mode for you automatically based on detected billing — <strong>subscription/flat-rate → <code>--lossless-only</code></strong>, <strong>metered/API-key (PAYG) → <code>--expand</code></strong>. Override per-session with an explicit flag.</p>
+    <p><strong>The short answer: you usually don't need to choose.</strong> Run <code>distil onboard</code> once — it detects whether you're on a pay-per-use API key or a flat monthly subscription and writes the right setting into your shell. Every session after that just works. Pass a flag on the command line any time you want to override for a specific session.</p>
 
+    <p>Here's what each mode actually means in plain terms:</p>
+    <ul>
+      <li><strong>digest</strong> (the default) — Distil shortens long things (big files, command output, past steps) into compact summaries, and can pull back the full original the moment the AI needs it. Originals are kept on your machine and restored automatically. You save the most, and nothing is truly gone. <em>Most people should just use this.</em></li>
+      <li><strong>expand</strong> (<code>--expand</code>) — Same shortening as digest, but Distil also gives the AI a "show me the full version" button it can press on its own. Best when the AI runs for a long time on its own — long coding sessions, autonomous tasks. <em>Picked automatically if you pay per use (API key).</em></li>
+      <li><strong>lossless-only</strong> (<code>--lossless-only</code> / <code>--safe</code>) — The cautious setting: Distil only trims things it can rebuild perfectly (like extra blank space), and never summarizes. You save less, but there is zero chance of losing any detail. <em>Picked automatically on a flat monthly subscription.</em></li>
+      <li><strong>verbatim</strong> (<code>--verbatim</code>) — The lightest touch: just tidies formatting, changes nothing else. Almost no savings. Use it when you want to see or audit exactly what's being sent.</li>
+    </ul>
+
+    <p>For the technical breakdown:</p>
     <table>
       <thead><tr><th>Mode flag</th><th>What it does</th><th>Savings</th><th>Safety</th><th>Auto-selected when</th></tr></thead>
       <tbody>
-        <tr><td><code>--expand</code></td><td>Digest + injected expand tool so the model recovers content on demand</td><td>Most</td><td>Lossy-but-recoverable</td><td>Metered / API-key (PAYG)</td></tr>
-        <tr><td><em>(no flag)</em> digest</td><td>Tier-1 digest only — no tool injection</td><td>High</td><td>Reversible via RestoreStore</td><td>Default if no flag passed</td></tr>
-        <tr><td><code>--lossless-only</code> / <code>--safe</code></td><td>Lossless transforms only — no digests, no tool injection</td><td>Fewer</td><td>Zero unrecoverable content</td><td>Subscription / flat-rate</td></tr>
+        <tr><td><code>--expand</code></td><td>Shortens context + the AI gets a button to request the full original back</td><td>Most</td><td>Originals kept locally, restorable</td><td>Metered / API-key (PAYG)</td></tr>
+        <tr><td><em>(no flag)</em> digest</td><td>Shortens context; originals stored on your machine and restored when the AI needs them</td><td>High</td><td>Originals kept locally, restorable</td><td>Default if no flag passed</td></tr>
+        <tr><td><code>--lossless-only</code> / <code>--safe</code></td><td>Lossless-only transforms — no summarizing, every byte reconstructible</td><td>Fewer</td><td>Zero unrecoverable content</td><td>Subscription / flat-rate</td></tr>
         <tr><td><code>--verbatim</code></td><td>Whitespace + JSON normalization only</td><td>Minimal</td><td>Most conservative</td><td>Debugging / auditing</td></tr>
       </tbody>
     </table>

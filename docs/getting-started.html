@@ -161,12 +161,20 @@ distil wrap --lossless-only -- claude
 <span class="d"># Codex, Gemini CLI, or any agent — same pattern:</span>
 distil wrap --expand -- codex</pre>
 
+    <p><strong>You usually don't need to pick a mode</strong> — <code>distil onboard</code> detects your billing and writes the right one into your setup automatically. Here's what each mode means in plain terms:</p>
+    <ul>
+      <li><strong>digest</strong> (default) — Distil shortens long things (big files, command output, past steps) into short summaries, and can pull back the full original the moment the AI needs it. Originals are kept and restored automatically. <em>Most people should just use this.</em></li>
+      <li><strong>expand</strong> (<code>--expand</code>) — Same shortening as digest, but Distil also gives the AI a "show me the full version" button it can press on its own. Best for long autonomous coding sessions. <em>Picked automatically if you pay per use (API key).</em></li>
+      <li><strong>lossless-only</strong> (<code>--lossless-only</code> / <code>--safe</code>) — The cautious setting: only trims things that can be rebuilt perfectly (like extra whitespace), never summarizes. Zero chance of losing any detail. <em>Picked automatically on a flat monthly subscription.</em></li>
+      <li><strong>verbatim</strong> (<code>--verbatim</code>) — Just tidies formatting, changes nothing else. Almost no savings. Use it to audit exactly what's being sent.</li>
+    </ul>
+
     <table>
       <thead><tr><th>Mode flag</th><th>What it does</th><th>Savings</th><th>Safety</th><th>Auto-selected when</th></tr></thead>
       <tbody>
-        <tr><td><code>--expand</code></td><td>Digest + injected expand tool so the model recovers content on demand</td><td>Most</td><td>Lossy-but-recoverable</td><td>Metered / API-key (PAYG)</td></tr>
-        <tr><td><em>(no flag)</em> digest</td><td>Tier-1 digest only — no tool injection</td><td>High</td><td>Reversible via RestoreStore</td><td>Default if no flag passed</td></tr>
-        <tr><td><code>--lossless-only</code> / <code>--safe</code></td><td>Lossless transforms only — no digests, no tool injection</td><td>Fewer</td><td>Zero unrecoverable content</td><td>Subscription / flat-rate</td></tr>
+        <tr><td><code>--expand</code></td><td>Digest + the AI gets a "show me more" button to pull back compressed content on demand</td><td>Most</td><td>Originals kept, restorable</td><td>Metered / API-key (PAYG)</td></tr>
+        <tr><td><em>(no flag)</em> digest</td><td>Shortens long context; originals stored locally and restored when the AI needs them</td><td>High</td><td>Originals kept, restorable</td><td>Default if no flag passed</td></tr>
+        <tr><td><code>--lossless-only</code> / <code>--safe</code></td><td>Lossless-only transforms — no summarizing, rebuilds perfectly every time</td><td>Fewer</td><td>Zero unrecoverable content</td><td>Subscription / flat-rate</td></tr>
         <tr><td><code>--verbatim</code></td><td>Whitespace + JSON normalization only</td><td>Minimal</td><td>Most conservative</td><td>Debugging / auditing</td></tr>
       </tbody>
     </table>
