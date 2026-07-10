@@ -709,6 +709,22 @@ def cmd_statusline(args: argparse.Namespace) -> int:
     # eq% under 25 shadow samples — "eq 100.0% (1)" is noise wearing a number.
     # Full breakdown: distil stats / dashboard.
     parts = [c("1;38;5;79", "distil")]
+    # Mode chip: which compression mode this session is actually running, read from
+    # the last recorded row (source of truth — reflects --mode / billing default).
+    # Glyph encodes intensity: filled hex = full digest, hollow diamond = lossless
+    # guardrail, tick = verbatim-only. So "which mode am I in" is visible at a glance.
+    _mode_chip = {
+        "digest": (
+            "1;38;5;51",
+            "⬢ digest",
+        ),  # neon cyan — full reversible compression (most savings)
+        "lossless-only": ("1;38;5;48", "◇ lossless"),  # spring green — safety boundary
+        "verbatim": ("38;5;244", "▪ verbatim"),  # dim — whitespace/JSON only
+    }.get(
+        ledger.latest_mode()
+    )  # ponytail: newest overall mode; pass a session id if mixed-mode panes ever matter
+    if _mode_chip:
+        parts.append(c(*_mode_chip))
     if s is None or s.runs == 0:
         if not _routed:
             parts.append(c("38;5;73", "no savings yet · distil wrap -- <agent>"))

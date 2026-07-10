@@ -87,3 +87,20 @@ def test_backup_created_past_threshold(tmp_path, monkeypatch):
     assert bak.exists()
     # Backup is a prefix snapshot of the ledger, never longer than the live file.
     assert bak.stat().st_size <= p.stat().st_size
+
+
+def test_latest_mode_reads_newest_skips_corruption_and_filters(tmp_path):
+    """latest_mode powers the status line's mode chip — it must return the newest
+    row's mode, honor a session filter, skip a corrupt line, and never crash."""
+    import json
+
+    p = tmp_path / "savings.jsonl"
+    p.write_text(
+        json.dumps({"session": "s1", "mode": "digest", "ts": 1}) + "\n"
+        "{ corrupt not json\n"
+        + json.dumps({"session": "s2", "mode": "lossless-only", "ts": 2}) + "\n"
+    )
+    assert ledger.latest_mode(path=p) == "lossless-only"  # newest overall
+    assert ledger.latest_mode(session="s1", path=p) == "digest"  # session-scoped, skips corrupt
+    assert ledger.latest_mode(session="nope", path=p) == ""  # no match
+    assert ledger.latest_mode(path=tmp_path / "absent.jsonl") == ""  # missing file never crashes

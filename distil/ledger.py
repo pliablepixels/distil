@@ -191,6 +191,30 @@ def latest_session(path: Path | None = None) -> tuple[str, float]:
     return best_id, best_ts
 
 
+def latest_mode(session: str = "", path: Path | None = None) -> str:
+    """Compression mode (``digest`` / ``lossless-only`` / ``verbatim``) of the most
+    recent row — for ``session`` if given, else the newest overall. "" if none.
+    Reversed single pass so the status line's mode chip stays cheap."""
+    path = path or default_path()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            d = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue  # skip a corrupt/partial line rather than crash the status line
+        if session and (d.get("session") or "") != session:
+            continue
+        m = d.get("mode") or ""
+        if m:
+            return m
+    return ""
+
+
 def summary(
     path: Path | None = None, *, since: float | None = None, session: str | None = None
 ) -> LedgerSummary:
