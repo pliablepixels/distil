@@ -605,7 +605,7 @@ def build_handler(
                 from .streamrelay import stream_upstream
 
                 with request_span(_span_model, self.path) as _span:
-                    status_s, rbody_opt = stream_upstream(
+                    status_s, _rbody_opt = stream_upstream(
                         self,
                         _upstream + self.path,
                         new_raw,
@@ -613,7 +613,7 @@ def build_handler(
                         timeout=_UPSTREAM_TIMEOUT,
                         hop_by_hop=_HOP_BY_HOP,
                         extras=extras,
-                        want_body=shadow_sampled,  # only buffer the body when shadow needs it
+                        want_body=False,  # v3 shadow re-issues its own temp-0 calls; no need to buffer
                     )
                     set_result_attrs(
                         _span,
@@ -632,8 +632,8 @@ def build_handler(
                     _bt, _at, _m = _pending_savings
                     savings.record(_bt, _at, model=_m)
                     savings.maybe_flush(every=flush_every)
-                if shadow_sampled and rbody_opt:
-                    self._spawn_shadow(raw, headers, rbody_opt, compressed_raw=new_raw)
+                if shadow_sampled:
+                    self._spawn_shadow(raw, headers, new_raw)
                 return
 
             with request_span(_span_model, self.path) as _span:
@@ -681,7 +681,7 @@ def build_handler(
             # the background and record whether it matched — a live decision-change
             # signal on real traffic. Never blocks the client's response.
             if shadow_sampled:
-                self._spawn_shadow(raw, headers, rbody, compressed_raw=new_raw)
+                self._spawn_shadow(raw, headers, new_raw)
             # Book savings only after a confirmed 2xx (P0-1): failed or SDK-retried
             # upstream calls must not be counted as savings.
             if savings is not None and _pending_savings is not None and 200 <= status < 300:
@@ -694,36 +694,42 @@ def build_handler(
             self,
             orig_raw: bytes,
             headers: dict[str, str],
-            compressed: bytes,
-            compressed_raw: bytes | None = None,
+            compressed_raw: bytes,
         ) -> None:
             """Re-run a sampled request in the background and record whether the
             agent's decision matched. Never blocks the client's response.
 
-            Two sample kinds (see ShadowLedger): most replays are A/B (original,
-            uncompressed request — did compression change the decision?); a
-            third are A/A (the SAME compressed request again — how often does
-            the model disagree with itself on identical input?). Without the
-            A/A baseline, sampling nondeterminism reads as compression harm."""
+            v3: both sides are re-issued at temperature 0 (see force_deterministic),
+            never reusing the live served response. Two sample kinds (see
+            ShadowLedger): most replays are A/B (compressed vs original — did
+            compression change the decision?); a third are A/A (the SAME compressed
+            request twice — a provider-honesty probe that must read ~100% at temp 0).
+            v2 compared hot samples, so A/A read ~38% noise and buried the A/B signal."""
             import hashlib
             import random as _random
 
             is_aa = (
-                compressed_raw is not None and _random.random() < 1 / 3
+                _random.random() < 1 / 3
             )  # ponytail: fixed 1/3 split; make configurable if the baseline needs tuning
 
             def _shadow_compare() -> None:
                 try:
-                    from .shadow import decision_signature_from_body
+                    from .shadow import decision_signature_from_body, force_deterministic
 
-                    replay_raw = (
-                        compressed_raw if is_aa and compressed_raw is not None else orig_raw
-                    )
-                    _s, _h, replay_rbody = self._post_upstream(self.path, replay_raw, headers)
+                    # Re-issue BOTH sides at temperature 0 — never reuse the live
+                    # served response (produced at the agent's hot temperature).
+                    # A non-JSON body can't be made deterministic; skip it rather
+                    # than fall back to a hot comparison that re-poisons the baseline.
+                    served_det = force_deterministic(compressed_raw)
+                    replay_det = force_deterministic(compressed_raw if is_aa else orig_raw)
+                    if served_det is None or replay_det is None:
+                        return
+                    _s1, _h1, served_rbody = self._post_upstream(self.path, served_det, headers)
+                    _s2, _h2, replay_rbody = self._post_upstream(self.path, replay_det, headers)
                     # decision_signature_from_body handles both JSON and streamed
                     # (SSE / chunk-array) bodies, so this works for Claude Code /
                     # Codex / Gemini sessions, which stream their responses.
-                    comp_sig = decision_signature_from_body(compressed)
+                    comp_sig = decision_signature_from_body(served_rbody)
                     replay_sig = decision_signature_from_body(replay_rbody)
                     # "none" means no decision could be extracted (transient upstream
                     # error or empty/unparseable body). Recording it as agreement or

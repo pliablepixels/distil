@@ -55,12 +55,18 @@ def _state_dir() -> Path:
 
 
 # Decision-signature algorithm version. Bump on ANY change to how a signature is
-# computed. Rows and certificates are stamped with this; v1 and v2 signatures are
-# NEVER compared (a wording-jitter fix must not silently invalidate old evidence).
+# computed OR how the compared sample is generated — both change what a row means,
+# so old and new rows are NEVER compared (a methodology fix must not silently
+# invalidate, or be averaged into, old evidence).
 # v1: tool name + full input, only Python-code strings AST-normalized.
 # v2: + formatting-whitespace canonicalized on all strings (and non-Python code),
 #     so `ls -la` == `ls  -la` and re-serialization jitter isn't a "decision change".
-SIG_VERSION = 2
+# v3: both A/A and A/B sides re-issued at temperature 0 (see force_deterministic).
+#     v2 compared the live served response (produced at the agent's hot sampling
+#     temperature) against a hot replay, so A/A self-agreement read ~38% — pure
+#     sampling noise, not compression harm. v3 collapses that noise floor toward
+#     ~100%, making A/B a trustworthy compression signal. v2 rows are discarded.
+SIG_VERSION = 3
 
 # A verdict (✓/⚠/✗) is only rendered once evidence is robust — a percentage over a
 # handful of samples is noise wearing a number, and the noise-adjusted rate divides
@@ -338,6 +344,38 @@ def decision_signature_from_body(raw: Any) -> str:
     if isinstance(obj, list):
         return _decision_from_chunks(obj)
     return "none"
+
+
+def force_deterministic(raw: bytes | None) -> bytes | None:
+    """Rewrite a chat-completion *request* body to sample deterministically.
+
+    The shadow gate exists to measure whether *compression* changes the agent's
+    next decision — not whether the model happened to sample differently. A hot
+    (temperature > 0) request answers the same prompt differently on repeat, which
+    is why the v2 A/A self-agreement baseline read ~38% under live temps: pure
+    sampling noise. Replaying both the served and replay sides at ``temperature 0``
+    collapses that noise floor toward ~100%, so any remaining A/B disagreement is
+    genuine compression drift.
+
+    Only ``temperature`` is set — deliberately not ``top_p``/``seed``. Anthropic
+    (Claude Code's own upstream) rejects unknown params and warns on temperature
+    +top_p together; a 400 there would zero out exactly the samples we most need.
+    temperature 0 is the one knob every provider honors, and the decision signature
+    (tool + normalized args) is coarse enough that greedy decoding agrees ~100%.
+
+    Returns ``None`` when the body isn't a JSON object (not a chat request → skip
+    the sample rather than compare it under hot sampling).
+    """
+    if not raw:
+        return None
+    try:
+        obj = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+    obj["temperature"] = 0
+    return json.dumps(obj).encode("utf-8")
 
 
 class ShadowSampler:

@@ -3,6 +3,23 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.13.0] — 1.13.0rc7 — trustworthy shadow gate: deterministic (temp-0) decision-equivalence
+
+### Fixed
+
+- **Shadow decision-equivalence is now measured deterministically.** The A/A
+  self-agreement baseline was reading ~38% — not because compression changed the
+  agent's decision, but because the replay ran at the agent's live sampling
+  temperature, so the model disagreed with *itself* on identical input. Both the
+  served and replay sides of every shadow sample are now re-issued at
+  `temperature 0` (`shadow.force_deterministic`), never reusing the live hot
+  response. A/A collapses toward ~100%, so the A/B rate becomes a real compression
+  signal instead of noise. Signature methodology bumps to **v3**; v2 samples are
+  scoped out (never averaged with v3), so the gate restarts on a clean baseline.
+  Do not promote 1.13.0 GA until v3 A/A ≈ 100% and A/B clears target.
+- As a side effect, the streaming path no longer buffers the upstream response
+  body for shadow (it re-issues its own calls), removing that per-request copy.
+
 ## [1.13.0] — 1.13.0rc6 — seamless hot-swap: upgrades apply to live sessions, no restart
 
 ### Added

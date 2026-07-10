@@ -587,3 +587,43 @@ def test_concurrent_cross_process_appends_stay_intact(tmp_path):
     assert len(lines) == workers * rows_each  # nothing lost
     for line in lines:
         _json.loads(line)  # nothing torn
+
+
+# --- v3: deterministic (temp-0) replay -----------------------------------------
+# The gate measures whether COMPRESSION changed the decision, not whether the model
+# sampled differently. force_deterministic pins temperature so the A/A noise floor
+# collapses (~38% under v2 hot sampling -> ~100%), leaving A/B a real signal.
+
+
+def test_force_deterministic_pins_temperature_and_preserves_prompt():
+    import json
+
+    from distil.shadow import force_deterministic
+
+    body = json.dumps(
+        {"model": "claude-x", "messages": [{"role": "user", "content": "hi"}], "temperature": 1}
+    ).encode()
+    obj = json.loads(force_deterministic(body))
+    assert obj["temperature"] == 0  # sampling pinned
+    assert obj["model"] == "claude-x"  # same request otherwise replayed
+    assert obj["messages"] == [{"role": "user", "content": "hi"}]
+    # ONLY temperature — no top_p/seed, which Anthropic (Claude Code's upstream) 400s on
+    assert "seed" not in obj and "top_p" not in obj
+
+
+def test_force_deterministic_adds_temperature_when_absent():
+    import json
+
+    from distil.shadow import force_deterministic
+
+    obj = json.loads(force_deterministic(b'{"model":"m","messages":[]}'))
+    assert obj["temperature"] == 0
+
+
+def test_force_deterministic_skips_non_json():
+    from distil.shadow import force_deterministic
+
+    assert force_deterministic(None) is None
+    assert force_deterministic(b"") is None
+    assert force_deterministic(b"not json") is None
+    assert force_deterministic(b"[1,2,3]") is None  # JSON but not an object -> skip
