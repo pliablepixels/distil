@@ -6,12 +6,14 @@ re-expanded on demand (`expand(handle)`), so this is lossless in effect.
 
 The codec is decision-aware: any line the runtime cannot prove irrelevant is
 preserved verbatim. The keep rules are (1) any line carrying a DECISION: marker,
-(2) error/warning/traceback lines an agent reacts to, and (3) the *result* line
-of a command — a test/build/exit verdict, the one line that is often the whole
-reason the output exists. Rule 3 exists because rules 1–2 alone invert priority
-on a passing run: they keep the alarming ERROR stdout and fold the "1955 passed"
-verdict. In production this is where a learned per-content-type codec plugs in.
-The point is that the *keep* rule is explicit and auditable, not blind truncation.
+(2) error/warning/traceback lines an agent reacts to — deduped, so a loop that
+logs the same error 400× keeps its first occurrences plus a fold, not 400 copies —
+and (3) the *result* line of a command — a test/build/exit verdict, the one line
+that is often the whole reason the output exists. Rule 3 exists because rules 1–2
+alone invert priority on a passing run: they keep the alarming ERROR stdout and
+fold the "1955 passed" verdict. In production this is where a learned
+per-content-type codec plugs in. The point is that the *keep* rule is explicit
+and auditable, not blind truncation.
 """
 
 from __future__ import annotations
@@ -73,15 +75,39 @@ def _must_keep(line: str) -> bool:
     )
 
 
-def digest(text: str, head: int = 3, tail: int = 1) -> tuple[str, bool]:
+# Noise dedup — a run that logs the same ERROR on purpose in a loop produces
+# hundreds of near-identical lines that differ only in an index/id/timestamp.
+# Keeping them all floods the digest with noise (the second half of the
+# "kept the noise, folded the answer" inversion). Normalize away the varying
+# numerics to get the line's *shape*; the first few occurrences of a shape are
+# kept as the signal "this error happens", the rest fold into the existing
+# handle markers (recoverable like any folded line). DECISION: and verdict
+# lines are exempt — they are answers, not noise.
+_NUM_RE = re.compile(r"0x[0-9a-fA-F]+|\d+")
+
+
+def _shape(line: str) -> str:
+    return _NUM_RE.sub("#", " ".join(line.split())).lower()
+
+
+def digest(text: str, head: int = 3, tail: int = 1, max_repeats: int = 2) -> tuple[str, bool]:
     """Return (digest_text, changed). Keeps head/tail context + every must-keep
-    line, replacing the dropped middle with a single handle marker."""
+    line, replacing the dropped middle with a single handle marker. Near-identical
+    error/warn repeats beyond `max_repeats` per shape fold with the rest."""
     lines = text.splitlines()
     if len(lines) <= head + tail + 1:
         return text, False
 
     keep_idx = set(range(head)) | set(range(len(lines) - tail, len(lines)))
-    keep_idx |= {i for i, ln in enumerate(lines) if _must_keep(ln)}
+    shape_seen: dict[str, int] = {}
+    for i, ln in enumerate(lines):
+        if "DECISION:" in ln or _SUMMARY_RE.search(ln) is not None:
+            keep_idx.add(i)  # answers — never deduped
+        elif _KEEP_RE.search(ln) is not None:
+            s = _shape(ln)
+            shape_seen[s] = shape_seen.get(s, 0) + 1
+            if shape_seen[s] <= max_repeats:
+                keep_idx.add(i)
 
     out: list[str] = []
     dropped = 0
