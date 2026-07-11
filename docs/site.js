@@ -126,21 +126,3 @@
     });
   });
 })();
-
-/* Scroll-reveal motion (firstpass/compass feel). Fail-safe: only sections BELOW the
-   fold at load are pre-hidden, so if JS never runs nothing is hidden, and above-fold
-   content never flashes. Respects prefers-reduced-motion via CSS. */
-(function () {
-  if (!("IntersectionObserver" in window)) return;
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-    });
-  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.04 });
-  document.querySelectorAll("section").forEach(function (el) {
-    if (el.getBoundingClientRect().top > window.innerHeight * 0.85) {
-      el.classList.add("reveal");
-      io.observe(el);
-    }
-  });
-})();
