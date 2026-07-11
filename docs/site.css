@@ -2,6 +2,9 @@
    Class names match the existing pages; only the styling is elevated.
    ----------------------------------------------------------------- */
 
+/* Next-gen type to match the landing page: Space Grotesk (display) + JetBrains Mono (code) */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 /* ── Self-hosted Inter (variable, offline) ─────────────────────────── */
 @font-face {
   font-family: "Inter";
@@ -28,6 +31,8 @@
   --good:   #5ad19a;
   --grad:   linear-gradient(135deg, #8b7bff 0%, #5ad1c9 100%);
   --card:   linear-gradient(180deg, #12151f 0%, #0b0d15 100%);
+  --disp:   "Space Grotesk", "Inter", ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  --mono:   "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --shadow:  0 18px 50px -28px rgba(0,0,0,.8);
   --shadow2: 0 24px 60px -24px rgba(139,123,255,.28);
@@ -82,7 +87,7 @@ a { color: inherit; text-decoration: none; }
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
   background: linear-gradient(90deg, transparent, rgba(139,123,255,.45), rgba(90,209,201,.45), transparent);
 }
-.topbar-logo { font-weight: 800; font-size: 21px; letter-spacing: -.03em; white-space: nowrap; }
+.topbar-logo { font-family: var(--disp); font-weight: 800; font-size: 21px; letter-spacing: -.03em; white-space: nowrap; }
 .topbar-logo b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .topbar-pill {
   font-size: 10.5px; color: var(--acc2);
@@ -143,6 +148,7 @@ a { color: inherit; text-decoration: none; }
 /* ── Typography ────────────────────────────────────────────────────── */
 h1, h2, h3, h4 { scroll-margin-top: calc(var(--topbar-h) + 18px); }
 h1 {
+  font-family: var(--disp);
   font-size: clamp(30px, 4.2vw, 46px); line-height: 1.08; letter-spacing: -.035em;
   font-weight: 800; color: var(--ink); margin: 0 0 18px;
 }
@@ -150,6 +156,7 @@ h1 .g, h2 .g, h3 .g {
   background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 h2 {
+  font-family: var(--disp);
   position: relative; font-size: 23px; letter-spacing: -.02em; font-weight: 750;
   margin: 48px 0 12px; color: var(--ink); padding-left: 15px;
 }
@@ -158,7 +165,7 @@ h2::before {
   border-radius: 4px; background: var(--grad);
 }
 h2:first-child { margin-top: 0; }
-h3 { font-size: 17.5px; font-weight: 700; margin: 30px 0 9px; color: var(--ink); letter-spacing: -.01em; }
+h3 { font-family: var(--disp); font-size: 17.5px; font-weight: 700; margin: 30px 0 9px; color: var(--ink); letter-spacing: -.01em; }
 p { color: var(--mut); margin: 0 0 15px; }
 p strong, p b, li strong, li b { color: var(--ink); font-weight: 650; }
 ul, ol { color: var(--mut); padding-left: 22px; margin: 0 0 15px; }
@@ -175,7 +182,7 @@ li::marker { color: var(--dim); }
 
 /* ── Inline code ───────────────────────────────────────────────────── */
 code {
-  font: 12.5px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font: 12.5px/1 var(--mono);
   background: rgba(139,123,255,.08); border: 1px solid var(--line2);
   border-radius: 6px; padding: 1.5px 6px; color: var(--acc2);
   overflow-wrap: anywhere;
@@ -187,7 +194,7 @@ pre {
   background: linear-gradient(180deg, #0a0c14, #070810);
   border: 1px solid var(--line2); border-radius: 14px;
   padding: 22px 22px 20px; overflow-x: auto;
-  font: 13px/1.7 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font: 13px/1.7 var(--mono);
   color: #cdd2df; margin: 14px 0 22px;
   box-shadow: var(--shadow);
 }
