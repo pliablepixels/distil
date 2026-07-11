@@ -5,19 +5,21 @@ digest plus a content handle. The full original is kept locally and can be
 re-expanded on demand (`expand(handle)`), so this is lossless in effect.
 
 The codec is decision-aware: any line the runtime cannot prove irrelevant is
-preserved verbatim. Here that rule is "keep any line carrying a DECISION:
-marker" — in production this is where a learned per-content-type codec or a
-salience model plugs in. The point is that the *keep* rule is explicit and
-auditable, not a blind truncation.
+preserved verbatim. The keep rule is a *per-content-type* policy (see
+``keep_policy``): the generic net keeps DECISION: markers and error/failure lines,
+and each content kind adds its own load-bearing lines (a test log's pass/fail
+summary, a traceback's frames, a diff's hunk headers). The dropped span is folded
+to a marker that also reports what was dropped by category, so the agent can judge
+whether to expand. The *keep* rule is explicit and auditable, not a blind truncation.
 """
 
 from __future__ import annotations
 
 import hashlib
-import re
 
 from ..trajectory import Block, Kind
 from .base import CompressResult
+from .keep_policy import classify, must_keep, summarize_dropped
 
 _DIGESTIBLE = {Kind.TOOL_OUTPUT, Kind.RETRIEVED}
 
@@ -26,48 +28,42 @@ def _handle(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:8]
 
 
-# Heuristic salience net, pending the learned per-content-type salience model the
-# module docstring describes. Beyond explicit DECISION: markers, keep the lines an
-# agent most often needs verbatim to react: errors, exceptions, tracebacks,
-# failures, warnings, panics. Substring + case-insensitive so camelCase exception
-# names ("ValueError") and variants ("failed", "errors", "warn") all match — for a
-# salience net a stray keep (a rare "terror") only costs a little compression, while
-# a miss costs the agent the line, so we deliberately bias toward over-keeping.
-_KEEP_RE = re.compile(
-    r"error|exception|traceback|fail|warn|panic|fatal",
-    re.IGNORECASE,
-)
-
-
-def _must_keep(line: str) -> bool:
-    return "DECISION:" in line or _KEEP_RE.search(line) is not None
+def _fold_marker(dropped: list[str], handle: str) -> str:
+    """Marker for a folded run: the recoverable handle plus a by-category
+    breakdown, which is omitted when nothing flagged (error/warn) was folded."""
+    breakdown = summarize_dropped(dropped)
+    suffix = f" ({breakdown})" if breakdown else ""
+    return f"<< +{len(dropped)} lines omitted{suffix}, handle={handle} >>"
 
 
 def digest(text: str, head: int = 3, tail: int = 1) -> tuple[str, bool]:
     """Return (digest_text, changed). Keeps head/tail context + every must-keep
-    line, replacing the dropped middle with a single handle marker."""
+    line for the block's content kind, replacing each dropped run with a marker
+    that carries the recovery handle and a by-category count of what it hides."""
     lines = text.splitlines()
     if len(lines) <= head + tail + 1:
         return text, False
 
+    kind = classify(text)
     keep_idx = set(range(head)) | set(range(len(lines) - tail, len(lines)))
-    keep_idx |= {i for i, ln in enumerate(lines) if _must_keep(ln)}
+    keep_idx |= {i for i, ln in enumerate(lines) if must_keep(ln, kind)}
 
+    handle = _handle(text)
     out: list[str] = []
-    dropped = 0
+    dropped: list[str] = []
     i = 0
     n = len(lines)
     while i < n:
         if i in keep_idx:
             if dropped:
-                out.append(f"<< +{dropped} lines, handle={_handle(text)} >>")
-                dropped = 0
+                out.append(_fold_marker(dropped, handle))
+                dropped = []
             out.append(lines[i])
         else:
-            dropped += 1
+            dropped.append(lines[i])
         i += 1
     if dropped:
-        out.append(f"<< +{dropped} lines, handle={_handle(text)} >>")
+        out.append(_fold_marker(dropped, handle))
     return "\n".join(out), True
 
 

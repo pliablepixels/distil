@@ -49,7 +49,7 @@ def decision_prompt(blocks: list[Block]) -> tuple[str, str]:
 # committing — a runner-agnostic simulation of the distil_expand recovery loop.
 EXPAND_INSTRUCTION = (
     "Some context was digested to save tokens and appears as a marker like "
-    "'<< +N lines, handle=XXXXXXXX >>' (or a «…» marker). You may recover the full "
+    "'<< +N lines omitted, handle=XXXXXXXX >>' (or a «…» marker). You may recover the full "
     "original content of any digested block before deciding. Respond with ONLY one "
     "compact JSON object:\n"
     '  {"expand": ["<handle>", ...]}   to recover digested content you need, OR\n'

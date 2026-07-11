@@ -1,7 +1,7 @@
 """Expand-aware grading — measure the reversible tier *with* its recovery loop.
 
 distil's premise is digest-behind-handle + recover-on-demand: a tool output is
-folded to a marker ``<< +N lines, handle=XXXXXXXX >>`` and the model can pull the
+folded to a marker ``<< +N lines omitted, handle=XXXXXXXX >>`` and the model can pull the
 original back with ``distil_expand`` when it needs detail. Grading the digest with
 that loop *disabled* (the default offline path) measures a conservative LOWER BOUND
 on decision-equivalence — it counts a flip even when the model would simply have

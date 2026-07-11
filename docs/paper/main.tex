@@ -309,7 +309,7 @@ rate is controlled.}
 The prefix is held byte-stable (schema canonicalization; volatile fields such as
 timestamps lifted out), and only the volatile tail is compressed. The reversible
 tier digests a verbose tool output to a compact marker
-\verb|<< +N lines, handle=XXXXXXXX >>| and keeps the byte-exact original in a local,
+\verb|<< +N lines omitted, handle=XXXXXXXX >>| and keeps the byte-exact original in a local,
 content-addressed store; the model can recover any block on demand via a
 \texttt{distil\_expand} tool. Compression is thus \emph{lossless} (byte-in-context),
 \emph{reversible} (digested but recoverable), or \emph{lossy} (the rest).
