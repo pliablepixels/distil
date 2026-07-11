@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 120" width="470" height="120" role="img" aria-label="distil">
+  <title>distil</title>
+  <defs>
+    <linearGradient id="l-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5ad1c9"/>
+      <stop offset=".5" stop-color="#5ad19a"/>
+      <stop offset="1" stop-color="#8b7bff"/>
+    </linearGradient>
+    <radialGradient id="l-glow" cx=".5" cy=".76" r=".46">
+      <stop offset="0" stop-color="#5ad1c9" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#5ad1c9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- mark: proven logo.svg geometry (tile-less), scaled ~0.45 -->
+  <g transform="translate(2,2) scale(0.45)">
+    <circle cx="128" cy="188" r="66" fill="url(#l-glow)"/>
+    <g fill="url(#l-grad)">
+      <rect x="54"  y="62"  width="148" height="15" rx="7.5"/>
+      <rect x="74"  y="92"  width="108" height="15" rx="7.5"/>
+      <rect x="95"  y="122" width="66"  height="15" rx="7.5"/>
+    </g>
+    <path d="M128 146 C150 178 160 190 160 204 a32 32 0 1 1 -64 0 c0-14 10-26 32-58 Z" fill="url(#l-grad)"/>
+    <ellipse cx="117" cy="200" rx="10" ry="13" fill="#eafffb" fill-opacity=".8"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="130" y="78" font-family="'Inter','Segoe UI',ui-sans-serif,system-ui,-apple-system,sans-serif"
+        font-size="68" font-weight="650" letter-spacing="-3" fill="#eef0f4">distil</text>
+</svg>

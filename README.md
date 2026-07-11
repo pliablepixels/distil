@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="docs/assets/logo.svg" alt="Distil" width="96" height="96"/>
+</p>
+
+<p align="center">
   <img src="docs/assets/banner.svg" alt="Distil — compression with a quality contract" width="100%"/>
 </p>
 
