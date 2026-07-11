@@ -190,6 +190,46 @@
   .card,.stat,.tier,.door,.tabs{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
   .card:hover,.stat:hover,.tier:hover,.door:hover{transform:translateY(-3px);border-color:#2a2550;
     box-shadow:0 18px 50px -24px rgba(139,123,255,.45)}
+
+  /* ── next-gen hero terminal: teal→green glow + live cursor (firstpass DNA) ── */
+  .heroterm{box-shadow:0 30px 80px -34px rgba(0,0,0,.8),
+    0 0 0 1px rgba(90,209,201,.14), 0 0 60px -20px rgba(90,209,154,.28)}
+  .heroterm .bar{background:linear-gradient(180deg,rgba(90,209,201,.05),transparent)}
+  .hc{display:inline-block;width:8px;height:15px;vertical-align:-2px;margin-left:2px;
+    background:var(--good);border-radius:1px;animation:blink 1.05s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ── section eyebrow rhythm on every section (compass/firstpass DNA) ── */
+  .seyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);
+    font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);margin:0 0 16px}
+  .seyebrow::before{content:"";width:7px;height:7px;border-radius:50%;
+    background:var(--acc2);box-shadow:0 0 12px 1px rgba(90,209,201,.7);flex:0 0 auto}
+  .seyebrow.p::before{background:var(--acc);box-shadow:0 0 12px 1px rgba(139,123,255,.7)}
+  .seyebrow.gr::before{background:var(--good);box-shadow:0 0 12px 1px rgba(90,209,154,.7)}
+
+  /* ── trust-vs-prove split card (firstpass signature) ── */
+  #why{padding-top:44px}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+  .vs .col{border:1px solid var(--line);border-radius:18px;padding:24px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel))}
+  .vs .bad{border-color:#3a1f24;background:linear-gradient(180deg,rgba(255,90,90,.05),var(--panel))}
+  .vs .good{border-color:#1f3a2c;background:linear-gradient(180deg,rgba(90,209,154,.06),var(--panel))}
+  .vs .vk{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .vs .bad .vk{color:#ff7a7a} .vs .good .vk{color:var(--good)}
+  .vs ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  .vs li{display:flex;gap:11px;font-size:14.5px;line-height:1.5;color:var(--ink)}
+  .vs li::before{flex:0 0 auto;font-family:var(--mono);font-weight:700;margin-top:1px}
+  .vs .bad li{color:var(--mut)} .vs .bad li::before{content:"✗";color:#ff6b6b}
+  .vs .good li::before{content:"✓";color:var(--good)}
+  .vs .vfoot{margin-top:16px;font-size:12.5px;color:var(--dim);font-family:var(--mono)}
+  @media(max-width:840px){.vs{grid-template-columns:1fr}}
+
+  /* ── closing CTA (compass/firstpass close the same way) ── */
+  .close{text-align:center;padding:76px 0 30px;border-top:1px solid var(--line)}
+  .close h2{font-size:clamp(28px,3.4vw,40px);margin:0 0 8px}
+  .close p{color:var(--mut);max-width:560px;margin:0 auto 26px}
+  .close .cta{justify-content:center}
 </style>
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="Distil"/>
@@ -226,14 +266,7 @@
   <p class="sub" style="font-size:17px">On <b>500 real coding tasks</b>, compressed context <b>matched full context within statistical noise</b> —
     <b>42.0% vs 39.2%</b>
     <small>(<a href="compare.html">SWE-bench Verified, E14</a>; 95% CI &minus;0.6..+6.2pp — no significant difference)</small></p>
-  <figure style="margin:26px auto 0;max-width:860px">
-    <img src="assets/distil-demo.gif" alt="distil bench certifies 7 real agent trajectories (all PASS, aggressive rejected), then distil wrap shows live token savings ticking to 200K, 62% smaller"
-         style="width:100%;border:1px solid var(--line,#232a3e);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35)" loading="lazy">
-    <figcaption style="font-size:13px;opacity:.7;margin-top:10px;text-align:center">
-      <code>uvx --from distil-llm distil bench</code> — the certificate gate, in ~10s, no API key.
-    </figcaption>
-  </figure>
-  <p class="sub" style="font-size:15px;margin-top:18px">New to this? <a href="#plain"><b>See how it works in plain English →</b></a></p>
+  <p class="sub" style="font-size:15px;margin-top:22px">New to this? <a href="#plain"><b>See how it works in plain English →</b></a></p>
 
   <div class="doors">
     <a class="door" href="getting-started.html">
@@ -251,7 +284,7 @@
     <pre class="term"><span class="d">$</span> uvx --from distil-llm distil bench   <span class="d"># ~10s, no API key</span>
 <span class="g">GATE: PASS</span> <span class="d">— every trajectory certified non-inferior; aggressive rejected.</span>
 <span class="d">$</span> distil wrap -- claude   <span class="d"># route your agent, zero config</span>
-<span style="color:#8b91a1">distil</span> · <span style="color:#5ad19a;font-weight:600">▼75.0K</span> · <span class="d">62% smaller</span> · <span class="g">$0.31</span> · <span style="color:#5ad1c9">total ▼27.0M</span> · <span style="color:#5ad19a">✓eq 99.5%</span></pre>
+<span style="color:#8b91a1">distil</span> · <span style="color:#5ad19a;font-weight:600">▼75.0K</span> · <span class="d">62% smaller</span> · <span class="g">$0.31</span> · <span style="color:#5ad1c9">total ▼27.0M</span> · <span style="color:#5ad19a">✓eq 99.5%</span><span class="hc"></span></pre>
     <div class="cap">Real, reproducible output — you run the exact same commands.</div>
   </div>
 
@@ -295,7 +328,33 @@
   </p>
 </div></header>
 
+<section id="why"><div class="wrap">
+  <div class="seyebrow p">The difference</div>
+  <h2 style="margin-top:0">Every other compressor <b class="w">trusts</b>.<br>Distil <b class="g">proves</b>.</h2>
+  <div class="vs">
+    <div class="col bad">
+      <div class="vk">✗ Trust · every other compressor</div>
+      <ul>
+        <li>Drops tokens and <b>hopes</b> the agent still decides the same</li>
+        <li>“Looks fine” on a demo — no proof on <b>your</b> traffic</li>
+        <li>You discover the regression <b>in production</b></li>
+      </ul>
+      <div class="vfoot">trust me · no receipt</div>
+    </div>
+    <div class="col good">
+      <div class="vk">✓ Prove · distil</div>
+      <ul>
+        <li><b>Certifies decision-equivalence</b> before it ever serves</li>
+        <li>A shadow gate re-checks live decisions at <b>temperature 0</b></li>
+        <li><b>Fails closed</b> — if quality would drop, it doesn't compress</li>
+      </ul>
+      <div class="vfoot">signed certificate · <span style="color:var(--good)">✓eq 99.5%</span></div>
+    </div>
+  </div>
+</div></section>
+
 <section id="plain"><div class="wrap">
+  <div class="seyebrow">In plain English</div>
   <h2>How it works <span class="g">— in plain English</span><a class="hlink" href="#plain" aria-label="Link to this section">#</a></h2>
   <p class="lead">No jargon. Here's the whole idea in three pictures.</p>
   <div class="tiers">
@@ -316,6 +375,7 @@
 </div></section>
 
 <section id="how"><div class="wrap">
+  <div class="seyebrow p">The architecture</div>
   <h2>Under the hood <span class="g">— a cost-optimized cache hierarchy with a contract</span><a class="hlink" href="#how" aria-label="Link to this section">#</a></h2>
   <p class="lead">Most compressors optimize bytes. In an agent loop the money is somewhere else.</p>
   <img src="assets/architecture.svg" alt="architecture" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 24px"/>
@@ -350,6 +410,7 @@
 </div></section>
 
 <section id="proof"><div class="wrap">
+  <div class="seyebrow gr">Receipts, not vibes</div>
   <h2>The proof <span class="g">— a quality contract, not an estimate</span><a class="hlink" href="#proof" aria-label="Link to this section">#</a></h2>
   <p class="lead">We didn't just benchmark ourselves. We ran the real LLMLingua-2 and Headroom
     packages through the same gate, graded <b>live by the real model</b>.</p>
@@ -381,6 +442,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
 </div></section>
 
 <section id="domains"><div class="wrap">
+  <div class="seyebrow">Coverage</div>
   <h2>Measured across 7 domains <span class="g">— the same gate, not one example</span><a class="hlink" href="#domains" aria-label="Link to this section">#</a></h2>
   <p class="lead">A strategy isn't trustworthy because it works once. <code>distil bench</code> certifies
     every domain — ops, coding, support, research, data, devops, finance — or it doesn't ship.</p>
@@ -388,6 +450,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
 </div></section>
 
 <section id="tiers"><div class="wrap">
+  <div class="seyebrow p">Risk grading</div>
   <h2>Risk-graded tiers<a class="hlink" href="#tiers" aria-label="Link to this section">#</a></h2>
   <p class="lead">Apply the provably-safe ones everywhere; gate the rest on evidence.</p>
   <div class="tiers">
@@ -401,6 +464,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
 </div></section>
 
 <section id="bestof"><div class="wrap">
+  <div class="seyebrow">The cost stack</div>
   <h2>Capabilities <span class="g">— every layer of the cost stack</span><a class="hlink" href="#bestof" aria-label="Link to this section">#</a></h2>
   <table>
     <tr><th>Capability</th><th>What it does</th><th>Loss profile</th></tr>
@@ -417,6 +481,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
 </div></section>
 
 <section id="integrations"><div class="wrap">
+  <div class="seyebrow gr">Drop-in</div>
   <h2>Works with every SDK <span class="g">— one proxy, no code change</span><a class="hlink" href="#integrations" aria-label="Link to this section">#</a></h2>
   <p class="lead">Point any <code>base_url</code>-honoring client at the proxy — Python, TypeScript, any language —
     and get cache-aware lossless compression. <a href="integrations.html" style="color:var(--acc2)">See integrations →</a></p>
@@ -424,6 +489,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
 </div></section>
 
 <section id="install"><div class="wrap">
+  <div class="seyebrow p">Get started</div>
   <h2>Install <span class="g">— pick a format</span><a class="hlink" href="#install" aria-label="Link to this section">#</a></h2>
   <p class="lead">The stdlib-only core makes the packaging clean: zero runtime deps, corpus bundled.</p>
   <div class="tabs" id="install-tabs">
@@ -461,6 +527,7 @@ client = wrap(anthropic.Anthropic())  <span class="d"># compresses + keeps the c
 </div></section>
 
 <section id="honest"><div class="wrap">
+  <div class="seyebrow">No overselling</div>
   <h2>What we won't pretend<a class="hlink" href="#honest" aria-label="Link to this section">#</a></h2>
   <div class="callout">
     A headline like "87% reduction, 100% accuracy" is <b>unverified marketing</b> until you
@@ -471,6 +538,16 @@ client = wrap(anthropic.Anthropic())  <span class="d"># compresses + keeps the c
     strategy that can't pass non-inferiority doesn't ship. The default tokenizer is an offline
     heuristic (ratios robust, dollars approximate); <code>--tokenizer anthropic</code> and
     <code>--runner anthropic</code> make it billing-grade against the real model.
+  </div>
+</div></section>
+
+<section class="close"><div class="wrap">
+  <div class="seyebrow gr" style="justify-content:center;display:flex">Prove it on your own traffic</div>
+  <h2>Compress the context.<br><b class="g">Keep</b> <b>the decisions.</b></h2>
+  <p>One proxy in front of any agent. A signed decision-equivalence certificate on the way out — or it doesn't compress. No API key to try it.</p>
+  <div class="cta">
+    <a class="btn primary" href="#install">Install distil</a>
+    <a class="btn ghost" href="https://github.com/dshakes/distil">View on GitHub →</a>
   </div>
 </div></section>
 
