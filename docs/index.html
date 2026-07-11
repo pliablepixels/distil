@@ -240,13 +240,20 @@
   .herofoot .sub{max-width:none!important;margin:0!important}
   @media(max-width:760px){.herofoot{grid-template-columns:1fr;gap:18px}}
 
-  /* rotating distil-themed ambient background (compass parity) */
+  /* distil-native ambient — a "still": the droplet mark with rings that
+     condense INWARD (distillation), orbiting droplets, and a bobbing drop. */
   header{position:relative;overflow:hidden}
   header>.wrap{position:relative;z-index:1}
-  .orbit{position:absolute;pointer-events:none;z-index:0;transform-origin:50% 50%}
-  .orbit.a{top:-300px;right:-240px;width:900px;height:900px;opacity:.55;animation:spin 70s linear infinite}
-  .orbit.b{top:-140px;right:-40px;width:520px;height:520px;opacity:.4;animation:spin 46s linear infinite reverse}
+  .still{position:absolute;top:-200px;right:-170px;width:800px;height:800px;z-index:0;pointer-events:none;opacity:.62}
+  .still .rot{transform-box:fill-box;transform-origin:center;animation:spin 88s linear infinite}
+  .still .drop{transform-box:fill-box;transform-origin:center;animation:bob 7.5s ease-in-out infinite}
+  .still .ring{transform-box:fill-box;transform-origin:center;animation:condense 6s ease-in infinite}
+  .still .ring:nth-of-type(2){animation-delay:1.5s}
+  .still .ring:nth-of-type(3){animation-delay:3s}
+  .still .ring:nth-of-type(4){animation-delay:4.5s}
   @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+  @keyframes condense{0%{transform:scale(1);opacity:0}14%{opacity:.5}100%{transform:scale(.1);opacity:0}}
 
   /* ── closing CTA (compass/firstpass close the same way) ── */
   .close{text-align:center;padding:76px 0 30px;border-top:1px solid var(--line)}
@@ -283,21 +290,25 @@
 </div></nav>
 
 <header>
-  <svg class="orbit a" viewBox="0 0 400 400" fill="none" aria-hidden="true">
-    <defs><linearGradient id="og1" x1="0" y1="0" x2="1" y2="1">
+  <svg class="still" viewBox="0 0 400 400" fill="none" aria-hidden="true">
+    <defs><linearGradient id="stg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#8b7bff"/><stop offset=".5" stop-color="#5ad1c9"/><stop offset="1" stop-color="#5ad19a"/></linearGradient></defs>
-    <circle cx="200" cy="200" r="197" stroke="url(#og1)" stroke-width="1" stroke-opacity=".55"/>
-    <circle cx="200" cy="200" r="168" stroke="#5ad1c9" stroke-width="1" stroke-opacity=".3" stroke-dasharray="1.5 7"/>
-    <circle cx="200" cy="200" r="132" stroke="url(#og1)" stroke-width="1" stroke-opacity=".28" stroke-dasharray="10 14"/>
-    <line x1="200" y1="8" x2="200" y2="34" stroke="#8b7bff" stroke-width="1.5" stroke-opacity=".6"/>
-    <line x1="200" y1="366" x2="200" y2="392" stroke="#5ad19a" stroke-width="1.5" stroke-opacity=".5"/>
-    <line x1="8" y1="200" x2="34" y2="200" stroke="#5ad1c9" stroke-width="1.5" stroke-opacity=".5"/>
-    <line x1="366" y1="200" x2="392" y2="200" stroke="#5ad1c9" stroke-width="1.5" stroke-opacity=".5"/>
-  </svg>
-  <svg class="orbit b" viewBox="0 0 400 400" fill="none" aria-hidden="true">
-    <circle cx="200" cy="200" r="150" stroke="#5ad19a" stroke-width="1" stroke-opacity=".3" stroke-dasharray="3 12"/>
-    <circle cx="200" cy="200" r="110" stroke="#8b7bff" stroke-width="1" stroke-opacity=".35"/>
-    <path d="M200 150 C226 182 240 202 240 224 a40 40 0 1 1-80 0 c0-22 14-42 40-74Z" fill="#5ad1c9" fill-opacity=".05" stroke="#5ad1c9" stroke-width="1" stroke-opacity=".4"/>
+    <!-- rings condensing inward toward the drop (distillation) -->
+    <circle class="ring" cx="200" cy="200" r="196" stroke="url(#stg)" stroke-width="1.2"/>
+    <circle class="ring" cx="200" cy="200" r="196" stroke="url(#stg)" stroke-width="1.2"/>
+    <circle class="ring" cx="200" cy="200" r="196" stroke="#5ad1c9" stroke-width="1.2"/>
+    <circle class="ring" cx="200" cy="200" r="196" stroke="#5ad19a" stroke-width="1.2"/>
+    <!-- rotating orbit: dashed dial + droplets riding it -->
+    <g class="rot">
+      <circle cx="200" cy="200" r="188" stroke="url(#stg)" stroke-width="1" stroke-opacity=".32" stroke-dasharray="2 11"/>
+      <circle cx="200" cy="14" r="4.5" fill="#8b7bff"/>
+      <circle cx="360" cy="150" r="3.5" fill="#5ad1c9"/>
+      <circle cx="70" cy="318" r="4" fill="#5ad19a"/>
+    </g>
+    <!-- distil mark: the droplet, faint, gently bobbing (condensed essence) -->
+    <path class="drop" d="M200 92 C252 168 282 208 282 250 a82 82 0 1 1-164 0 c0-42 30-82 82-158 Z"
+      fill="url(#stg)" fill-opacity=".055" stroke="url(#stg)" stroke-width="1.5" stroke-opacity=".55"/>
+    <ellipse cx="172" cy="250" rx="17" ry="22" fill="#eef2ff" fill-opacity=".06"/>
   </svg>
   <div class="wrap">
   <div class="eyebrow">The certified context layer for agents</div>
@@ -414,7 +425,7 @@
   <div class="seyebrow p">The architecture</div>
   <h2>Under the hood <span class="g">— a cost-optimized cache hierarchy with a contract</span><a class="hlink" href="#how" aria-label="Link to this section">#</a></h2>
   <p class="lead">Most compressors optimize bytes. In an agent loop the money is somewhere else.</p>
-  <img src="assets/architecture.svg" alt="architecture" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 24px"/>
+  <img loading="lazy" src="assets/architecture.svg" alt="architecture" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 24px"/>
   <h3 style="font-size:22px">Two highest-leverage techniques <span class="g">— and why they win</span></h3>
   <div class="grid2">
     <div class="card">
@@ -450,7 +461,7 @@
   <h2>The proof <span class="g">— a quality contract, not an estimate</span><a class="hlink" href="#proof" aria-label="Link to this section">#</a></h2>
   <p class="lead">We didn't just benchmark ourselves. We ran the real LLMLingua-2 and Headroom
     packages through the same gate, graded <b>live by the real model</b>.</p>
-  <img src="assets/head-to-head.svg" alt="Live head-to-head: Distil vs LLMLingua-2 vs Headroom" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 10px"/>
+  <img loading="lazy" src="assets/head-to-head.svg" alt="Live head-to-head: Distil vs LLMLingua-2 vs Headroom" style="width:100%;border:1px solid var(--line);border-radius:16px;margin:6px 0 10px"/>
   <div class="callout" style="margin-bottom:22px">
     <b>On the decision-equivalence proxy, Distil is the most aggressive, fully decision-equivalent, and lowest-latency.</b>
     Certified <b>83.2% token savings at a 0% decision-change rate</b> (≤5% at 95% confidence) — while LLMLingua-2 cuts 53% but flips
@@ -474,7 +485,7 @@ VERDICT: <span class="g">PASS</span>  (certified non-inferior)
 <span class="d">$ distil certify --strategy aggressive</span>
 decision-equivalence match rate: <span class="w">0.0%</span>
 VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
-  <img src="assets/cache-aware.svg" alt="cache-aware savings" style="width:100%;border:1px solid var(--line);border-radius:16px;margin-top:18px"/>
+  <img loading="lazy" src="assets/cache-aware.svg" alt="cache-aware savings" style="width:100%;border:1px solid var(--line);border-radius:16px;margin-top:18px"/>
 </div></section>
 
 <section id="domains"><div class="wrap">
@@ -482,7 +493,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
   <h2>Measured across 7 domains <span class="g">— the same gate, not one example</span><a class="hlink" href="#domains" aria-label="Link to this section">#</a></h2>
   <p class="lead">A strategy isn't trustworthy because it works once. <code>distil bench</code> certifies
     every domain — ops, coding, support, research, data, devops, finance — or it doesn't ship.</p>
-  <img src="assets/domains.svg" alt="measured across 7 domains" style="width:100%;border:1px solid var(--line);border-radius:16px"/>
+  <img loading="lazy" src="assets/domains.svg" alt="measured across 7 domains" style="width:100%;border:1px solid var(--line);border-radius:16px"/>
 </div></section>
 
 <section id="tiers"><div class="wrap">
@@ -521,7 +532,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
   <h2>Works with every SDK <span class="g">— one proxy, no code change</span><a class="hlink" href="#integrations" aria-label="Link to this section">#</a></h2>
   <p class="lead">Point any <code>base_url</code>-honoring client at the proxy — Python, TypeScript, any language —
     and get cache-aware lossless compression. <a href="integrations.html" style="color:var(--acc2)">See integrations →</a></p>
-  <img src="assets/cross-sdk.svg" alt="one proxy, every SDK" style="width:100%;border:1px solid var(--line);border-radius:16px"/>
+  <img loading="lazy" src="assets/cross-sdk.svg" alt="one proxy, every SDK" style="width:100%;border:1px solid var(--line);border-radius:16px"/>
 </div></section>
 
 <section id="install"><div class="wrap">
