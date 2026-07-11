@@ -5,10 +5,13 @@ digest plus a content handle. The full original is kept locally and can be
 re-expanded on demand (`expand(handle)`), so this is lossless in effect.
 
 The codec is decision-aware: any line the runtime cannot prove irrelevant is
-preserved verbatim. Here that rule is "keep any line carrying a DECISION:
-marker" — in production this is where a learned per-content-type codec or a
-salience model plugs in. The point is that the *keep* rule is explicit and
-auditable, not a blind truncation.
+preserved verbatim. The keep rules are (1) any line carrying a DECISION: marker,
+(2) error/warning/traceback lines an agent reacts to, and (3) the *result* line
+of a command — a test/build/exit verdict, the one line that is often the whole
+reason the output exists. Rule 3 exists because rules 1–2 alone invert priority
+on a passing run: they keep the alarming ERROR stdout and fold the "1955 passed"
+verdict. In production this is where a learned per-content-type codec plugs in.
+The point is that the *keep* rule is explicit and auditable, not blind truncation.
 """
 
 from __future__ import annotations
@@ -38,9 +41,36 @@ _KEEP_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Result-line net — the single line that carries the OUTCOME of a command, which
+# is often the whole reason the output exists (a test run, a build, a script). The
+# error/warn net above keeps the *alarming* lines; on its own it inverts priority
+# on a passing run, whose verdict ("1955 passed", no error word in it) gets folded
+# while the noisy ERROR stdout the run emitted on purpose is kept — the answer
+# thrown away, the noise retained. This pins the verdict verbatim. Covers the
+# common test runners + build/exit summaries; the learned per-content-type codec
+# the module docstring describes would subsume it.
+# ponytail: regex covers vitest/jest/pytest/mocha/go/cargo/gradle/maven + exit
+# status — the 99% of CI output; add a framework here if one slips through.
+_SUMMARY_RE = re.compile(
+    r"""
+      \b\d+\ +(?:passed|failed|skipped|pending|todo|errors?)\b   # vitest/jest/pytest counts
+    | \b\d+\ +(?:passing|failing)\b                              # mocha "1955 passing"
+    | \btest\ result:                                            # cargo "test result: ok. 5 passed"
+    | ^\s*(?:ok|FAIL|PASS)\b                                     # go package ok/FAIL, bare PASS/FAIL
+    | ^\s*---\ +(?:FAIL|PASS|SKIP):                              # go subtest verdicts
+    | \bBUILD\ (?:SUCCESS(?:FUL)?|FAIL(?:ED|URE))\b              # gradle/maven
+    | \bexit\ (?:code|status)\ +\d+                              # command exit status
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
 
 def _must_keep(line: str) -> bool:
-    return "DECISION:" in line or _KEEP_RE.search(line) is not None
+    return (
+        "DECISION:" in line
+        or _KEEP_RE.search(line) is not None
+        or _SUMMARY_RE.search(line) is not None
+    )
 
 
 def digest(text: str, head: int = 3, tail: int = 1) -> tuple[str, bool]:
