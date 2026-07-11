@@ -4,8 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Distil — Compression with a quality contract</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
   :root{
+    --disp:"Space Grotesk",ui-sans-serif,-apple-system,"Segoe UI",Inter,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
     --bg:#06070a; --panel:#0c0e14; --panel2:#0f1219; --line:#1b1f2a;
     --ink:#e7e9ee; --mut:#8b91a1; --dim:#5b6173;
     --acc:#8b7bff; --acc2:#5ad1c9; --warn:#ff8a6b; --good:#5ad19a;
@@ -177,6 +182,14 @@
   .tabpanel pre{margin:0}
   .tabnote{color:var(--mut);font-size:13px;margin:12px 0 0}
   .tabnote a{color:var(--acc2);text-decoration:underline}
+  /* ── display + mono typography (compass/firstpass DNA) ── */
+  h1,h2,h3,.stat .n,a.logo,.eyebrow,.heroterm .bartitle{font-family:var(--disp)}
+  h1,h2{letter-spacing:-.035em}
+  pre,code,.term,.heroterm pre,.tabpanel pre,kbd{font-family:var(--mono)}
+  /* card hover-lift + glow (compass/firstpass DNA) */
+  .card,.stat,.tier,.door,.tabs{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+  .card:hover,.stat:hover,.tier:hover,.door:hover{transform:translateY(-3px);border-color:#2a2550;
+    box-shadow:0 18px 50px -24px rgba(139,123,255,.45)}
 </style>
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="Distil"/>
