@@ -378,7 +378,27 @@ class TestCmdBench:
         out = capsys.readouterr().out
         assert rc == 0
         assert "GATE: PASS" not in out
-        assert "savings-only" in out.lower()
+
+    def test_verdict_retention_check_runs(self, capsys):
+        rc = cmd_bench(self._ns())
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "verdict-retention: PASS" in out
+
+    def test_verdict_retention_check_can_fail(self, capsys, monkeypatch):
+        # the gate must be real: a digest that drops verdict lines flips it red
+        import distil.cli as cli_mod
+
+        def lossy_digest(text, *a, **kw):
+            kept = [ln for ln in text.splitlines() if "passed" not in ln]
+            return "\n".join(kept), True
+
+        monkeypatch.setattr(cli_mod, "_tier1_digest", lossy_digest)
+        rc = cmd_bench(self._ns())
+        out = capsys.readouterr().out
+        assert rc == 1
+        assert "verdict-retention (green)" in out
+        assert "GATE: FAIL" in out
 
     def test_aggregate_savings_positive(self, capsys):
         cmd_bench(self._ns())

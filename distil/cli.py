@@ -15,6 +15,7 @@ from pathlib import Path
 
 from . import __version__, ledger, pricing, tokenizer
 from .compress.cache_aware import simulate
+from .compress.tier1 import digest as _tier1_digest
 from .compress.strategies import REGISTRY, distil as distil_strategy
 from .corpus import load_corpus, validate
 from .replay.ablation import discover
@@ -420,6 +421,25 @@ def cmd_bench(args: argparse.Namespace) -> int:
             f"recorded corpus run to the savings ledger: "
             f"${rec.dollars_saved:.5f} / {rec.tokens_saved} tokens saved. (distil leaderboard)"
         )
+
+    # Verdict-retention self-check — an independent power-user comparison caught
+    # distil compressing away a passing run's verdict line while keeping ERROR
+    # noise. Gate on it forever: digest a canonical green and red test log; the
+    # verdict must survive both (the same substring check the comparison used).
+    for name, verdict in (
+        ("green", "  Tests  1955 passed (1955)"),
+        ("red", "Tests: 2 failed, 1953 passed, 1955 total"),
+    ):
+        log = "\n".join(
+            ["RUN suite", ""]
+            + [f"ERROR [SUT] on-purpose noise {i}" for i in range(40)]
+            + ["", verdict, " Duration 3.2s"]
+        )
+        out, _ = _tier1_digest(log)
+        if verdict not in out:
+            failures.append(f"verdict-retention ({name}): digest dropped {verdict!r}")
+    if not any(f.startswith("verdict-retention") for f in failures):
+        print("verdict-retention: PASS — test/build verdicts survive digestion.")
 
     if failures:
         print(f"\nGATE: FAIL ({len(failures)} issue(s))")
