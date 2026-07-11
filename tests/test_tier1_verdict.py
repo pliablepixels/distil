@@ -60,8 +60,26 @@ def test_no_false_keep_on_prose():
         assert not _must_keep(line), f"false keep hurts compression: {line!r}"
 
 
+def test_salience_layer_pins_verdicts():
+    # same bug class on the salience path: a green verdict has no error word and
+    # 0-1 digit groups, so it scored below the keep bar while ERROR noise scored 0.95
+    from distil.codec.keep_model import SalienceKeepModel
+
+    m = SalienceKeepModel()
+    for line in [
+        "ok  \tgithub.com/x/y\t0.02s",
+        "PASS",
+        "BUILD SUCCESSFUL in 3s",
+        "  Tests  1955 passed (1955)",
+    ]:
+        assert m.score(line, "tool_result") == 1.0, f"salience dropped verdict: {line!r}"
+    for line in ["const passed = true;", "return ok(result)"]:
+        assert m.score(line, "tool_result") < 1.0, f"false verdict pin: {line!r}"
+
+
 if __name__ == "__main__":
     test_passing_verdict_survives_digest()
     test_go_and_build_verdicts_kept()
     test_no_false_keep_on_prose()
+    test_salience_layer_pins_verdicts()
     print("ok — verdict-preservation holds across vitest/jest/pytest/cargo/mocha/go")

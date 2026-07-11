@@ -49,6 +49,8 @@ import math
 import re
 from typing import Protocol
 
+from ..compress.tier1 import _SUMMARY_RE
+
 # ---------------------------------------------------------------------------
 # Keyword constants — module-level so callers can introspect / extend them.
 # ---------------------------------------------------------------------------
@@ -120,6 +122,15 @@ class SalienceKeepModel:
 
         # 1.0 — never-drop marker
         if NEVER_DROP_MARKER in line:
+            return 1.0
+
+        # 1.0 — command result / verdict line ("1955 passed", "BUILD SUCCESSFUL",
+        # go's "ok pkg 0.02s"). The answer outranks the alarm: without this rule a
+        # green run's verdict carries no error word and only 0-1 digit groups, so
+        # it scored 0.3-0.6 and was dropped while ERROR noise scored 0.95 — the
+        # same inversion tier-1 fixed (see distil/compress/tier1.py:_SUMMARY_RE,
+        # the single source of truth for what counts as a verdict).
+        if _SUMMARY_RE.search(line) is not None:
             return 1.0
 
         lower = stripped.lower()
