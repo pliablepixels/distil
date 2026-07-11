@@ -157,7 +157,7 @@
   pre{position:relative}
   .copy-btn{position:absolute;top:10px;right:10px;display:inline-flex;align-items:center;gap:5px;
     font:600 11px/1 "Inter",ui-sans-serif,system-ui,sans-serif;color:var(--mut);background:rgba(255,255,255,.04);
-    border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;opacity:0;z-index:2;
+    border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;opacity:.55;z-index:2;
     transition:opacity .15s,color .15s,border-color .15s,background .15s}
   pre:hover .copy-btn{opacity:1}
   .copy-btn:hover{color:var(--ink);border-color:#34405e;background:rgba(255,255,255,.07)}
@@ -165,15 +165,24 @@
   /* tabbed installer */
   .tabs{margin-top:8px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
     background:linear-gradient(180deg,var(--panel2),var(--panel))}
-  .tabbar{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+  /* compass-style gradient PILL tabs (not underline) */
+  .tabbar{display:flex;flex-wrap:wrap;gap:9px;padding:16px 16px 4px;overflow-x:auto}
   .tabbar::-webkit-scrollbar{display:none}
-  .tab{position:relative;background:transparent;border:0;color:var(--mut);
-    font:600 14px/1 ui-sans-serif,system-ui,-apple-system,sans-serif;padding:12px 16px 14px;cursor:pointer;
-    white-space:nowrap;border-radius:10px 10px 0 0;transition:color .15s,background .15s}
-  .tab:hover{color:var(--ink);background:rgba(255,255,255,.03)}
-  .tab.is-active{color:var(--ink)}
-  .tab.is-active::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;
-    background:var(--grad);border-radius:2px}
+  .tab{background:rgba(255,255,255,.02);border:1px solid var(--line);color:var(--mut);
+    font:600 14px/1 var(--disp),ui-sans-serif,system-ui,sans-serif;padding:11px 16px;cursor:pointer;
+    white-space:nowrap;border-radius:12px;transition:color .15s,background .15s,border-color .15s,box-shadow .15s,transform .15s}
+  .tab:hover{color:var(--ink);border-color:#2a2550;transform:translateY(-1px)}
+  .tab.is-active{color:#08121e;background:var(--grad);border-color:transparent;font-weight:700;
+    box-shadow:0 10px 26px -12px rgba(139,123,255,.65)}
+  .tab.is-active .tab-hint{color:#0b2b28;opacity:.85}
+  /* recommended micro-line under the pills */
+  .tabrec{padding:12px 18px 2px;color:var(--mut);font-size:13.5px}
+  .tabrec .rec{color:var(--acc);font-weight:700}
+  /* compass "what install actually does" — purple left-border explainer */
+  .does{margin-top:16px;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:12px;
+    padding:18px 20px;background:linear-gradient(180deg,rgba(139,123,255,.05),var(--panel));
+    color:var(--mut);font-size:14px;line-height:1.65}
+  .does b{color:var(--ink)} .does code{color:var(--acc2)} .does .ok{color:var(--good);font-weight:700}
   .tab-hint{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:700;letter-spacing:.06em;
     text-transform:uppercase;color:var(--acc2);opacity:.85}
   .tabpanels{padding:18px}
@@ -225,6 +234,20 @@
   .vs .vfoot{margin-top:16px;font-size:12.5px;color:var(--dim);font-family:var(--mono)}
   @media(max-width:840px){.vs{grid-template-columns:1fr}}
 
+  /* hero fine-print: 2-col so it fills the width (no right-side gap) */
+  .herofoot{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:28px;
+    padding-top:22px;border-top:1px solid var(--line)}
+  .herofoot .sub{max-width:none!important;margin:0!important}
+  @media(max-width:760px){.herofoot{grid-template-columns:1fr;gap:18px}}
+
+  /* rotating distil-themed ambient background (compass parity) */
+  header{position:relative;overflow:hidden}
+  header>.wrap{position:relative;z-index:1}
+  .orbit{position:absolute;pointer-events:none;z-index:0;transform-origin:50% 50%}
+  .orbit.a{top:-300px;right:-240px;width:900px;height:900px;opacity:.55;animation:spin 70s linear infinite}
+  .orbit.b{top:-140px;right:-40px;width:520px;height:520px;opacity:.4;animation:spin 46s linear infinite reverse}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
   /* ── closing CTA (compass/firstpass close the same way) ── */
   .close{text-align:center;padding:76px 0 30px;border-top:1px solid var(--line)}
   .close h2{font-size:clamp(28px,3.4vw,40px);margin:0 0 8px}
@@ -259,7 +282,24 @@
   </div>
 </div></nav>
 
-<header><div class="wrap">
+<header>
+  <svg class="orbit a" viewBox="0 0 400 400" fill="none" aria-hidden="true">
+    <defs><linearGradient id="og1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b7bff"/><stop offset=".5" stop-color="#5ad1c9"/><stop offset="1" stop-color="#5ad19a"/></linearGradient></defs>
+    <circle cx="200" cy="200" r="197" stroke="url(#og1)" stroke-width="1" stroke-opacity=".55"/>
+    <circle cx="200" cy="200" r="168" stroke="#5ad1c9" stroke-width="1" stroke-opacity=".3" stroke-dasharray="1.5 7"/>
+    <circle cx="200" cy="200" r="132" stroke="url(#og1)" stroke-width="1" stroke-opacity=".28" stroke-dasharray="10 14"/>
+    <line x1="200" y1="8" x2="200" y2="34" stroke="#8b7bff" stroke-width="1.5" stroke-opacity=".6"/>
+    <line x1="200" y1="366" x2="200" y2="392" stroke="#5ad19a" stroke-width="1.5" stroke-opacity=".5"/>
+    <line x1="8" y1="200" x2="34" y2="200" stroke="#5ad1c9" stroke-width="1.5" stroke-opacity=".5"/>
+    <line x1="366" y1="200" x2="392" y2="200" stroke="#5ad1c9" stroke-width="1.5" stroke-opacity=".5"/>
+  </svg>
+  <svg class="orbit b" viewBox="0 0 400 400" fill="none" aria-hidden="true">
+    <circle cx="200" cy="200" r="150" stroke="#5ad19a" stroke-width="1" stroke-opacity=".3" stroke-dasharray="3 12"/>
+    <circle cx="200" cy="200" r="110" stroke="#8b7bff" stroke-width="1" stroke-opacity=".35"/>
+    <path d="M200 150 C226 182 240 202 240 224 a40 40 0 1 1-80 0 c0-22 14-42 40-74Z" fill="#5ad1c9" fill-opacity=".05" stroke="#5ad1c9" stroke-width="1" stroke-opacity=".4"/>
+  </svg>
+  <div class="wrap">
   <div class="eyebrow">The certified context layer for agents</div>
   <h1>Compress your agent's context.<br><b class="g">Prove</b> <b>its decisions don't change.</b></h1>
   <p class="sub"><b>Every other compressor asks you to <em>trust</em> it won't break your agent. Distil is the only one that <b>proves</b> it won't.</b></p>
@@ -288,15 +328,17 @@
     <div class="cap">Real, reproducible output — you run the exact same commands.</div>
   </div>
 
-  <p class="sub" style="font-size:13px;opacity:.85;margin-top:26px">Honest scope: the certificate covers
-    <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success — on real SWE-bench
-    Verified the proxy <b>does not transfer</b> once compression gets aggressive, and we publish that.
-    Relevance-gated reversible compression is the one condition proven non-inferior to full context —
-    <a href="concepts.html#honest-scope">full statement, CIs and ablations &rarr;</a></p>
+  <div class="herofoot">
+    <p class="sub" style="font-size:13px;opacity:.85">Honest scope: the certificate covers
+      <b>decision-equivalence on a trajectory corpus</b>, not end-to-end task success — on real SWE-bench
+      Verified the proxy <b>does not transfer</b> once compression gets aggressive, and we publish that.
+      Relevance-gated reversible compression is the one condition proven non-inferior to full context —
+      <a href="concepts.html#honest-scope">full statement, CIs and ablations &rarr;</a></p>
 
-  <p class="sub" style="font-size:13.5px;margin-top:16px">One command sets you up — <code>distil onboard</code> detects your agent + billing, wires the status line, and hands you the exact next steps:<br>
-    <code>pipx install distil-llm &amp;&amp; distil onboard</code><br>
-    <span style="opacity:.8">…or route Claude Code directly, no code change: <code>distil wrap --expand -- claude</code></span></p>
+    <p class="sub" style="font-size:13.5px">One command sets you up — <code>distil onboard</code> detects your agent + billing, wires the status line, and hands you the exact next steps:<br>
+      <code>pipx install distil-llm &amp;&amp; distil onboard</code><br>
+      <span style="opacity:.8">…or route Claude Code directly, no code change: <code>distil wrap --expand -- claude</code></span></p>
+  </div>
 
   <div class="stats">
     <div class="stat hl">
@@ -320,12 +362,6 @@
       <div class="foot">stdlib-only · 700+ tests · pip · docker · pyz</div>
     </div>
   </div>
-  <img src="assets/head-to-head.svg" alt="Live head-to-head: Distil vs LLMLingua-2 vs Headroom — token savings vs decision-change rate" style="width:100%;max-width:100%;border:1px solid var(--line);border-radius:16px;margin-top:20px"/>
-  <p class="muted" style="font-size:12.5px;margin-top:14px">
-    Certified live against the real model and head-to-head vs. the real LLMLingua-2 and Headroom packages
-    (<a href="benchmark.html#live-head-to-head">see the benchmark</a>). Distribution-free, finite-sample,
-    reproducible — and honest about its caveats. No vanity metrics.
-  </p>
 </div></header>
 
 <section id="why"><div class="wrap">
@@ -500,6 +536,7 @@ VERDICT: <span class="w">FAIL</span>  (would degrade quality — blocked)</pre>
       <button class="tab" data-tab="docker" role="tab">Docker</button>
       <button class="tab" data-tab="pyz" role="tab">zipapp</button>
     </div>
+    <p class="tabrec"><b>uvx</b> — zero install, <span class="rec">recommended</span>. Runs straight from PyPI, nothing to clean up.</p>
     <div class="tabpanels">
       <div class="tabpanel is-active" data-panel="uvx"><pre>uvx --from distil-llm distil bench</pre>
         <p class="tabnote">Run straight from PyPI — nothing installed. Needs <a href="https://docs.astral.sh/uv/">uv</a>.</p></div>
@@ -518,7 +555,9 @@ python dist/distil.pyz bench</pre>
     </div>
   </div>
   <p class="lead" style="margin-top:18px"><b>Already installed? Do this next →</b> <code>distil onboard</code> detects your agent + billing, wires the savings status line, and gives you a guided tour tailored to your setup — then <code>distil default</code> makes it the default for every session (<code>distil offboard</code> reverses that).</p>
-  <p style="color:var(--dim);font-size:12.5px;margin-top:10px">Needs Python 3.9+. Install isolated (pipx/uv/brew/Docker) — system <code>pip install</code> is blocked by <a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a> on modern macOS/Linux. Node/other stacks: point your SDK <code>baseURL</code> at <code>distil proxy</code>.</p>
+  <div class="does">
+    <b>What install actually does:</b> every door drops the proxy into an <b>isolated environment</b> — uv/pipx venv, a Homebrew keg, or a container — never your system Python (<code>pip install</code> is blocked by <a href="https://peps.python.org/pep-0668/">PEP&nbsp;668</a> on modern macOS/Linux, and that's fine). <code>distil onboard</code> wires your agent and the savings status line; <code>distil default</code> makes it the default and <code>distil offboard</code> <b>fully reverses</b> it — nothing is touched that isn't put back. Node/other stacks just point their SDK <code>baseURL</code> at <code>distil proxy</code>. Verify anytime: <code>distil bench</code> → expect <span class="ok">GATE: PASS</span>.
+  </div>
   <div class="callout" style="margin-top:18px">
     Drop-in, no call-site change:
     <pre style="margin-top:10px"><span class="c">from</span> distil.adapters.anthropic <span class="c">import</span> wrap
