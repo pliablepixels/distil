@@ -12,6 +12,21 @@
     <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
     <linearGradient id="bar0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e2235"/><stop offset="1" stop-color="#151826"/></linearGradient>
     <linearGradient id="bar1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#262d4a"/><stop offset="1" stop-color="#1a2038"/></linearGradient>
+    <clipPath id="cwclip"><rect x="300" y="292" width="459" height="30" rx="10"/></clipPath>
+    <linearGradient id="cshimg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <style>
+      @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+      @keyframes glowpulse{0%,100%{opacity:.9}50%{opacity:1}}
+      @keyframes sweep{0%{transform:translateX(0)}60%,100%{transform:translateX(471px)}}
+      .cbar{transform-box:fill-box;transform-origin:left center}
+      .c1{animation:grow .9s cubic-bezier(.2,.75,.25,1) both}
+      .c2{animation:grow .9s cubic-bezier(.2,.75,.25,1) .14s both}
+      .c3{animation:grow .9s cubic-bezier(.2,.75,.25,1) .28s both}
+      .cwin{animation:grow .9s cubic-bezier(.2,.75,.25,1) .42s both,glowpulse 2.6s ease-in-out 1.4s infinite}
+      .c4{animation:grow .9s cubic-bezier(.2,.75,.25,1) .42s both}
+      .cshim{animation:sweep 2.9s ease-in-out 1.5s infinite}
+      @media(prefers-reduced-motion:reduce){.cbar,.cwin,.cshim{animation:none}}
+    </style>
   </defs>
 
   <!-- 3-layer background -->
@@ -36,28 +51,29 @@
     <!-- baseline 0.01524 -->
     <text x="40" y="139" fill="#f2f3f7">baseline</text>
     <text x="40" y="155" font-size="10" fill="#5b6177">no cache, no compress</text>
-    <rect x="300" y="124" width="686" height="30" rx="10" fill="url(#bar0)" stroke="#252c3e" stroke-width="1"/>
+    <rect class="cbar c1" x="300" y="124" width="686" height="30" rx="10" fill="url(#bar0)" stroke="#252c3e" stroke-width="1"/>
     <text x="1000" y="145" fill="#8b91a3">$0.01524</text>
 
     <!-- cache only 0.01115 -->
     <text x="40" y="195" fill="#f2f3f7">cache only</text>
-    <rect x="300" y="180" width="502" height="30" rx="10" fill="url(#bar1)" stroke="#2e3758" stroke-width="1"/>
+    <rect class="cbar c2" x="300" y="180" width="502" height="30" rx="10" fill="url(#bar1)" stroke="#2e3758" stroke-width="1"/>
     <text x="816" y="201" fill="#8b91a3">$0.01115  ·  −27%</text>
 
     <!-- naive 0.01691 -->
     <text x="40" y="251" fill="#ff8a6b">naive compress</text>
     <text x="40" y="267" font-size="10" fill="#5b6177">busts the prefix cache</text>
     <text x="1055" y="226" font-size="10.5" text-anchor="end" fill="#ff8a6b">▲ costs MORE than baseline</text>
-    <rect x="300" y="236" width="761" height="30" rx="10" fill="#2e1a20" stroke="#ff8a6b" stroke-width="1.5" stroke-opacity="0.7"/>
+    <rect class="cbar c3" x="300" y="236" width="761" height="30" rx="10" fill="#2e1a20" stroke="#ff8a6b" stroke-width="1.5" stroke-opacity="0.7"/>
     <text x="1075" y="256" fill="#ff8a6b">$0.01691</text>
 
     <!-- distil 0.01019 -->
     <text x="40" y="307" fill="#5ad1c9">distil</text>
     <text x="40" y="323" font-size="10" fill="#5b6177">cache-aware lossless</text>
     <!-- glow layer behind distil bar -->
-    <rect x="300" y="292" width="459" height="30" rx="10" fill="url(#g)" filter="url(#glow)" opacity="0.35"/>
+    <rect class="cbar c4" x="300" y="292" width="459" height="30" rx="10" fill="url(#g)" filter="url(#glow)" opacity="0.35"/>
     <!-- actual distil bar -->
-    <rect x="300" y="292" width="459" height="30" rx="10" fill="url(#g)"/>
+    <rect class="cbar cwin" x="300" y="292" width="459" height="30" rx="10" fill="url(#g)"/>
+    <g clip-path="url(#cwclip)"><rect class="cshim" x="230" y="292" width="70" height="30" fill="url(#cshimg)"/></g>
     <text x="773" y="313" font-weight="700" fill="#f2f3f7">$0.01019  ·  −33%</text>
   </g>
 </svg>

@@ -10,6 +10,16 @@
     <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7390"/></marker>
     <marker id="arg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8cff"/></marker>
+    <style>
+      @keyframes flow{to{stroke-dashoffset:-140}}
+      @keyframes pxp{0%,100%{opacity:.4}50%{opacity:.78}}
+      @keyframes sdotp{0%,100%{opacity:.5}50%{opacity:1}}
+      .flowc{stroke-dasharray:5 9;animation:flow 2.6s linear infinite}
+      .flowp{stroke-dasharray:5 9;animation:flow 2.3s linear infinite}
+      .pxpulse{transform-box:fill-box;transform-origin:center;animation:pxp 3.6s ease-in-out infinite}
+      .sdot{animation:sdotp 2.6s ease-in-out infinite}
+      @media(prefers-reduced-motion:reduce){.flowc,.flowp,.pxpulse,.sdot{animation:none}}
+    </style>
   </defs>
   <rect width="1200" height="480" fill="url(#bg)"/>
   <rect width="1200" height="480" fill="url(#dots)"/>
@@ -23,14 +33,14 @@
   </g>
 
   <!-- connectors (curved, behind cards): clients funnel to (468,278); providers fan from (762,278) -->
-  <g fill="none" stroke="#5b6177" stroke-width="1.4" stroke-linecap="round" opacity="0.8">
+  <g class="flowc" fill="none" stroke="#5b6177" stroke-width="1.4" stroke-linecap="round" opacity="0.8">
     <path d="M345,150 C420,150 410,278 463,278" marker-end="url(#ar)"/>
     <path d="M345,214 C412,214 408,278 463,278" marker-end="url(#ar)"/>
     <path d="M345,278 L463,278" marker-end="url(#ar)"/>
     <path d="M345,342 C412,342 408,278 463,278" marker-end="url(#ar)"/>
     <path d="M345,406 C420,406 410,278 463,278" marker-end="url(#ar)"/>
   </g>
-  <g fill="none" stroke="#7d8cff" stroke-width="1.7" stroke-linecap="round">
+  <g class="flowp" fill="none" stroke="#7d8cff" stroke-width="1.7" stroke-linecap="round">
     <path d="M765,278 C828,278 820,208 873,208" marker-end="url(#arg)"/>
     <path d="M765,278 C828,278 824,294 873,294" marker-end="url(#arg)"/>
     <path d="M765,278 C828,278 820,380 873,380" marker-end="url(#arg)"/>
@@ -46,14 +56,14 @@
   </g>
 
   <!-- hero proxy node: x=470 w=290 y=190 h=176, center 278 -->
-  <g filter="url(#glow)" opacity="0.5"><rect x="470" y="190" width="290" height="176" rx="18" fill="#5ad1c9" opacity="0.12"/></g>
+  <g class="pxpulse" filter="url(#glow)" opacity="0.5"><rect x="470" y="190" width="290" height="176" rx="18" fill="#5ad1c9" opacity="0.12"/></g>
   <rect x="470" y="190" width="290" height="176" rx="18" fill="url(#hero)" stroke="url(#g)" stroke-width="1.6"/>
   <text x="615" y="222" text-anchor="middle" font-size="23" font-weight="800" fill="url(#g)">Distil</text>
   <text x="615" y="241" text-anchor="middle" font-size="11" fill="#8b91a3">proxy · localhost:8788</text>
   <g text-anchor="middle" font-size="11.5">
-    <rect x="492" y="254" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle cx="510" cy="268" r="3" fill="#5ad1c9"/><text x="620" y="272" fill="#cdd3e2">cache-aware compress</text>
-    <rect x="492" y="289" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle cx="510" cy="303" r="3" fill="#5ad19a"/><text x="620" y="307" fill="#cdd3e2">lossless · reversible</text>
-    <rect x="492" y="324" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle cx="510" cy="338" r="3" fill="#ff8a6b"/><text x="620" y="342" fill="#cdd3e2">auth-mode gating</text>
+    <rect x="492" y="254" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle class="sdot" cx="510" cy="268" r="3" fill="#5ad1c9"/><text x="620" y="272" fill="#cdd3e2">cache-aware compress</text>
+    <rect x="492" y="289" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle class="sdot" cx="510" cy="303" r="3" fill="#5ad19a"/><text x="620" y="307" fill="#cdd3e2">lossless · reversible</text>
+    <rect x="492" y="324" width="246" height="28" rx="9" fill="#0e1320" stroke="#222a3e"/><circle class="sdot" cx="510" cy="338" r="3" fill="#ff8a6b"/><text x="620" y="342" fill="#cdd3e2">auth-mode gating</text>
   </g>
 
   <!-- in-process alternative -->
