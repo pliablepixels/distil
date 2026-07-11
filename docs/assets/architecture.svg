@@ -12,8 +12,8 @@
       @keyframes loopflow{to{stroke-dashoffset:-324}}
       @keyframes puls{0%,100%{opacity:.45}50%{opacity:1}}
       @keyframes glow{0%,100%{stroke-opacity:.55}50%{stroke-opacity:1}}
-      .fwd{animation:flow 1.05s linear infinite}
-      .loop{animation:loopflow 6s linear infinite}
+      .fwd{animation:flow 2.6s linear infinite}
+      .loop{animation:loopflow 9.5s linear infinite}
       .dot{animation:puls 2.4s ease-in-out infinite}
       .heroedge{animation:glow 3.6s ease-in-out infinite}
       @media(prefers-reduced-motion:reduce){.fwd,.loop,.dot,.heroedge{animation:none}}

@@ -240,20 +240,22 @@
   .herofoot .sub{max-width:none!important;margin:0!important}
   @media(max-width:760px){.herofoot{grid-template-columns:1fr;gap:18px}}
 
-  /* distil-native ambient — a "still": the droplet mark with rings that
-     condense INWARD (distillation), orbiting droplets, and a bobbing drop. */
+  /* distil-native ambient — "the condenser": a field of token-particles
+     funnels from a wide scatter down into one glowing droplet (compression =
+     many→one), which emits a slow CERTIFIED pulse (decisions proven stable). */
   header{position:relative;overflow:hidden}
   header>.wrap{position:relative;z-index:1}
-  .still{position:absolute;top:-200px;right:-170px;width:800px;height:800px;z-index:0;pointer-events:none;opacity:.62}
-  .still .rot{transform-box:fill-box;transform-origin:center;animation:spin 88s linear infinite}
-  .still .drop{transform-box:fill-box;transform-origin:center;animation:bob 7.5s ease-in-out infinite}
-  .still .ring{transform-box:fill-box;transform-origin:center;animation:condense 6s ease-in infinite}
-  .still .ring:nth-of-type(2){animation-delay:1.5s}
-  .still .ring:nth-of-type(3){animation-delay:3s}
-  .still .ring:nth-of-type(4){animation-delay:4.5s}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
-  @keyframes condense{0%{transform:scale(1);opacity:0}14%{opacity:.5}100%{transform:scale(.1);opacity:0}}
+  .still{position:absolute;top:-120px;right:-150px;width:640px;height:860px;z-index:0;pointer-events:none;
+    opacity:.9;-webkit-mask-image:radial-gradient(120% 90% at 74% 34%,#000 55%,transparent 100%);
+            mask-image:radial-gradient(120% 90% at 74% 34%,#000 55%,transparent 100%)}
+  .still .stream{animation:fall 7s linear infinite}
+  .still .drop{transform-box:fill-box;transform-origin:center;animation:breathe 6.5s ease-in-out infinite}
+  .still .halo{transform-box:fill-box;transform-origin:center;animation:breathe 6.5s ease-in-out infinite}
+  .still .pulse{transform-box:fill-box;transform-origin:center;animation:certify 5.5s cubic-bezier(.25,.6,.3,1) infinite}
+  .still .pulse.p2{animation-delay:2.75s}
+  @keyframes fall{to{stroke-dashoffset:-260}}
+  @keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+  @keyframes certify{0%{transform:scale(.35);opacity:0}18%{opacity:.5}100%{transform:scale(1.7);opacity:0}}
 
   /* ── closing CTA (compass/firstpass close the same way) ── */
   .close{text-align:center;padding:76px 0 30px;border-top:1px solid var(--line)}
@@ -290,25 +292,35 @@
 </div></nav>
 
 <header>
-  <svg class="still" viewBox="0 0 400 400" fill="none" aria-hidden="true">
-    <defs><linearGradient id="stg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#8b7bff"/><stop offset=".5" stop-color="#5ad1c9"/><stop offset="1" stop-color="#5ad19a"/></linearGradient></defs>
-    <!-- rings condensing inward toward the drop (distillation) -->
-    <circle class="ring" cx="200" cy="200" r="196" stroke="url(#stg)" stroke-width="1.2"/>
-    <circle class="ring" cx="200" cy="200" r="196" stroke="url(#stg)" stroke-width="1.2"/>
-    <circle class="ring" cx="200" cy="200" r="196" stroke="#5ad1c9" stroke-width="1.2"/>
-    <circle class="ring" cx="200" cy="200" r="196" stroke="#5ad19a" stroke-width="1.2"/>
-    <!-- rotating orbit: dashed dial + droplets riding it -->
-    <g class="rot">
-      <circle cx="200" cy="200" r="188" stroke="url(#stg)" stroke-width="1" stroke-opacity=".32" stroke-dasharray="2 11"/>
-      <circle cx="200" cy="14" r="4.5" fill="#8b7bff"/>
-      <circle cx="360" cy="150" r="3.5" fill="#5ad1c9"/>
-      <circle cx="70" cy="318" r="4" fill="#5ad19a"/>
+  <svg class="still" viewBox="0 0 440 620" fill="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="stg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#8b7bff"/><stop offset=".5" stop-color="#5ad1c9"/><stop offset="1" stop-color="#5ad19a"/></linearGradient>
+      <radialGradient id="dglow" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="#5ad1c9" stop-opacity=".30"/><stop offset="55%" stop-color="#5ad19a" stop-opacity=".07"/><stop offset="100%" stop-color="#5ad19a" stop-opacity="0"/></radialGradient>
+      <filter id="dblur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6"/></filter>
+    </defs>
+    <!-- token-particles streaming down, funnelling many→one into the droplet (compression) -->
+    <g stroke="url(#stg)" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 13">
+      <path class="stream" style="animation-duration:6.2s;animation-delay:-0.3s" d="M40,0 C40,150 300,150 300,300"/>
+      <path class="stream" style="animation-duration:7.4s;animation-delay:-2.1s" d="M118,0 C118,150 300,160 300,300"/>
+      <path class="stream" style="animation-duration:5.6s;animation-delay:-1.2s" d="M188,0 C188,140 300,170 300,300"/>
+      <path class="stream" style="animation-duration:8.0s;animation-delay:-3.4s" d="M250,0 C250,130 300,185 300,300"/>
+      <path class="stream" style="animation-duration:6.8s;animation-delay:-0.9s" d="M300,0 L300,300"/>
+      <path class="stream" style="animation-duration:7.1s;animation-delay:-2.7s" d="M356,0 C356,130 300,185 300,300"/>
+      <path class="stream" style="animation-duration:5.9s;animation-delay:-1.6s" d="M420,0 C420,140 300,170 300,300"/>
+      <path class="stream" style="animation-duration:7.7s;animation-delay:-3.9s" d="M492,0 C492,150 300,160 300,300"/>
     </g>
-    <!-- distil mark: the droplet, faint, gently bobbing (condensed essence) -->
-    <path class="drop" d="M200 92 C252 168 282 208 282 250 a82 82 0 1 1-164 0 c0-42 30-82 82-158 Z"
-      fill="url(#stg)" fill-opacity=".055" stroke="url(#stg)" stroke-width="1.5" stroke-opacity=".55"/>
-    <ellipse cx="172" cy="250" rx="17" ry="22" fill="#eef2ff" fill-opacity=".06"/>
+    <!-- glow + slow CERTIFIED pulses radiating from the droplet (decisions proven stable) -->
+    <ellipse class="halo" cx="300" cy="440" rx="155" ry="155" fill="url(#dglow)"/>
+    <circle class="pulse" cx="300" cy="442" r="66" stroke="#5ad19a" stroke-width="1.4" stroke-opacity=".5"/>
+    <circle class="pulse p2" cx="300" cy="442" r="66" stroke="#5ad1c9" stroke-width="1.4" stroke-opacity=".5"/>
+    <!-- the condensed essence: the distil droplet, glowing -->
+    <path class="drop" d="M300 300 C340 372 366 404 366 440 a66 66 0 1 1 -132 0 C234 404 260 372 300 300 Z"
+      fill="url(#stg)" fill-opacity=".10" stroke="url(#stg)" stroke-width="3" stroke-opacity=".7" filter="url(#dblur)"/>
+    <path class="drop" d="M300 300 C340 372 366 404 366 440 a66 66 0 1 1 -132 0 C234 404 260 372 300 300 Z"
+      fill="none" stroke="url(#stg)" stroke-width="1.7" stroke-opacity=".9"/>
+    <ellipse cx="278" cy="448" rx="14" ry="19" fill="#eef2ff" fill-opacity=".08"/>
   </svg>
   <div class="wrap">
   <div class="eyebrow">The certified context layer for agents</div>
