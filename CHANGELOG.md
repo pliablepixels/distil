@@ -3,7 +3,7 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.14.1] — outcome-aware routing + verdict gate
 
 ### Added
 - **Outcome-aware routing (tier-1)** — the first content-type profile. When the
