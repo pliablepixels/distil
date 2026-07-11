@@ -91,27 +91,6 @@
   }
 })();
 
-/* Copy buttons on every code block — added to the shared bundle so all pages get it. */
-(function () {
-  document.querySelectorAll("pre").forEach(function (pre) {
-    if (pre.querySelector(".copybtn")) return;
-    var text = (pre.querySelector("code") || pre).textContent;
-    var b = document.createElement("button");
-    b.className = "copybtn";
-    b.type = "button";
-    b.textContent = "Copy";
-    b.setAttribute("aria-label", "Copy to clipboard");
-    b.addEventListener("click", function () {
-      navigator.clipboard.writeText(text.trim()).then(function () {
-        b.textContent = "Copied";
-        b.classList.add("ok");
-        setTimeout(function () { b.textContent = "Copy"; b.classList.remove("ok"); }, 1400);
-      });
-    });
-    pre.appendChild(b);
-  });
-})();
-
 /* Tab groups: .tabs > .tab[data-tab] switches .tabpanel[data-panel]. */
 (function () {
   document.querySelectorAll(".tabs").forEach(function (grp) {
