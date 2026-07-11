@@ -468,3 +468,17 @@ pre:hover .copy-btn { opacity: 1; }
 /* Header ref links — clickable "#" anchor, revealed on hover/focus. */
 .hanchor { margin-left: .45em; color: var(--acc2); text-decoration: none; opacity: .45; font-weight: 600; font-size: .72em; transition: opacity .12s; }
 .content h2:hover .hanchor, .content h3:hover .hanchor, .hanchor:hover, .hanchor:focus { opacity: 1; text-decoration: underline; }
+
+/* Copy buttons on code blocks (JS-injected; see site.js) */
+pre { position: relative; }
+.copybtn {
+  position: absolute; top: 8px; right: 8px;
+  font: 600 11px/1 ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: #8b91a1; background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.11); border-radius: 7px;
+  padding: 5px 10px; cursor: pointer; opacity: 0;
+  transition: opacity .15s, color .15s, border-color .15s;
+}
+pre:hover .copybtn, .copybtn:focus-visible { opacity: 1; }
+.copybtn:hover { color: #5ad1c9; border-color: #5ad1c9; }
+.copybtn.ok { color: #5ad19a; border-color: #5ad19a; opacity: 1; }
