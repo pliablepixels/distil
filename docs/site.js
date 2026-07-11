@@ -5,7 +5,7 @@
 
   // ── Copy-to-clipboard on every code block ──────────────────────────
   document.querySelectorAll("pre").forEach(function (pre) {
-    var original = (pre.querySelector("code") || pre).innerText; // capture before button
+    var original = (pre.querySelector("code") || pre).textContent; // capture before button
     var btn = document.createElement("button");
     btn.className = "copy-btn";
     btn.type = "button";
@@ -95,7 +95,7 @@
 (function () {
   document.querySelectorAll("pre").forEach(function (pre) {
     if (pre.querySelector(".copybtn")) return;
-    var text = (pre.querySelector("code") || pre).innerText;
+    var text = (pre.querySelector("code") || pre).textContent;
     var b = document.createElement("button");
     b.className = "copybtn";
     b.type = "button";
@@ -109,5 +109,20 @@
       });
     });
     pre.appendChild(b);
+  });
+})();
+
+/* Tab groups: .tabs > .tab[data-tab] switches .tabpanel[data-panel]. */
+(function () {
+  document.querySelectorAll(".tabs").forEach(function (grp) {
+    var tabs = grp.querySelectorAll(".tab");
+    var panels = grp.querySelectorAll(".tabpanel");
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var key = tab.getAttribute("data-tab");
+        tabs.forEach(function (t) { t.classList.toggle("is-active", t === tab); });
+        panels.forEach(function (p) { p.classList.toggle("is-active", p.getAttribute("data-panel") === key); });
+      });
+    });
   });
 })();
