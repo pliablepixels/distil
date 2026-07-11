@@ -121,7 +121,7 @@ You don't need byte-equivalence — you need **decision-equivalence**: your agen
 - **Certified, not estimated** — a strategy ships only if a non-inferiority test passes; can't certify → full context.
 - **Certified end-to-end, too** — `distil certify-trajectories` bounds how many solvable tasks compression can cost (no other compressor certifies either level).
 - **Reversible, not lossy** — digests behind a handle, keeps the original, hands the agent a `distil_expand` tool. Compress fearlessly.
-- **Keeps the answer, folds the noise** — test/build verdict lines (`1955 passed`, `BUILD SUCCESSFUL`, exit codes) are pinned verbatim; repeated near-identical error spam is deduped behind the handle.
+- **Keeps the answer, folds the noise** — test/build verdict lines (`1955 passed`, `BUILD SUCCESSFUL`, exit codes) are pinned verbatim; repeated near-identical error spam is deduped behind the handle — and on a green run (its own verdict says nothing failed) dedup tightens further, since that noise by definition didn’t fail anything.
 - **Compounds on outcomes** — expansions and matched failures teach the policy what to protect (signatures only, never content) — always *more* conservative.
 - **Streams like it isn't there** — SSE relays chunk-by-chunk; TTFT preserved.
 

@@ -3,6 +3,21 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Outcome-aware routing (tier-1)** — the first content-type profile. When the
+  log's own verdict says GREEN (tests passed / build succeeded, nothing failed),
+  ERROR/WARN stdout is by definition noise the SUT logged on purpose: dedup
+  tightens to one sample per shape. Red or unknown outcome keeps the cautious 2;
+  explicit `max_repeats` still overrides; everything folded stays recoverable.
+  Power-user log shape: 19.9k tokens → ~93 with verdict + error signal in front
+  of the agent.
+- **Verdict-retention self-check in `distil bench`** — the gate digests a
+  canonical green and red test log and requires the verdict line to survive both
+  (the comparison's own substring check). A digest change that compresses away
+  the answer flips CI red instead of shipping silently.
+
 ## [1.14.0] — verdict-aware digest: keep the answer, fold the noise
 
 Driven by an independent power-user comparison on a live repo (4 tools, 3 tasks):
