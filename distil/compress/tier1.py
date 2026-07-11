@@ -90,13 +90,50 @@ def _shape(line: str) -> str:
     return _NUM_RE.sub("#", " ".join(line.split())).lower()
 
 
-def digest(text: str, head: int = 3, tail: int = 1, max_repeats: int = 2) -> tuple[str, bool]:
+# Outcome-aware routing — the first content-type profile. When the log's own
+# verdict says GREEN (tests passed / build succeeded, nothing failed), the
+# ERROR/WARN stdout is noise the SUT logged on purpose: by definition it did
+# not fail the run, so one sample per shape is enough signal. A red or unknown
+# outcome keeps the cautious default — there those errors may BE the answer.
+# Detection reads only verdict lines (the trustworthy part of the log), and
+# everything folded stays recoverable behind the handle.
+_RED_RE = re.compile(
+    r"""
+      \b[1-9]\d*\ +(?:failed|failing|errors?)\b    # non-zero fail/error counts
+    | ^\s*---\ +FAIL:                              # go subtest failure
+    | ^\s*FAIL\b                                   # go package FAIL / bare FAIL
+    | \bBUILD\ FAIL(?:ED|URE)\b                    # gradle/maven
+    | \bexit\ (?:code|status)\ +[1-9]              # non-zero exit
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _outcome(lines: list[str]) -> str:
+    """'green' | 'red' | 'unknown', judged from verdict lines only."""
+    saw_verdict = False
+    for ln in lines:
+        if _SUMMARY_RE.search(ln) is None:
+            continue
+        saw_verdict = True
+        if _RED_RE.search(ln) is not None:
+            return "red"
+    return "green" if saw_verdict else "unknown"
+
+
+def digest(
+    text: str, head: int = 3, tail: int = 1, max_repeats: int | None = None
+) -> tuple[str, bool]:
     """Return (digest_text, changed). Keeps head/tail context + every must-keep
     line, replacing the dropped middle with a single handle marker. Near-identical
-    error/warn repeats beyond `max_repeats` per shape fold with the rest."""
+    error/warn repeats beyond `max_repeats` per shape fold with the rest; the
+    default routes by the log's own outcome (green run -> 1 sample per shape,
+    red/unknown -> 2)."""
     lines = text.splitlines()
     if len(lines) <= head + tail + 1:
         return text, False
+    if max_repeats is None:
+        max_repeats = 1 if _outcome(lines) == "green" else 2
 
     keep_idx = set(range(head)) | set(range(len(lines) - tail, len(lines)))
     shape_seen: dict[str, int] = {}
