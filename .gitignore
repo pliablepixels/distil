@@ -55,3 +55,6 @@ launch/
 
 # IDE/agent tool state
 .serena/
+
+# local eval run artifacts (predictions/scores from bench runs)
+benchmarks/swe_bench_e2e/results_*/

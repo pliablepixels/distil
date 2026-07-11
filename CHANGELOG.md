@@ -3,6 +3,37 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.14.0] — verdict-aware digest: keep the answer, fold the noise
+
+Driven by an independent power-user comparison on a live repo (4 tools, 3 tasks):
+distil tied for best on bug-fact retention and was the only tool with *measured*
+byte-exact reversibility — but on a 22,971-token passing test log it folded the
+one line that mattered (`1955 passed`) into a handle while keeping repeated
+ERROR/WARN stdout. Both halves of that inversion are fixed.
+
+### Added
+- **Verdict preservation (tier-1)** — `_SUMMARY_RE` in the digest keep-net pins
+  command *result* lines verbatim: vitest/jest/pytest/mocha counts, cargo
+  `test result:`, go `ok`/`PASS`/`--- FAIL:`, gradle/maven `BUILD SUCCESSFUL|FAILED`,
+  and `exit code N`. A green run's verdict (which carries no error keyword) can no
+  longer be compressed away.
+- **Verdict preservation (salience)** — `SalienceKeepModel` scores the same verdict
+  lines at the 1.0 never-drop floor (they previously scored 0.3–0.6 and dropped
+  while ERROR noise scored 0.95). Single source of truth: tier-1's `_SUMMARY_RE`.
+- **Error-noise dedup (tier-1)** — near-identical error/warn repeats (same line
+  *shape* after normalizing digits/hex) keep their first 2 occurrences as signal;
+  the rest fold behind the existing handle markers, fully recoverable. `DECISION:`
+  and verdict lines are exempt.
+
+### Changed
+- On the comparison's log shape (passing suite, looped on-purpose ERROR/WARN
+  stdout, verdict near the tail): 19.9k tokens → ~131 tokens **with** the verdict
+  and first-occurrence error signal in front of the agent — previously 90%
+  reduction but the answer required a second round-trip to recover.
+
+Everything is additive to the keep-rules and reversible; no wire, config, or
+API changes.
+
 ## [1.13.0] — trustworthy shadow gate: deterministic decision-equivalence + mode visibility
 
 Promoted to GA on live validation: **100% decision-equivalence over 116 sampled
