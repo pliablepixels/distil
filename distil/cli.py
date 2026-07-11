@@ -212,8 +212,16 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
                 sess = ledger.summary(session=sid)
         except Exception:  # noqa: BLE001 — session slice is best-effort
             pass
+        from .doctor import subscription_mode
+
         Path(args.html).write_text(
-            ledger.render_html(s, change_rate=change_rate, samples=samples, session=sess),
+            ledger.render_html(
+                s,
+                change_rate=change_rate,
+                samples=samples,
+                session=sess,
+                subscription=subscription_mode(),
+            ),
             encoding="utf-8",
         )
         print(f"your savings page → {args.html}")

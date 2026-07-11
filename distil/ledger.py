@@ -283,6 +283,7 @@ def render_html(
     change_rate: float | None = None,
     samples: int = 0,
     session: "LedgerSummary | None" = None,
+    subscription: bool = False,
 ) -> str:
     """Render the ledger as a self-contained dark HTML page — GENUINE savings
     from your own usage (the `live-proxy` source is real proxy traffic).
@@ -307,8 +308,28 @@ def render_html(
             f" Includes {s.legacy_records:,} record(s) from pre-1.10 accounting "
             "— savings for those may be overstated."
         )
+    # Honesty: on a flat-rate plan the dollar figure is NOT money billed — it's the
+    # notional metered-API cost of the tokens saved. Lead with tokens (the real win)
+    # and label the dollars clearly, so the dashboard never implies cash it didn't save.
+    if subscription:
+        tok_v, dol_v = "v g", "v"  # tokens become the gradient hero card
+        dol_label, dol_note = (
+            "Cost avoided · notional",
+            '<div class="l" style="margin-top:2px">flat-rate plan — not billed</div>',
+        )
+        hero = (
+            '<p class="sub" style="color:#c9cdd6;margin-top:-16px">You’re on a '
+            "<b>flat-rate plan</b> — the real win is the <b>token reduction</b>. Dollar "
+            "figures are <b>notional</b> (what these tokens would cost at metered API rates), "
+            "not money billed.</p>"
+        )
+        col_hdr = "$ notional"
+    else:
+        tok_v, dol_v = "v", "v g"
+        dol_label, dol_note, hero, col_hdr = "Dollars saved", "", "", "$ saved"
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="icon" type="image/svg+xml" href="https://dshakes.github.io/distil/assets/logo.svg"/>
 <title>Distil — your savings</title><style>
 body{{margin:0;background:#06070b;color:#f2f3f7;font:15px/1.6 Inter,ui-sans-serif,sans-serif;
  -webkit-font-smoothing:antialiased}}
@@ -328,13 +349,14 @@ td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{
 </style></head><body><div class="wrap">
 <h1>Your <span class="g">savings</span></h1>
 <p class="sub">Genuine, local-first — measured from your own runs and proxy traffic. No content leaves your machine.</p>
+{hero}
 <div class="tot">
- <div class="card"><div class="l">Tokens saved</div><div class="v">{s.total_tokens_saved:,}</div></div>
- <div class="card"><div class="l">Dollars saved</div><div class="v g">${s.total_dollars_saved:,.4f}</div></div>
+ <div class="card"><div class="l">Tokens saved</div><div class="{tok_v}">{s.total_tokens_saved:,}</div></div>
+ <div class="card"><div class="l">{dol_label}</div><div class="{dol_v}">${s.total_dollars_saved:,.2f}</div>{dol_note}</div>
  <div class="card"><div class="l">Runs</div><div class="v">{s.runs:,}</div></div>
  {_eq_card(change_rate, samples)}{_session_card(session)}
 </div>
-<table><thead><tr><th>source</th><th style="text-align:right">$ saved</th></tr></thead><tbody>{rows}</tbody></table>
+<table><thead><tr><th>source</th><th style="text-align:right">{col_hdr}</th></tr></thead><tbody>{rows}</tbody></table>
 <p class="foot">{note} Share verifiably across instances with <code>distil federated-leaderboard</code>.</p>
 </div></body></html>"""
 
