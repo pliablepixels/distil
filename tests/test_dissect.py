@@ -636,6 +636,39 @@ class TestAnomalies:
         assert any("off by >50% vs billed" in w for w in warnings)
 
 
+class TestHeadlines:
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        monkeypatch.delenv("DISTIL_SESSION", raising=False)
+        _seed_state(tmp_path)
+
+    def test_layman_story(self) -> None:
+        heads = dict(dz.dissect("s200-1").headlines())
+        assert "distil kept 6.10k of 10.00k input tokens off the wire (61%)" in heads
+        assert "mostly by summarizing large logs" in heads[
+            "distil kept 6.10k of 10.00k input tokens off the wire (61%)"
+        ]
+        out_head = "The model wrote 450 output tokens (12% of billed traffic)"
+        assert out_head in heads
+        # Subscription session -> the output-shaping gate is explained.
+        assert "never shortened on a subscription" in heads[out_head]
+        assert any("resent and re-summarized" in h for h in heads)
+        assert any("spot-checked" in h for h in heads)
+
+    def test_story_leads_the_renderers(self) -> None:
+        d = dz.dissect("s200-1")
+        text = dz.render_text(d, color=False)
+        assert text.index("what happened") < text.index("savings (input tokens")
+        page = dz.render_html(d)
+        assert page.index("What happened") < page.index("Per model")
+        payload = dz.to_json(d)
+        assert payload["headlines"][0]["headline"].startswith("distil kept 6.10k")
+
+    def test_no_story_without_data(self, tmp_path: Path) -> None:
+        assert dz.dissect("s999-0").headlines() == []
+
+
 class TestScanUsage:
     def test_json_body(self) -> None:
         from distil.streamrelay import scan_usage

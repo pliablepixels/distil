@@ -440,6 +440,108 @@ class Dissection:
             ((name, v[0], v[0] * v[1]) for name, v in per.items()), key=lambda t: -t[2]
         )
 
+    def headlines(self) -> list[tuple[str, str]]:
+        """The layman's story of the session: [(headline, detail)] in plain
+        language, data-driven, biggest thing first. This is what a reader who
+        will never hover a tile should still walk away knowing."""
+        out: list[tuple[str, str]] = []
+        kind_words = {
+            "log": "large logs",
+            "prose": "long text output",
+            "code": "code listings",
+            "error": "error output",
+            "traceback": "stack traces",
+            "diff": "diffs",
+            "columnar": "tabular data",
+        }
+        if self.baseline_tokens:
+            kinds = self.blocks_by_kind()
+            mostly = ""
+            if kinds:
+                word = kind_words.get(kinds[0][0].split(":")[0], "bulky content")
+                mostly = f", mostly by summarizing {word}"
+            kept = self.baseline_tokens - self.distil_tokens
+            out.append(
+                (
+                    f"distil kept {_human(kept)} of {_human(self.baseline_tokens)} input "
+                    f"tokens off the wire ({self.pct_saved:.0f}%)",
+                    f"Your session's conversation and tool results would have cost "
+                    f"{_human(self.baseline_tokens)} tokens to resend across its requests; "
+                    f"{_human(self.distil_tokens)} actually went out{mostly}. Everything "
+                    "summarized stays recoverable on this machine.",
+                )
+            )
+        if self.detail_available and self.overhead_share >= 30:
+            n_tools = len(self.tool_costs())
+            out.append(
+                (
+                    f"Your agent's fixed setup is {self.overhead_share:.0f}% of everything sent",
+                    f"The system prompt plus {n_tools} tool definitions are resent "
+                    "word-for-word on every request, and no compression applies to them. "
+                    "Disabling tools/MCP servers you don't use is the single cheapest "
+                    "saving available.",
+                )
+            )
+        if self.usage_output_total:
+            total_usage = self.usage_input_total + self.usage_output_total
+            pct = 100.0 * self.usage_output_total / total_usage if total_usage else 0.0
+            shaping = (self.manifest or {}).get("flags", {}).get("shape_output", "off")
+            if self.billing == "subscription":
+                shaping_note = (
+                    "Live replies are never shortened on a subscription — output shaping "
+                    "is gated to metered billing, where its effect is measured before "
+                    "being trusted."
+                )
+            elif shaping and shaping != "off":
+                shaping_note = f"Output shaping is on ({shaping}) for live replies."
+            else:
+                shaping_note = (
+                    "Live replies can additionally be shortened with --shape-output "
+                    "(off for this session)."
+                )
+            out.append(
+                (
+                    f"The model wrote {_human(self.usage_output_total)} output tokens "
+                    f"({pct:.0f}% of billed traffic)",
+                    "Output tokens are the model's own replies. distil trims verbose past "
+                    "replies when they re-enter later requests as context (that saving is "
+                    f"counted above). {shaping_note}",
+                )
+            )
+        if self.churn_tokens and self.tokens_saved_total and (
+            self.churn_tokens >= 0.25 * self.tokens_saved_total
+        ):
+            out.append(
+                (
+                    f"{_human(self.churn_tokens)} tokens were resent and re-summarized",
+                    "The client kept resending the same content, so distil had to fold it "
+                    "again each time. The session-delta cache absorbs exactly this; if it "
+                    "is already on, these blocks are candidates for the learned codec.",
+                )
+            )
+        if self.shadow_window_rows:
+            out.append(
+                (
+                    f"Compression was spot-checked {self.shadow_window_rows} time"
+                    f"{'s' if self.shadow_window_rows != 1 else ''} — "
+                    f"{self.shadow_window_agree} matched",
+                    "Shadow mode re-ran a sample of requests uncompressed in the "
+                    "background and compared the answers, so you don't have to take the "
+                    "savings on faith.",
+                )
+            )
+        if self.detail_available and self.expand_resolved:
+            out.append(
+                (
+                    f"The model asked for folded detail back {self.expand_resolved} time"
+                    f"{'s' if self.expand_resolved != 1 else ''}",
+                    "When a summary wasn't enough, the model used its recovery handle and "
+                    "distil restored the original content mid-request — nothing was lost, "
+                    "it just cost one extra round-trip.",
+                )
+            )
+        return out
+
     def blocks_by_kind(self) -> list[tuple[str, int, int]]:
         """[(signature, unique_blocks, tokens)] biggest-token first."""
         agg: dict[str, list[int]] = {}
@@ -616,6 +718,14 @@ def render_text(
         for w in warnings:
             out.append(c("33", f"  ⚠ {w}"))
 
+    heads = d.headlines()
+    if heads:
+        out.append("")
+        out.append(c("1", "what happened"))
+        for title, body in heads:
+            out.append(f"  • {title}")
+            out.append(c("2", f"    {body}"))
+
     # Savings (ledger)
     out.append("")
     out.append(c("1", "savings (input tokens, booked 2xx only)"))
@@ -746,6 +856,7 @@ def to_json(d: Dissection, peers: list[SessionOverview] | None = None) -> dict[s
     """Machine-readable dissection (same numbers the text/html reports show)."""
     cal = d.calibration()
     return {
+        "headlines": [{"headline": h, "detail": b} for h, b in d.headlines()],
         "insights": {
             "mechanism": {
                 "digest_tokens_saved": d.digest_saved,
@@ -1177,6 +1288,17 @@ still on this machine.</p>
             "wrap from this distil version or newer.</p>"
         )
     exit_line = f"<p class='muted'>exit: {e(d.exit_note)}</p>" if d.exit_note else ""
+    heads = d.headlines()
+    story = (
+        "<h2>What happened</h2>"
+        "<p class='desc'>The session in plain language — details and charts below.</p>"
+        + "".join(
+            f'<div class="story"><b>{e(h)}</b><div class="n">{e(body)}</div></div>'
+            for h, body in heads
+        )
+        if heads
+        else ""
+    )
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1199,6 +1321,10 @@ h2{{font-size:17px;font-weight:700;margin:34px 0 12px}}
 .tile{{cursor:help}} .card[title] .l{{border-bottom:1px dotted #3a4257;display:inline-block;
  padding-bottom:1px}}
 .desc{{color:#5b6177;font-size:13px;line-height:1.55;margin:-4px 0 14px}}
+.story{{background:linear-gradient(180deg,#12151f,#0b0d15);border:1px solid #252c3e;
+ border-radius:14px;padding:16px 20px;margin:0 0 10px}}
+.story b{{font-size:15px}}
+.story .n{{color:#9aa1b3;font-size:13px;line-height:1.55;margin-top:4px}}
 .g{{background:linear-gradient(135deg,#8b7bff,#5ad1c9);-webkit-background-clip:text;background-clip:text;color:transparent}}
 table{{width:100%;border-collapse:collapse;border:1px solid #1b2030;border-radius:12px;overflow:hidden}}
 th,td{{padding:11px 14px;border-bottom:1px solid #1b2030;text-align:left}}
@@ -1224,6 +1350,7 @@ details{{margin:10px 0}} details summary{{cursor:pointer;color:#5b6177}}
 <div class="card" title="Share of input tokens distil kept off the wire across the whole session."><div class="l">Saved</div><div class="v g">{d.pct_saved:.1f}%</div><div class="n">of input tokens never sent</div></div>
 <div class="card" title="What those saved tokens are worth at API prices. On a flat-rate subscription nothing is billed per token, so this is notional — the real win is headroom."><div class="l">Dollars{e(dol_note)}</div><div class="v">${d.dollars_saved:.2f}</div><div class="n">at API prices for this model mix</div></div>
 </div>
+{story}
 <h2>Per model</h2>
 <p class="desc">Who talked and what it cost: baseline is what each model <em>would</em> have
 received unwrapped; distil is what was actually sent after compression.</p>
