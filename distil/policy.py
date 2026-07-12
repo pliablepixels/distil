@@ -7,14 +7,21 @@ violate provider terms (injected retrieval tools the user never authorized,
 rewritten history). So the *mode* gates which strategies are even allowed:
 
   * PAYG          — full toolbox, including lossy strategies and tool injection.
-  * SUBSCRIPTION  — lossless-only. No lossy compression, no tool injection — and
-                    therefore no Tier-1 digest stubs either: with no expand tool
-                    injected the agent could never recover a stub, so it would be
-                    irreversibly lossy in context. lossless-only forces Tier-0-only
-                    (verbatim) at every proxy entry point (see build_handler /
-                    make_app / build_gateway_handler).
+  * SUBSCRIPTION  — lossless-only *by default*. No lossy output shaping, and no
+                    Tier-1 digest stubs — because with no expand tool injected the
+                    agent could never recover a stub, so it would be irreversibly
+                    lossy in context. That is the reason for the verbatim force, and
+                    it is conditional: an explicit `--expand` injects distil_expand,
+                    which makes every stub recoverable — the exact hazard the force
+                    guards against no longer exists. So an informed user opt-in
+                    (`--expand`) re-enables the recoverable digest even here; the
+                    default (no flag) stays lossless-only, and genuinely-lossy output
+                    shaping stays PAYG-only regardless. See build_handler / issue #28.
 
-This is a tightening boundary: a project can never loosen it.
+This is a tightening *default*, not a cage: the software never silently applies
+lossy or tool-injecting compression to a subscription, but it also does not override
+a user who explicitly, knowingly asks for recoverable expand. A project config still
+cannot loosen the default — only the end user, per-invocation, can.
 """
 
 from __future__ import annotations

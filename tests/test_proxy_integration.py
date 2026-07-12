@@ -25,10 +25,13 @@ _RESP = json.dumps(
 ).encode()
 
 
+_LAST_BODY: dict[str, bytes] = {}
+
+
 class _Echo(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         n = int(self.headers.get("content-length", 0))
-        self.rfile.read(n)
+        _LAST_BODY["raw"] = self.rfile.read(n)
         self.send_response(200)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(_RESP)))
@@ -126,6 +129,29 @@ def test_lossless_only_round_trip(proxy_factory):
     port = proxy_factory(lossless_only=True)
     out = _post(port, _digestible())
     assert b"done" in out
+
+
+def test_expand_overrides_lossless_only(proxy_factory):
+    # issue #28: an explicit --expand runs the recoverable digest even under
+    # lossless-only (subscription) — the injected distil_expand makes stubs
+    # recoverable, so the verbatim force no longer applies. Without --expand,
+    # lossless-only stays verbatim (the safe default).
+    port_expand = proxy_factory(lossless_only=True, expand=True)
+    _post(port_expand, _digestible())
+    body_expand = _LAST_BODY["raw"].decode()
+
+    port_plain = proxy_factory(lossless_only=True, expand=False)
+    _post(port_plain, _digestible())
+    body_plain = _LAST_BODY["raw"].decode()
+
+    # The discriminator is the recovery handle: expand's Tier-1 digest emits a
+    # handle-bearing stub (recoverable via distil_expand); lossless-only (even with
+    # the #24 columnar fold) emits none. So handle= present <=> the recoverable
+    # digest ran, which is exactly what --expand must enable here.
+    assert "handle=" not in body_plain, "lossless-only alone emits no recovery handle"
+    assert "handle=" in body_expand, (
+        "explicit --expand must run the recoverable digest even on lossless-only (#28)"
+    )
 
 
 def test_session_delta_round_trip(proxy_factory):

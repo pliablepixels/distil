@@ -426,7 +426,9 @@ def _check_mode() -> Check:
             "always-on proxy runs in VERBATIM mode — the reversible digest is off, "
             "so savings are near-zero by design (this is why ▼ can read 0)",
             "switch to reversible savings:  distil default --mode lossless-only "
-            "(subscription-safe) or --mode expand (metered)",
+            "(the subscription-safe default) or --mode expand (max recoverable "
+            "compression — the default on metered keys, and an explicit opt-in on "
+            "a subscription)",
         )
     return Check("compression mode", OK, f"always-on proxy: {mode} (reversible digest active)")
 

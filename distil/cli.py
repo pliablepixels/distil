@@ -561,9 +561,7 @@ def cmd_dissect(args: argparse.Namespace) -> int:
 
     from . import dissect as dz
 
-    use_color = (
-        (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
-    )
+    use_color = (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
     if args.serve:
         server = dz.make_server(args.host, args.port, transcript=args.transcript)
         host, port = server.server_address[:2]
@@ -2256,7 +2254,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--expand",
         action="store_true",
         help="recoverable compression: inject the distil_expand tool so the agent can "
-        "pull back digested detail on demand (transparent server-side recovery loop)",
+        "pull back digested detail on demand (transparent server-side recovery loop). "
+        "Max token reduction with full in-context recovery. An explicit --expand also "
+        "overrides lossless-only on a subscription — you opted in, and the digest is "
+        "recoverable so nothing is irreversibly lost.",
     )
     px.add_argument(
         "--shadow",

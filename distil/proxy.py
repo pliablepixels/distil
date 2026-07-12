@@ -282,7 +282,24 @@ def build_handler(
     # can never loosen). This forces Tier-0-only (verbatim) and gates output shaping.
     _auth_mode = AuthMode.SUBSCRIPTION if lossless_only else AuthMode.PAYG
     _lossy_ok = may_compress_lossy(_auth_mode)
-    verbatim = verbatim or not _lossy_ok
+    # lossless-only forces verbatim because an *unrecoverable* Tier-1 stub is
+    # irreversibly lossy in-context. But `--expand` injects distil_expand, so every
+    # stub IS recoverable — the very condition the verbatim-force guards against no
+    # longer holds. So an explicit `--expand` lifts the force even on a subscription:
+    # the user opted in, and nothing is irreversibly lost. The default (no --expand)
+    # stays lossless-only. Output shaping stays gated on `_lossy_ok` (PAYG-only) — it
+    # rewrites the *response*, which expand does not make recoverable. See issue #28.
+    verbatim = verbatim or not (_lossy_ok or expand)
+    if lossless_only and expand:
+        import sys as _sys
+
+        print(
+            "distil: --expand enabled on a lossless-only/subscription session — the "
+            "recoverable digest is ON (you opted in explicitly). distil_expand is "
+            "injected so nothing is irreversibly lost; note this alters requests more "
+            "than pure lossless mode. Drop --expand for lossless-only.",
+            file=_sys.stderr,
+        )
 
     # Learning flywheel state (loaded once when expand is on): the learned
     # keep-byte-exact policy + the accumulating expand stats. See distil.learn.
