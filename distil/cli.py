@@ -303,7 +303,7 @@ def cmd_dissect(args: argparse.Namespace) -> int:
         (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
     )
     if args.serve:
-        server = dz.make_server(args.host, args.port)
+        server = dz.make_server(args.host, args.port, transcript=args.transcript)
         host, port = server.server_address[:2]
         print(f"dissect portal: http://{host}:{port}/  (Ctrl-C to stop)")
         print("sessions index at /, reports at /session/<sid>, JSON at /json/<sid>")

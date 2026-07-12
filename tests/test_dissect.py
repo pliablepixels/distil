@@ -882,6 +882,20 @@ class TestTranscriptCorrelation:
         out = capsys.readouterr().out
         assert "no matching agent transcript found" in out
 
+    def test_serve_with_transcript_flag_correlates_by_default(self) -> None:
+        server = dz.make_server("127.0.0.1", 0, transcript="auto")
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            with urllib.request.urlopen(base + "/session/s200-1") as resp:
+                page = resp.read().decode()
+            assert "Conversation correlation" in page  # default on
+            assert 'href="/session/s200-1?t=0"' in page  # opt-out link
+            with urllib.request.urlopen(base + "/session/s200-1?t=0") as resp:
+                assert "Conversation correlation" not in resp.read().decode()
+        finally:
+            server.shutdown()
+
     def test_portal_correlation_toggle(self) -> None:
         server = dz.make_server("127.0.0.1", 0)
         threading.Thread(target=server.serve_forever, daemon=True).start()

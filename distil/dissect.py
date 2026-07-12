@@ -1646,9 +1646,15 @@ JSON at /json/&lt;session&gt;.</p>
 </div></body></html>"""
 
 
-def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
+def make_server(
+    host: str = "127.0.0.1", port: int = 8790, transcript: str | None = None
+) -> Any:
     """Build (don't start) the dissect portal server — stdlib only, like the
     gateway. Routes: ``/`` index, ``/session/<sid>`` report, ``/json/<sid>``.
+
+    ``transcript`` makes correlation the default for every report page
+    ("auto" or a transcript path — the ``--transcript`` flag passed through);
+    ``?t=0`` opts a page out, ``?t=1`` opts in when no default is set.
 
     Every request re-reads state from disk, so a refresh shows the live
     session as it grows. Binds localhost by default; the data is one user's
@@ -1684,7 +1690,11 @@ def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
                     d = dissect(sid)
                     peers = list_sessions()
                     corr = None
-                    if "t=1" in query.split("&"):
+                    params = query.split("&")
+                    want_corr = (
+                        "t=1" in params or (transcript is not None and "t=0" not in params)
+                    )
+                    if want_corr:
                         try:
                             from .correlate import correlate
                             from .transcripts import find_transcript
@@ -1694,6 +1704,7 @@ def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
                                 str(man.get("tool") or ""),
                                 (d.started, d.ended or d.started),
                                 cwd=man.get("cwd"),
+                                path=None if transcript in (None, "auto") else transcript,
                             )
                             if tr is not None:
                                 corr = correlate(d, tr)
@@ -1707,7 +1718,7 @@ def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
                         )
                     else:
                         toggle = (
-                            f'<a href="/session/{_html.escape(sid)}" style="color:#8b7bff">hide correlation</a>'
+                            f'<a href="/session/{_html.escape(sid)}?t=0" style="color:#8b7bff">hide correlation</a>'
                             if corr is not None
                             else f'<a href="/session/{_html.escape(sid)}?t=1" style="color:#8b7bff">+ correlate with transcript</a>'
                         )
