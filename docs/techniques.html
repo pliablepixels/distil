@@ -383,6 +383,8 @@ score = model.score(<span class="g">"ERROR: disk at 94% capacity"</span>, <span 
 
     <p>The content agents actually traffic in — JSON record arrays, SQL rows, telemetry — is re-encoded into a compact <strong>columnar</strong> form: repeated keys stated once, values listed as rows. A homogeneous array of N records pays its keys and punctuation N times in JSON; the folded form pays them once — typically a 40–70% reduction with no loss of meaning. Unlike lossy structural crushing, <strong>nothing is discarded</strong>: the byte-exact original is kept in the restore table and is one <code>expand()</code> away.</p>
 
+    <p>The same fold runs on the live <strong>subscription / lossless path</strong> in a self-describing form — the compact table is emitted inline with <strong>no restore handle</strong>, so there's nothing to expand and nothing that invites a <code>distil_expand</code> the flat-rate client can't issue. Fewer tokens per turn, fully in-context, ToS-safe: the real subscription win even when there's no per-token bill to cut.</p>
+
     <h2>Template mining <span class="g">(Drain / LogPai family)</span></h2>
     <p><strong>Module:</strong> <code>distil/compress/structured.py</code> &middot; <code>template_fold()</code> &middot; Loss profile: lossless</p>
 
