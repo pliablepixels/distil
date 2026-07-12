@@ -758,7 +758,7 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
             print(
                 "No shadow samples yet. Start it in one command:\n"
                 "  distil wrap --shadow 0.1 -- claude   "
-                "(or codex/gemini; add --lossless-only on a subscription)\n"
+                "(or codex/gemini; a subscription auto-selects lossless-only)\n"
                 "then use your agent normally — samples accumulate as you work."
             )
         return 0

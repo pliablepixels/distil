@@ -3,6 +3,34 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.4] — GA hardening: structured-audit fixes
+
+A three-front structured audit (proxy request path, compression correctness, policy/telemetry
+privacy). The content-free telemetry guarantee, the opt-in transcript correlation, and the #28
+fix were all independently verified clean. Six real findings fixed, each with a proof test; the
+async silent-drop fix from the prior batch is included here.
+
+### Fixed
+- **[HIGH] Subscription-safe default now applies to direct `distil wrap`/`distil proxy`.** Only
+  the managed `distil default` install auto-selected lossless-only before; a bare
+  `distil wrap -- claude` on a subscription ran the Tier-1 digest with no expand tool — leaving
+  irreversibly-lossy stubs in a subscription session. Now a detected subscription with no explicit
+  mode flag defaults to lossless-only. An explicit `--expand`/`--verbatim`/`--lossless-only`
+  always wins.
+- **[HIGH] Recency exemption was silently bypassed for the standard tool_result *list* shape.**
+  The list-content path dropped the `is_recent` flag (the string and OpenAI paths passed it), so
+  the agent's most-recent output — which the real Anthropic SDK always sends as a list — got
+  folded instead of kept byte-exact. A regression introduced with the 1.15.1 columnar fold.
+- **[MED] `--lossless-only --shape-output X` no longer falsely claims to shape.** It printed
+  "output shaping: X" at startup while the handler correctly suppressed shaping on lossless-only.
+  Now it warns the request is suppressed (sync + async proxies).
+- **[MED] `distil proxy --async` no longer silently drops `--expand`/`--session-delta`/`--shadow`**
+  (from the prior batch) — it names the ignored flags and points at the standard proxy.
+- **[LOW] Disk restore now has the in-memory collision guard** — a 32-bit handle collision across
+  sessions can no longer clobber and expand to the wrong bytes.
+- **[LOW] `fold` bails when a JSON key contains `,`** (the column-header delimiter) instead of
+  emitting a mis-keyed table.
+
 ## [1.15.3] — honor explicit --expand on a subscription (#28)
 
 ### Fixed
