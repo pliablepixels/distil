@@ -3,6 +3,50 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.0] — query-aware salience, content-type keep policy, expand reliability
+
+The digest gets genuinely content- and intent-aware, and two reliability bugs on the
+subscription path are fixed. Several items began as issues/a PR from an external tester
+(@pliablepixels, #22–#25) and are credited on the commits.
+
+### Added
+- **Query-aware salience** — distil is a proxy, so at compress time it holds the agent's
+  intent (its `tool_use` arguments + latest ask) in the *same request* as the output being
+  compressed. Lines that match a *discriminating* intent term are now additively pinned, so
+  the one line the agent is looking for survives even in arbitrary output where no fixed rule
+  knows which line matters (a grep hit, a config value, a SHA). No post-hoc compressor has
+  that query/output pairing. Strictly additive: the keep set only widens, so reversibility is
+  untouched and the certificate can only hold or improve. A non-discriminating term (one
+  matching most lines) is dropped, preserving compression. `distil/compress/intent.py`;
+  spec in `specs/query-aware-salience.md`. Example: a 4,152-token log with the answer buried
+  in 600 neutral lines → ~163 tokens with the answer kept.
+- **Per-content-type keep policy** (#23, thanks @pliablepixels) — a new
+  `distil/compress/keep_policy.py` classifies a block (log / traceback / diff / generic) and
+  keeps each kind's load-bearing lines: a log's pass/fail verdict, a traceback's stack frames,
+  a diff's hunk headers — on top of the generic error/DECISION net. Supersedes the 1.14.x
+  inline verdict rules with a cleaner, extensible module (the "per-content-type codec" the
+  tier-1 docstring long promised); the outcome-aware dedup layer rides on top unchanged.
+- **Shadow observability** (#25, thanks @pliablepixels) — shadow sampling now keeps
+  content-free counters (requests seen / sampled / replays attempted / failed + last reason /
+  recorded). `distil shadow-stats` explains a `0 recorded` result ("19 seen, 2 sampled, 2
+  replays failed (last: 401)") instead of a silent "no samples yet", so a failing replay path
+  (e.g. OAuth rejecting proxy replays) is visible instead of indistinguishable from bad luck.
+
+### Fixed
+- **`distil_expand` tool_use escaping on the streamed path** (#25, thanks @pliablepixels) —
+  the expand gate keyed on handles created *this* request, but `RestoreStore` persists to disk,
+  so a streamed turn that digested nothing new yet referenced an older stub emitted a
+  `distil_expand` call with no tool injected and no expand loop — and it escaped to the client
+  as "No such tool available". The gate now keys on any recoverable handle in the outgoing
+  conversation, injecting the tool and buffering to resolve the call server-side.
+
+### Changed
+- **Subscription onboarding clarity** (#24, thanks @pliablepixels) — when a flat-rate
+  subscription is detected, `distil onboard` now states plainly that lossless mode trims
+  context + latency but does **not** reduce token count or cost. (The suggested lossy default
+  for subscriptions was declined: it is not provider-ToS-safe and `--session-delta` needs the
+  `distil_expand` tool that lossless mode intentionally withholds.)
+
 ## [1.14.1] — outcome-aware routing + verdict gate
 
 ### Added

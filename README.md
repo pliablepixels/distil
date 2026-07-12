@@ -121,7 +121,8 @@ You don't need byte-equivalence — you need **decision-equivalence**: your agen
 - **Certified, not estimated** — a strategy ships only if a non-inferiority test passes; can't certify → full context.
 - **Certified end-to-end, too** — `distil certify-trajectories` bounds how many solvable tasks compression can cost (no other compressor certifies either level).
 - **Reversible, not lossy** — digests behind a handle, keeps the original, hands the agent a `distil_expand` tool. Compress fearlessly.
-- **Keeps the answer, folds the noise** — test/build verdict lines (`1955 passed`, `BUILD SUCCESSFUL`, exit codes) are pinned verbatim; repeated near-identical error spam is deduped behind the handle — and on a green run (its own verdict says nothing failed) dedup tightens further, since that noise by definition didn’t fail anything.
+- **Keeps the answer, folds the noise** — a per-content-type keep policy pins each kind's load-bearing lines (a log's pass/fail verdict, a traceback's frames, a diff's hunk headers); repeated near-identical error spam is deduped, and on a green run dedup tightens further since that noise didn't fail anything.
+- **Query-aware — keeps the line you're actually asking about** — distil is a proxy, so it sees the agent's intent (its tool_use args + latest ask) in the *same request* as the output. The line matching what you searched for (a grep hit, a config value, a SHA) is pinned even in arbitrary output — additively, so reversibility and the certificate are untouched. No post-hoc compressor has that query/output pairing.
 - **Compounds on outcomes** — expansions and matched failures teach the policy what to protect (signatures only, never content) — always *more* conservative.
 - **Streams like it isn't there** — SSE relays chunk-by-chunk; TTFT preserved.
 

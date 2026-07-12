@@ -148,6 +148,7 @@ distil (cache-aware lossless)          0.01019         <span class="g">33.1%</sp
       <li><strong>Entropy scoring</strong> — high-entropy mixed-alnum tokens carry information-dense content (novel ID formats no fixed pattern anticipates) and are protected regardless of keyword matches.</li>
       <li><strong>Cross-reference detection</strong> — a token referenced in two or more blocks is an anchor the agent navigates by, treated as load-bearing even if it looks inert in isolation.</li>
       <li><strong>Surprise</strong> (<code>surprise_lines</code>) — error/failure/timeout/anomaly lines and unified-diff changed lines, over-retained regardless of the other three signals because a lossy compressor drops the incongruent detail first, and that detail is what decides the next action.</li>
+      <li><strong>Query relevance</strong> (<code>compress/intent.py</code>) — lines matching a salient term from the agent&rsquo;s own request (tool-use arguments, the latest user ask) are additively pinned. distil is a proxy: the query and the output arrive in the same request, so the relevant line is kept even when no fixed rule knows which line matters. A selectivity guard drops terms matching most lines, preserving compression when intent is too broad.</li>
     </ul>
 
     <p>Protection is line-aware: the guard operates on individual lines, not blocks, so it can preserve a single critical row inside an otherwise-compressible table. The cost is a small savings reduction — roughly 2.4 percentage points on the benchmark corpus — in exchange for a structural guarantee.</p>
@@ -277,6 +278,8 @@ tokens provably free to drop: 615 across 2 block(s).</pre>
 
     <h3>Heuristic default — SalienceKeepModel</h3>
     <p><code>distil/codec/keep_model.py</code> &middot; A deterministic rule-set that fires on error keywords, command <em>verdict</em> lines (<code>1955 passed</code>, <code>BUILD SUCCESSFUL</code>, exit codes &mdash; pinned at the never-drop floor, because a green run&rsquo;s answer carries no error word), structured data markers (<code>DECISION:</code>, key:value lines, pipe tables), digit density, and debug-noise keywords. Always available; no training step, no external dependencies.</p>
+
+    <p>The Tier-1 digest also classifies each block by content kind before applying these rules (<code>distil/compress/keep_policy.py</code>): a <strong>log</strong> block pins its pass/fail verdict lines (<code>3 passed</code>, <code>BUILD SUCCESSFUL</code>), a <strong>traceback</strong> pins every stack frame (<code>File "…", line N</code>), and a <strong>diff</strong> block pins file and hunk headers — each on top of the shared <code>DECISION:</code>/error base net.</p>
 
     <h3>Logistic keep-model — built-in, zero-dep</h3>
     <p><code>distil/codec/learned.py</code> &middot; A logistic-regression classifier trained entirely in pure Python (stdlib only), implementing the same <code>KeepModel</code> protocol. Key design decisions grounded in the source:</p>

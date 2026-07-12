@@ -1,6 +1,6 @@
 # Spec: Query-Aware Salience
 
-**Status:** proposed
+**Status:** implemented (phase 1, deterministic) — shipped in 1.15.0; phase 2 (learned scorer) pending
 **Author:** distil core (assisted)
 **Date:** 2026-07-12
 **Depends on:** `distil/adapters/anthropic.py` (live compress path), `distil/compress/tier1.py` (keep decision), PR #23 content-type keep policy (complementary)
