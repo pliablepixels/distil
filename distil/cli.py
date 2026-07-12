@@ -291,6 +291,52 @@ def cmd_leaderboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dissect(args: argparse.Namespace) -> int:
+    """Everything distil knows about one wrap session — or the picker when no
+    session is given. Works for any wrapped tool (claude/codex/gemini/...)."""
+    import os
+    import sys
+
+    from . import dissect as dz
+
+    use_color = (
+        (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+    )
+    if not args.session:
+        if args.json:
+            rows = [
+                {
+                    "session": o.sid,
+                    "tool": o.tool,
+                    "started_ts": o.started,
+                    "last_ts": o.last_ts,
+                    "requests": o.requests,
+                    "baseline_input_tokens": o.baseline_tokens,
+                    "distil_input_tokens": o.distil_tokens,
+                    "status": o.status,
+                }
+                for o in dz.list_sessions()
+            ]
+            print(json.dumps(rows, indent=2))
+        else:
+            print(dz.render_sessions_text(dz.list_sessions(), color=use_color))
+        return 0
+    sid = dz.resolve_sid(args.session)
+    if sid is None:
+        print(f"no session matches {args.session!r} — run `distil dissect` to list them")
+        return 2
+    d = dz.dissect(sid)
+    if args.json:
+        print(json.dumps(dz.to_json(d), indent=2))
+        return 0
+    if args.html:
+        Path(args.html).write_text(dz.render_html(d), encoding="utf-8")
+        print(f"wrote {args.html}")
+        return 0
+    print(dz.render_text(d, color=use_color))
+    return 0
+
+
 def cmd_prune(args: argparse.Namespace) -> int:
     traj = _load(args.trajectory)
     report = discover(traj)
@@ -1958,6 +2004,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="print a shields.io badge URL + markdown of your measured savings",
     )
     lb.set_defaults(func=cmd_leaderboard)
+
+    di = sub.add_parser(
+        "dissect",
+        help="everything distil knows about one wrap session (savings, folds, quality loops)",
+    )
+    di.add_argument(
+        "session",
+        nargs="?",
+        help="session id, a unique prefix, or `latest` — omit to list sessions to pick from",
+    )
+    di.add_argument("--html", help="render the dissection as a self-contained HTML page")
+    di.add_argument("--json", action="store_true", help="machine-readable output")
+    di.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    di.set_defaults(func=cmd_dissect)
 
     rs = sub.add_parser(
         "reset",

@@ -672,6 +672,19 @@ def build_handler(
                     _bt, _at, _m = _pending_savings
                     savings.record(_bt, _at, model=_m)
                     savings.maybe_flush(every=flush_every)
+                self._emit_detail(
+                    extras=extras,
+                    store=store,
+                    body=body if isinstance(body, dict) else None,
+                    model=_span_model,
+                    stream=True,
+                    status=status_s,
+                    booked=(
+                        savings is not None
+                        and _pending_savings is not None
+                        and 200 <= status_s < 300
+                    ),
+                )
                 if shadow_sampled:
                     self._spawn_shadow(raw, headers, new_raw)
                 return
@@ -722,6 +735,17 @@ def build_handler(
             # signal on real traffic. Never blocks the client's response.
             if shadow_sampled:
                 self._spawn_shadow(raw, headers, new_raw)
+            self._emit_detail(
+                extras=extras,
+                store=store,
+                body=body if isinstance(body, dict) else None,
+                model=_span_model,
+                stream=False,
+                status=status,
+                booked=(
+                    savings is not None and _pending_savings is not None and 200 <= status < 300
+                ),
+            )
             # Book savings only after a confirmed 2xx (P0-1): failed or SDK-retried
             # upstream calls must not be counted as savings.
             if savings is not None and _pending_savings is not None and 200 <= status < 300:
@@ -729,6 +753,68 @@ def build_handler(
                 savings.record(_bt, _at, model=_m)
                 savings.maybe_flush(every=flush_every)
             self._relay(status, rhdrs, rbody, extras=extras)
+
+        def _emit_detail(
+            self,
+            *,
+            extras: dict[str, str],
+            store: Any,
+            body: dict[str, Any] | None,
+            model: str,
+            stream: bool,
+            status: int,
+            booked: bool,
+        ) -> None:
+            """Append one content-free per-request record to the wrap session's
+            ``sessions/<sid>.requests.jsonl`` (read by ``distil dissect``).
+            Records token accounting, per-block digest signatures (handle + kind
+            + size only — never content), and shadow/expand flags. Best-effort:
+            any failure is a debug log — bookkeeping must never break a request."""
+            try:
+                from . import ledger
+
+                if ledger.session_requests_path() is None:
+                    return  # not a wrap session; nothing to attribute the request to
+                from .learn import signature
+
+                blocks: list[dict[str, Any]] = []
+                for h in sorted(getattr(store, "handles", None) or ()):
+                    try:
+                        text = store.expand(h)
+                        blocks.append(
+                            {"h": h, "sig": signature(text), "tokens": _tokenizer.count(text)}
+                        )
+                    except Exception:  # noqa: BLE001 — one bad handle must not drop the record
+                        continue
+                overhead = 0
+                if isinstance(body, dict):
+                    for key in ("system", "tools"):
+                        val = body.get(key)
+                        if val:
+                            overhead += _tokenizer.count(
+                                val if isinstance(val, str) else json.dumps(val)
+                            )
+                rec = {
+                    "ts": time.time(),
+                    "model": model,
+                    "stream": stream,
+                    "status": status,
+                    "booked": booked,
+                    "mode": extras.get("x-distil-mode", "verbatim"),
+                    "compressible_tokens": int(extras.get("x-distil-compressible-tokens", 0) or 0),
+                    "tokens_saved": int(extras.get("x-distil-tokens-saved", 0) or 0),
+                    "overhead_tokens": overhead,
+                    "delta_refs": int(extras.get("x-distil-cache-refs", 0) or 0),
+                    "delta_tokens_saved": int(extras.get("x-distil-cache-tokens-saved", 0) or 0),
+                    "prefix_msgs": int(extras.get("x-distil-cache-prefix-msgs", 0) or 0),
+                    "shadow_sampled": extras.get("x-distil-shadow") == "sampled",
+                    "expanded": extras.get("x-distil-expanded") == "1",
+                    "output_shaping": extras.get("x-distil-output-shaping", ""),
+                    "blocks": blocks,
+                }
+                ledger.append_session_request(rec)
+            except Exception:  # noqa: BLE001 — bookkeeping must never break a request
+                log.debug("request-detail record failed", exc_info=True)
 
         def _spawn_shadow(
             self,
@@ -1059,6 +1145,41 @@ def wrap_run(
             marker.with_name(marker.name + ".exit").unlink(missing_ok=True)
         except OSError:
             pass  # marker is best-effort; never block the wrap over it
+
+    # Session manifest: what this wrap *is* (tool, argv, flags, billing) — the
+    # header `distil dissect` reads. Best-effort, like the marker above.
+    try:
+        from . import __version__ as _ver
+        from . import ledger as _ledger
+
+        try:
+            from .doctor import subscription_mode
+
+            _billing = "subscription" if subscription_mode() else "metered"
+        except Exception:  # noqa: BLE001 — billing detection is cosmetic
+            _billing = "unknown"
+        _ledger.write_session_manifest(
+            {
+                "sid": os.environ["DISTIL_SESSION"],
+                "tool": os.path.basename(command[0]) if command else "",
+                "argv": command,
+                "started_ts": time.time(),
+                "distil_version": _ver,
+                "billing": _billing,
+                "flags": {
+                    "upstream": upstream,
+                    "env_var": env_var,
+                    "lossless_only": lossless_only,
+                    "verbatim": verbatim,
+                    "shape_output": shape_output,
+                    "expand": expand,
+                    "session_delta": session_delta,
+                    "shadow_rate": shadow_rate,
+                },
+            }
+        )
+    except Exception:  # noqa: BLE001 — manifest is best-effort; never block the wrap
+        log.debug("session manifest write failed", exc_info=True)
 
     # Hot-swap (POSIX default): the proxy runs as a supervised subprocess on a
     # listener FD the wrap owns, so a `pipx upgrade` mid-session swaps in a

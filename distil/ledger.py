@@ -18,6 +18,7 @@ import shutil
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 try:
     import fcntl  # POSIX advisory locking; absent on Windows
@@ -54,6 +55,49 @@ def session_marker_path(sid: str | None = None) -> Path | None:
     if not sid or "/" in sid or "\\" in sid or ".." in sid:
         return None  # session ids are wrap-minted; refuse anything path-like
     return default_path().parent / "sessions" / sid
+
+
+def session_manifest_path(sid: str | None = None) -> Path | None:
+    """``sessions/<sid>.json`` — what a wrap session *was*: wrapped tool, argv,
+    flags, start time, billing mode. Written once by ``distil wrap`` at startup;
+    read by ``distil dissect``. Same TTL sweep as the liveness markers."""
+    base = session_marker_path(sid)
+    return None if base is None else base.with_suffix(".json")
+
+
+def session_requests_path(sid: str | None = None) -> Path | None:
+    """``sessions/<sid>.requests.jsonl`` — one content-free record per proxied
+    request (token accounting, per-block digest signatures, shadow/expand flags).
+    Appended by the proxy; read by ``distil dissect``."""
+    base = session_marker_path(sid)
+    return None if base is None else base.with_name(base.name + ".requests.jsonl")
+
+
+def write_session_manifest(manifest: dict[str, Any], sid: str | None = None) -> None:
+    """Best-effort write of the session manifest — never raises (the wrap must
+    start even when the state dir is unwritable)."""
+    path = session_manifest_path(sid)
+    if path is None:
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def append_session_request(rec: dict[str, Any], sid: str | None = None) -> None:
+    """Best-effort append of one per-request detail record — never raises
+    (bookkeeping must never break a request)."""
+    path = session_requests_path(sid)
+    if path is None:
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, sort_keys=True) + "\n")
+    except OSError:
+        pass
 
 
 @dataclass
