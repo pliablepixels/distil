@@ -168,6 +168,18 @@ def _apply_tier0(text: str) -> str:
     return base
 
 
+def _lossless_fold(text: str) -> str | None:
+    """In-context-lossless structured compaction with NO recovery handle: a
+    self-describing columnar table (JSON array of flat records) or templated run.
+    Every value stays inline and the model reads it directly, so it is safe on the
+    lossless/subscription path (no expand tool injected). Returns None when the
+    content isn't tabular/repetitive. Inherits fold's decision-equivalence — the
+    table is byte-identical to the handle-bearing fold minus a metadata token."""
+    from ..compress.structured import fold, template_fold  # local: avoid load-time cycle
+
+    return fold(text, emit_handle=False) or template_fold(text, emit_handle=False)
+
+
 def _compress_text_content(text: str, store: RestoreStore, verbatim: bool) -> str:
     """Apply only Tier-0 lossless transforms to a plain text block."""
     return _apply_tier0(text)
@@ -186,12 +198,16 @@ def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = 
     """
     lines = text.splitlines()
     if len(lines) < _MIN_LINES:
-        # Too short to digest — apply lossless transforms only.
-        return _apply_tier0(text)
+        # Too short to digest — lossless transforms only (a tabular blob is often one
+        # long line, so try the self-describing fold before tier-0).
+        return _lossless_fold(text) or _apply_tier0(text)
 
-    # Verbatim: never replace content with a stub the model can't recover.
+    # Verbatim: never replace content with a stub the model can't recover — but a
+    # self-describing columnar/template fold is in-context-lossless (all data inline,
+    # no recovery handle to invite an unavailable distil_expand), so it is safe here and
+    # saves far more than tier-0 alone on the tabular tool output subscription users see.
     if verbatim:
-        return _apply_tier0(text)
+        return _lossless_fold(text) or _apply_tier0(text)
 
     # Learned policy: if your agents keep expanding this kind of content, keep it
     # byte-exact (strictly safer — only ever reduces savings, never equivalence).

@@ -48,7 +48,7 @@ def _cell(v: object) -> str:
     return str(v)
 
 
-def fold(text: str) -> str | None:
+def fold(text: str, emit_handle: bool = True) -> str | None:
     """Columnar-fold a JSON array of homogeneous flat records. Returns the compact
     form, or None if the text isn't a foldable structure or wouldn't shrink."""
     s = text.strip()
@@ -85,10 +85,16 @@ def fold(text: str) -> str | None:
     # Embed the recovery handle in the marker so the model (and the offline grader's
     # _HANDLE_IN_TEXT regex) can expand the fold. The handle keys the byte-exact
     # original that Tier1Reversible.compress records under _handle(b.text) == this.
-    compact = (
+    # emit_handle=False -> a self-describing, lossless columnar table with NO recovery
+    # handle: every row is inline, so the model reads it directly, and with no handle
+    # there is nothing to invite an (unavailable) distil_expand call. That is what makes
+    # the fold safe on the lossless/subscription path where no expand tool is injected.
+    marker = (
         f"{_HDR}rows={len(obj)} cols={','.join(cols)} handle={_handle(text)}{_HDR}\n"
-        + "\n".join(rows)
+        if emit_handle
+        else f"{_HDR}rows={len(obj)} cols={','.join(cols)}{_HDR}\n"
     )
+    compact = marker + "\n".join(rows)
     return compact if len(compact) < len(s) else None
 
 
@@ -116,7 +122,7 @@ def _mask(line: str) -> str:
     return _VAR.sub(_SLOT, line)
 
 
-def template_fold(text: str, min_run: int = 5) -> str | None:
+def template_fold(text: str, min_run: int = 5, emit_handle: bool = True) -> str | None:
     """Collapse runs of >=min_run consecutive lines sharing a template into
     ``«N× <template>»`` + a ``vars:`` table of the per-line varying tokens."""
     if "DECISION:" in text:
@@ -135,7 +141,8 @@ def template_fold(text: str, min_run: int = 5) -> str | None:
         run = j - i
         if run >= min_run and _SLOT in m:
             rows = [" ".join(_VAR.findall(lines[k])) for k in range(i, j)]
-            out.append(f"{_HDR}{run}× {m} handle={_handle(text)}{_HDR}")
+            _h = f" handle={_handle(text)}" if emit_handle else ""
+            out.append(f"{_HDR}{run}× {m}{_h}{_HDR}")
             out.append("vars: " + " | ".join(rows))
             changed = True
         else:
