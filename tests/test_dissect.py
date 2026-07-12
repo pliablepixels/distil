@@ -497,6 +497,11 @@ class TestToolsAndCharts:
         assert "request 2 · m-small · overhead 500 · sent 800 · saved 1,200" in page
         assert "data table" in page  # accessible table view of the timeline
         assert "Request composition" in page
+        # Plain-English help layer: section descriptions + hover titles on tiles.
+        assert "for what the term means" in page
+        assert 'title="Tokens distil avoided sending by replacing bulky content' in page
+        assert "class=\"desc\"" in page
+        assert "re-described to the model on every request" in page
 
     def test_json_has_tool_breakdown(self) -> None:
         payload = dz.to_json(dz.dissect("s200-1"))

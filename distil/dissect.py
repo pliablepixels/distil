@@ -731,6 +731,10 @@ def render_text(
         out.append("  no session-scoped signal recorded for this session")
 
     out.append("")
+    out.append(c("2", "terms: fold = bulky content replaced by a summary + recovery handle · cache-delta ="))
+    out.append(c("2", "resent content replaced by a reference · verbatim = passed through untouched ·"))
+    out.append(c("2", "unbooked = upstream failed/retried, not counted as savings"))
+    out.append("")
     out.append(
         c("2", "sources: savings.jsonl, sessions/<sid>{.json,.requests.jsonl,.hb,.exit}, restore/, shadow.jsonl")
     )
@@ -950,10 +954,13 @@ def _timeline_table(requests: list[dict[str, Any]]) -> str:
     )
 
 
-def _tile(label: str, value: str, note: str = "") -> str:
+def _tile(label: str, value: str, note: str = "", help_text: str = "") -> str:
+    """One stat card. ``help_text`` becomes a native hover (title=) in plain
+    English — every distil term on the page must be explainable without docs."""
     note_html = f'<div class="n">{note}</div>' if note else ""
+    title = f' title="{_html.escape(help_text)}"' if help_text else ""
     return (
-        f'<div class="card tile"><div class="l">{label}</div>'
+        f'<div class="card tile"{title}><div class="l">{label}</div>'
         f'<div class="v2">{value}</div>{note_html}</div>'
     )
 
@@ -987,7 +994,9 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
 
     warn_html = "".join(f"<li>{e(w)}</li>" for w in d.anomalies(peers))
     warn_card = (
-        f'<div class="callout"><b>⚠ Worth your attention</b><ul class="warn">{warn_html}</ul></div>'
+        f'<div class="callout"><b>⚠ Worth your attention</b>'
+        f'<div class="n">Automatic checks on this session found things that may need '
+        f'action.</div><ul class="warn">{warn_html}</ul></div>'
         if warn_html
         else ""
     )
@@ -1000,27 +1009,42 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
                 "Requests",
                 str(len(d.requests)),
                 f"{d.unbooked_requests} unbooked · {d.verbatim_requests} verbatim",
+                "API calls the wrapped tool made through distil. Unbooked = the upstream "
+                "call failed or was retried, so it is not counted as savings. Verbatim = "
+                "the request was passed through untouched because nothing in it was worth "
+                "compressing.",
             ),
             _tile(
                 "Digest folds",
                 _human(d.digest_saved),
                 f"{100.0 * d.digest_saved / saved:.0f}% of savings",
+                "Tokens distil avoided sending by replacing bulky content (test logs, file "
+                "dumps, stack traces) with a short summary plus a recovery handle. The "
+                "original bytes stay on this machine and can be restored at any time.",
             ),
             _tile(
                 "Cache-delta",
                 _human(d.delta_tokens_saved),
                 f"{100.0 * d.delta_tokens_saved / saved:.0f}% of savings",
+                "Tokens avoided by sending a short reference to content this session "
+                "already sent earlier, instead of resending the full text every request.",
             ),
             _tile(
                 "Fixed overhead",
                 _human(d.overhead_tokens_total),
                 f"{d.overhead_share:.0f}% of sent · system {_human(d.system_tokens_avg)}/req "
                 f"· tools {_human(d.tools_tokens_avg)}/req",
+                "The system prompt and tool definitions are resent word-for-word with "
+                "every single request, and distil never alters them. If this share is "
+                "large, removing unused tools/MCP servers saves more than compression can.",
             ),
             _tile(
                 "Re-fold churn",
                 _human(d.churn_tokens),
                 f"{d.churned_blocks} block{'s' if d.churned_blocks != 1 else ''} re-folded",
+                "The same content arrived again on later requests and had to be folded "
+                "again. High churn means smarter caching (cache-delta / the learned codec) "
+                "has room to help.",
             ),
         ]
         cal = d.calibration()
@@ -1030,25 +1054,56 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
                     "Billed input",
                     _human(d.usage_input_total),
                     f"{_human(d.usage_output_total)} out · estimate ×{cal[0] / cal[1]:.2f} of billed",
+                    "Token counts reported by the API itself in its responses — the ground "
+                    "truth. The × figure is how close distil's local estimate came to it "
+                    "(×1.00 would be exact).",
                 )
             )
         else:
-            tiles.append(_tile("Billed input", "—", "usage not captured"))
+            tiles.append(
+                _tile(
+                    "Billed input",
+                    "—",
+                    "usage not captured",
+                    "The API reports exact token counts in its responses; none were "
+                    "captured for this session (recorded by newer wraps only).",
+                )
+            )
         if subscription and d.headroom_multiplier > 1:
             tiles.append(
                 _tile(
                     "Headroom",
                     f"{d.headroom_multiplier:.1f}×",
                     "flat-rate: context budget stretched",
+                    "On a flat-rate subscription there is no per-token bill — the real win "
+                    "is that the same rate/context limits go this many times further "
+                    "before you hit them.",
                 )
             )
-        tiles.append(_tile("Expand", str(d.expand_resolved), "requests resolved in-proxy"))
+        tiles.append(
+            _tile(
+                "Expand",
+                str(d.expand_resolved),
+                "requests resolved in-proxy",
+                "Times the model asked for a folded block back (it kept a recovery handle) "
+                "and distil answered from local storage, invisibly to the session.",
+            )
+        )
         shadow_note = (
             f"{d.shadow_window_agree}/{d.shadow_window_rows} verdicts equivalent"
             if d.shadow_window_rows
             else "no verdicts in window"
         )
-        tiles.append(_tile("Shadow", str(d.shadow_sampled), f"sampled · {shadow_note}"))
+        tiles.append(
+            _tile(
+                "Shadow",
+                str(d.shadow_sampled),
+                f"sampled · {shadow_note}",
+                "A sample of requests is re-run uncompressed in the background and the "
+                "two answers compared — a live check that compression is not changing "
+                "the model's decisions.",
+            )
+        )
 
         notes: list[str] = []
         growth = d.system_growth()
@@ -1081,8 +1136,11 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
 
         tool_rows = [(name, per) for name, per, _tot in d.tool_costs()[:10]]
         tools_chart = (
-            "<h2>Tool definitions <span class='muted'>(tokens per request — resent every "
-            f"time)</span></h2>{_svg_hbars(tool_rows)}"
+            "<h2>Tool definitions <span class='muted'>(tokens per request)</span></h2>"
+            "<p class='desc'>Every enabled tool is re-described to the model on every "
+            "request, so each bar is a standing cost you pay per call. Long bars from "
+            "tools you rarely use are the cheapest tokens to reclaim — disable them.</p>"
+            f"{_svg_hbars(tool_rows)}"
             if tool_rows
             else ""
         )
@@ -1090,18 +1148,29 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
             [(sig, toks) for sig, _u, toks in d.blocks_by_kind()[:10]], color=_C_SAVED
         )
         detail_body = f"""<h2>Request detail</h2>
+<p class="desc">Every API request this session made, and where its tokens went — hover any
+card for what the term means.</p>
 <div class="grid">{"".join(tiles)}</div>
 {notes_html}
 <h2>Request composition <span class="muted">(tokens per request)</span></h2>
+<p class="desc">One bar per request, in order. Blue is the fixed overhead every request must
+carry, green is conversation content that was actually sent, yellow is what distil kept off
+the wire. Hover a bar for exact numbers.</p>
 {_legend()}
 {_svg_stack_timeline(d.requests)}
 {_timeline_table(d.requests)}
 {tools_chart}
-<h2>Digested blocks <span class="muted">(content-free: kind:size)</span></h2>
+<h2>Digested blocks <span class="muted">(what got folded)</span></h2>
+<p class="desc">Content distil summarized, grouped by what it looked like. The label is
+kind:size — e.g. <code>log:l</code> is a large log, <code>prose:m</code> a medium block of
+text. Only these labels are stored, never the content.</p>
 {kind_chart}
 <table><tr><th>kind</th><th>blocks</th><th>tokens</th></tr>{kind_rows}</table>
 <h2>Largest folds</h2>
-<table><tr><th>handle</th><th>kind</th><th>tokens</th><th>seen</th><th>restore</th></tr>{top_rows}</table>"""
+<p class="desc">The biggest single blocks distil summarized. The handle is the short ID the
+model can use to ask for the original back; “recoverable” means those original bytes are
+still on this machine.</p>
+<table><tr><th>handle</th><th>kind</th><th>tokens</th><th title="how many requests carried this block">seen</th><th title="is the original still on disk (restore/)?">restore</th></tr>{top_rows}</table>"""
     else:
         detail_body = (
             "<h2>Request detail</h2><p class='muted'>Not recorded — per-request detail needs a "
@@ -1127,6 +1196,9 @@ h2{{font-size:17px;font-weight:700;margin:34px 0 12px}}
 .card .l{{color:#9aa1b3;font-size:12px}} .card .v{{font-size:30px;font-weight:800;margin-top:4px}}
 .card .v2{{font-size:22px;font-weight:700;margin-top:4px}}
 .card .n{{color:#5b6177;font-size:12px;margin-top:6px;line-height:1.45}}
+.tile{{cursor:help}} .card[title] .l{{border-bottom:1px dotted #3a4257;display:inline-block;
+ padding-bottom:1px}}
+.desc{{color:#5b6177;font-size:13px;line-height:1.55;margin:-4px 0 14px}}
 .g{{background:linear-gradient(135deg,#8b7bff,#5ad1c9);-webkit-background-clip:text;background-clip:text;color:transparent}}
 table{{width:100%;border-collapse:collapse;border:1px solid #1b2030;border-radius:12px;overflow:hidden}}
 th,td{{padding:11px 14px;border-bottom:1px solid #1b2030;text-align:left}}
@@ -1148,16 +1220,21 @@ details{{margin:10px 0}} details summary{{cursor:pointer;color:#5b6177}}
 · billing: {e(d.billing)}</p>
 {warn_card}
 <div class="tot">
-<div class="card"><div class="l">Input tokens</div><div class="v">{_human(d.baseline_tokens)} → {_human(d.distil_tokens)}</div></div>
-<div class="card"><div class="l">Saved</div><div class="v g">{d.pct_saved:.1f}%</div></div>
-<div class="card"><div class="l">Dollars{e(dol_note)}</div><div class="v">${d.dollars_saved:.2f}</div></div>
+<div class="card" title="Input tokens are everything sent TO the model (your conversation so far, tool outputs, prompts) — the part that grows every turn and that distil compresses."><div class="l">Input tokens</div><div class="v">{_human(d.baseline_tokens)} → {_human(d.distil_tokens)}</div><div class="n">would have been sent → actually sent</div></div>
+<div class="card" title="Share of input tokens distil kept off the wire across the whole session."><div class="l">Saved</div><div class="v g">{d.pct_saved:.1f}%</div><div class="n">of input tokens never sent</div></div>
+<div class="card" title="What those saved tokens are worth at API prices. On a flat-rate subscription nothing is billed per token, so this is notional — the real win is headroom."><div class="l">Dollars{e(dol_note)}</div><div class="v">${d.dollars_saved:.2f}</div><div class="n">at API prices for this model mix</div></div>
 </div>
 <h2>Per model</h2>
+<p class="desc">Who talked and what it cost: baseline is what each model <em>would</em> have
+received unwrapped; distil is what was actually sent after compression.</p>
 <table><tr><th>model</th><th>req</th><th>baseline</th><th>distil</th><th>saved</th></tr>{model_rows}</table>
 {detail_body}
 <h2>Quality loops</h2>
+<p class="desc">distil's own safety nets: <b>expand</b> lets the model pull any folded block
+back when it needs the detail; <b>shadow</b> re-runs a sample of requests uncompressed to
+verify the answers don't change.</p>
 <p class="muted">expand: {d.expand_resolved} resolved in-proxy · shadow: {d.shadow_sampled} sampled ·
-window verdicts (time-joined): {d.shadow_window_agree}/{d.shadow_window_rows} equivalent</p>
+verdicts near this session (time-joined): {d.shadow_window_agree}/{d.shadow_window_rows} equivalent</p>
 {exit_line}
 <p class="foot">Local-first: assembled from savings.jsonl, sessions/&lt;sid&gt;*, restore/ and
 shadow.jsonl on this machine. Content-free — handles and kind:size signatures only.</p>
