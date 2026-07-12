@@ -51,29 +51,66 @@ def _write_transcript(claude_dir: Path, cwd_slug: str = "-tmp-proj") -> Path:
     proj.mkdir(parents=True, exist_ok=True)
     lines = [
         {"type": "ai-title", "aiTitle": "fix the flaky tests"},
-        {"type": "user", "timestamp": _iso(900), "cwd": "/tmp/proj",
-         "origin": {"kind": "human"},
-         "message": {"role": "user", "content": "please run the tests"}},
-        {"type": "assistant", "timestamp": _iso(950),
-         "message": {"role": "assistant", "content": [
-             {"type": "tool_use", "id": "tu1", "name": "bash", "input": {}}]}},
-        {"type": "user", "timestamp": _iso(990),
-         "message": {"role": "user", "content": [
-             {"type": "tool_result", "tool_use_id": "tu1",
-              "content": [{"type": "text", "text": "$ make test\n" + _BLOB}]}]}},
+        {
+            "type": "user",
+            "timestamp": _iso(900),
+            "cwd": "/tmp/proj",
+            "origin": {"kind": "human"},
+            "message": {"role": "user", "content": "please run the tests"},
+        },
+        {
+            "type": "assistant",
+            "timestamp": _iso(950),
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "tu1", "name": "bash", "input": {}}],
+            },
+        },
+        {
+            "type": "user",
+            "timestamp": _iso(990),
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tu1",
+                        "content": [{"type": "text", "text": "$ make test\n" + _BLOB}],
+                    }
+                ],
+            },
+        },
         # a sidechain human line must NOT count as a turn
-        {"type": "user", "timestamp": _iso(1200), "isSidechain": True,
-         "origin": {"kind": "human"},
-         "message": {"role": "user", "content": "subagent task prompt"}},
-        {"type": "user", "timestamp": _iso(1500), "origin": {"kind": "human"},
-         "message": {"role": "user", "content": [{"type": "text", "text": "now fix the bug"}]}},
-        {"type": "assistant", "timestamp": _iso(1550),
-         "message": {"role": "assistant", "content": [
-             {"type": "tool_use", "id": "tu2", "name": "Read", "input": {}}]}},
+        {
+            "type": "user",
+            "timestamp": _iso(1200),
+            "isSidechain": True,
+            "origin": {"kind": "human"},
+            "message": {"role": "user", "content": "subagent task prompt"},
+        },
+        {
+            "type": "user",
+            "timestamp": _iso(1500),
+            "origin": {"kind": "human"},
+            "message": {"role": "user", "content": [{"type": "text", "text": "now fix the bug"}]},
+        },
+        {
+            "type": "assistant",
+            "timestamp": _iso(1550),
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "tu2", "name": "Read", "input": {}}],
+            },
+        },
         # the agent re-fetched the same content after it had been folded
-        {"type": "user", "timestamp": _iso(1560),
-         "message": {"role": "user", "content": [
-             {"type": "tool_result", "tool_use_id": "tu2", "content": _BLOB}]}},
+        {
+            "type": "user",
+            "timestamp": _iso(1560),
+            "message": {
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "tu2", "content": _BLOB}],
+            },
+        },
         {"type": "not json line skipped below"},
     ]
     path = proj / "abc-session.jsonl"
@@ -106,9 +143,7 @@ class _EchoHandler(BaseHTTPRequestHandler):
         streaming = b'"stream": true' in body or b'"stream":true' in body
         payload = _UPSTREAM_SSE if streaming else _UPSTREAM_JSON
         self.send_response(200)
-        self.send_header(
-            "Content-Type", "text/event-stream" if streaming else "application/json"
-        )
+        self.send_header("Content-Type", "text/event-stream" if streaming else "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
@@ -148,9 +183,7 @@ def _compressible_payload() -> dict[str, Any]:
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {"type": "tool_result", "tool_use_id": "t1", "content": _LOG_LINES}
-                ],
+                "content": [{"type": "tool_result", "tool_use_id": "t1", "content": _LOG_LINES}],
             },
             {"role": "user", "content": "next"},
             {"role": "user", "content": "next again"},
@@ -169,7 +202,7 @@ class TestRequestDetailLogging:
             assert resp.status == 200
         path = session_requests_path("s100-1")
         assert path is not None and path.exists()
-        recs = [json.loads(line) for line in path.read_text().splitlines()]
+        recs = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
         assert len(recs) == 1
         rec = recs[0]
         assert rec["model"] == "claude-test-1"
@@ -202,13 +235,17 @@ class TestRequestDetailLogging:
             resp.read()
         path = session_requests_path("s101-1")
         assert path is not None
-        # The detail record lands after the last relayed byte — poll briefly.
-        for _ in range(100):
+        # The detail record lands after the last relayed byte — poll until a full
+        # LINE is present (the file can exist momentarily before the line is flushed).
+        rec = None
+        for _ in range(250):
             if path.exists():
-                break
+                lines = path.read_text(encoding="utf-8").splitlines()
+                if lines:
+                    rec = json.loads(lines[0])
+                    break
             time.sleep(0.02)
-        assert path.exists()
-        rec = json.loads(path.read_text().splitlines()[0])
+        assert rec is not None, "streamed detail record was not written in time"
         assert rec["stream"] is True and rec["client_stream"] is True
         assert rec["usage_input_tokens"] == 1234  # from SSE message_start
         assert rec["usage_output_tokens"] == 55  # last (cumulative) message_delta
@@ -233,7 +270,7 @@ class TestWrapManifest:
         assert wrap_run(["true"], expand=True, session_delta=True, shadow_rate=0.25) == 0
         manifests = list((tmp_path / "sessions").glob("s*.json"))
         assert len(manifests) == 1
-        man = json.loads(manifests[0].read_text())
+        man = json.loads(manifests[0].read_text(encoding="utf-8"))
         assert man["tool"] == "true" and man["argv"] == ["true"]
         assert man["flags"]["expand"] is True
         assert man["flags"]["session_delta"] is True
@@ -259,75 +296,164 @@ def _seed_state(home: Path) -> None:
         "acct": 2,
     }
     ledger = [
-        {**row, "session": "s200-1", "model": "m-big", "turns": 2, "ts": 1000.0,
-         "baseline_input_tokens": 9000, "distil_input_tokens": 3000,
-         "baseline_dollars": 0.9, "distil_dollars": 0.3},
-        {**row, "session": "s200-1", "model": "m-small", "turns": 1, "ts": 1600.0,
-         "baseline_input_tokens": 1000, "distil_input_tokens": 900,
-         "baseline_dollars": 0.1, "distil_dollars": 0.09},
-        {**row, "session": "s300-9", "model": "m-big", "turns": 1, "ts": 2000.0,
-         "baseline_input_tokens": 500, "distil_input_tokens": 400,
-         "baseline_dollars": 0.05, "distil_dollars": 0.04},
+        {
+            **row,
+            "session": "s200-1",
+            "model": "m-big",
+            "turns": 2,
+            "ts": 1000.0,
+            "baseline_input_tokens": 9000,
+            "distil_input_tokens": 3000,
+            "baseline_dollars": 0.9,
+            "distil_dollars": 0.3,
+        },
+        {
+            **row,
+            "session": "s200-1",
+            "model": "m-small",
+            "turns": 1,
+            "ts": 1600.0,
+            "baseline_input_tokens": 1000,
+            "distil_input_tokens": 900,
+            "baseline_dollars": 0.1,
+            "distil_dollars": 0.09,
+        },
+        {
+            **row,
+            "session": "s300-9",
+            "model": "m-big",
+            "turns": 1,
+            "ts": 2000.0,
+            "baseline_input_tokens": 500,
+            "distil_input_tokens": 400,
+            "baseline_dollars": 0.05,
+            "distil_dollars": 0.04,
+        },
         {"corrupt": "row missing session"},
     ]
-    (home / "savings.jsonl").write_text(
-        "\n".join(json.dumps(r) for r in ledger) + "\nnot json\n"
-    )
+    (home / "savings.jsonl").write_text("\n".join(json.dumps(r) for r in ledger) + "\nnot json\n")
     sess = home / "sessions"
     sess.mkdir()
-    (sess / "s200-1.json").write_text(json.dumps({
-        "sid": "s200-1", "tool": "codex", "argv": ["codex", "--full-auto"],
-        "cwd": "/tmp/proj",
-        "started_ts": 990.0, "distil_version": "1.15.0", "billing": "subscription",
-        "flags": {"expand": True, "session_delta": True, "shadow_rate": 0.1,
-                  "lossless_only": False, "verbatim": False, "shape_output": "off",
-                  "upstream": "https://api.anthropic.com", "env_var": "ANTHROPIC_BASE_URL"},
-    }))
-    details = [
-        {"ts": 1000.0, "model": "m-big", "stream": True, "client_stream": True,
-         "status": 200, "booked": True, "duration_ms": 4000,
-         "usage_input_tokens": 2100, "usage_output_tokens": 300, "expanded_handles": [],
-         "mode": "digest", "compressible_tokens": 5000, "tokens_saved": 3500,
-         "overhead_tokens": 700, "system_tokens": 100, "tools_tokens": 600,
-         "tools": [{"name": "bash", "tokens": 300},
-                   {"name": "mcp__gmail__search", "tokens": 300}],
-         "delta_refs": 0, "delta_tokens_saved": 0,
-         "prefix_msgs": 0, "shadow_sampled": True, "expanded": False,
-         "output_shaping": "",
-         "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000},
-                    {"h": "bbbb2222", "sig": "prose:m", "tokens": 900}]},
-        {"ts": 1600.0, "model": "m-small", "stream": False, "client_stream": True,
-         "status": 200, "booked": True, "duration_ms": 9000,
-         "usage_input_tokens": 1200, "usage_output_tokens": 150,
-         "expanded_handles": ["aaaa1111"],
-         "mode": "digest", "compressible_tokens": 2000, "tokens_saved": 1200,
-         "overhead_tokens": 500, "system_tokens": 200, "tools_tokens": 300,
-         "tools": [{"name": "bash", "tokens": 300}],
-         "delta_refs": 3, "delta_tokens_saved": 800,
-         "prefix_msgs": 4, "shadow_sampled": False, "expanded": True,
-         "output_shaping": "",
-         "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000}]},
-        {"ts": 1700.0, "model": "m-small", "stream": False, "client_stream": False,
-         "status": 529, "booked": False, "duration_ms": 500,
-         "usage_input_tokens": None, "usage_output_tokens": None, "expanded_handles": [],
-         "mode": "verbatim", "compressible_tokens": 0, "tokens_saved": 0,
-         "overhead_tokens": 500, "system_tokens": 250, "tools_tokens": 250,
-         "tools": [{"name": "bash", "tokens": 250}],
-         "delta_refs": 0, "delta_tokens_saved": 0,
-         "prefix_msgs": 0, "shadow_sampled": False, "expanded": False,
-         "output_shaping": "", "blocks": []},
-    ]
-    (sess / "s200-1.requests.jsonl").write_text(
-        "\n".join(json.dumps(r) for r in details) + "\n"
+    (sess / "s200-1.json").write_text(
+        json.dumps(
+            {
+                "sid": "s200-1",
+                "tool": "codex",
+                "argv": ["codex", "--full-auto"],
+                "cwd": "/tmp/proj",
+                "started_ts": 990.0,
+                "distil_version": "1.15.0",
+                "billing": "subscription",
+                "flags": {
+                    "expand": True,
+                    "session_delta": True,
+                    "shadow_rate": 0.1,
+                    "lossless_only": False,
+                    "verbatim": False,
+                    "shape_output": "off",
+                    "upstream": "https://api.anthropic.com",
+                    "env_var": "ANTHROPIC_BASE_URL",
+                },
+            }
+        )
     )
+    details = [
+        {
+            "ts": 1000.0,
+            "model": "m-big",
+            "stream": True,
+            "client_stream": True,
+            "status": 200,
+            "booked": True,
+            "duration_ms": 4000,
+            "usage_input_tokens": 2100,
+            "usage_output_tokens": 300,
+            "expanded_handles": [],
+            "mode": "digest",
+            "compressible_tokens": 5000,
+            "tokens_saved": 3500,
+            "overhead_tokens": 700,
+            "system_tokens": 100,
+            "tools_tokens": 600,
+            "tools": [
+                {"name": "bash", "tokens": 300},
+                {"name": "mcp__gmail__search", "tokens": 300},
+            ],
+            "delta_refs": 0,
+            "delta_tokens_saved": 0,
+            "prefix_msgs": 0,
+            "shadow_sampled": True,
+            "expanded": False,
+            "output_shaping": "",
+            "blocks": [
+                {"h": "aaaa1111", "sig": "log:l", "tokens": 2000},
+                {"h": "bbbb2222", "sig": "prose:m", "tokens": 900},
+            ],
+        },
+        {
+            "ts": 1600.0,
+            "model": "m-small",
+            "stream": False,
+            "client_stream": True,
+            "status": 200,
+            "booked": True,
+            "duration_ms": 9000,
+            "usage_input_tokens": 1200,
+            "usage_output_tokens": 150,
+            "expanded_handles": ["aaaa1111"],
+            "mode": "digest",
+            "compressible_tokens": 2000,
+            "tokens_saved": 1200,
+            "overhead_tokens": 500,
+            "system_tokens": 200,
+            "tools_tokens": 300,
+            "tools": [{"name": "bash", "tokens": 300}],
+            "delta_refs": 3,
+            "delta_tokens_saved": 800,
+            "prefix_msgs": 4,
+            "shadow_sampled": False,
+            "expanded": True,
+            "output_shaping": "",
+            "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000}],
+        },
+        {
+            "ts": 1700.0,
+            "model": "m-small",
+            "stream": False,
+            "client_stream": False,
+            "status": 529,
+            "booked": False,
+            "duration_ms": 500,
+            "usage_input_tokens": None,
+            "usage_output_tokens": None,
+            "expanded_handles": [],
+            "mode": "verbatim",
+            "compressible_tokens": 0,
+            "tokens_saved": 0,
+            "overhead_tokens": 500,
+            "system_tokens": 250,
+            "tools_tokens": 250,
+            "tools": [{"name": "bash", "tokens": 250}],
+            "delta_refs": 0,
+            "delta_tokens_saved": 0,
+            "prefix_msgs": 0,
+            "shadow_sampled": False,
+            "expanded": False,
+            "output_shaping": "",
+            "blocks": [],
+        },
+    ]
+    (sess / "s200-1.requests.jsonl").write_text("\n".join(json.dumps(r) for r in details) + "\n")
     (sess / "s200-1").write_text("1")
     (sess / "s300-9.exit").write_text("rc=0")
     restore = home / "restore"
     restore.mkdir()
     (restore / "aaaa1111").write_text(_BLOB)
     (home / "shadow.jsonl").write_text(
-        json.dumps({"ts": 1500.0, "equivalent": True}) + "\n"
-        + json.dumps({"ts": 999999.0, "equivalent": False}) + "\n"
+        json.dumps({"ts": 1500.0, "equivalent": True})
+        + "\n"
+        + json.dumps({"ts": 999999.0, "equivalent": False})
+        + "\n"
     )
 
 
@@ -436,7 +562,7 @@ class TestCli:
     def test_html_export(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         out_file = tmp_path / "dissect.html"
         assert main(["dissect", "s200-1", "--html", str(out_file)]) == 0
-        assert out_file.read_text().startswith("<!doctype html>")
+        assert out_file.read_text(encoding="utf-8").startswith("<!doctype html>")
 
     def test_unknown_session_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
         assert main(["dissect", "zzz"]) == 2
@@ -554,7 +680,7 @@ class TestToolsAndCharts:
         # Plain-English help layer: section descriptions + tile explanations.
         assert "for what the term means" in page
         assert "Tokens distil avoided sending by replacing bulky content" in page
-        assert "class=\"desc\"" in page
+        assert 'class="desc"' in page
         assert "re-described to the model on every request" in page
 
     def test_json_has_tool_breakdown(self) -> None:
@@ -625,10 +751,18 @@ class TestAnomalies:
         sess = home / "sessions"
         sess.mkdir(exist_ok=True)
         man = {
-            "sid": "s900-1", "tool": "claude", "argv": ["claude"], "started_ts": 1.0,
-            "distil_version": "1.15.0", "billing": "subscription",
-            "flags": {"expand": False, "session_delta": False, "shadow_rate": 0.0,
-                      "lossless_only": False},
+            "sid": "s900-1",
+            "tool": "claude",
+            "argv": ["claude"],
+            "started_ts": 1.0,
+            "distil_version": "1.15.0",
+            "billing": "subscription",
+            "flags": {
+                "expand": False,
+                "session_delta": False,
+                "shadow_rate": 0.0,
+                "lossless_only": False,
+            },
         }
         man["flags"].update(manifest.pop("flags", {}))
         man.update(manifest)
@@ -640,21 +774,32 @@ class TestAnomalies:
     @staticmethod
     def _req(**over: Any) -> dict[str, Any]:
         base = {
-            "ts": 10.0, "model": "m", "stream": True, "client_stream": True,
-            "status": 200, "booked": True, "duration_ms": 100,
-            "usage_input_tokens": None, "usage_output_tokens": None,
-            "expanded_handles": [], "mode": "digest", "compressible_tokens": 100,
-            "tokens_saved": 50, "overhead_tokens": 10, "delta_refs": 0,
-            "delta_tokens_saved": 0, "prefix_msgs": 0, "shadow_sampled": False,
-            "expanded": False, "output_shaping": "",
+            "ts": 10.0,
+            "model": "m",
+            "stream": True,
+            "client_stream": True,
+            "status": 200,
+            "booked": True,
+            "duration_ms": 100,
+            "usage_input_tokens": None,
+            "usage_output_tokens": None,
+            "expanded_handles": [],
+            "mode": "digest",
+            "compressible_tokens": 100,
+            "tokens_saved": 50,
+            "overhead_tokens": 10,
+            "delta_refs": 0,
+            "delta_tokens_saved": 0,
+            "prefix_msgs": 0,
+            "shadow_sampled": False,
+            "expanded": False,
+            "output_shaping": "",
             "blocks": [{"h": "cccc3333", "sig": "log:m", "tokens": 40}],
         }
         base.update(over)
         return base
 
-    def test_silent_shadow_flagged(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_silent_shadow_flagged(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
         self._session(tmp_path, [self._req() for _ in range(12)], flags={"shadow_rate": 0.5})
         warnings = dz.dissect("s900-1").anomalies()
@@ -669,9 +814,7 @@ class TestAnomalies:
         warnings = dz.dissect("s900-1").anomalies()
         assert any("could never be intercepted" in w for w in warnings)
 
-    def test_unbooked_spike_flagged(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_unbooked_spike_flagged(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
         reqs = [self._req() for _ in range(6)] + [
             self._req(booked=False, status=529) for _ in range(4)
@@ -700,9 +843,10 @@ class TestHeadlines:
     def test_layman_story(self) -> None:
         heads = dict(dz.dissect("s200-1").headlines())
         assert "distil kept 6.10k of 10.00k input tokens off the wire (61%)" in heads
-        assert "mostly by summarizing large logs" in heads[
-            "distil kept 6.10k of 10.00k input tokens off the wire (61%)"
-        ]
+        assert (
+            "mostly by summarizing large logs"
+            in heads["distil kept 6.10k of 10.00k input tokens off the wire (61%)"]
+        )
         out_head = "The model wrote 450 output tokens (12% of billed traffic)"
         assert out_head in heads
         # Subscription session -> the output-shaping gate is explained.
@@ -813,7 +957,9 @@ class TestTranscriptCorrelation:
 
             def load(self, path: Path) -> Transcript:
                 return Transcript(
-                    agent=self.name, path=path, label="toy session",
+                    agent=self.name,
+                    path=path,
+                    label="toy session",
                     turns=[UserTurn(index=1, ts=1.0, text="hi")],
                     tool_results=[ToolResult(ts=2.0, text="x" * 50, tool="toytool", turn=1)],
                 )
