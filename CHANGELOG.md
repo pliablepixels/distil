@@ -3,6 +3,19 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.3] — honor explicit --expand on a subscription (#28)
+
+### Fixed
+- **`--expand` is no longer silently disabled on a subscription** (#28, thanks @pliablepixels).
+  Subscription sessions run lossless-only, which forces verbatim and turns the Tier-1 digest
+  off — so `--expand` did nothing there. The verbatim force exists because an *unrecoverable*
+  stub is irreversibly lossy; but `--expand` injects `distil_expand`, which makes every stub
+  recoverable, so that hazard doesn't apply. An explicit `--expand` now lifts the force even on
+  a subscription: maximum recoverable compression, nothing irreversibly lost, with a one-time
+  startup notice. **The default is unchanged — no `--expand` still means lossless-only.**
+  Genuinely-lossy output shaping stays metered-only (it rewrites the response, which expand
+  can't recover).
+
 ## [1.15.2] — CI portability + docs
 
 Maintenance release. No shipped-code behaviour change from 1.15.1 — the package is byte-identical
