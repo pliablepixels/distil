@@ -548,6 +548,112 @@ class ShadowLedger:
         return led
 
 
+class ShadowCounters:
+    """Content-free sampling diagnostics — counts only, never prompt/response content.
+
+    note_seen() / note_sampled() are safe to call from the request path (in-memory
+    only, no I/O).  flush_with() is called from the background shadow thread and
+    drains pending in-memory increments to disk via flock-guarded JSON, matching the
+    ShadowLedger persistence style.
+    """
+
+    _FILENAME = "shadow_counters.json"
+
+    def __init__(self, path: Path | None = None) -> None:
+        self._path = path or (_state_dir() / self._FILENAME)
+        self._lock = threading.Lock()
+        self._pending: dict[str, int] = {}
+
+    # ---- request-path helpers (in-memory only, no I/O) -------------------------
+
+    def note_seen(self) -> None:
+        """Increment requests_seen. In-memory only — safe for the hot request path."""
+        with self._lock:
+            self._pending["requests_seen"] = self._pending.get("requests_seen", 0) + 1
+
+    def note_sampled(self) -> None:
+        """Increment sampled. In-memory only — safe for the hot request path."""
+        with self._lock:
+            self._pending["sampled"] = self._pending.get("sampled", 0) + 1
+
+    # ---- background-thread helper -----------------------------------------------
+
+    def flush_with(
+        self,
+        *,
+        replay_attempted: bool = False,
+        replay_failed: bool = False,
+        fail_reason: str = "",
+        sig_none_skipped: bool = False,
+        recorded: bool = False,
+    ) -> None:
+        """Drain pending in-memory counters + append outcome flags, then persist.
+
+        Always called from the background shadow thread — never from the request path.
+        Swallows all exceptions so counter writes never surface to callers.
+        """
+        try:
+            with self._lock:
+                deltas: dict[str, int] = dict(self._pending)
+                self._pending.clear()
+            if replay_attempted:
+                deltas["replay_attempted"] = deltas.get("replay_attempted", 0) + 1
+            if replay_failed:
+                deltas["replay_failed"] = deltas.get("replay_failed", 0) + 1
+            if sig_none_skipped:
+                deltas["signature_none_skipped"] = deltas.get("signature_none_skipped", 0) + 1
+            if recorded:
+                deltas["recorded"] = deltas.get("recorded", 0) + 1
+            self._write(deltas, fail_reason if replay_failed else "")
+        except Exception:  # noqa: BLE001 — counter writes must never surface
+            pass
+
+    def _write(self, deltas: dict[str, int], fail_reason: str) -> None:
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._path, "a+") as f:
+                if _HAVE_FCNTL:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                try:
+                    f.seek(0)
+                    try:
+                        data: dict[str, Any] = json.load(f)
+                    except (json.JSONDecodeError, ValueError):
+                        data = {}
+                    for k, v in deltas.items():
+                        data[k] = data.get(k, 0) + v
+                    if fail_reason:
+                        data["last_fail_reason"] = fail_reason
+                    f.seek(0)
+                    f.truncate()
+                    json.dump(data, f)
+                finally:
+                    if _HAVE_FCNTL:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+
+    @classmethod
+    def load(cls, path: Path | None = None) -> dict[str, Any]:
+        """Read the persisted counter JSON. Returns {} if missing or unreadable."""
+        try:
+            p = path or (_state_dir() / cls._FILENAME)
+            if not p.exists():
+                return {}
+            with open(p) as f:
+                if _HAVE_FCNTL:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)
+                try:
+                    return json.load(f)
+                except (json.JSONDecodeError, ValueError):
+                    return {}
+                finally:
+                    if _HAVE_FCNTL:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            return {}
+
+
 def compare_decisions(compressed_resp: Any, original_resp: Any) -> bool:
     """True iff the agent made the same decision with and without compression."""
     return decision_signature(compressed_resp) == decision_signature(original_resp)

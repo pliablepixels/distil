@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import threading
 import time
@@ -59,6 +60,39 @@ _HOP_BY_HOP = frozenset(
         "upgrade",
     }
 )
+
+# A distil digest stub embeds an 8-hex content handle ("<< +N lines, handle=1a2b3c4d >>",
+# columnar/delta variants). RestoreStore persists to disk, so a stub can outlive the
+# request that created it and be expanded turns later.
+_HANDLE_STUB_RE = re.compile(r"handle=[0-9a-fA-F]{6,}")
+
+
+def _has_recoverable_stub(body: dict) -> bool:
+    """True if the outgoing conversation still carries any distil digest handle."""
+    try:
+        blob = json.dumps(body.get("messages") or [])
+    except (TypeError, ValueError):
+        return False
+    return _HANDLE_STUB_RE.search(blob) is not None
+
+
+def _expand_should_intercept(expand: bool, store: object, body: dict) -> bool:
+    """Whether the expand tool must be injected AND the response buffered to run the
+    expand loop. True whenever expand mode is on and the outgoing conversation carries
+    ANY recoverable handle — one created THIS request, or one that persisted from an
+    earlier turn. Keying on ``store.handles`` alone (this request only) let a *streamed*
+    turn that digested nothing new but referenced an older stub emit a ``distil_expand``
+    tool_use with no tool injected and no expand loop, so the call escaped to the client
+    as "No such tool available" (#25). Cheap case (new handles this request) short-circuits
+    before the message scan.
+    ponytail: buffering whenever a stub is in context costs streaming TTFT on long expand
+    sessions; that is the price of never leaking an unresolvable tool call. Stream-intercept
+    of the tool_use frame would recover TTFT if it ever matters."""
+    if not expand:
+        return False
+    if getattr(store, "handles", None):
+        return True
+    return _has_recoverable_stub(body)
 
 
 # Upstream socket timeout (seconds). Generous — LLM generations run minutes —
@@ -282,6 +316,7 @@ def build_handler(
     # decision uncompressed too (in the background), and record whether it matched.
     _shadow_sampler = None
     _shadow_ledger = None
+    _shadow_counters = None
     _shadow_threads: list[threading.Thread] = []
     _shadow_threads_lock = threading.Lock()
     from . import __version__ as _running_version
@@ -291,10 +326,11 @@ def build_handler(
     # path re-checks the installed version (throttled) and warns once on drift.
     _version_state: dict[str, Any] = {"running": _running_version}
     if shadow_rate and shadow_rate > 0:
-        from .shadow import ShadowLedger, ShadowSampler
+        from .shadow import ShadowCounters, ShadowLedger, ShadowSampler
 
         _shadow_sampler = ShadowSampler(shadow_rate)
         _shadow_ledger = ShadowLedger()
+        _shadow_counters = ShadowCounters()
 
     # First-POST latch for the session traffic marker: only the 0→1 transition
     # matters, so after one write the check is a single list lookup.
@@ -541,7 +577,7 @@ def build_handler(
                     extras["x-distil-cache-prefix-msgs"] = str(_dstats.prefix_msgs)
                 # Recoverable compression: if anything was digested, offer the model
                 # the distil_expand tool so it can pull back detail on demand.
-                if expand and getattr(store, "handles", None):
+                if _expand_should_intercept(expand, store, body):
                     from .expand import inject_expand_tool
 
                     body = inject_expand_tool(body)
@@ -592,6 +628,10 @@ def build_handler(
             # Decide shadow sampling BEFORE relaying so the marker header can be
             # sent on the streaming path too (headers go out before the body).
             shadow_sampled = _shadow_sampler is not None and _shadow_sampler.should_sample()
+            if _shadow_sampler is not None and _shadow_counters is not None:
+                _shadow_counters.note_seen()
+            if shadow_sampled and _shadow_counters is not None:
+                _shadow_counters.note_sampled()
             if shadow_sampled:
                 extras["x-distil-shadow"] = "sampled"
 
@@ -601,7 +641,7 @@ def build_handler(
             # re-query before answering), so expand-eligible requests stay on
             # the buffered path.
             want_stream = bool(body.get("stream")) or ":streamGenerateContent" in self.path
-            if want_stream and not (expand and getattr(store, "handles", None)):
+            if want_stream and not _expand_should_intercept(expand, store, body):
                 from .streamrelay import stream_upstream
 
                 with request_span(_span_model, self.path) as _span:
@@ -651,7 +691,7 @@ def build_handler(
 
             # Transparent expand loop: resolve any distil_expand tool calls against
             # the local store and re-query, invisibly, before returning to the agent.
-            if expand and getattr(store, "handles", None):
+            if _expand_should_intercept(expand, store, body):
                 try:
                     resp_json = json.loads(rbody)
                 except (ValueError, TypeError):
@@ -713,6 +753,11 @@ def build_handler(
             )  # ponytail: fixed 1/3 split; make configurable if the baseline needs tuning
 
             def _shadow_compare() -> None:
+                _attempted = False
+                _failed = False
+                _fail_reason = ""
+                _skipped = False
+                _written = False
                 try:
                     from .shadow import decision_signature_from_body, force_deterministic
 
@@ -723,9 +768,13 @@ def build_handler(
                     served_det = force_deterministic(compressed_raw)
                     replay_det = force_deterministic(compressed_raw if is_aa else orig_raw)
                     if served_det is None or replay_det is None:
-                        return
+                        return  # not deterministic; flush pending seen/sampled via finally
+                    _attempted = True
                     _s1, _h1, served_rbody = self._post_upstream(self.path, served_det, headers)
                     _s2, _h2, replay_rbody = self._post_upstream(self.path, replay_det, headers)
+                    if not (200 <= _s1 < 300 and 200 <= _s2 < 300):
+                        _failed = True
+                        _fail_reason = str(_s2 if not (200 <= _s2 < 300) else _s1)
                     # decision_signature_from_body handles both JSON and streamed
                     # (SSE / chunk-array) bodies, so this works for Claude Code /
                     # Codex / Gemini sessions, which stream their responses.
@@ -747,8 +796,22 @@ def build_handler(
                                 "sig_replay": replay_sig,
                             },
                         )
+                        _written = True
+                    elif "none" in (comp_sig, replay_sig):
+                        _skipped = True
                 except Exception:  # noqa: BLE001 — shadow must never affect the request
                     log.debug("shadow compare failed", exc_info=True)
+                    if _attempted and not _written:
+                        _failed, _fail_reason = True, "exception"
+                finally:
+                    if _shadow_counters is not None:
+                        _shadow_counters.flush_with(
+                            replay_attempted=_attempted,
+                            replay_failed=_failed,
+                            fail_reason=_fail_reason,
+                            sig_none_skipped=_skipped,
+                            recorded=_written,
+                        )
 
             # Track the thread so teardown can drain it: a daemon thread is
             # killed on process exit, which loses the sample on a quick run

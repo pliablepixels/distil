@@ -555,11 +555,12 @@ def cmd_proxy_worker(args: argparse.Namespace) -> int:
 
 def cmd_shadow_stats(args: argparse.Namespace) -> int:
     """Show the live decision-equivalence measured by shadow mode on real traffic."""
-    from .shadow import ShadowLedger
+    from .shadow import ShadowCounters, ShadowLedger
 
     # Default to the current signature algorithm so these numbers match the status
     # line verdict; --all reads every row (incl. old-version) for auditing.
     led = ShadowLedger.load(current_only=not getattr(args, "all", False))
+    _ctrs = ShadowCounters.load()
     if getattr(args, "json", False):
         print(
             json.dumps(
@@ -585,12 +586,38 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
         )
         return 0
     if led.samples == 0:
-        print(
-            "No shadow samples yet. Start it in one command:\n"
-            "  distil wrap --shadow 0.1 -- claude   "
-            "(or codex/gemini; add --lossless-only on a subscription)\n"
-            "then use your agent normally — samples accumulate as you work."
-        )
+        _attempted = _ctrs.get("replay_attempted", 0)
+        if _attempted > 0:
+            _seen = _ctrs.get("requests_seen", 0)
+            _sampled = _ctrs.get("sampled", 0)
+            _failed = _ctrs.get("replay_failed", 0)
+            _reason = _ctrs.get("last_fail_reason", "")
+            _skipped = _ctrs.get("signature_none_skipped", 0)
+            _reason_str = f" (last: {_reason})" if _reason else ""
+            print(
+                f"Shadow counters: {_seen} seen, {_sampled} sampled, "
+                f"{_attempted} replay{'s' if _attempted != 1 else ''} attempted, "
+                f"{_failed} failed{_reason_str}"
+            )
+            if _failed and _failed == _attempted:
+                print(
+                    "\nAll replays failed — check upstream auth (subscription OAuth "
+                    "may reject proxy-initiated replay requests)."
+                )
+            elif _skipped:
+                print(
+                    f"\n{_skipped} skip{'s' if _skipped != 1 else ''}: upstream returned "
+                    "no parseable decision (transient error or non-JSON body)."
+                )
+            else:
+                print("\nNo recorded samples yet — keep using your agent.")
+        else:
+            print(
+                "No shadow samples yet. Start it in one command:\n"
+                "  distil wrap --shadow 0.1 -- claude   "
+                "(or codex/gemini; add --lossless-only on a subscription)\n"
+                "then use your agent normally — samples accumulate as you work."
+            )
         return 0
     change = led.rate()
     print("Shadow-mode live decision-equivalence (real traffic, content-free)\n")
@@ -625,6 +652,18 @@ def cmd_shadow_stats(args: argparse.Namespace) -> int:
         "\n  Each sampled request was run BOTH compressed and uncompressed; "
         "equivalence\n  means the agent chose the same next action. Numbers only, never content."
     )
+    if _ctrs:
+        _seen = _ctrs.get("requests_seen", 0)
+        _sampled = _ctrs.get("sampled", 0)
+        _attempted = _ctrs.get("replay_attempted", 0)
+        _failed = _ctrs.get("replay_failed", 0)
+        _reason = _ctrs.get("last_fail_reason", "")
+        _recorded = _ctrs.get("recorded", 0)
+        _reason_str = f" (last: {_reason})" if _reason and _failed else ""
+        print(
+            f"\n  Sampling: {_seen} seen, {_sampled} sampled, "
+            f"{_attempted} attempted, {_failed} failed{_reason_str}, {_recorded} recorded"
+        )
     return 0
 
 
