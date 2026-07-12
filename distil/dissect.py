@@ -1480,3 +1480,98 @@ shadow.jsonl on this machine. Content-free — handles and kind:size signatures 
   document.addEventListener("focusout", function () {{ tip.style.display = "none"; }});
 }})();
 </script></body></html>"""
+
+
+# ------------------------------------------------------------------- portal
+def render_sessions_html(sessions: list[SessionOverview]) -> str:
+    """The portal index: the session picker as a clickable page."""
+    e = _html.escape
+    rows = "".join(
+        f'<tr onclick="location=\'/session/{e(o.sid)}\'">'
+        f"<td><code>{e(o.sid)}</code></td><td>{e(o.tool or '?')}</td>"
+        f"<td>{e(_when(o.started))}</td><td>{e(_when(o.last_ts))}</td>"
+        f"<td class='r'>{o.requests}</td>"
+        f"<td class='r'>{100.0 * (o.baseline_tokens - o.distil_tokens) / o.baseline_tokens if o.baseline_tokens else 0.0:.1f}%</td>"
+        f"<td>{e(o.status)}</td></tr>"
+        for o in sessions
+    ) or "<tr><td class='muted' colspan='7'>no sessions recorded yet — run a wrap first</td></tr>"
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="refresh" content="15"/>
+<title>Distil — sessions</title><style>
+body{{margin:0;background:#06070b;color:#f2f3f7;font:15px/1.6 Inter,ui-sans-serif,sans-serif}}
+.wrap{{max-width:820px;margin:0 auto;padding:48px 24px}}
+h1{{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}}
+.sub{{color:#9aa1b3;margin:0 0 28px}}
+.g{{background:linear-gradient(135deg,#8b7bff,#5ad1c9);-webkit-background-clip:text;background-clip:text;color:transparent}}
+table{{width:100%;border-collapse:collapse;border:1px solid #1b2030;border-radius:12px;overflow:hidden}}
+th,td{{padding:11px 14px;border-bottom:1px solid #1b2030;text-align:left}}
+th{{color:#5b6177;font-size:11px;text-transform:uppercase;letter-spacing:.07em}}
+td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}}
+tbody tr{{cursor:pointer}} tbody tr:hover td{{background:#10131d}}
+code{{color:#8b7bff}} .muted{{color:#5b6177}}
+.foot{{color:#5b6177;font-size:12.5px;margin-top:22px}}
+</style></head><body><div class="wrap">
+<h1>Distil <span class="g">sessions</span></h1>
+<p class="sub">Pick a session to dissect — newest activity first. This page refreshes itself.</p>
+<table><thead><tr><th>session</th><th>tool</th><th>started</th><th>last</th><th>reqs</th>
+<th>saved</th><th>status</th></tr></thead><tbody>{rows}</tbody></table>
+<p class="foot">Local-first: served from this machine's ~/.distil only. Reports are per-session;
+JSON at /json/&lt;session&gt;.</p>
+</div></body></html>"""
+
+
+def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
+    """Build (don't start) the dissect portal server — stdlib only, like the
+    gateway. Routes: ``/`` index, ``/session/<sid>`` report, ``/json/<sid>``.
+
+    Every request re-reads state from disk, so a refresh shows the live
+    session as it grows. Binds localhost by default; the data is one user's
+    own telemetry, so there is no auth layer — don't bind it wider unless
+    that is understood.
+    """
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class _Portal(BaseHTTPRequestHandler):
+        server_version = "distil-dissect"
+
+        def _send(self, status: int, body: str, ctype: str = "text/html; charset=utf-8") -> None:
+            data = body.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def do_GET(self) -> None:  # noqa: N802 — http.server API
+            path = self.path.split("?", 1)[0]
+            if path in ("/", "/index.html"):
+                self._send(200, render_sessions_html(list_sessions()))
+                return
+            for prefix, as_json in (("/session/", False), ("/json/", True)):
+                if path.startswith(prefix):
+                    sid = resolve_sid(path[len(prefix):])
+                    if sid is None:
+                        self._send(404, "<h1>unknown session</h1>")
+                        return
+                    d = dissect(sid)
+                    peers = list_sessions()
+                    if as_json:
+                        self._send(
+                            200,
+                            json.dumps(to_json(d, peers), indent=2),
+                            ctype="application/json",
+                        )
+                    else:
+                        page = render_html(d, peers).replace(
+                            "<h1>", '<p><a href="/" style="color:#8b7bff">← sessions</a></p><h1>', 1
+                        )
+                        self._send(200, page)
+                    return
+            self._send(404, "<h1>not found</h1><p><a href='/'>sessions</a></p>")
+
+        def log_message(self, *args: Any) -> None:  # quiet by design, like the proxy
+            pass
+
+    return ThreadingHTTPServer((host, port), _Portal)

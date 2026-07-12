@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -673,6 +674,54 @@ class TestHeadlines:
 
     def test_no_story_without_data(self, tmp_path: Path) -> None:
         assert dz.dissect("s999-0").headlines() == []
+
+
+class TestServePortal:
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        monkeypatch.delenv("DISTIL_SESSION", raising=False)
+        _seed_state(tmp_path)
+
+    @pytest.fixture()
+    def portal(self) -> Any:
+        server = dz.make_server("127.0.0.1", 0)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+        server.shutdown()
+
+    def _get(self, url: str) -> tuple[int, str]:
+        try:
+            with urllib.request.urlopen(url) as resp:
+                return resp.status, resp.read().decode()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read().decode()
+
+    def test_index_lists_sessions_as_links(self, portal: str) -> None:
+        status, body = self._get(portal + "/")
+        assert status == 200
+        assert "s200-1" in body and "s300-9" in body and "codex" in body
+        assert "/session/s200-1" in body  # clickable rows
+
+    def test_session_report_served_live(self, portal: str) -> None:
+        status, body = self._get(portal + "/session/s200-1")
+        assert status == 200
+        assert "What happened" in body and "61.0%" in body
+        assert "← sessions" in body  # back link injected before the title
+
+    def test_prefix_and_latest_resolve(self, portal: str) -> None:
+        assert self._get(portal + "/session/s200")[0] == 200
+        status, body = self._get(portal + "/json/latest")
+        assert status == 200
+        assert json.loads(body)["session"] == "s300-9"
+
+    def test_unknown_session_404(self, portal: str) -> None:
+        assert self._get(portal + "/session/zzz")[0] == 404
+        assert self._get(portal + "/nope")[0] == 404
+
+    def test_traversal_is_not_a_session(self, portal: str) -> None:
+        status, _ = self._get(portal + "/session/..%2F..%2Fetc%2Fpasswd")
+        assert status == 404
 
 
 class TestScanUsage:

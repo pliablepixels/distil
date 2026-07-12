@@ -302,6 +302,18 @@ def cmd_dissect(args: argparse.Namespace) -> int:
     use_color = (
         (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
     )
+    if args.serve:
+        server = dz.make_server(args.host, args.port)
+        host, port = server.server_address[:2]
+        print(f"dissect portal: http://{host}:{port}/  (Ctrl-C to stop)")
+        print("sessions index at /, reports at /session/<sid>, JSON at /json/<sid>")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print()
+        finally:
+            server.server_close()
+        return 0
     sid: str | None
     if not args.session:
         sessions = dz.list_sessions()
@@ -2035,6 +2047,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="session id, a unique prefix, or `latest` — omit to list sessions to pick from",
     )
     di.add_argument("--html", help="render the dissection as a self-contained HTML page")
+    di.add_argument(
+        "--serve",
+        action="store_true",
+        help="serve a live localhost portal instead: / lists sessions, /session/<sid> reports",
+    )
+    di.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
+    di.add_argument("--port", type=int, default=8790, help="portal port (default 8790)")
     di.add_argument("--json", action="store_true", help="machine-readable output")
     di.add_argument("--no-color", action="store_true", help="disable ANSI colors")
     di.set_defaults(func=cmd_dissect)
