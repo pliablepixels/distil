@@ -950,8 +950,21 @@ def _timeline_table(requests: list[dict[str, Any]]) -> str:
     )
 
 
+def _tile(label: str, value: str, note: str = "") -> str:
+    note_html = f'<div class="n">{note}</div>' if note else ""
+    return (
+        f'<div class="card tile"><div class="l">{label}</div>'
+        f'<div class="v2">{value}</div>{note_html}</div>'
+    )
+
+
 def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> str:
-    """Self-contained dark page in the ledger `render_html` style."""
+    """Self-contained dark page in the ledger `render_html` style.
+
+    Layout follows the stat-tile pattern: one number per card with a short
+    sub-note, anomalies in a bordered callout, and one observation per line —
+    never a paragraph of run-together figures.
+    """
     man = d.manifest or {}
     subscription = d.billing == "subscription"
     e = _html.escape
@@ -962,7 +975,6 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
         f"<td class='r'>{_human(t)}</td><td class='r'>{100.0 * (b - t) / b if b else 0.0:.1f}%</td></tr>"
         for m, r, b, t in d.per_model()
     ) or "<tr><td class='muted' colspan='5'>no booked requests</td></tr>"
-
     kind_rows = "".join(
         f"<tr><td>{e(s)}</td><td class='r'>{u}</td><td class='r'>{_human(t)}</td></tr>"
         for s, u, t in d.blocks_by_kind()
@@ -972,69 +984,114 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
         f"<td class='r'>×{f}</td><td>{'recoverable' if r else '<span class=muted>expired</span>'}</td></tr>"
         for h, s, t, f, r in d.top_blocks()
     )
+
     warn_html = "".join(f"<li>{e(w)}</li>" for w in d.anomalies(peers))
     warn_card = (
-        f"<h2>Worth your attention</h2><ul class='warn'>{warn_html}</ul>" if warn_html else ""
-    )
-    cal = d.calibration()
-    cal_line = (
-        f"Billed usage: <b>{_human(d.usage_input_total)}</b> in / "
-        f"<b>{_human(d.usage_output_total)}</b> out over {d.usage_requests} requests; heuristic "
-        f"estimate x{cal[0] / cal[1]:.2f} of billed."
-        if cal is not None and cal[1]
-        else "Billed usage: not captured for this session."
-    )
-    saved = d.tokens_saved_total
-    mech_line = (
-        f"Mechanism: digest folds <b>{_human(d.digest_saved)}</b> "
-        f"({100.0 * d.digest_saved / saved:.0f}%), cache-delta "
-        f"<b>{_human(d.delta_tokens_saved)}</b>."
-        if saved
+        f'<div class="callout"><b>⚠ Worth your attention</b><ul class="warn">{warn_html}</ul></div>'
+        if warn_html
         else ""
     )
-    lat_line = " · ".join(f"{k}: {n} req @ {ms / 1000:.1f}s" for k, n, ms in d.latency_by_path())
-    headroom_line = (
-        f"Flat-rate headroom: context budget stretched ~<b>{d.headroom_multiplier:.1f}x</b>."
-        if d.billing == "subscription" and d.headroom_multiplier > 1
-        else ""
-    )
-    regret_line = (
-        "Expansion regret: "
-        + "; ".join(f"{e(s)} pulled back {x}/{t}" for s, x, t in d.expansion_regret())
-        + "."
-        if d.expansion_regret()
-        else ""
-    )
-    tool_rows = [(name, per) for name, per, _tot in d.tool_costs()[:10]]
-    tools_chart = (
-        "<h2>Tool definitions <span class='muted'>(tokens per request — resent every "
-        f"time)</span></h2>{_svg_hbars(tool_rows)}"
-        if tool_rows
-        else ""
-    )
-    growth = d.system_growth()
-    prompt_line = (
-        f"System prompt grew {_human(growth[0])} → {_human(growth[1])} tokens over the "
-        "session (memory/context injections accumulate there)."
-        if growth and growth[1] != growth[0]
-        else ""
-    )
-    kind_chart = _svg_hbars(
-        [(sig, toks) for sig, _u, toks in d.blocks_by_kind()[:10]], color=_C_SAVED
-    )
-    detail_card = (
-        f"""<h2>Request detail</h2>
-<p>{len(d.requests)} proxied requests — {d.unbooked_requests} not booked (non-2xx/retry),
-{d.verbatim_requests} verbatim (nothing worth compressing).
-{mech_line}
-Fixed overhead: system prompt ({_human(d.system_tokens_avg)}/req) + tool definitions
-({_human(d.tools_tokens_avg)}/req) = <b>{_human(d.overhead_tokens_total)}</b> tokens
-({d.overhead_share:.0f}% of everything sent). {prompt_line}
-Re-fold churn: <b>{_human(d.churn_tokens)}</b> tokens across {d.churned_blocks} re-folded
-block{'s' if d.churned_blocks != 1 else ''}. {cal_line} {headroom_line}</p>
-<p class="muted">Latency — {lat_line or "not recorded"}.
-{f"{d.forced_buffered} streamed requests buffered for the expand loop (TTFT tax)." if d.forced_buffered else ""}
-{regret_line}</p>
+
+    detail_body = ""
+    if d.detail_available:
+        saved = d.tokens_saved_total or 1
+        tiles = [
+            _tile(
+                "Requests",
+                str(len(d.requests)),
+                f"{d.unbooked_requests} unbooked · {d.verbatim_requests} verbatim",
+            ),
+            _tile(
+                "Digest folds",
+                _human(d.digest_saved),
+                f"{100.0 * d.digest_saved / saved:.0f}% of savings",
+            ),
+            _tile(
+                "Cache-delta",
+                _human(d.delta_tokens_saved),
+                f"{100.0 * d.delta_tokens_saved / saved:.0f}% of savings",
+            ),
+            _tile(
+                "Fixed overhead",
+                _human(d.overhead_tokens_total),
+                f"{d.overhead_share:.0f}% of sent · system {_human(d.system_tokens_avg)}/req "
+                f"· tools {_human(d.tools_tokens_avg)}/req",
+            ),
+            _tile(
+                "Re-fold churn",
+                _human(d.churn_tokens),
+                f"{d.churned_blocks} block{'s' if d.churned_blocks != 1 else ''} re-folded",
+            ),
+        ]
+        cal = d.calibration()
+        if cal is not None and cal[1]:
+            tiles.append(
+                _tile(
+                    "Billed input",
+                    _human(d.usage_input_total),
+                    f"{_human(d.usage_output_total)} out · estimate ×{cal[0] / cal[1]:.2f} of billed",
+                )
+            )
+        else:
+            tiles.append(_tile("Billed input", "—", "usage not captured"))
+        if subscription and d.headroom_multiplier > 1:
+            tiles.append(
+                _tile(
+                    "Headroom",
+                    f"{d.headroom_multiplier:.1f}×",
+                    "flat-rate: context budget stretched",
+                )
+            )
+        tiles.append(_tile("Expand", str(d.expand_resolved), "requests resolved in-proxy"))
+        shadow_note = (
+            f"{d.shadow_window_agree}/{d.shadow_window_rows} verdicts equivalent"
+            if d.shadow_window_rows
+            else "no verdicts in window"
+        )
+        tiles.append(_tile("Shadow", str(d.shadow_sampled), f"sampled · {shadow_note}"))
+
+        notes: list[str] = []
+        growth = d.system_growth()
+        if growth and growth[1] != growth[0]:
+            notes.append(
+                f"System prompt grew {_human(growth[0])} → {_human(growth[1])} tokens over the "
+                "session — memory/context injections accumulate there."
+            )
+        lat = d.latency_by_path()
+        if lat:
+            notes.append(
+                "Latency: " + " · ".join(f"{k} {n} req @ {ms / 1000:.1f}s" for k, n, ms in lat)
+            )
+        if d.forced_buffered:
+            notes.append(
+                f"{d.forced_buffered} streamed request"
+                f"{'s' if d.forced_buffered != 1 else ''} buffered for the expand loop — "
+                "the --expand time-to-first-token tax."
+            )
+        for s, x, t in d.expansion_regret():
+            notes.append(
+                f"Expansion regret: {e(s)} blocks pulled back {x}/{t} — folding this kind "
+                "costs a round-trip more than it saves."
+            )
+        notes_html = (
+            "<ul class='notes'>" + "".join(f"<li>{n}</li>" for n in notes) + "</ul>"
+            if notes
+            else ""
+        )
+
+        tool_rows = [(name, per) for name, per, _tot in d.tool_costs()[:10]]
+        tools_chart = (
+            "<h2>Tool definitions <span class='muted'>(tokens per request — resent every "
+            f"time)</span></h2>{_svg_hbars(tool_rows)}"
+            if tool_rows
+            else ""
+        )
+        kind_chart = _svg_hbars(
+            [(sig, toks) for sig, _u, toks in d.blocks_by_kind()[:10]], color=_C_SAVED
+        )
+        detail_body = f"""<h2>Request detail</h2>
+<div class="grid">{"".join(tiles)}</div>
+{notes_html}
 <h2>Request composition <span class="muted">(tokens per request)</span></h2>
 {_legend()}
 {_svg_stack_timeline(d.requests)}
@@ -1045,16 +1102,11 @@ block{'s' if d.churned_blocks != 1 else ''}. {cal_line} {headroom_line}</p>
 <table><tr><th>kind</th><th>blocks</th><th>tokens</th></tr>{kind_rows}</table>
 <h2>Largest folds</h2>
 <table><tr><th>handle</th><th>kind</th><th>tokens</th><th>seen</th><th>restore</th></tr>{top_rows}</table>"""
-        if d.detail_available
-        else "<h2>Request detail</h2><p class='muted'>Not recorded — per-request detail needs a "
-        "wrap from this distil version or newer.</p>"
-    )
-    quality = (
-        f"<p>expand: {d.expand_resolved} requests resolved in-proxy · shadow: {d.shadow_sampled} "
-        f"sampled · window verdicts (time-joined): {d.shadow_window_agree}/{d.shadow_window_rows} equivalent</p>"
-        if (d.detail_available or d.shadow_window_rows)
-        else "<p class='muted'>no session-scoped quality signal recorded</p>"
-    )
+    else:
+        detail_body = (
+            "<h2>Request detail</h2><p class='muted'>Not recorded — per-request detail needs a "
+            "wrap from this distil version or newer.</p>"
+        )
     exit_line = f"<p class='muted'>exit: {e(d.exit_note)}</p>" if d.exit_note else ""
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"/>
@@ -1063,40 +1115,49 @@ block{'s' if d.churned_blocks != 1 else ''}. {cal_line} {headroom_line}</p>
 <title>Distil — dissect {e(d.sid)}</title><style>
 body{{margin:0;background:#06070b;color:#f2f3f7;font:15px/1.6 Inter,ui-sans-serif,sans-serif;
  -webkit-font-smoothing:antialiased}}
-.wrap{{max-width:760px;margin:0 auto;padding:48px 24px}}
+.wrap{{max-width:820px;margin:0 auto;padding:48px 24px}}
 h1{{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}}
-h2{{font-size:17px;font-weight:700;margin:26px 0 10px}}
+h2{{font-size:17px;font-weight:700;margin:34px 0 12px}}
 .sub{{color:#9aa1b3;margin:0 0 28px}}
-.tot{{display:flex;gap:14px;margin:0 0 28px;flex-wrap:wrap}}
-.card{{flex:1;min-width:150px;background:linear-gradient(180deg,#12151f,#0b0d15);
+.tot{{display:flex;gap:14px;margin:0 0 14px;flex-wrap:wrap}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}}
+.card{{background:linear-gradient(180deg,#12151f,#0b0d15);
  border:1px solid #252c3e;border-radius:14px;padding:20px}}
+.tot .card{{flex:1;min-width:150px}}
 .card .l{{color:#9aa1b3;font-size:12px}} .card .v{{font-size:30px;font-weight:800;margin-top:4px}}
+.card .v2{{font-size:22px;font-weight:700;margin-top:4px}}
+.card .n{{color:#5b6177;font-size:12px;margin-top:6px;line-height:1.45}}
 .g{{background:linear-gradient(135deg,#8b7bff,#5ad1c9);-webkit-background-clip:text;background-clip:text;color:transparent}}
 table{{width:100%;border-collapse:collapse;border:1px solid #1b2030;border-radius:12px;overflow:hidden}}
 th,td{{padding:11px 14px;border-bottom:1px solid #1b2030;text-align:left}}
 th{{color:#5b6177;font-size:11px;text-transform:uppercase;letter-spacing:.07em}}
-ul.warn{{margin:0;padding-left:20px}} ul.warn li{{color:#e8b34b;margin:4px 0}}
-svg .mark:hover{{filter:brightness(1.3)}}
-details{{margin:10px 0}} details summary{{cursor:pointer}}
 td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{{color:#5b6177}}
 code{{color:#8b7bff}}
-.foot{{color:#5b6177;font-size:12.5px;margin-top:22px}}
+.callout{{border:1px solid #6b5416;background:#14100a;border-radius:12px;
+ padding:14px 18px;margin:24px 0}}
+.callout b{{color:#e8b34b}}
+ul.warn{{margin:8px 0 0;padding-left:20px}} ul.warn li{{color:#e8b34b;margin:6px 0}}
+ul.notes{{margin:14px 0 0;padding-left:20px}} ul.notes li{{color:#9aa1b3;margin:8px 0}}
+svg .mark:hover{{filter:brightness(1.3)}}
+details{{margin:10px 0}} details summary{{cursor:pointer;color:#5b6177}}
+.foot{{color:#5b6177;font-size:12.5px;margin-top:26px}}
 </style></head><body><div class="wrap">
 <h1>Session <span class="g">dissected</span></h1>
 <p class="sub">{e(d.sid)} — {e(man.get("tool") or "unknown tool")},
 {e(_when(d.started))} → {e(_when(d.ended))} · wrap flags: {e(_flags_line(man)) if man else "unknown"}
 · billing: {e(d.billing)}</p>
+{warn_card}
 <div class="tot">
 <div class="card"><div class="l">Input tokens</div><div class="v">{_human(d.baseline_tokens)} → {_human(d.distil_tokens)}</div></div>
 <div class="card"><div class="l">Saved</div><div class="v g">{d.pct_saved:.1f}%</div></div>
 <div class="card"><div class="l">Dollars{e(dol_note)}</div><div class="v">${d.dollars_saved:.2f}</div></div>
 </div>
-{warn_card}
 <h2>Per model</h2>
 <table><tr><th>model</th><th>req</th><th>baseline</th><th>distil</th><th>saved</th></tr>{model_rows}</table>
-{detail_card}
+{detail_body}
 <h2>Quality loops</h2>
-{quality}
+<p class="muted">expand: {d.expand_resolved} resolved in-proxy · shadow: {d.shadow_sampled} sampled ·
+window verdicts (time-joined): {d.shadow_window_agree}/{d.shadow_window_rows} equivalent</p>
 {exit_line}
 <p class="foot">Local-first: assembled from savings.jsonl, sessions/&lt;sid&gt;*, restore/ and
 shadow.jsonl on this machine. Content-free — handles and kind:size signatures only.</p>

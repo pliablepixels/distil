@@ -457,7 +457,8 @@ class TestInsights:
         assert "buffered (forced by expand) 1 req @ 9.0s" in text
         assert "regret: log:l blocks pulled back 1/1" in text
         page = dz.render_html(d, peers=dz.list_sessions())
-        assert "Mechanism" in page and "stretched ~<b>2.6x</b>" in page
+        assert "Digest folds" in page and "83% of savings" in page
+        assert ">2.6\u00d7<" in page  # headroom tile
         payload = dz.to_json(d, dz.list_sessions())
         assert payload["insights"]["churn"]["tokens"] == 2000
         assert payload["insights"]["usage"]["calibration"] == {
