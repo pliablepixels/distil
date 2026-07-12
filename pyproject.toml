@@ -105,4 +105,9 @@ exclude_also = [
     "def serve\\(",
     "def wrap_run\\(",
     "def serve_gateway\\(",
+    # Fail-open defensive handlers, explicitly marked `# noqa: BLE001`: they exist
+    # ONLY to guarantee "telemetry/compression must never break a request" and do
+    # nothing but log at debug and continue. There is no behaviour to assert, and a
+    # unit test cannot reliably force the internal exception that triggers them.
+    "except .*# noqa: BLE001",
 ]

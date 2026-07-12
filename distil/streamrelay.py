@@ -12,11 +12,37 @@ Content-Length (the SSE case); requires the handler to speak HTTP/1.1.
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
 _CHUNK = 8192
+
+# Billed-usage capture. Works on a plain JSON response and on SSE bytes alike:
+# input_tokens appears once near the start (message_start), output_tokens is
+# cumulative so the LAST occurrence (final message_delta) is the total.
+_USAGE_IN = re.compile(rb'"input_tokens"\s*:\s*(\d+)')
+_USAGE_OUT = re.compile(rb'"output_tokens"\s*:\s*(\d+)')
+_USAGE_SCAN_CAP = 16384  # head/tail window — usage lives at the edges of a stream
+
+
+def scan_usage(blob: bytes) -> dict[str, int]:
+    """Best-effort billed-token extraction from a response body (JSON or SSE).
+
+    Returns any of ``{"input_tokens": n, "output_tokens": m}`` found — empty
+    dict when the body carries no usage (error payloads, non-messages routes).
+    """
+    out: dict[str, int] = {}
+    m = _USAGE_IN.search(blob)
+    if m:
+        out["input_tokens"] = int(m.group(1))
+    last = None
+    for last in _USAGE_OUT.finditer(blob):  # noqa: B007 — want the final (cumulative) one
+        pass
+    if last is not None:
+        out["output_tokens"] = int(last.group(1))
+    return out
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -48,8 +74,13 @@ def stream_upstream(
     hop_by_hop: frozenset[str],
     extras: dict[str, str] | None = None,
     want_body: bool = False,
+    usage_sink: dict[str, int] | None = None,
 ) -> tuple[int, bytes | None]:
     """Send the request and relay the response to *handler* incrementally.
+
+    When ``usage_sink`` is given, the first/last ``_USAGE_SCAN_CAP`` bytes of
+    the relayed stream are scanned for billed usage after relay completes and
+    the result is merged into the dict — without buffering the full body.
 
     When ``want_body`` is set, returns the complete response body (buffered as
     it streamed) so callers can run post-hoc accounting (shadow sampling); when
@@ -116,6 +147,8 @@ def stream_upstream(
         handler.end_headers()
 
         buf = bytearray()
+        head = bytearray()
+        tail = bytearray()
         try:
             while True:
                 # read1: return as soon as ANY bytes arrive (at most one socket
@@ -126,6 +159,12 @@ def stream_upstream(
                     break
                 if want_body:
                     buf += chunk
+                if usage_sink is not None:
+                    if len(head) < _USAGE_SCAN_CAP:
+                        head += chunk
+                    tail += chunk
+                    if len(tail) > _USAGE_SCAN_CAP:
+                        del tail[: len(tail) - _USAGE_SCAN_CAP]
                 if chunked:
                     handler.wfile.write(f"{len(chunk):X}\r\n".encode() + chunk + b"\r\n")
                 else:
@@ -139,4 +178,9 @@ def stream_upstream(
             # can be appended once bytes have flowed — drop the connection but
             # keep what streamed for accounting.
             handler.close_connection = True
+        if usage_sink is not None:
+            try:
+                usage_sink.update(scan_usage(bytes(head) + b"\n" + bytes(tail)))
+            except Exception:  # noqa: BLE001 — usage capture must never break the relay
+                pass
         return resp.status, (bytes(buf) if want_body else None)

@@ -185,7 +185,9 @@ def _compress_text_content(text: str, store: RestoreStore, verbatim: bool) -> st
     return _apply_tier0(text)
 
 
-def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = False) -> str:
+def _compress_tool_result_text(
+    text: str, store: RestoreStore, verbatim: bool = False, is_recent: bool = False
+) -> str:
     """Digest a large tool_result string and record the original in *store*.
 
     In ``verbatim`` mode only *in-context-lossless* Tier-0 transforms are applied:
@@ -195,19 +197,24 @@ def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = 
     content rather than recover it via a tool. The default (digest) is reversible
     and decision-equivalent by the certificate; ``verbatim`` trades that for
     byte-in-context fidelity at lower savings.
+
+    ``is_recent`` marks a recency-exempt block (the last few tool turns): the agent
+    must see its most recent output byte-exact to choose its next action, so those
+    stay verbatim with NO fold — even a lossless columnar fold changes the bytes.
     """
     lines = text.splitlines()
     if len(lines) < _MIN_LINES:
-        # Too short to digest — lossless transforms only (a tabular blob is often one
-        # long line, so try the self-describing fold before tier-0).
-        return _lossless_fold(text) or _apply_tier0(text)
+        # Too short to digest — lossless Tier-0 transforms only.
+        return _apply_tier0(text)
 
-    # Verbatim: never replace content with a stub the model can't recover — but a
-    # self-describing columnar/template fold is in-context-lossless (all data inline,
-    # no recovery handle to invite an unavailable distil_expand), so it is safe here and
-    # saves far more than tier-0 alone on the tabular tool output subscription users see.
+    # Verbatim + not recent (a subscription/lossless OLDER block): a self-describing
+    # columnar/template fold is in-context-lossless (all data inline, no recovery handle
+    # to invite an unavailable distil_expand), so it is safe and saves far more than
+    # tier-0 alone on the tabular tool output subscription users see. Recent blocks stay
+    # byte-exact (no fold) so the agent's latest output is unchanged.
     if verbatim:
-        return _lossless_fold(text) or _apply_tier0(text)
+        folded = None if is_recent else _lossless_fold(text)
+        return folded or _apply_tier0(text)
 
     # Learned policy: if your agents keep expanding this kind of content, keep it
     # byte-exact (strictly safer — only ever reduces savings, never equivalence).
@@ -225,7 +232,7 @@ def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = 
 
 
 def _compress_content_item(
-    item: dict[str, Any], store: RestoreStore, role: str, verbatim: bool
+    item: dict[str, Any], store: RestoreStore, role: str, verbatim: bool, is_recent: bool = False
 ) -> dict[str, Any]:
     """Return a (possibly new) content block after compression.
 
@@ -259,7 +266,7 @@ def _compress_content_item(
             return item
 
         if isinstance(content, str):
-            new_content = _compress_tool_result_text(content, store, verbatim)
+            new_content = _compress_tool_result_text(content, store, verbatim, is_recent)
             if new_content == content:
                 return item
             return {**item, "content": new_content}
@@ -289,7 +296,9 @@ def _compress_content_item(
     return item
 
 
-def _compress_message(msg: dict[str, Any], store: RestoreStore, verbatim: bool) -> dict[str, Any]:
+def _compress_message(
+    msg: dict[str, Any], store: RestoreStore, verbatim: bool, is_recent: bool = False
+) -> dict[str, Any]:
     """Return a (possibly new) message dict after compressing its content."""
     role = msg.get("role", "")
     content = msg.get("content")
@@ -301,7 +310,7 @@ def _compress_message(msg: dict[str, Any], store: RestoreStore, verbatim: bool) 
         # decision-aware reversible digest as Anthropic tool_result blocks; other
         # string content gets Tier-0 lossless transforms.
         if role == "tool":
-            new_text = _compress_tool_result_text(content, store, verbatim)
+            new_text = _compress_tool_result_text(content, store, verbatim, is_recent)
         else:
             new_text = _compress_text_content(content, store, verbatim)
         if new_text == content:
@@ -313,7 +322,7 @@ def _compress_message(msg: dict[str, Any], store: RestoreStore, verbatim: bool) 
         changed = False
         for item in content:
             if isinstance(item, dict):
-                new_item = _compress_content_item(item, store, role, verbatim)
+                new_item = _compress_content_item(item, store, role, verbatim, is_recent)
                 new_blocks.append(new_item)
                 if new_item is not item:
                     changed = True
@@ -373,7 +382,7 @@ def compress_messages(
             # Force verbatim for the most recent turns so their tool_results are
             # never replaced by a digest stub the agent must reason over blind.
             msg_verbatim = verbatim or idx in recent
-            new_messages.append(_compress_message(msg, store, msg_verbatim))
+            new_messages.append(_compress_message(msg, store, msg_verbatim, is_recent=idx in recent))
         return new_messages, store
     finally:
         _keep_tls.fn = None

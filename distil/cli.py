@@ -553,6 +553,100 @@ def cmd_proxy_worker(args: argparse.Namespace) -> int:
     return worker_main()
 
 
+def cmd_dissect(args: argparse.Namespace) -> int:
+    """Everything distil knows about one wrap session — or the picker when no
+    session is given. Works for any wrapped tool (claude/codex/gemini/...)."""
+    import os
+    import sys
+
+    from . import dissect as dz
+
+    use_color = (
+        (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+    )
+    if args.serve:
+        server = dz.make_server(args.host, args.port, transcript=args.transcript)
+        host, port = server.server_address[:2]
+        print(f"dissect portal: http://{host}:{port}/  (Ctrl-C to stop)")
+        print("sessions index at /, reports at /session/<sid>, JSON at /json/<sid>")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print()
+        finally:
+            server.server_close()
+        return 0
+    sid: str | None
+    if not args.session:
+        sessions = dz.list_sessions()
+        if args.json:
+            rows = [
+                {
+                    "session": o.sid,
+                    "tool": o.tool,
+                    "started_ts": o.started,
+                    "last_ts": o.last_ts,
+                    "requests": o.requests,
+                    "baseline_input_tokens": o.baseline_tokens,
+                    "distil_input_tokens": o.distil_tokens,
+                    "status": o.status,
+                }
+                for o in sessions
+            ]
+            print(json.dumps(rows, indent=2))
+            return 0
+        print(dz.render_sessions_text(sessions, color=use_color))
+        # On a terminal, let the user pick right here instead of retyping the id.
+        if not (sessions and sys.stdin.isatty() and sys.stdout.isatty()):
+            return 0
+        try:
+            choice = input(f"\ndissect which session? [1-{len(sessions)}, Enter to quit] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+        if not choice:
+            return 0
+        if choice.isdigit() and 1 <= int(choice) <= len(sessions):
+            sid = sessions[int(choice) - 1].sid
+        else:
+            sid = dz.resolve_sid(choice)
+        if sid is None:
+            print(f"no session matches {choice!r}")
+            return 2
+    else:
+        sid = dz.resolve_sid(args.session)
+        if sid is None:
+            print(f"no session matches {args.session!r} — run `distil dissect` to list them")
+            return 2
+    d = dz.dissect(sid)
+    peers = dz.list_sessions()
+    corr = None
+    if args.transcript:
+        from .correlate import correlate
+        from .transcripts import find_transcript
+
+        man = d.manifest or {}
+        tr = find_transcript(
+            str(man.get("tool") or ""),
+            (d.started, d.ended or d.started),
+            cwd=man.get("cwd"),
+            path=None if args.transcript == "auto" else args.transcript,
+        )
+        if tr is None:
+            print("note: no matching agent transcript found — report is uncorrelated\n")
+        else:
+            corr = correlate(d, tr)
+    if args.json:
+        print(json.dumps(dz.to_json(d, peers, corr), indent=2))
+        return 0
+    if args.html:
+        Path(args.html).write_text(dz.render_html(d, peers, corr), encoding="utf-8")
+        print(f"wrote {args.html}")
+        return 0
+    print(dz.render_text(d, color=use_color, peers=peers, corr=corr))
+    return 0
+
+
 def cmd_shadow_stats(args: argparse.Namespace) -> int:
     """Show the live decision-equivalence measured by shadow mode on real traffic."""
     from .shadow import ShadowCounters, ShadowLedger
@@ -2198,6 +2292,34 @@ def build_parser() -> argparse.ArgumentParser:
         "default scopes to the current algorithm, matching the status line)",
     )
     ss.set_defaults(func=cmd_shadow_stats)
+
+    di = sub.add_parser(
+        "dissect",
+        help="everything distil knows about one wrap session (savings, folds, quality loops)",
+    )
+    di.add_argument(
+        "session",
+        nargs="?",
+        help="session id, a unique prefix, or `latest` — omit to list sessions to pick from",
+    )
+    di.add_argument("--html", help="render the dissection as a self-contained HTML page")
+    di.add_argument(
+        "--transcript",
+        nargs="?",
+        const="auto",
+        help="correlate with the agent's own conversation log (opt-in; names tools/prompts). "
+        "`auto` finds it by session window; or pass a transcript path",
+    )
+    di.add_argument(
+        "--serve",
+        action="store_true",
+        help="serve a live localhost portal instead: / lists sessions, /session/<sid> reports",
+    )
+    di.add_argument("--host", default="127.0.0.1", help="bind address (default: localhost only)")
+    di.add_argument("--port", type=int, default=8790, help="portal port (default 8790)")
+    di.add_argument("--json", action="store_true", help="machine-readable output")
+    di.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    di.set_defaults(func=cmd_dissect)
 
     dash = sub.add_parser(
         "dashboard", help="live terminal dashboard of your savings (Ctrl-C to exit)"

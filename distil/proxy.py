@@ -641,9 +641,11 @@ def build_handler(
             # re-query before answering), so expand-eligible requests stay on
             # the buffered path.
             want_stream = bool(body.get("stream")) or ":streamGenerateContent" in self.path
+            t_req = time.monotonic()  # upstream + relay latency (compression excluded)
             if want_stream and not _expand_should_intercept(expand, store, body):
                 from .streamrelay import stream_upstream
 
+                _usage_s: dict[str, int] = {}
                 with request_span(_span_model, self.path) as _span:
                     status_s, _rbody_opt = stream_upstream(
                         self,
@@ -654,6 +656,7 @@ def build_handler(
                         hop_by_hop=_HOP_BY_HOP,
                         extras=extras,
                         want_body=False,  # v3 shadow re-issues its own temp-0 calls; no need to buffer
+                        usage_sink=_usage_s,
                     )
                     set_result_attrs(
                         _span,
@@ -672,6 +675,22 @@ def build_handler(
                     _bt, _at, _m = _pending_savings
                     savings.record(_bt, _at, model=_m)
                     savings.maybe_flush(every=flush_every)
+                self._emit_detail(
+                    extras=extras,
+                    store=store,
+                    body=body if isinstance(body, dict) else None,
+                    model=_span_model,
+                    stream=True,
+                    client_stream=want_stream,
+                    status=status_s,
+                    booked=(
+                        savings is not None
+                        and _pending_savings is not None
+                        and 200 <= status_s < 300
+                    ),
+                    duration_ms=int((time.monotonic() - t_req) * 1000),
+                    usage=_usage_s,
+                )
                 if shadow_sampled:
                     self._spawn_shadow(raw, headers, new_raw)
                 return
@@ -691,6 +710,7 @@ def build_handler(
 
             # Transparent expand loop: resolve any distil_expand tool calls against
             # the local store and re-query, invisibly, before returning to the agent.
+            _expanded_handles: list[str] = []
             if _expand_should_intercept(expand, store, body):
                 try:
                     resp_json = json.loads(rbody)
@@ -704,6 +724,7 @@ def build_handler(
                         return json.loads(rb)
 
                     def _on_signal(handle: str, original: str) -> None:
+                        _expanded_handles.append(handle)
                         record_signal(handle, original)  # content-free expand log
                         if _learn_stats is not None:  # learn the expanded signature
                             from .learn import signature
@@ -722,6 +743,33 @@ def build_handler(
             # signal on real traffic. Never blocks the client's response.
             if shadow_sampled:
                 self._spawn_shadow(raw, headers, new_raw)
+            _usage_b: dict[str, int] = {}
+            try:
+                from .streamrelay import scan_usage
+
+                _usage_b = scan_usage(rbody[:16384] + b"\n" + rbody[-16384:])
+            except Exception:  # noqa: BLE001 — usage capture is bookkeeping only
+                pass
+            # Per-request detail written synchronously before the relay: this guarantees
+            # a record for every request (deterministic, none lost on abrupt shutdown) —
+            # the property dissect relies on. The write is a bounded ~5-15ms of local disk
+            # I/O and is fail-open. (A future async-write could shave that latency without
+            # losing the guarantee; deliberately not doing it under a synchronous contract.)
+            self._emit_detail(
+                extras=extras,
+                store=store,
+                body=body if isinstance(body, dict) else None,
+                model=_span_model,
+                stream=False,
+                client_stream=want_stream,
+                status=status,
+                booked=(
+                    savings is not None and _pending_savings is not None and 200 <= status < 300
+                ),
+                duration_ms=int((time.monotonic() - t_req) * 1000),
+                usage=_usage_b,
+                expanded_handles=_expanded_handles,
+            )
             # Book savings only after a confirmed 2xx (P0-1): failed or SDK-retried
             # upstream calls must not be counted as savings.
             if savings is not None and _pending_savings is not None and 200 <= status < 300:
@@ -729,6 +777,90 @@ def build_handler(
                 savings.record(_bt, _at, model=_m)
                 savings.maybe_flush(every=flush_every)
             self._relay(status, rhdrs, rbody, extras=extras)
+
+        def _emit_detail(
+            self,
+            *,
+            extras: dict[str, str],
+            store: Any,
+            body: dict[str, Any] | None,
+            model: str,
+            stream: bool,
+            client_stream: bool,
+            status: int,
+            booked: bool,
+            duration_ms: int | None = None,
+            usage: dict[str, int] | None = None,
+            expanded_handles: list[str] | None = None,
+        ) -> None:
+            """Append one content-free per-request record to the wrap session's
+            ``sessions/<sid>.requests.jsonl`` (read by ``distil dissect``).
+            Records token accounting, per-block digest signatures (handle + kind
+            + size only — never content), and shadow/expand flags. Best-effort:
+            any failure is a debug log — bookkeeping must never break a request."""
+            try:
+                from . import ledger
+
+                if ledger.session_requests_path() is None:
+                    return  # not a wrap session; nothing to attribute the request to
+                from .learn import signature
+
+                blocks: list[dict[str, Any]] = []
+                for h in sorted(getattr(store, "handles", None) or ()):
+                    try:
+                        text = store.expand(h)
+                        blocks.append(
+                            {"h": h, "sig": signature(text), "tokens": _tokenizer.count(text)}
+                        )
+                    except Exception:  # noqa: BLE001 — one bad handle must not drop the record
+                        continue
+                system_tok = tools_tok = 0
+                tool_costs: list[dict[str, Any]] = []
+                if isinstance(body, dict):
+                    sys_val = body.get("system")
+                    if sys_val:
+                        system_tok = _tokenizer.count(
+                            sys_val if isinstance(sys_val, str) else json.dumps(sys_val)
+                        )
+                    for tool in body.get("tools") or []:
+                        try:
+                            n = _tokenizer.count(json.dumps(tool))
+                            tools_tok += n
+                            name = tool.get("name") if isinstance(tool, dict) else None
+                            tool_costs.append({"name": str(name or "?"), "tokens": n})
+                        except Exception:  # noqa: BLE001 — one odd tool must not drop the rest
+                            continue
+                    tool_costs.sort(key=lambda t: -t["tokens"])
+                overhead = system_tok + tools_tok
+                rec = {
+                    "ts": time.time(),
+                    "model": model,
+                    "stream": stream,
+                    "client_stream": client_stream,
+                    "status": status,
+                    "booked": booked,
+                    "duration_ms": duration_ms,
+                    "usage_input_tokens": (usage or {}).get("input_tokens"),
+                    "usage_output_tokens": (usage or {}).get("output_tokens"),
+                    "expanded_handles": expanded_handles or [],
+                    "mode": extras.get("x-distil-mode", "verbatim"),
+                    "compressible_tokens": int(extras.get("x-distil-compressible-tokens", 0) or 0),
+                    "tokens_saved": int(extras.get("x-distil-tokens-saved", 0) or 0),
+                    "overhead_tokens": overhead,
+                    "system_tokens": system_tok,
+                    "tools_tokens": tools_tok,
+                    "tools": tool_costs[:24],  # names + token counts only; content-free
+                    "delta_refs": int(extras.get("x-distil-cache-refs", 0) or 0),
+                    "delta_tokens_saved": int(extras.get("x-distil-cache-tokens-saved", 0) or 0),
+                    "prefix_msgs": int(extras.get("x-distil-cache-prefix-msgs", 0) or 0),
+                    "shadow_sampled": extras.get("x-distil-shadow") == "sampled",
+                    "expanded": extras.get("x-distil-expanded") == "1",
+                    "output_shaping": extras.get("x-distil-output-shaping", ""),
+                    "blocks": blocks,
+                }
+                ledger.append_session_request(rec)
+            except Exception:  # noqa: BLE001 — bookkeeping must never break a request
+                log.debug("request-detail record failed", exc_info=True)
 
         def _spawn_shadow(
             self,
@@ -1059,6 +1191,45 @@ def wrap_run(
             marker.with_name(marker.name + ".exit").unlink(missing_ok=True)
         except OSError:
             pass  # marker is best-effort; never block the wrap over it
+
+    # Session manifest: what this wrap *is* (tool, argv, flags, billing) — the
+    # header `distil dissect` reads. Best-effort, like the marker above.
+    try:
+        from . import __version__ as _ver
+        from . import ledger as _ledger
+
+        try:
+            from .doctor import subscription_mode
+
+            _billing = "subscription" if subscription_mode() else "metered"
+        except Exception:  # noqa: BLE001 — billing detection is cosmetic
+            _billing = "unknown"
+        _ledger.write_session_manifest(
+            {
+                "sid": os.environ["DISTIL_SESSION"],
+                "tool": os.path.basename(command[0]) if command else "",
+                # command[:1] only — never persist full argv: a user may pass a
+                # credential as a flag (--api-key sk-...) and the manifest is on disk.
+                # The "tool" field already carries basename(command[0]).
+                "argv": command[:1],
+                "cwd": os.getcwd(),
+                "started_ts": time.time(),
+                "distil_version": _ver,
+                "billing": _billing,
+                "flags": {
+                    "upstream": upstream,
+                    "env_var": env_var,
+                    "lossless_only": lossless_only,
+                    "verbatim": verbatim,
+                    "shape_output": shape_output,
+                    "expand": expand,
+                    "session_delta": session_delta,
+                    "shadow_rate": shadow_rate,
+                },
+            }
+        )
+    except Exception:  # noqa: BLE001 — manifest is best-effort; never block the wrap
+        log.debug("session manifest write failed", exc_info=True)
 
     # Hot-swap (POSIX default): the proxy runs as a supervised subprocess on a
     # listener FD the wrap owns, so a `pipx upgrade` mid-session swaps in a
