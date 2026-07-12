@@ -35,6 +35,52 @@ _LOG_LINES = "\n".join(
 )
 
 
+_BLOB = "\n".join(f"[worker-{i}] heartbeat ok, queue depth {i * 7}, no errors" for i in range(8))
+
+
+def _iso(ts: float) -> str:
+    from datetime import datetime, timezone
+
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _write_transcript(claude_dir: Path, cwd_slug: str = "-tmp-proj") -> Path:
+    """A minimal Claude-Code-shaped transcript matching the seeded session
+    (s200-1: requests at ts 1000/1600/1700, restore blob _BLOB)."""
+    proj = claude_dir / "projects" / cwd_slug
+    proj.mkdir(parents=True, exist_ok=True)
+    lines = [
+        {"type": "ai-title", "aiTitle": "fix the flaky tests"},
+        {"type": "user", "timestamp": _iso(900), "cwd": "/tmp/proj",
+         "origin": {"kind": "human"},
+         "message": {"role": "user", "content": "please run the tests"}},
+        {"type": "assistant", "timestamp": _iso(950),
+         "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "id": "tu1", "name": "bash", "input": {}}]}},
+        {"type": "user", "timestamp": _iso(990),
+         "message": {"role": "user", "content": [
+             {"type": "tool_result", "tool_use_id": "tu1",
+              "content": [{"type": "text", "text": "$ make test\n" + _BLOB}]}]}},
+        # a sidechain human line must NOT count as a turn
+        {"type": "user", "timestamp": _iso(1200), "isSidechain": True,
+         "origin": {"kind": "human"},
+         "message": {"role": "user", "content": "subagent task prompt"}},
+        {"type": "user", "timestamp": _iso(1500), "origin": {"kind": "human"},
+         "message": {"role": "user", "content": [{"type": "text", "text": "now fix the bug"}]}},
+        {"type": "assistant", "timestamp": _iso(1550),
+         "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "id": "tu2", "name": "Read", "input": {}}]}},
+        # the agent re-fetched the same content after it had been folded
+        {"type": "user", "timestamp": _iso(1560),
+         "message": {"role": "user", "content": [
+             {"type": "tool_result", "tool_use_id": "tu2", "content": _BLOB}]}},
+        {"type": "not json line skipped below"},
+    ]
+    path = proj / "abc-session.jsonl"
+    path.write_text("\n".join(json.dumps(rec) for rec in lines) + "\nnot json\n")
+    return path
+
+
 _UPSTREAM_JSON = json.dumps(
     {
         "id": "msg_test",
@@ -231,6 +277,7 @@ def _seed_state(home: Path) -> None:
     sess.mkdir()
     (sess / "s200-1.json").write_text(json.dumps({
         "sid": "s200-1", "tool": "codex", "argv": ["codex", "--full-auto"],
+        "cwd": "/tmp/proj",
         "started_ts": 990.0, "distil_version": "1.15.0", "billing": "subscription",
         "flags": {"expand": True, "session_delta": True, "shadow_rate": 0.1,
                   "lossless_only": False, "verbatim": False, "shape_output": "off",
@@ -277,7 +324,7 @@ def _seed_state(home: Path) -> None:
     (sess / "s300-9.exit").write_text("rc=0")
     restore = home / "restore"
     restore.mkdir()
-    (restore / "aaaa1111").write_text("original log content")
+    (restore / "aaaa1111").write_text(_BLOB)
     (home / "shadow.jsonl").write_text(
         json.dumps({"ts": 1500.0, "equivalent": True}) + "\n"
         + json.dumps({"ts": 999999.0, "equivalent": False}) + "\n"
@@ -722,6 +769,133 @@ class TestServePortal:
     def test_traversal_is_not_a_session(self, portal: str) -> None:
         status, _ = self._get(portal + "/session/..%2F..%2Fetc%2Fpasswd")
         assert status == 404
+
+
+class TestTranscriptCorrelation:
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path / "distil"))
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
+        monkeypatch.delenv("DISTIL_SESSION", raising=False)
+        (tmp_path / "distil").mkdir()
+        _seed_state(tmp_path / "distil")
+        self.transcript = _write_transcript(tmp_path / "claude")
+
+    def test_adapter_parses_the_shape(self) -> None:
+        from distil.transcripts.claude_code import ClaudeCodeAdapter
+
+        tr = ClaudeCodeAdapter().load(self.transcript)
+        assert tr.label == "fix the flaky tests"
+        assert [t.text for t in tr.turns] == ["please run the tests", "now fix the bug"]
+        assert [c.name for c in tr.tool_calls] == ["bash", "Read"]
+        assert len(tr.tool_results) == 2
+        assert tr.tool_results[0].tool == "bash"  # resolved via tool_use_id
+        assert tr.tool_results[1].turn == 2  # attributed to the second turn
+
+    def test_discovery_by_window_and_cwd(self) -> None:
+        from distil.transcripts import find_transcript
+
+        tr = find_transcript("claude", (900.0, 1800.0), cwd="/tmp/proj")
+        assert tr is not None and tr.path == self.transcript
+        # A window that ends before the transcript's first event can't match.
+        assert find_transcript("claude", (100.0, 200.0), cwd="/tmp/proj") is None
+
+    def test_registry_is_the_extension_point(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Proof of the contract: a new agent = one adapter + one registry entry."""
+        from distil import transcripts
+        from distil.transcripts.base import ToolResult, Transcript, UserTurn
+
+        class ToyAdapter:
+            name = "toyagent"
+
+            def discover(self, window: Any, cwd: Any) -> list[Path]:
+                return [Path("/toy.log")]
+
+            def load(self, path: Path) -> Transcript:
+                return Transcript(
+                    agent=self.name, path=path, label="toy session",
+                    turns=[UserTurn(index=1, ts=1.0, text="hi")],
+                    tool_results=[ToolResult(ts=2.0, text="x" * 50, tool="toytool", turn=1)],
+                )
+
+        monkeypatch.setitem(transcripts.ADAPTERS, "toyagent", ToyAdapter())
+        tr = transcripts.find_transcript("toyagent", (0.0, 10.0))
+        assert tr is not None and tr.agent == "toyagent" and tr.label == "toy session"
+
+    def _corr(self) -> Any:
+        from distil.correlate import correlate
+        from distil.transcripts import find_transcript
+
+        d = dz.dissect("s200-1")
+        tr = find_transcript("claude", (d.started, d.ended), cwd="/tmp/proj")
+        assert tr is not None
+        return d, correlate(d, tr)
+
+    def test_fold_sources_named_by_content(self) -> None:
+        _d, corr = self._corr()
+        assert len(corr.fold_sources) == 1  # bbbb2222's blob is expired -> unnamed
+        src = corr.fold_sources[0]
+        assert src.handle == "aaaa1111" and src.tool == "bash" and src.turn == 1
+        assert src.refetches == 2  # seen again at turn 2 -> re-fetch after fold
+        assert corr.refetched and corr.refetched[0].handle == "aaaa1111"
+        assert corr.unnamed_blocks == 1
+
+    def test_unused_tools_defined_minus_invoked(self) -> None:
+        _d, corr = self._corr()
+        assert corr.tools_defined == 2 and corr.tools_invoked == 1
+        assert corr.unused_tools == [("mcp__gmail__search", 300)]
+        assert corr.unused_tokens_per_request == 300
+
+    def test_turn_cost_attribution(self) -> None:
+        _d, corr = self._corr()
+        by_index = {t.index: t for t in corr.turns}
+        assert by_index[1].requests == 1 and by_index[1].baseline_tokens == 5700
+        assert by_index[2].requests == 2 and by_index[2].baseline_tokens == 3000
+        assert corr.turns[0].index == 1  # costliest first
+
+    def test_renderers_carry_the_correlation(self) -> None:
+        d, corr = self._corr()
+        text = dz.render_text(d, color=False, corr=corr)
+        assert "conversation correlation (claude transcript: fix the flaky tests)" in text
+        assert "bash output" in text and "unused tools (1/2 defined" in text
+        assert "re-fetched after fold" in text
+        assert 'turn 1: "please run the tests"' in text
+        page = dz.render_html(d, corr=corr)
+        assert "Conversation correlation" in page and "never invoked" in page
+        assert "mcp__gmail__search" in page and "reappeared in 2 separate tool results" in page
+        payload = dz.to_json(d, corr=corr)
+        assert payload["correlation"]["tools"]["unused"] == [
+            {"name": "mcp__gmail__search", "tokens_per_request": 300}
+        ]
+        assert payload["correlation"]["fold_sources"][0]["tool"] == "bash"
+
+    def test_cli_transcript_flag(self, capsys: pytest.CaptureFixture[str]) -> None:
+        assert main(["dissect", "s200", "--no-color", "--transcript"]) == 0
+        out = capsys.readouterr().out
+        assert "conversation correlation" in out
+
+    def test_cli_no_transcript_found_is_a_note(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", "/nonexistent")
+        assert main(["dissect", "s200", "--no-color", "--transcript"]) == 0
+        out = capsys.readouterr().out
+        assert "no matching agent transcript found" in out
+
+    def test_portal_correlation_toggle(self) -> None:
+        server = dz.make_server("127.0.0.1", 0)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            with urllib.request.urlopen(base + "/session/s200-1") as resp:
+                plain = resp.read().decode()
+            assert "+ correlate with transcript" in plain
+            assert "Conversation correlation" not in plain
+            with urllib.request.urlopen(base + "/session/s200-1?t=1") as resp:
+                correlated = resp.read().decode()
+            assert "Conversation correlation" in correlated and "hide correlation" in correlated
+        finally:
+            server.shutdown()
 
 
 class TestScanUsage:

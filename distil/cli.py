@@ -358,14 +358,30 @@ def cmd_dissect(args: argparse.Namespace) -> int:
             return 2
     d = dz.dissect(sid)
     peers = dz.list_sessions()
+    corr = None
+    if args.transcript:
+        from .correlate import correlate
+        from .transcripts import find_transcript
+
+        man = d.manifest or {}
+        tr = find_transcript(
+            str(man.get("tool") or ""),
+            (d.started, d.ended or d.started),
+            cwd=man.get("cwd"),
+            path=None if args.transcript == "auto" else args.transcript,
+        )
+        if tr is None:
+            print("note: no matching agent transcript found — report is uncorrelated\n")
+        else:
+            corr = correlate(d, tr)
     if args.json:
-        print(json.dumps(dz.to_json(d, peers), indent=2))
+        print(json.dumps(dz.to_json(d, peers, corr), indent=2))
         return 0
     if args.html:
-        Path(args.html).write_text(dz.render_html(d, peers), encoding="utf-8")
+        Path(args.html).write_text(dz.render_html(d, peers, corr), encoding="utf-8")
         print(f"wrote {args.html}")
         return 0
-    print(dz.render_text(d, color=use_color, peers=peers))
+    print(dz.render_text(d, color=use_color, peers=peers, corr=corr))
     return 0
 
 
@@ -2047,6 +2063,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="session id, a unique prefix, or `latest` — omit to list sessions to pick from",
     )
     di.add_argument("--html", help="render the dissection as a self-contained HTML page")
+    di.add_argument(
+        "--transcript",
+        nargs="?",
+        const="auto",
+        help="correlate with the agent's own conversation log (opt-in; names tools/prompts). "
+        "`auto` finds it by session window; or pass a transcript path",
+    )
     di.add_argument(
         "--serve",
         action="store_true",

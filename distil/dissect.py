@@ -28,12 +28,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from typing import TYPE_CHECKING
+
 from .ledger import (
     default_path,
     session_manifest_path,
     session_marker_path,
     session_requests_path,
 )
+
+if TYPE_CHECKING:  # pragma: no cover — render-time only
+    from .correlate import Correlation
 
 
 def _state_dir() -> Path:
@@ -681,7 +686,11 @@ def _flags_line(man: dict[str, Any]) -> str:
 
 
 def render_text(
-    d: Dissection, *, color: bool = True, peers: list[SessionOverview] | None = None
+    d: Dissection,
+    *,
+    color: bool = True,
+    peers: list[SessionOverview] | None = None,
+    corr: "Correlation | None" = None,
 ) -> str:
     """Terminal report. Sections degrade gracefully when a source is missing."""
 
@@ -840,6 +849,39 @@ def render_text(
     elif not d.detail_available:
         out.append("  no session-scoped signal recorded for this session")
 
+    if corr is not None:
+        out.append("")
+        out.append(c("1", f"conversation correlation ({corr.agent} transcript: {corr.label or 'untitled'})"))
+        if corr.fold_sources:
+            out.append("  largest folds, named:")
+            for s in corr.fold_sources[:5]:
+                who = s.tool or "unknown tool"
+                turn = f' (turn {s.turn}: "{s.turn_text[:40]}…")' if s.turn_text else ""
+                out.append(f"    {_human(s.tokens):>8} ×{s.folds}  {who} output{turn}")
+        if corr.unnamed_blocks:
+            out.append(f"  {corr.unnamed_blocks} blocks unattributed (restore blob expired or content transformed)")
+        if corr.unused_tools:
+            out.append(
+                f"  unused tools ({len(corr.unused_tools)}/{corr.tools_defined} defined, "
+                f"{_human(corr.unused_tokens_per_request)} tokens/request paid for nothing): "
+                + ", ".join(n for n, _t in corr.unused_tools[:8])
+                + (" …" if len(corr.unused_tools) > 8 else "")
+            )
+        for s in corr.refetched[:3]:
+            out.append(
+                c("33", f"  ⚠ re-fetched after fold: {s.tool or '?'} output ({_human(s.tokens)} tokens) "
+                        f"appeared in {s.refetches} separate results — the digest may have dropped "
+                        "something the agent needed")
+            )
+        if corr.turns:
+            out.append("  costliest turns:")
+            for t in corr.turns[:3]:
+                label = t.text[:46] + ("…" if len(t.text) > 46 else "") if t.text else "(session start)"
+                out.append(
+                    f'    turn {t.index}: "{label}" — {t.requests} req, '
+                    f"{_human(t.baseline_tokens)} baseline, {_human(t.saved_tokens)} saved"
+                )
+
     out.append("")
     out.append(c("2", "terms: fold = bulky content replaced by a summary + recovery handle · cache-delta ="))
     out.append(c("2", "resent content replaced by a reference · verbatim = passed through untouched ·"))
@@ -852,10 +894,42 @@ def render_text(
     return "\n".join(out)
 
 
-def to_json(d: Dissection, peers: list[SessionOverview] | None = None) -> dict[str, Any]:
+def to_json(
+    d: Dissection,
+    peers: list[SessionOverview] | None = None,
+    corr: "Correlation | None" = None,
+) -> dict[str, Any]:
     """Machine-readable dissection (same numbers the text/html reports show)."""
     cal = d.calibration()
+    correlation = None
+    if corr is not None:
+        correlation = {
+            "agent": corr.agent,
+            "label": corr.label,
+            "transcript": corr.path,
+            "fold_sources": [
+                {"handle": s.handle, "sig": s.sig, "tokens": s.tokens, "folds": s.folds,
+                 "tool": s.tool, "turn": s.turn, "refetches": s.refetches}
+                for s in corr.fold_sources
+            ],
+            "unnamed_blocks": corr.unnamed_blocks,
+            "tools": {
+                "defined": corr.tools_defined,
+                "invoked": corr.tools_invoked,
+                "unused": [{"name": n, "tokens_per_request": t} for n, t in corr.unused_tools],
+            },
+            "refetched_after_fold": [
+                {"tool": s.tool, "tokens": s.tokens, "refetches": s.refetches}
+                for s in corr.refetched
+            ],
+            "turns": [
+                {"index": t.index, "text": t.text, "requests": t.requests,
+                 "baseline_tokens": t.baseline_tokens, "saved_tokens": t.saved_tokens}
+                for t in corr.turns
+            ],
+        }
     return {
+        "correlation": correlation,
         "headlines": [{"headline": h, "detail": b} for h, b in d.headlines()],
         "insights": {
             "mechanism": {
@@ -1119,7 +1193,11 @@ def _tile(label: str, value: str, note: str = "", help_text: str = "") -> str:
     )
 
 
-def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> str:
+def render_html(
+    d: Dissection,
+    peers: list[SessionOverview] | None = None,
+    corr: "Correlation | None" = None,
+) -> str:
     """Self-contained dark page in the ledger `render_html` style.
 
     Layout follows the stat-tile pattern: one number per card with a short
@@ -1352,6 +1430,51 @@ still on this machine.</p>
             "wrap from this distil version or newer.</p>"
         )
     exit_line = f"<p class='muted'>exit: {e(d.exit_note)}</p>" if d.exit_note else ""
+    corr_html = ""
+    if corr is not None:
+        fold_rows = "".join(
+            f"<tr><td>{e(s.tool or 'unknown')}</td>"
+            f"<td class='muted'>{e((s.turn_text or '')[:48])}</td>"
+            f"<td class='r'>{_human(s.tokens)}</td><td class='r'>×{s.folds}</td>"
+            f"<td class='r'>{s.refetches}</td></tr>"
+            for s in corr.fold_sources[:10]
+        )
+        unused = (
+            f"<p><b>{len(corr.unused_tools)}</b> of {corr.tools_defined} defined tools were "
+            f"never invoked, costing <b>{_human(corr.unused_tokens_per_request)}</b> tokens on "
+            f"every request: <span class='muted'>"
+            + e(", ".join(n for n, _t in corr.unused_tools[:10]))
+            + ("…" if len(corr.unused_tools) > 10 else "")
+            + "</span></p>"
+            if corr.unused_tools
+            else f"<p>All {corr.tools_defined} defined tools were invoked at least once.</p>"
+        )
+        refetch = "".join(
+            f"<li>{e(s.tool or '?')} output ({_human(s.tokens)} tokens) reappeared in "
+            f"{s.refetches} separate tool results — the digest may have dropped something "
+            "the agent needed</li>"
+            for s in corr.refetched[:3]
+        )
+        refetch_html = f"<ul class='warn'>{refetch}</ul>" if refetch else ""
+        turn_rows = "".join(
+            f"<tr><td>{t.index or '—'}</td><td class='muted'>{e(t.text[:56]) or '(session start)'}</td>"
+            f"<td class='r'>{t.requests}</td><td class='r'>{_human(t.baseline_tokens)}</td>"
+            f"<td class='r'>{_human(t.saved_tokens)}</td></tr>"
+            for t in corr.turns[:8]
+        )
+        corr_html = f"""<h2>Conversation correlation <span class="muted">({e(corr.agent)}:
+{e(corr.label or "untitled")})</span></h2>
+<p class="desc">Opt-in join with the agent's own transcript (read locally, stored nowhere):
+folds named by the tool call that produced them, tools you pay for but never used, and what
+each of your prompts cost.</p>
+{unused}
+{refetch_html}
+<h3>Largest folds, named</h3>
+<table><tr><th>source</th><th>under turn</th><th>tokens</th><th>folds</th><th>results seen in</th></tr>
+{fold_rows or "<tr><td class='muted' colspan='5'>no blocks could be attributed</td></tr>"}</table>
+<h3>Costliest turns</h3>
+<table><tr><th>#</th><th>your prompt</th><th>req</th><th>baseline</th><th>saved</th></tr>
+{turn_rows or "<tr><td class='muted' colspan='5'>no turns matched</td></tr>"}</table>"""
     heads = d.headlines()
     story = (
         "<h2>What happened</h2>"
@@ -1373,6 +1496,7 @@ body{{margin:0;background:#06070b;color:#f2f3f7;font:15px/1.6 Inter,ui-sans-seri
 .wrap{{max-width:820px;margin:0 auto;padding:48px 24px}}
 h1{{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}}
 h2{{font-size:17px;font-weight:700;margin:34px 0 12px}}
+h3{{font-size:14px;font-weight:700;margin:20px 0 8px}}
 .sub{{color:#9aa1b3;margin:0 0 28px}}
 .tot{{display:flex;gap:14px;margin:0 0 14px;flex-wrap:wrap}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}}
@@ -1430,6 +1554,7 @@ details{{margin:10px 0}} details summary{{cursor:pointer;color:#5b6177}}
 received unwrapped; distil is what was actually sent after compression.</p>
 <table><tr><th>model</th><th>req</th><th>baseline</th><th>distil</th><th>saved</th></tr>{model_rows}</table>
 {detail_body}
+{corr_html}
 <h2>Quality loops</h2>
 <p class="desc">distil's own safety nets: <b>expand</b> lets the model pull any folded block
 back when it needs the detail; <b>shadow</b> re-runs a sample of requests uncompressed to
@@ -1549,6 +1674,7 @@ def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
             if path in ("/", "/index.html"):
                 self._send(200, render_sessions_html(list_sessions()))
                 return
+            query = self.path.partition("?")[2]
             for prefix, as_json in (("/session/", False), ("/json/", True)):
                 if path.startswith(prefix):
                     sid = resolve_sid(path[len(prefix):])
@@ -1557,15 +1683,38 @@ def make_server(host: str = "127.0.0.1", port: int = 8790) -> Any:
                         return
                     d = dissect(sid)
                     peers = list_sessions()
+                    corr = None
+                    if "t=1" in query.split("&"):
+                        try:
+                            from .correlate import correlate
+                            from .transcripts import find_transcript
+
+                            man = d.manifest or {}
+                            tr = find_transcript(
+                                str(man.get("tool") or ""),
+                                (d.started, d.ended or d.started),
+                                cwd=man.get("cwd"),
+                            )
+                            if tr is not None:
+                                corr = correlate(d, tr)
+                        except Exception:  # noqa: BLE001 — correlation is best-effort
+                            corr = None
                     if as_json:
                         self._send(
                             200,
-                            json.dumps(to_json(d, peers), indent=2),
+                            json.dumps(to_json(d, peers, corr), indent=2),
                             ctype="application/json",
                         )
                     else:
-                        page = render_html(d, peers).replace(
-                            "<h1>", '<p><a href="/" style="color:#8b7bff">← sessions</a></p><h1>', 1
+                        toggle = (
+                            f'<a href="/session/{_html.escape(sid)}" style="color:#8b7bff">hide correlation</a>'
+                            if corr is not None
+                            else f'<a href="/session/{_html.escape(sid)}?t=1" style="color:#8b7bff">+ correlate with transcript</a>'
+                        )
+                        page = render_html(d, peers, corr).replace(
+                            "<h1>",
+                            f'<p><a href="/" style="color:#8b7bff">← sessions</a> · {toggle}</p><h1>',
+                            1,
                         )
                         self._send(200, page)
                     return

@@ -1204,6 +1204,7 @@ def wrap_run(
                 "sid": os.environ["DISTIL_SESSION"],
                 "tool": os.path.basename(command[0]) if command else "",
                 "argv": command,
+                "cwd": os.getcwd(),
                 "started_ts": time.time(),
                 "distil_version": _ver,
                 "billing": _billing,
