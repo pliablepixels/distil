@@ -3,6 +3,23 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.2] — CI portability + docs
+
+Maintenance release. No shipped-code behaviour change from 1.15.1 — the package is byte-identical
+apart from the version; this cuts a clean tag over the test/docs fixes below.
+
+### Fixed
+- **CI green on Windows and under load** — two portability bugs in the adopted dissect tests
+  (both passed on Linux/macOS): a report file was read with the platform default codec
+  (`UnicodeDecodeError` on Windows cp1252 for the `«` fold marker), and the streamed detail
+  record was read before its line flushed (`IndexError` under CI timing). Test-only.
+
+### Docs
+- The landing page, getting-started FAQ, and techniques page now depict the full 1.15 line —
+  content-type keep policy, query-aware salience, columnar fold, and `distil dissect`. The
+  "will it save me money?" answer no longer under-sells subscriptions: lossless mode **does**
+  cut tokens per turn (headroom + rate-limit room), it just doesn't lower a flat-rate bill.
+
 ## [1.15.1] — distil dissect + lossless columnar fold for subscriptions
 
 Driven by the same independent power-user (@pliablepixels, #24 / #26 / PR #27). Both a big
