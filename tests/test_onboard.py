@@ -20,10 +20,25 @@ def test_best_install_prefers_pipx_then_uv_then_fallback() -> None:
 
 
 def test_guide_subscription_uses_lossless() -> None:
-    env = Env(os_name="Darwin", agents=[("claude", "Claude Code")], subscription=True, has_anthropic=True)
-    cmds = [cmd for _, cmd, _ in onboard.next_steps(env)]
+    env = Env(
+        os_name="Darwin", agents=[("claude", "Claude Code")], subscription=True, has_anthropic=True
+    )
+    steps = onboard.next_steps(env)
+    cmds = [cmd for _, cmd, _ in steps]
+    notes = [note for _, _, note in steps]
     assert any("--lossless-only -- claude" in c for c in cmds)
     assert not any("--expand -- claude" in c for c in cmds)
+    # Tradeoff must be explicit: subscription users save context+latency but NOT tokens/cost
+    lossless_notes = [
+        n
+        for n in notes
+        if "lossless" in n.lower() or "flat-rate" in n.lower() or "does not" in n.lower()
+    ]
+    assert lossless_notes, "subscription step must have a note explaining the lossless tradeoff"
+    assert any(
+        "does not reduce token" in n.lower() or "does not reduce" in n.lower()
+        for n in lossless_notes
+    ), "subscription note must state that token count/cost is NOT reduced"
 
 
 def test_guide_metered_uses_expand_and_primary_agent() -> None:
@@ -60,7 +75,18 @@ def test_cmd_onboard_wires_statusline_and_prints_guide(tmp_path, monkeypatch, ca
 
     settings = tmp_path / "settings.json"
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
-    rc = cli.cmd_onboard(argparse.Namespace(dry_run=False, force=False, no_color=True, json=False, offline=True, upgrade=False, yes=False, no_interactive=True))
+    rc = cli.cmd_onboard(
+        argparse.Namespace(
+            dry_run=False,
+            force=False,
+            no_color=True,
+            json=False,
+            offline=True,
+            upgrade=False,
+            yes=False,
+            no_interactive=True,
+        )
+    )
     assert rc == 0
     assert "distil" in json.loads(settings.read_text())["statusLine"]["command"]
     out = capsys.readouterr().out
@@ -75,7 +101,18 @@ def test_cmd_onboard_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
 
     settings = tmp_path / "settings.json"
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
-    rc = cli.cmd_onboard(argparse.Namespace(dry_run=True, force=False, no_color=True, json=False, offline=True, upgrade=False, yes=False, no_interactive=True))
+    rc = cli.cmd_onboard(
+        argparse.Namespace(
+            dry_run=True,
+            force=False,
+            no_color=True,
+            json=False,
+            offline=True,
+            upgrade=False,
+            yes=False,
+            no_interactive=True,
+        )
+    )
     assert rc == 0
     assert not settings.exists()  # dry-run wrote nothing
     assert "Next steps" in capsys.readouterr().out
@@ -85,8 +122,10 @@ def test_is_outdated_semantics() -> None:
     assert onboard.is_outdated("1.2.0", "1.3.0") is True
     assert onboard.is_outdated("1.3.0", "1.3.0") is False
     assert onboard.is_outdated("1.4.0.dev0", "1.3.0") is False  # dev build is ahead of release
-    assert onboard.is_outdated("1.3.0.dev0", "1.3.0") is True   # pre-release of the release → upgrade
-    assert onboard.is_outdated("1.3.0", None) is False          # offline / check failed
+    assert (
+        onboard.is_outdated("1.3.0.dev0", "1.3.0") is True
+    )  # pre-release of the release → upgrade
+    assert onboard.is_outdated("1.3.0", None) is False  # offline / check failed
 
 
 def test_upgrade_command_per_method() -> None:
@@ -108,7 +147,9 @@ def test_report_is_agent_ready() -> None:
     assert r["upgrade_command"] == "pipx upgrade distil-llm"
     assert r["primary_agent"] == "claude"
     assert r["billing"] == "subscription"
-    assert r["next_steps"] and all({"title", "command", "note"} <= s.keys() for s in r["next_steps"])
+    assert r["next_steps"] and all(
+        {"title", "command", "note"} <= s.keys() for s in r["next_steps"]
+    )
 
 
 def test_cmd_onboard_json_is_pure(tmp_path, monkeypatch, capsys) -> None:
@@ -123,7 +164,9 @@ def test_cmd_onboard_json_is_pure(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(setup_mod, "default_settings_path", lambda: settings)
     monkeypatch.setattr(ob, "latest_pypi_version", lambda *a, **k: "9.9.9")  # no real network
     rc = cli.cmd_onboard(
-        argparse.Namespace(json=True, offline=False, dry_run=False, force=False, upgrade=False, no_color=True)
+        argparse.Namespace(
+            json=True, offline=False, dry_run=False, force=False, upgrade=False, no_color=True
+        )
     )
     assert rc == 0
     assert not settings.exists()  # --json takes no actions
@@ -144,7 +187,10 @@ def test_cmd_onboard_yes_runs_first_step(tmp_path, monkeypatch, capsys) -> None:
         ob,
         "detect",
         lambda: ob.Env(
-            os_name="Darwin", agents=[("claude", "Claude Code")], installed_version="1.4.0", method="pipx"
+            os_name="Darwin",
+            agents=[("claude", "Claude Code")],
+            installed_version="1.4.0",
+            method="pipx",
         ),
     )
     monkeypatch.setattr(ob, "latest_pypi_version", lambda *a, **k: None)  # up to date
@@ -160,8 +206,14 @@ def test_cmd_onboard_yes_runs_first_step(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(subprocess, "run", fake_run)
     rc = cli.cmd_onboard(
         argparse.Namespace(
-            json=False, offline=False, dry_run=False, force=False, upgrade=False,
-            no_color=True, yes=True, no_interactive=False,
+            json=False,
+            offline=False,
+            dry_run=False,
+            force=False,
+            upgrade=False,
+            no_color=True,
+            yes=True,
+            no_interactive=False,
         )
     )
     assert rc == 0
@@ -203,8 +255,14 @@ def test_cmd_onboard_ephemeral_offers_permanent_install(tmp_path, monkeypatch, c
 
     cli.cmd_onboard(
         argparse.Namespace(
-            dry_run=False, force=False, no_color=True, json=False,
-            offline=True, upgrade=False, yes=True, no_interactive=False,
+            dry_run=False,
+            force=False,
+            no_color=True,
+            json=False,
+            offline=True,
+            upgrade=False,
+            yes=True,
+            no_interactive=False,
         )
     )
     assert any("pipx install distil-llm" in str(c) for c in calls)  # bootstrapped itself
