@@ -515,6 +515,27 @@ def cmd_proxy(args: argparse.Namespace) -> int:
     if args.use_async:
         from .aproxy import serve as aserve  # high-concurrency (needs distil-llm[async])
 
+        # The async proxy doesn't implement the response-buffering expand loop,
+        # cache-delta, or shadow sampling yet. Never silently drop an explicit flag —
+        # name what's ignored and point at the standard proxy, which supports them.
+        _unsupported = [
+            n
+            for n, on in (
+                ("--expand", getattr(args, "expand", False)),
+                ("--session-delta", getattr(args, "session_delta", False)),
+                ("--shadow", bool(getattr(args, "shadow", 0.0))),
+            )
+            if on
+        ]
+        if _unsupported:
+            import sys as _sys
+
+            print(
+                f"distil proxy --async: {', '.join(_unsupported)} not supported on the "
+                "async proxy yet — ignoring. Drop --async to use them (the standard proxy "
+                "handles typical agent concurrency).",
+                file=_sys.stderr,
+            )
         aserve(
             host=args.host,
             port=args.port,
