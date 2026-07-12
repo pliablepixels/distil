@@ -182,6 +182,7 @@ distil wrap --expand -- codex</pre>
     <p>Then watch genuine, measured savings from <em>your</em> traffic (not estimates):</p>
     <pre class="term">distil leaderboard          <span class="d"># cumulative tokens + $ saved, from the local ledger (alias: distil stats)</span>
 distil dashboard            <span class="d"># live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit</span>
+distil dissect             <span class="d"># per-session deep-dive: savings, digest inventory, anomalies (--html/--serve)</span>
 distil doctor               <span class="d"># diagnose your setup: ledger, shadow, proxy self-test, wiring</span></pre>
     <p>Wire the status line in one step with <code>distil setup</code>. The <strong>status line</strong> and <code>distil dashboard</code> auto-detect a flat-rate <strong>Claude subscription</strong> — the per-token dollar figure is notional, so it's dropped and the token reduction leads (override with <code>DISTIL_SUBSCRIPTION=0/1</code>). Inside Claude Code, <code>/distil-stats</code>, <code>/distil-shadow</code>, <code>/distil-dashboard</code>, <code>/distil-doctor</code>, <code>/distil-certify</code> (the trajectory-level certificate), and <code>/distil-badge</code> (share your measured savings) surface this on demand — see <a href="integrations.html">Integrations</a> for the full plugin.</p>
     <p>Tired of typing <code>distil wrap</code> each session? Make it the default — once:</p>

@@ -3,6 +3,34 @@
 All notable changes to Distil are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.1] — distil dissect + lossless columnar fold for subscriptions
+
+Driven by the same independent power-user (@pliablepixels, #24 / #26 / PR #27). Both a big
+new observability feature and a real subscription-savings gap addressed.
+
+### Added
+- **`distil dissect`** (#26, PR #27, thanks @pliablepixels) — a per-session deep-dive report:
+  savings by model and by mechanism (digest vs cache-delta), the digest inventory (blocks by
+  kind, largest folds, re-fold churn, restore recoverability), billed usage captured from API
+  responses with a heuristic-calibration figure, latency by path (the `--expand` buffering tax
+  as a measured number), quality loops, and a **"worth your attention" anomaly list that
+  auto-detects the #25 signatures** so that class of silent failure can't hide again. Optional,
+  strictly opt-in transcript correlation names tools/files/prompts; everything else stays
+  content-free. New content-free session logging on the proxy is fail-open and off the request
+  path. `distil dissect [session] [--html|--json|--serve]`.
+- **Lossless columnar fold on the subscription/lossless path** (#24) — a JSON array of flat
+  records (extremely common tool output) now folds to a compact, self-describing table (all
+  rows inline, no recovery handle to invite an unavailable `distil_expand`), ~70–79% lossless
+  and ToS-safe. Recent tool_results stay byte-exact (never fold) so the agent's latest output
+  is unchanged. Inherits fold's decision-equivalence certification.
+
+### Fixed
+- **Subscription onboard clarity** (#24) — the note now states plainly that lossless mode *does*
+  cut tokens (JSON minify + run collapse + columnar fold), it just doesn't lower a flat-rate bill.
+- **Adopted with review fixes over the contributor's branch**: `argv` persisted as `command[:1]`
+  only (no credential-in-flag leak to the session manifest), and `fcntl.flock` on the per-request
+  JSONL append (concurrent-write safety).
+
 ## [1.15.0] — query-aware salience, content-type keep policy, expand reliability
 
 The digest gets genuinely content- and intent-aware, and two reliability bugs on the

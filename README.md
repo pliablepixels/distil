@@ -99,6 +99,7 @@ Then watch genuine savings from **your** traffic — measured, not estimated:
 ```bash
 distil leaderboard          # cumulative tokens + $ saved, from the local ledger
 distil dashboard            # live terminal TUI — token-trim + decision-equiv bars, Ctrl-C to exit
+distil dissect             # per-session deep-dive: savings, digest inventory, anomalies (--html/--serve)
 ```
 
 **Validate it on your traffic.** `--shadow` runs a fraction of requests twice (compressed **and** full) and compares the agent's chosen next action:
@@ -123,6 +124,8 @@ You don't need byte-equivalence — you need **decision-equivalence**: your agen
 - **Reversible, not lossy** — digests behind a handle, keeps the original, hands the agent a `distil_expand` tool. Compress fearlessly.
 - **Keeps the answer, folds the noise** — a per-content-type keep policy pins each kind's load-bearing lines (a log's pass/fail verdict, a traceback's frames, a diff's hunk headers); repeated near-identical error spam is deduped, and on a green run dedup tightens further since that noise didn't fail anything.
 - **Query-aware — keeps the line you're actually asking about** — distil is a proxy, so it sees the agent's intent (its tool_use args + latest ask) in the *same request* as the output. The line matching what you searched for (a grep hit, a config value, a SHA) is pinned even in arbitrary output — additively, so reversibility and the certificate are untouched. No post-hoc compressor has that query/output pairing.
+- **Lossless even on a flat-rate plan** — subscription/lossless mode isn't just verbatim: it minifies JSON, collapses duplicate runs, and folds tabular tool output into a compact self-describing table (~70–79% smaller, ToS-safe, no lossy digest). Recent tool outputs stay byte-exact.
+- **See exactly what happened** — `distil dissect` turns a wrap session into a report: savings by model/mechanism, the digest inventory, billed-usage calibration, latency by path, and a *worth-your-attention* anomaly list that catches silent failures automatically.
 - **Compounds on outcomes** — expansions and matched failures teach the policy what to protect (signatures only, never content) — always *more* conservative.
 - **Streams like it isn't there** — SSE relays chunk-by-chunk; TTFT preserved.
 
@@ -274,6 +277,7 @@ Basics are in [Use it now](#-use-it-now) and [Works with every SDK](#-works-with
 | Diagnose your setup (ledger, shadow, proxy self-test, wiring) | `distil doctor` |
 | Wire the savings status line into Claude Code | `distil setup` (compact segment: `DISTIL_STATUSLINE=minimal`) |
 | Watch genuine savings accumulate | `distil leaderboard` · live TUI: `distil dashboard` |
+| Deep-dive one session (savings, anomalies) | `distil dissect` (`--html` / `--serve`) |
 | Live decision-equivalence on real traffic | `distil wrap --shadow 0.1 -- claude` → `distil shadow-stats` |
 | Certify on *your* domain | `distil ingest --input prod.jsonl --out ./mycorpus` → `distil conformal --corpus ./mycorpus` |
 | Recover digested detail from any agent (MCP) | `distil mcp` |

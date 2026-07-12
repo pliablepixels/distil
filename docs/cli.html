@@ -321,6 +321,12 @@ by trajectory:
     <hr/>
 
     <!-- proxy -->
+    <h2 id="dissect">distil dissect</h2>
+    <p>Everything Distil knows about one <code>wrap</code> session, in a single report — or a picker when no session id is given. Leads with a plain-language "what happened", then drills into savings by model and by mechanism (digest vs cache-delta), the digest inventory (blocks by kind, largest folds, re-fold churn, restore recoverability), billed usage captured from API responses with a heuristic-calibration figure, latency by path (the <code>--expand</code> buffering tax as a measured number), and a <strong>"worth your attention" anomaly list that auto-detects silent-failure signatures</strong> (proxy bypass, a shadow that is configured but recording nothing, an expand path that never intercepts). Session telemetry is content-free (sizes, hashes, token counts — never prompt or response text) and written fail-open, off the request path. Optional <code>--transcript</code> correlation names tools/files/prompts by joining the session with the agent's own log; everything else stays content-free.</p>
+    <pre class="term"><span class="d">$ distil dissect</span>            <span class="d"># pick a recent session</span>
+<span class="d">$ distil dissect s4821-3 --html report.html</span>
+<span class="d">$ distil dissect --serve</span>       <span class="d"># localhost portal, all sessions</span></pre>
+
     <h2 id="proxy">distil proxy</h2>
     <p>HTTP proxy that applies Distil compression to every LLM API request passing through it. Drop-in for any client that honours a <code>base_url</code> parameter — Anthropic SDK, OpenAI SDK, LiteLLM, LangChain, etc. As real traffic flows through it, the actual per-request token reduction is accumulated into your local ledger (see <a href="#leaderboard">distil leaderboard</a>) — genuine savings, numbers only, never content.</p>
 
