@@ -161,9 +161,10 @@ def next_steps(env: Env) -> list[tuple[str, str, str]]:
             (
                 "Route your agent (subscription-safe)",
                 f"distil wrap --lossless-only -- {agent}",
-                "flat-rate plan: trims context window + latency, ToS-safe"
-                " — does NOT reduce token count or cost"
-                " (flat-rate billing is unchanged by context size)",
+                "flat-rate plan: real lossless token savings — minifies JSON, collapses"
+                " duplicate runs, ToS-safe (no lossy digest, no tool injection). Won't"
+                " lower a flat-rate bill, but fewer tokens per turn = more context"
+                " headroom and rate-limit room.",
             )
         )
     else:

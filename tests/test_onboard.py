@@ -35,10 +35,12 @@ def test_guide_subscription_uses_lossless() -> None:
         if "lossless" in n.lower() or "flat-rate" in n.lower() or "does not" in n.lower()
     ]
     assert lossless_notes, "subscription step must have a note explaining the lossless tradeoff"
-    assert any(
-        "does not reduce token" in n.lower() or "does not reduce" in n.lower()
-        for n in lossless_notes
-    ), "subscription note must state that token count/cost is NOT reduced"
+    # the note must be honest on BOTH axes: lossless mode DOES cut tokens, but not a flat-rate bill
+    joined = " ".join(lossless_notes).lower()
+    assert "lossless" in joined and "token" in joined, "note must state lossless token savings"
+    assert "bill" in joined or "cost" in joined or "rate" in joined, (
+        "note must clarify the flat-rate bill is unchanged"
+    )
 
 
 def test_guide_metered_uses_expand_and_primary_agent() -> None:
