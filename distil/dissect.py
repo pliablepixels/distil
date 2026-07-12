@@ -943,28 +943,38 @@ _GRID = "#1b2030"
 _INK_MUTED = "#9aa1b3"
 
 
-def _svg_hbars(rows: list[tuple[str, int]], *, color: str = _C_OVERHEAD) -> str:
-    """Horizontal bar chart (single measure, one hue): label, thin bar, value."""
+def _svg_hbars(
+    rows: list[tuple[str, int, list[tuple[str, str, str]]]],
+    *,
+    color: str = _C_OVERHEAD,
+) -> str:
+    """Horizontal bar chart (single measure, one hue): label, thin bar, value.
+
+    Each row is (label, value, tooltip_rows). The whole row — label through
+    value — is one oversized hit target for the styled tooltip.
+    """
     if not rows:
         return ""
-    top = max(v for _, v in rows) or 1
+    top = max(v for _, v, _t in rows) or 1
     rh, bar_h, label_w, val_w, width = 26, 12, 220, 64, 640
     plot_w = width - label_w - val_w
     parts = [
         f'<svg viewBox="0 0 {width} {len(rows) * rh + 6}" role="img" '
         f'style="width:100%;height:auto;font:12px Inter,ui-sans-serif,sans-serif">'
     ]
-    for i, (label, val) in enumerate(rows):
+    for i, (label, val, tip_rows) in enumerate(rows):
         y = i * rh + 4
         w = max(2, round(plot_w * val / top))
         name = label if len(label) <= 30 else label[:29] + "…"
         parts.append(
+            f"<g{_tip_attr(label, tip_rows)}>"
+            f'<rect x="0" y="{y - 2}" width="{width}" height="{rh}" fill="transparent"/>'
             f'<text x="{label_w - 8}" y="{y + bar_h - 2}" text-anchor="end" '
             f'fill="{_INK_MUTED}">{_html.escape(name)}</text>'
             f'<rect class="mark" x="{label_w}" y="{y}" width="{w}" height="{bar_h}" '
-            f'rx="2" fill="{color}"><title>{_html.escape(label)}: {val:,} tokens</title></rect>'
+            f'rx="2" fill="{color}"/>'
             f'<text x="{label_w + w + 6}" y="{y + bar_h - 2}" fill="{_INK_MUTED}">'
-            f"{_human(val)}</text>"
+            f"{_human(val)}</text></g>"
         )
     parts.append("</svg>")
     return "".join(parts)
@@ -1004,13 +1014,26 @@ def _svg_stack_timeline(requests: list[dict[str, Any]]) -> str:
         )
     for i, (overhead, sent, saved, r) in enumerate(comp):
         x = pad_l + i * step + (step - bar_w) / 2
-        tip = (
-            f"request {i + 1} · {r.get('model', '?')} · overhead {overhead:,} · "
-            f"sent {sent:,} · saved {saved:,}"
-        )
+        tip_rows = [
+            (_C_SAVED, "saved by distil", f"{saved:,}"),
+            (_C_SENT, "sent content", f"{sent:,}"),
+            (_C_OVERHEAD, "overhead", f"{overhead:,}"),
+        ]
+        billed = r.get("usage_input_tokens")
+        if billed is not None:
+            tip_rows.append(("", "billed input", f"{int(billed):,}"))
+        if r.get("duration_ms") is not None:
+            tip_rows.append(("", "duration", f"{int(r['duration_ms']) / 1000:.1f}s"))
         y = 8 + plot_h
         segs = [(_C_OVERHEAD, overhead), (_C_SENT, sent), (_C_SAVED, saved)]
         drawn = [(c, v) for c, v in segs if v > 0]
+        # The whole column is one hit target: hover anywhere over the request,
+        # not just the thin bar, and every series is listed in one tooltip.
+        parts.append(
+            f"<g{_tip_attr(f'request {i + 1} · ' + str(r.get('model', '?')), tip_rows)}>"
+            f'<rect x="{pad_l + i * step:.1f}" y="8" width="{step:.1f}" '
+            f'height="{plot_h + pad_b:.1f}" fill="transparent"/>'
+        )
         for j, (color, val) in enumerate(drawn):
             h = max(1.0, plot_h * val / top)
             y -= h
@@ -1020,9 +1043,9 @@ def _svg_stack_timeline(requests: list[dict[str, Any]]) -> str:
             gap = 0.0 if topmost else min(2.0, h - 0.5)
             parts.append(
                 f'<rect class="mark" x="{x:.1f}" y="{y + gap:.1f}" width="{bar_w}" '
-                f'height="{h - gap:.1f}" rx="{2 if topmost else 0}" fill="{color}">'
-                f"<title>{_html.escape(tip)}</title></rect>"
+                f'height="{h - gap:.1f}" rx="{2 if topmost else 0}" fill="{color}"/>'
             )
+        parts.append("</g>")
     parts.append(
         f'<text x="{pad_l}" y="{height - 4}" fill="{_INK_MUTED}">1</text>'
         f'<text x="{width - 8}" y="{height - 4}" text-anchor="end" '
@@ -1065,13 +1088,33 @@ def _timeline_table(requests: list[dict[str, Any]]) -> str:
     )
 
 
-def _tile(label: str, value: str, note: str = "", help_text: str = "") -> str:
-    """One stat card. ``help_text`` becomes a native hover (title=) in plain
-    English — every distil term on the page must be explainable without docs."""
-    note_html = f'<div class="n">{note}</div>' if note else ""
-    title = f' title="{_html.escape(help_text)}"' if help_text else ""
+def _tip_attr(title: str, rows: list[tuple[str, str, str]] | None = None, body: str = "") -> str:
+    """Build the ``data-tip`` attribute for the styled hover layer.
+
+    Payload is JSON — the page's script rebuilds it with textContent (never
+    innerHTML), so model/tool/signature names stay data, not markup. ``rows``
+    are (series_color, label, value) triples; values render strong, labels
+    secondary, keyed by a short stroke of the series color.
+    """
+    payload: dict[str, Any] = {"t": title}
+    if rows:
+        payload["rows"] = [list(r) for r in rows]
+    if body:
+        payload["body"] = body
     return (
-        f'<div class="card tile"{title}><div class="l">{label}</div>'
+        f' data-tip="{_html.escape(json.dumps(payload, ensure_ascii=False), quote=True)}"'
+        ' tabindex="0"'
+    )
+
+
+def _tile(label: str, value: str, note: str = "", help_text: str = "") -> str:
+    """One stat card. ``help_text`` feeds the styled hover/focus tooltip in
+    plain English — every distil term on the page must be explainable without
+    docs."""
+    note_html = f'<div class="n">{note}</div>' if note else ""
+    tip = _tip_attr(label, body=help_text) if help_text else ""
+    return (
+        f'<div class="card tile"{tip}><div class="l">{label}</div>'
         f'<div class="v2">{value}</div>{note_html}</div>'
     )
 
@@ -1245,7 +1288,17 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
             else ""
         )
 
-        tool_rows = [(name, per) for name, per, _tot in d.tool_costs()[:10]]
+        tool_rows = [
+            (
+                name,
+                per,
+                [
+                    (_C_OVERHEAD, "tokens per request", f"{per:,}"),
+                    ("", "session total (× every request)", f"{tot:,}"),
+                ],
+            )
+            for name, per, tot in d.tool_costs()[:10]
+        ]
         tools_chart = (
             "<h2>Tool definitions <span class='muted'>(tokens per request)</span></h2>"
             "<p class='desc'>Every enabled tool is re-described to the model on every "
@@ -1256,7 +1309,18 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
             else ""
         )
         kind_chart = _svg_hbars(
-            [(sig, toks) for sig, _u, toks in d.blocks_by_kind()[:10]], color=_C_SAVED
+            [
+                (
+                    sig,
+                    toks,
+                    [
+                        (_C_SAVED, "tokens folded", f"{toks:,}"),
+                        ("", "distinct blocks", str(uniq)),
+                    ],
+                )
+                for sig, uniq, toks in d.blocks_by_kind()[:10]
+            ],
+            color=_C_SAVED,
         )
         detail_body = f"""<h2>Request detail</h2>
 <p class="desc">Every API request this session made, and where its tokens went — hover any
@@ -1318,8 +1382,19 @@ h2{{font-size:17px;font-weight:700;margin:34px 0 12px}}
 .card .l{{color:#9aa1b3;font-size:12px}} .card .v{{font-size:30px;font-weight:800;margin-top:4px}}
 .card .v2{{font-size:22px;font-weight:700;margin-top:4px}}
 .card .n{{color:#5b6177;font-size:12px;margin-top:6px;line-height:1.45}}
-.tile{{cursor:help}} .card[title] .l{{border-bottom:1px dotted #3a4257;display:inline-block;
+.tile{{cursor:help}} .card[data-tip] .l{{border-bottom:1px dotted #3a4257;display:inline-block;
  padding-bottom:1px}}
+[data-tip]{{outline:none}}
+g[data-tip]:hover .mark,g[data-tip]:focus .mark{{filter:brightness(1.35)}}
+#tip{{position:fixed;display:none;background:#161a26;border:1px solid #2c3550;
+ border-radius:10px;padding:10px 13px;font-size:12.5px;line-height:1.5;
+ pointer-events:none;z-index:9;max-width:340px;box-shadow:0 8px 24px rgba(0,0,0,.55)}}
+#tip .tt{{color:#f2f3f7;font-weight:600;margin-bottom:2px}}
+#tip .tb{{color:#9aa1b3}}
+#tip .trow{{display:flex;align-items:center;gap:8px;margin:3px 0}}
+#tip .tkey{{width:10px;height:3px;border-radius:1.5px;flex:none}}
+#tip .trow b{{font-variant-numeric:tabular-nums}}
+#tip .tlab{{color:#9aa1b3}}
 .desc{{color:#5b6177;font-size:13px;line-height:1.55;margin:-4px 0 14px}}
 .story{{background:linear-gradient(180deg,#12151f,#0b0d15);border:1px solid #252c3e;
  border-radius:14px;padding:16px 20px;margin:0 0 10px}}
@@ -1336,7 +1411,6 @@ code{{color:#8b7bff}}
 .callout b{{color:#e8b34b}}
 ul.warn{{margin:8px 0 0;padding-left:20px}} ul.warn li{{color:#e8b34b;margin:6px 0}}
 ul.notes{{margin:14px 0 0;padding-left:20px}} ul.notes li{{color:#9aa1b3;margin:8px 0}}
-svg .mark:hover{{filter:brightness(1.3)}}
 details{{margin:10px 0}} details summary{{cursor:pointer;color:#5b6177}}
 .foot{{color:#5b6177;font-size:12.5px;margin-top:26px}}
 </style></head><body><div class="wrap">
@@ -1365,4 +1439,44 @@ verdicts near this session (time-joined): {d.shadow_window_agree}/{d.shadow_wind
 {exit_line}
 <p class="foot">Local-first: assembled from savings.jsonl, sessions/&lt;sid&gt;*, restore/ and
 shadow.jsonl on this machine. Content-free — handles and kind:size signatures only.</p>
-</div></body></html>"""
+</div><div id="tip" role="tooltip"></div><script>
+(function () {{
+  var tip = document.getElementById("tip");
+  function fill(el) {{
+    var d; try {{ d = JSON.parse(el.dataset.tip); }} catch (e) {{ return false; }}
+    tip.replaceChildren();
+    var t = document.createElement("div"); t.className = "tt";
+    t.textContent = d.t || ""; tip.append(t);
+    if (d.body) {{ var b = document.createElement("div"); b.className = "tb";
+      b.textContent = d.body; tip.append(b); }}
+    (d.rows || []).forEach(function (r) {{
+      var row = document.createElement("div"); row.className = "trow";
+      var key = document.createElement("span"); key.className = "tkey";
+      if (r[0]) key.style.background = r[0]; else key.style.visibility = "hidden";
+      var val = document.createElement("b"); val.textContent = r[2];
+      var lab = document.createElement("span"); lab.className = "tlab";
+      lab.textContent = r[1];
+      row.append(key, val, lab); tip.append(row);
+    }});
+    tip.style.display = "block";
+    return true;
+  }}
+  function place(x, y) {{
+    var r = tip.getBoundingClientRect(), pad = 14;
+    var px = x + pad, py = y + pad;
+    if (px + r.width > innerWidth - 8) px = x - r.width - pad;
+    if (py + r.height > innerHeight - 8) py = y - r.height - pad;
+    tip.style.left = Math.max(8, px) + "px"; tip.style.top = Math.max(8, py) + "px";
+  }}
+  document.addEventListener("mousemove", function (e) {{
+    var el = e.target.closest && e.target.closest("[data-tip]");
+    if (el && fill(el)) place(e.clientX, e.clientY);
+    else tip.style.display = "none";
+  }});
+  document.addEventListener("focusin", function (e) {{
+    var el = e.target.closest && e.target.closest("[data-tip]");
+    if (el && fill(el)) {{ var r = el.getBoundingClientRect(); place(r.right, r.top); }}
+  }});
+  document.addEventListener("focusout", function () {{ tip.style.display = "none"; }});
+}})();
+</script></body></html>"""

@@ -494,12 +494,18 @@ class TestToolsAndCharts:
         assert "#3987e5" in page and "#199e70" in page and "#c98500" in page
         assert "overhead (system + tools)" in page  # legend, not color-alone
         assert "Tool definitions" in page and "bash" in page
-        assert "request 2 · m-small · overhead 500 · sent 800 · saved 1,200" in page
         assert "data table" in page  # accessible table view of the timeline
         assert "Request composition" in page
-        # Plain-English help layer: section descriptions + hover titles on tiles.
+        # Styled hover layer: JSON data-tip payloads rebuilt with textContent,
+        # full-column/row hit targets, and the tooltip container + script.
+        assert "request 2 · m-small" in page  # timeline column tip title
+        assert "saved by distil" in page and "billed input" in page  # series rows
+        assert page.count("data-tip=") >= 15  # tiles + columns + bar rows
+        assert '<div id="tip" role="tooltip">' in page and "dataset.tip" in page
+        assert "textContent" in page and "innerHTML" not in page  # names stay data
+        # Plain-English help layer: section descriptions + tile explanations.
         assert "for what the term means" in page
-        assert 'title="Tokens distil avoided sending by replacing bulky content' in page
+        assert "Tokens distil avoided sending by replacing bulky content" in page
         assert "class=\"desc\"" in page
         assert "re-described to the model on every request" in page
 
