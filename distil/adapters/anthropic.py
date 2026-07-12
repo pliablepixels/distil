@@ -33,6 +33,7 @@ from typing import Any
 from ..compress.tier0 import collapse_runs, minify_json
 from ..mcp_server import load_restore as _load_restore
 from ..mcp_server import record_restore as _record_restore
+from ..compress.intent import extract_intent
 from ..compress.tier1 import digest as _tier1_digest
 from ..tokenizer import DEFAULT as _tokenizer
 
@@ -59,6 +60,16 @@ _keep_tls = _threading.local()
 def _active_keep(text: str) -> bool:
     fn = getattr(_keep_tls, "fn", None)
     return bool(fn and fn(text))
+
+
+# Query-aware salience: the request's intent terms, set once per compress_messages call
+# (it holds the whole conversation) and read by the tool_result digester. Thread-local so
+# the per-block compressor need not thread a new arg through its recursion.
+_intent_tls = _threading.local()
+
+
+def _active_intent() -> frozenset[str]:
+    return getattr(_intent_tls, "terms", frozenset())
 
 
 def _recent_verbatim_indices(messages: list[dict[str, Any]], k: int) -> set[int]:
@@ -187,7 +198,7 @@ def _compress_tool_result_text(text: str, store: RestoreStore, verbatim: bool = 
     if _active_keep(text):
         return _apply_tier0(text)
 
-    digested, changed = _tier1_digest(text)
+    digested, changed = _tier1_digest(text, intent=_active_intent())
     if changed:
         h = _handle(text)
         if store._record(h, text):
@@ -334,6 +345,7 @@ def compress_messages(
         original text; call ``store.expand(handle)`` to recover it.
     """
     _keep_tls.fn = keep  # learned keep-byte-exact policy for this call (per-thread)
+    _intent_tls.terms = frozenset() if verbatim else extract_intent(messages)
     try:
         store = RestoreStore()
         new_messages: list[dict[str, Any]] = []
@@ -349,6 +361,7 @@ def compress_messages(
         return new_messages, store
     finally:
         _keep_tls.fn = None
+        _intent_tls.terms = frozenset()
 
 
 def place_cache_control(

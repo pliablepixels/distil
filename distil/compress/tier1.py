@@ -5,15 +5,15 @@ digest plus a content handle. The full original is kept locally and can be
 re-expanded on demand (`expand(handle)`), so this is lossless in effect.
 
 The codec is decision-aware: any line the runtime cannot prove irrelevant is
-preserved verbatim. The keep rules are (1) any line carrying a DECISION: marker,
-(2) error/warning/traceback lines an agent reacts to — deduped, so a loop that
-logs the same error 400× keeps its first occurrences plus a fold, not 400 copies —
-and (3) the *result* line of a command — a test/build/exit verdict, the one line
-that is often the whole reason the output exists. Rule 3 exists because rules 1–2
-alone invert priority on a passing run: they keep the alarming ERROR stdout and
-fold the "1955 passed" verdict. In production this is where a learned
-per-content-type codec plugs in. The point is that the *keep* rule is explicit
-and auditable, not blind truncation.
+preserved verbatim. The keep rules delegate to ``keep_policy``: the generic net
+keeps DECISION: markers and error/failure lines, and each content kind adds its
+own load-bearing lines (a test log's pass/fail summary, a traceback's frames, a
+diff's hunk headers). The dropped span is folded behind a retrieval handle so
+the full original is always recoverable.
+
+On top of the per-kind keep decision, an outcome-aware dedup layer collapses
+near-identical error/warn lines that differ only in an index/id: on a GREEN run
+those errors did not cause the failure, so one sample per shape is enough signal.
 """
 
 from __future__ import annotations
@@ -23,6 +23,9 @@ import re
 
 from ..trajectory import Block, Kind
 from .base import CompressResult
+from .intent import relevant_lines
+from .keep_policy import ContentKind, classify, must_keep
+from .keep_policy import _SUMMARY_RE  # re-exported: keep_model imports it from here (1.14.1 compat)
 
 _DIGESTIBLE = {Kind.TOOL_OUTPUT, Kind.RETRIEVED}
 
@@ -31,48 +34,9 @@ def _handle(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:8]
 
 
-# Heuristic salience net, pending the learned per-content-type salience model the
-# module docstring describes. Beyond explicit DECISION: markers, keep the lines an
-# agent most often needs verbatim to react: errors, exceptions, tracebacks,
-# failures, warnings, panics. Substring + case-insensitive so camelCase exception
-# names ("ValueError") and variants ("failed", "errors", "warn") all match — for a
-# salience net a stray keep (a rare "terror") only costs a little compression, while
-# a miss costs the agent the line, so we deliberately bias toward over-keeping.
-_KEEP_RE = re.compile(
-    r"error|exception|traceback|fail|warn|panic|fatal",
-    re.IGNORECASE,
-)
-
-# Result-line net — the single line that carries the OUTCOME of a command, which
-# is often the whole reason the output exists (a test run, a build, a script). The
-# error/warn net above keeps the *alarming* lines; on its own it inverts priority
-# on a passing run, whose verdict ("1955 passed", no error word in it) gets folded
-# while the noisy ERROR stdout the run emitted on purpose is kept — the answer
-# thrown away, the noise retained. This pins the verdict verbatim. Covers the
-# common test runners + build/exit summaries; the learned per-content-type codec
-# the module docstring describes would subsume it.
-# ponytail: regex covers vitest/jest/pytest/mocha/go/cargo/gradle/maven + exit
-# status — the 99% of CI output; add a framework here if one slips through.
-_SUMMARY_RE = re.compile(
-    r"""
-      \b\d+\ +(?:passed|failed|skipped|pending|todo|errors?)\b   # vitest/jest/pytest counts
-    | \b\d+\ +(?:passing|failing)\b                              # mocha "1955 passing"
-    | \btest\ result:                                            # cargo "test result: ok. 5 passed"
-    | ^\s*(?:ok|FAIL|PASS)\b                                     # go package ok/FAIL, bare PASS/FAIL
-    | ^\s*---\ +(?:FAIL|PASS|SKIP):                              # go subtest verdicts
-    | \bBUILD\ (?:SUCCESS(?:FUL)?|FAIL(?:ED|URE))\b              # gradle/maven
-    | \bexit\ (?:code|status)\ +\d+                              # command exit status
-    """,
-    re.IGNORECASE | re.VERBOSE,
-)
-
-
 def _must_keep(line: str) -> bool:
-    return (
-        "DECISION:" in line
-        or _KEEP_RE.search(line) is not None
-        or _SUMMARY_RE.search(line) is not None
-    )
+    """Compatibility shim for tests; superseded by keep_policy.must_keep + _SUMMARY_RE."""
+    return _SUMMARY_RE.search(line) is not None or must_keep(line, ContentKind.GENERIC)
 
 
 # Noise dedup — a run that logs the same ERROR on purpose in a loop produces
@@ -122,25 +86,37 @@ def _outcome(lines: list[str]) -> str:
 
 
 def digest(
-    text: str, head: int = 3, tail: int = 1, max_repeats: int | None = None
+    text: str,
+    head: int = 3,
+    tail: int = 1,
+    max_repeats: int | None = None,
+    intent: frozenset[str] = frozenset(),
 ) -> tuple[str, bool]:
     """Return (digest_text, changed). Keeps head/tail context + every must-keep
     line, replacing the dropped middle with a single handle marker. Near-identical
     error/warn repeats beyond `max_repeats` per shape fold with the rest; the
     default routes by the log's own outcome (green run -> 1 sample per shape,
-    red/unknown -> 2)."""
+    red/unknown -> 2).
+
+    `intent` (query-aware salience): salient terms naming what the agent is looking
+    for (its tool_use args + latest ask). Lines matching a *discriminating* intent
+    term are additively pinned — this only ever widens the keep set, so the full
+    original stays recoverable and the certificate is unaffected."""
     lines = text.splitlines()
     if len(lines) <= head + tail + 1:
         return text, False
     if max_repeats is None:
         max_repeats = 1 if _outcome(lines) == "green" else 2
 
+    kind = classify(text)
     keep_idx = set(range(head)) | set(range(len(lines) - tail, len(lines)))
+    if intent:
+        keep_idx |= relevant_lines(lines, intent)  # additive: query-relevant answers
     shape_seen: dict[str, int] = {}
     for i, ln in enumerate(lines):
         if "DECISION:" in ln or _SUMMARY_RE.search(ln) is not None:
             keep_idx.add(i)  # answers — never deduped
-        elif _KEEP_RE.search(ln) is not None:
+        elif must_keep(ln, kind):
             s = _shape(ln)
             shape_seen[s] = shape_seen.get(s, 0) + 1
             if shape_seen[s] <= max_repeats:

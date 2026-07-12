@@ -49,7 +49,7 @@ import math
 import re
 from typing import Protocol
 
-from ..compress.tier1 import _SUMMARY_RE
+from ..compress.keep_policy import _SUMMARY_RE
 
 # ---------------------------------------------------------------------------
 # Keyword constants — module-level so callers can introspect / extend them.
