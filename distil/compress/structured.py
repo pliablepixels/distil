@@ -74,6 +74,11 @@ def fold(text: str, emit_handle: bool = True) -> str | None:
         for k in r:
             if k not in cols:
                 cols.append(k)
+    # A column name containing the header delimiter (,) or the cell separator/newline
+    # would make the self-describing header ambiguous (advertises the wrong schema) —
+    # bail (rare). Without this, {"a,b":1} folds to a header claiming columns a AND b.
+    if any("," in c or _SEP in c or "\n" in c for c in cols):
+        return None
     # tabs/newlines in any cell would break the columnar layout — bail (rare)
     rows: list[str] = []
     for r in obj:

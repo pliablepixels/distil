@@ -280,7 +280,7 @@ def _compress_content_item(
                     and sub.get("type") == "text"
                     and isinstance(sub.get("text"), str)
                 ):
-                    new_text = _compress_tool_result_text(sub["text"], store, verbatim)
+                    new_text = _compress_tool_result_text(sub["text"], store, verbatim, is_recent)
                     if new_text != sub["text"]:
                         new_list.append({**sub, "text": new_text})
                         changed = True
@@ -382,7 +382,9 @@ def compress_messages(
             # Force verbatim for the most recent turns so their tool_results are
             # never replaced by a digest stub the agent must reason over blind.
             msg_verbatim = verbatim or idx in recent
-            new_messages.append(_compress_message(msg, store, msg_verbatim, is_recent=idx in recent))
+            new_messages.append(
+                _compress_message(msg, store, msg_verbatim, is_recent=idx in recent)
+            )
         return new_messages, store
     finally:
         _keep_tls.fn = None

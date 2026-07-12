@@ -154,6 +154,24 @@ def test_expand_overrides_lossless_only(proxy_factory):
     )
 
 
+def test_shape_output_suppressed_on_lossless_only(proxy_factory):
+    # finding E: lossless-only must NOT shape the response (the startup message used to
+    # claim it did). The x-distil-output-shaping header only appears when shaping ran.
+    def _headers(port):
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/v1/messages",
+            data=json.dumps(_digestible()).encode(),
+            headers={"content-type": "application/json"},
+            method="POST",
+        )
+        return urllib.request.urlopen(req).headers
+
+    h_lossless = _headers(proxy_factory(lossless_only=True, shape_output="light"))
+    assert h_lossless.get("x-distil-output-shaping") is None, "lossless-only must not shape"
+    h_payg = _headers(proxy_factory(lossless_only=False, shape_output="light"))
+    assert h_payg.get("x-distil-output-shaping") == "light", "PAYG with shaping should shape"
+
+
 def test_session_delta_round_trip(proxy_factory):
     # session-delta encodes the request against the prior turn -> exercises the
     # cachedelta encode path + cache-* extras (the second post deltas against the first)

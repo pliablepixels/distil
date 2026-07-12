@@ -510,8 +510,38 @@ def cmd_holdout(args: argparse.Namespace) -> int:
     return 0
 
 
+def _apply_subscription_safe_default(args: argparse.Namespace) -> None:
+    """A bare `wrap`/`proxy` on a subscription defaults to lossless-only — the same
+    safe default the managed `distil default` install bakes in (see cmd_default). Without
+    it, the direct commands run the Tier-1 digest with no expand tool injected, leaving
+    irreversibly-lossy stubs in a subscription session — the exact harm policy.py's mode
+    gate exists to prevent. An explicit --lossless-only/--verbatim/--expand always wins.
+    """
+    if (
+        getattr(args, "lossless_only", False)
+        or getattr(args, "verbatim", False)
+        or getattr(args, "expand", False)
+    ):
+        return
+    import sys as _sys
+
+    from .doctor import subscription_mode
+
+    if subscription_mode():
+        args.lossless_only = True
+        print(
+            "distil: subscription detected → lossless-only (safe default; no lossy digest "
+            "without a recovery tool). Add --expand for max recoverable compression, or "
+            "--verbatim for byte-exact. Override: DISTIL_SUBSCRIPTION=0.",
+            file=_sys.stderr,
+        )
+
+
 def cmd_proxy(args: argparse.Namespace) -> int:
     """Drop-in provider proxy: point any base_url-honoring client at it."""
+    import sys as _sys
+
+    _apply_subscription_safe_default(args)
     if args.use_async:
         from .aproxy import serve as aserve  # high-concurrency (needs distil-llm[async])
 
@@ -1578,6 +1608,7 @@ def cmd_wrap(args: argparse.Namespace) -> int:
     if not command:
         print("distil wrap: nothing to run — usage: distil wrap [opts] -- <command> [args...]")
         return 2
+    _apply_subscription_safe_default(args)
     from .proxy import wrap_run
 
     return wrap_run(

@@ -428,7 +428,13 @@ def serve(
     print(f"distil async proxy listening on http://{host}:{port}")
     print(f"  → upstream: {upstream}")
     if shape_output != "off":
-        print(f"  → output shaping: {shape_output}")
+        if lossless_only:
+            print(
+                "  ⚠ --shape-output requested but SUPPRESSED: lossless-only never modifies "
+                "the response. No shaping will happen. Drop --lossless-only to enable it."
+            )
+        else:
+            print(f"  → output shaping: {shape_output}")
     if savings is not None:
         print("  → recording genuine savings → distil leaderboard")
     web.run_app(app, host=host, port=port, print=None)

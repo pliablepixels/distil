@@ -127,6 +127,17 @@ def record_restore(handle: str, original: str) -> None:
         d = _restore_dir()
         d.mkdir(parents=True, exist_ok=True)
         p = d / handle
+        # Collision guard, mirroring RestoreStore._record's in-memory check: if this
+        # handle already maps to *different* bytes on disk, a 32-bit handle collided
+        # across sessions. Do NOT clobber the earlier block — its stub would then expand
+        # to the wrong content. Keep the first writer; skip the second (idempotent when
+        # the bytes match, which also refreshes mtime for the TTL sweep).
+        if p.exists():
+            try:
+                if p.read_text(encoding="utf-8") != original:
+                    return
+            except OSError:
+                pass  # unreadable → fall through and rewrite
         p.write_text(original, encoding="utf-8")
         p.chmod(0o600)  # plaintext content at rest — owner-only
         stale = sorted(d.iterdir(), key=lambda f: f.stat().st_mtime)[:-_RESTORE_CAP]

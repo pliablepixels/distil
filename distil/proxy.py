@@ -1141,7 +1141,13 @@ def serve(
             "  → recoverable compression: distil_expand tool active (agent recovers detail on demand)"
         )
     if shape_output != "off":
-        print(f"  → output shaping: {shape_output}")
+        if lossless_only:
+            print(
+                "  ⚠ --shape-output requested but SUPPRESSED: lossless-only never modifies "
+                "the response. No shaping will happen. Drop --lossless-only to enable it."
+            )
+        else:
+            print(f"  → output shaping: {shape_output}")
     if savings is not None:
         print("  → recording genuine savings → distil leaderboard")
     _install_sigterm_flush()
