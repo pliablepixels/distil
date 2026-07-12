@@ -641,9 +641,11 @@ def build_handler(
             # re-query before answering), so expand-eligible requests stay on
             # the buffered path.
             want_stream = bool(body.get("stream")) or ":streamGenerateContent" in self.path
+            t_req = time.monotonic()  # upstream + relay latency (compression excluded)
             if want_stream and not _expand_should_intercept(expand, store, body):
                 from .streamrelay import stream_upstream
 
+                _usage_s: dict[str, int] = {}
                 with request_span(_span_model, self.path) as _span:
                     status_s, _rbody_opt = stream_upstream(
                         self,
@@ -654,6 +656,7 @@ def build_handler(
                         hop_by_hop=_HOP_BY_HOP,
                         extras=extras,
                         want_body=False,  # v3 shadow re-issues its own temp-0 calls; no need to buffer
+                        usage_sink=_usage_s,
                     )
                     set_result_attrs(
                         _span,
@@ -678,12 +681,15 @@ def build_handler(
                     body=body if isinstance(body, dict) else None,
                     model=_span_model,
                     stream=True,
+                    client_stream=want_stream,
                     status=status_s,
                     booked=(
                         savings is not None
                         and _pending_savings is not None
                         and 200 <= status_s < 300
                     ),
+                    duration_ms=int((time.monotonic() - t_req) * 1000),
+                    usage=_usage_s,
                 )
                 if shadow_sampled:
                     self._spawn_shadow(raw, headers, new_raw)
@@ -704,6 +710,7 @@ def build_handler(
 
             # Transparent expand loop: resolve any distil_expand tool calls against
             # the local store and re-query, invisibly, before returning to the agent.
+            _expanded_handles: list[str] = []
             if _expand_should_intercept(expand, store, body):
                 try:
                     resp_json = json.loads(rbody)
@@ -717,6 +724,7 @@ def build_handler(
                         return json.loads(rb)
 
                     def _on_signal(handle: str, original: str) -> None:
+                        _expanded_handles.append(handle)
                         record_signal(handle, original)  # content-free expand log
                         if _learn_stats is not None:  # learn the expanded signature
                             from .learn import signature
@@ -735,16 +743,27 @@ def build_handler(
             # signal on real traffic. Never blocks the client's response.
             if shadow_sampled:
                 self._spawn_shadow(raw, headers, new_raw)
+            _usage_b: dict[str, int] = {}
+            try:
+                from .streamrelay import scan_usage
+
+                _usage_b = scan_usage(rbody[:16384] + b"\n" + rbody[-16384:])
+            except Exception:  # noqa: BLE001 — usage capture is bookkeeping only
+                pass
             self._emit_detail(
                 extras=extras,
                 store=store,
                 body=body if isinstance(body, dict) else None,
                 model=_span_model,
                 stream=False,
+                client_stream=want_stream,
                 status=status,
                 booked=(
                     savings is not None and _pending_savings is not None and 200 <= status < 300
                 ),
+                duration_ms=int((time.monotonic() - t_req) * 1000),
+                usage=_usage_b,
+                expanded_handles=_expanded_handles,
             )
             # Book savings only after a confirmed 2xx (P0-1): failed or SDK-retried
             # upstream calls must not be counted as savings.
@@ -762,8 +781,12 @@ def build_handler(
             body: dict[str, Any] | None,
             model: str,
             stream: bool,
+            client_stream: bool,
             status: int,
             booked: bool,
+            duration_ms: int | None = None,
+            usage: dict[str, int] | None = None,
+            expanded_handles: list[str] | None = None,
         ) -> None:
             """Append one content-free per-request record to the wrap session's
             ``sessions/<sid>.requests.jsonl`` (read by ``distil dissect``).
@@ -798,8 +821,13 @@ def build_handler(
                     "ts": time.time(),
                     "model": model,
                     "stream": stream,
+                    "client_stream": client_stream,
                     "status": status,
                     "booked": booked,
+                    "duration_ms": duration_ms,
+                    "usage_input_tokens": (usage or {}).get("input_tokens"),
+                    "usage_output_tokens": (usage or {}).get("output_tokens"),
+                    "expanded_handles": expanded_handles or [],
                     "mode": extras.get("x-distil-mode", "verbatim"),
                     "compressible_tokens": int(extras.get("x-distil-compressible-tokens", 0) or 0),
                     "tokens_saved": int(extras.get("x-distil-tokens-saved", 0) or 0),

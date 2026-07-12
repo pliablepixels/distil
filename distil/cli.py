@@ -326,14 +326,15 @@ def cmd_dissect(args: argparse.Namespace) -> int:
         print(f"no session matches {args.session!r} — run `distil dissect` to list them")
         return 2
     d = dz.dissect(sid)
+    peers = dz.list_sessions()
     if args.json:
-        print(json.dumps(dz.to_json(d), indent=2))
+        print(json.dumps(dz.to_json(d, peers), indent=2))
         return 0
     if args.html:
-        Path(args.html).write_text(dz.render_html(d), encoding="utf-8")
+        Path(args.html).write_text(dz.render_html(d, peers), encoding="utf-8")
         print(f"wrote {args.html}")
         return 0
-    print(dz.render_text(d, color=use_color))
+    print(dz.render_text(d, color=use_color, peers=peers))
     return 0
 
 

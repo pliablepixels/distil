@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -33,14 +34,37 @@ _LOG_LINES = "\n".join(
 )
 
 
+_UPSTREAM_JSON = json.dumps(
+    {
+        "id": "msg_test",
+        "content": [{"type": "text", "text": "ok"}],
+        "usage": {"input_tokens": 4321, "output_tokens": 87},
+    }
+).encode()
+
+_UPSTREAM_SSE = (
+    b'event: message_start\ndata: {"type":"message_start","message":'
+    b'{"usage":{"input_tokens":1234,"output_tokens":1}}}\n\n'
+    b'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":55}}\n\n'
+    b"event: message_stop\ndata: {}\n\n"
+)
+
+
 class _EchoHandler(BaseHTTPRequestHandler):
+    """Stub upstream: SSE when the request asked to stream, JSON otherwise —
+    both carrying known usage figures so capture can be asserted exactly."""
+
     def do_POST(self) -> None:  # noqa: N802 — http.server API
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        streaming = b'"stream": true' in body or b'"stream":true' in body
+        payload = _UPSTREAM_SSE if streaming else _UPSTREAM_JSON
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header(
+            "Content-Type", "text/event-stream" if streaming else "application/json"
+        )
+        self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(payload)
 
     def log_message(self, *args: Any) -> None:  # quiet
         pass
@@ -114,6 +138,34 @@ class TestRequestDetailLogging:
         assert set(blk) == {"h", "sig", "tokens"} and len(blk["h"]) == 8
         assert ":" in blk["sig"] and blk["tokens"] > 0
         assert "handle=" not in json.dumps(rec), "detail records must stay content-free"
+        assert rec["client_stream"] is False
+        assert rec["duration_ms"] is not None and rec["duration_ms"] >= 0
+        assert rec["usage_input_tokens"] == 4321  # billed usage from the JSON response
+        assert rec["usage_output_tokens"] == 87
+        assert rec["expanded_handles"] == []
+
+    def test_streamed_request_captures_sse_usage(
+        self, servers: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        monkeypatch.setenv("DISTIL_SESSION", "s101-1")
+        payload = _compressible_payload() | {"stream": True}
+        with _post(servers, payload) as resp:
+            assert resp.status == 200
+            resp.read()
+        path = session_requests_path("s101-1")
+        assert path is not None
+        # The detail record lands after the last relayed byte — poll briefly.
+        for _ in range(100):
+            if path.exists():
+                break
+            time.sleep(0.02)
+        assert path.exists()
+        rec = json.loads(path.read_text().splitlines()[0])
+        assert rec["stream"] is True and rec["client_stream"] is True
+        assert rec["usage_input_tokens"] == 1234  # from SSE message_start
+        assert rec["usage_output_tokens"] == 55  # last (cumulative) message_delta
+        assert rec["duration_ms"] is not None
 
     def test_no_session_no_record(
         self, servers: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -184,20 +236,27 @@ def _seed_state(home: Path) -> None:
                   "upstream": "https://api.anthropic.com", "env_var": "ANTHROPIC_BASE_URL"},
     }))
     details = [
-        {"ts": 1000.0, "model": "m-big", "stream": True, "status": 200, "booked": True,
+        {"ts": 1000.0, "model": "m-big", "stream": True, "client_stream": True,
+         "status": 200, "booked": True, "duration_ms": 4000,
+         "usage_input_tokens": 2100, "usage_output_tokens": 300, "expanded_handles": [],
          "mode": "digest", "compressible_tokens": 5000, "tokens_saved": 3500,
          "overhead_tokens": 700, "delta_refs": 0, "delta_tokens_saved": 0,
          "prefix_msgs": 0, "shadow_sampled": True, "expanded": False,
          "output_shaping": "",
          "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000},
                     {"h": "bbbb2222", "sig": "prose:m", "tokens": 900}]},
-        {"ts": 1600.0, "model": "m-small", "stream": True, "status": 200, "booked": True,
+        {"ts": 1600.0, "model": "m-small", "stream": False, "client_stream": True,
+         "status": 200, "booked": True, "duration_ms": 9000,
+         "usage_input_tokens": 1200, "usage_output_tokens": 150,
+         "expanded_handles": ["aaaa1111"],
          "mode": "digest", "compressible_tokens": 2000, "tokens_saved": 1200,
          "overhead_tokens": 500, "delta_refs": 3, "delta_tokens_saved": 800,
          "prefix_msgs": 4, "shadow_sampled": False, "expanded": True,
          "output_shaping": "",
          "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000}]},
-        {"ts": 1700.0, "model": "m-small", "stream": False, "status": 529, "booked": False,
+        {"ts": 1700.0, "model": "m-small", "stream": False, "client_stream": False,
+         "status": 529, "booked": False, "duration_ms": 500,
+         "usage_input_tokens": None, "usage_output_tokens": None, "expanded_handles": [],
          "mode": "verbatim", "compressible_tokens": 0, "tokens_saved": 0,
          "overhead_tokens": 500, "delta_refs": 0, "delta_tokens_saved": 0,
          "prefix_msgs": 0, "shadow_sampled": False, "expanded": False,
@@ -327,6 +386,165 @@ class TestCli:
     def test_unknown_session_exits_2(self, capsys: pytest.CaptureFixture[str]) -> None:
         assert main(["dissect", "zzz"]) == 2
         assert "no session matches" in capsys.readouterr().out
+
+
+class TestInsights:
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        monkeypatch.delenv("DISTIL_SESSION", raising=False)
+        _seed_state(tmp_path)
+
+    def test_mechanism_decomposition(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.tokens_saved_total == 4700
+        assert d.delta_tokens_saved == 800 and d.digest_saved == 3900
+
+    def test_overhead_tax(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.overhead_tokens_total == 1700
+        # 1700 overhead vs 7000 compressible -> 1700/8700
+        assert d.overhead_share == pytest.approx(19.54, abs=0.01)
+
+    def test_churn(self) -> None:
+        d = dz.dissect("s200-1")
+        # aaaa1111 folded twice -> 2000 tokens re-digested; no block hit 3+ folds
+        assert d.churn_tokens == 2000 and d.churned_blocks == 0
+
+    def test_usage_and_calibration(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.usage_input_total == 3300 and d.usage_output_total == 450
+        assert d.usage_requests == 2
+        est, billed = d.calibration()
+        # r1: 700 + (5000-3500) = 2200; r2: 500 + (2000-1200) = 1300
+        assert est == 3500 and billed == 3300
+
+    def test_headroom_multiplier(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.headroom_multiplier == pytest.approx(10000 / 3900)
+
+    def test_latency_by_path_and_forced_buffering(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.forced_buffered == 1
+        lat = dict((k, (n, ms)) for k, n, ms in d.latency_by_path())
+        assert lat["streamed"] == (1, 4000)
+        assert lat["buffered (forced by expand)"] == (1, 9000)
+        assert lat["buffered"] == (1, 500)
+
+    def test_expansion_regret(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.expansion_regret() == [("log:l", 1, 1)]
+
+    def test_no_anomalies_on_healthy_session(self) -> None:
+        d = dz.dissect("s200-1")
+        assert d.anomalies(dz.list_sessions()) == []
+
+    def test_report_renders_insights(self) -> None:
+        d = dz.dissect("s200-1")
+        text = dz.render_text(d, color=False, peers=dz.list_sessions())
+        assert "digest folds 3.90k (83%)" in text
+        assert "20% of everything sent" in text
+        assert "2.00k tokens re-digested" in text
+        assert "heuristic estimate 3.50k vs billed 3.30k" in text
+        assert "~2.6x" in text  # flat-rate headroom
+        assert "buffered (forced by expand) 1 req @ 9.0s" in text
+        assert "regret: log:l blocks pulled back 1/1" in text
+        page = dz.render_html(d, peers=dz.list_sessions())
+        assert "Mechanism" in page and "stretched ~<b>2.6x</b>" in page
+        payload = dz.to_json(d, dz.list_sessions())
+        assert payload["insights"]["churn"]["tokens"] == 2000
+        assert payload["insights"]["usage"]["calibration"] == {
+            "estimated": 3500,
+            "billed": 3300,
+        }
+        assert payload["insights"]["anomalies"] == []
+
+
+class TestAnomalies:
+    def _session(self, home: Path, requests: list[dict[str, Any]], **manifest: Any) -> None:
+        sess = home / "sessions"
+        sess.mkdir(exist_ok=True)
+        man = {
+            "sid": "s900-1", "tool": "claude", "argv": ["claude"], "started_ts": 1.0,
+            "distil_version": "1.15.0", "billing": "subscription",
+            "flags": {"expand": False, "session_delta": False, "shadow_rate": 0.0,
+                      "lossless_only": False},
+        }
+        man["flags"].update(manifest.pop("flags", {}))
+        man.update(manifest)
+        (sess / "s900-1.json").write_text(json.dumps(man))
+        (sess / "s900-1.requests.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in requests) + "\n"
+        )
+
+    @staticmethod
+    def _req(**over: Any) -> dict[str, Any]:
+        base = {
+            "ts": 10.0, "model": "m", "stream": True, "client_stream": True,
+            "status": 200, "booked": True, "duration_ms": 100,
+            "usage_input_tokens": None, "usage_output_tokens": None,
+            "expanded_handles": [], "mode": "digest", "compressible_tokens": 100,
+            "tokens_saved": 50, "overhead_tokens": 10, "delta_refs": 0,
+            "delta_tokens_saved": 0, "prefix_msgs": 0, "shadow_sampled": False,
+            "expanded": False, "output_shaping": "",
+            "blocks": [{"h": "cccc3333", "sig": "log:m", "tokens": 40}],
+        }
+        base.update(over)
+        return base
+
+    def test_silent_shadow_flagged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        self._session(tmp_path, [self._req() for _ in range(12)], flags={"shadow_rate": 0.5})
+        warnings = dz.dissect("s900-1").anomalies()
+        assert any("shadow may be silently failing" in w for w in warnings)
+
+    def test_expand_never_intercepted_flagged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        # expand on, folds happening, yet every request streamed straight through.
+        self._session(tmp_path, [self._req() for _ in range(12)], flags={"expand": True})
+        warnings = dz.dissect("s900-1").anomalies()
+        assert any("could never be intercepted" in w for w in warnings)
+
+    def test_unbooked_spike_flagged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        reqs = [self._req() for _ in range(6)] + [
+            self._req(booked=False, status=529) for _ in range(4)
+        ]
+        self._session(tmp_path, reqs)
+        warnings = dz.dissect("s900-1").anomalies()
+        assert any("not booked" in w for w in warnings)
+
+    def test_calibration_drift_flagged(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        # estimate 10+ (100-50) = 60 vs billed 20 -> ratio 3.0
+        self._session(tmp_path, [self._req(usage_input_tokens=20)])
+        warnings = dz.dissect("s900-1").anomalies()
+        assert any("off by >50% vs billed" in w for w in warnings)
+
+
+class TestScanUsage:
+    def test_json_body(self) -> None:
+        from distil.streamrelay import scan_usage
+
+        assert scan_usage(_UPSTREAM_JSON) == {"input_tokens": 4321, "output_tokens": 87}
+
+    def test_sse_body_takes_last_output(self) -> None:
+        from distil.streamrelay import scan_usage
+
+        assert scan_usage(_UPSTREAM_SSE) == {"input_tokens": 1234, "output_tokens": 55}
+
+    def test_no_usage(self) -> None:
+        from distil.streamrelay import scan_usage
+
+        assert scan_usage(b'{"error": "overloaded"}') == {}
 
 
 class TestTolerantReader:

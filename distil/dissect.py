@@ -237,6 +237,176 @@ class Dissection:
     def expand_resolved(self) -> int:
         return sum(1 for r in self.requests if r.get("expanded"))
 
+    # ---- insight metrics (all derived; None/0 when the inputs are absent) ----
+    @property
+    def tokens_saved_total(self) -> int:
+        """Heuristic tokens saved across requests (digest folds + cache-delta)."""
+        return sum(int(r.get("tokens_saved") or 0) for r in self.requests)
+
+    @property
+    def digest_saved(self) -> int:
+        """Mechanism decomposition: the non-delta share of tokens_saved."""
+        return max(0, self.tokens_saved_total - self.delta_tokens_saved)
+
+    @property
+    def overhead_tokens_total(self) -> int:
+        return sum(int(r.get("overhead_tokens") or 0) for r in self.requests)
+
+    @property
+    def overhead_share(self) -> float:
+        """Fixed tax: system prompt + tool definitions as a share of everything sent."""
+        comp = sum(int(r.get("compressible_tokens") or 0) for r in self.requests)
+        total = self.overhead_tokens_total + comp
+        return 100.0 * self.overhead_tokens_total / total if total else 0.0
+
+    @property
+    def churn_tokens(self) -> int:
+        """Tokens re-folded after first sight — resent content the client keeps sending."""
+        return sum(
+            int(i.get("tokens") or 0) * (int(i.get("folds") or 1) - 1)
+            for i in self.blocks.values()
+        )
+
+    @property
+    def churned_blocks(self) -> int:
+        return sum(1 for i in self.blocks.values() if int(i.get("folds") or 0) >= 3)
+
+    @property
+    def usage_input_total(self) -> int:
+        return sum(int(r.get("usage_input_tokens") or 0) for r in self.requests)
+
+    @property
+    def usage_output_total(self) -> int:
+        return sum(int(r.get("usage_output_tokens") or 0) for r in self.requests)
+
+    @property
+    def usage_requests(self) -> int:
+        return sum(1 for r in self.requests if r.get("usage_input_tokens") is not None)
+
+    def calibration(self) -> tuple[int, int] | None:
+        """(heuristic_estimate, billed) input tokens over requests that carry usage.
+
+        Estimate = overhead + compressible-after-savings; billed = the API's own
+        usage.input_tokens. This is what turns "we think we saved X" into a
+        measured claim (and shows how honest the heuristic tokenizer is).
+        """
+        est = billed = 0
+        for r in self.requests:
+            u = r.get("usage_input_tokens")
+            if u is None:
+                continue
+            est += int(r.get("overhead_tokens") or 0) + max(
+                0, int(r.get("compressible_tokens") or 0) - int(r.get("tokens_saved") or 0)
+            )
+            billed += int(u)
+        return (est, billed) if billed else None
+
+    @property
+    def headroom_multiplier(self) -> float:
+        """How much further the same context budget goes (baseline/sent)."""
+        return self.baseline_tokens / self.distil_tokens if self.distil_tokens else 0.0
+
+    @property
+    def forced_buffered(self) -> int:
+        """Client asked to stream but the expand loop forced full buffering (TTFT tax)."""
+        return sum(
+            1 for r in self.requests if r.get("client_stream") and not r.get("stream")
+        )
+
+    def latency_by_path(self) -> list[tuple[str, int, int]]:
+        """[(path, requests, avg_ms)] — streamed / buffered (forced) / buffered."""
+        groups: dict[str, list[int]] = {}
+        for r in self.requests:
+            if r.get("duration_ms") is None:
+                continue
+            if r.get("stream"):
+                key = "streamed"
+            elif r.get("client_stream"):
+                key = "buffered (forced by expand)"
+            else:
+                key = "buffered"
+            groups.setdefault(key, []).append(int(r["duration_ms"]))
+        return [(k, len(v), sum(v) // len(v)) for k, v in sorted(groups.items())]
+
+    def expansion_regret(self) -> list[tuple[str, int, int]]:
+        """[(sig, expanded_blocks, folded_blocks)] — kinds the agent keeps pulling back."""
+        expanded: set[str] = set()
+        for r in self.requests:
+            expanded.update(h for h in r.get("expanded_handles") or [] if isinstance(h, str))
+        by_sig: dict[str, list[int]] = {}
+        for h, info in self.blocks.items():
+            m = by_sig.setdefault(str(info.get("sig") or "?"), [0, 0])
+            m[1] += 1
+            if h in expanded:
+                m[0] += 1
+        return sorted(
+            ((s, v[0], v[1]) for s, v in by_sig.items() if v[0]),
+            key=lambda t: -t[1],
+        )
+
+    def anomalies(self, peers: list[SessionOverview] | None = None) -> list[str]:
+        """Things worth your attention — each one is a misconfiguration, a silent
+        failure, or upstream weather that plain totals would hide."""
+        out: list[str] = []
+        flags = (self.manifest or {}).get("flags") or {}
+        n = len(self.requests)
+        if self.marker == "0" and not self.ledger_rows:
+            out.append(
+                "wrapped but no traffic went through distil — the agent may be "
+                "bypassing the proxy (check ANTHROPIC_BASE_URL overrides)"
+            )
+        rate = float(flags.get("shadow_rate") or 0.0)
+        if rate > 0 and n >= 10 and self.shadow_sampled == 0:
+            out.append(
+                f"shadow_rate={rate} but 0 of {n} requests were sampled "
+                f"(expected ~{rate * n:.0f}) — shadow may be silently failing"
+            )
+        if self.shadow_sampled > 0 and self.shadow_window_rows == 0:
+            out.append(
+                f"{self.shadow_sampled} requests were shadow-sampled but no verdicts "
+                "were recorded — replays may be failing upstream"
+            )
+        if flags.get("expand") and self.blocks and n >= 10 and self.expand_resolved == 0:
+            if self.forced_buffered == 0 and any(r.get("stream") for r in self.requests):
+                out.append(
+                    "expand is on and blocks were folded, but every request took the "
+                    "streaming pass-through — distil_expand calls could never be "
+                    "intercepted (an escaped call surfaces to the agent as "
+                    "'no such tool')"
+                )
+        if n >= 5 and self.unbooked_requests / n > 0.2:
+            out.append(
+                f"{self.unbooked_requests}/{n} requests were not booked (non-2xx or "
+                "SDK-retried) — upstream errors or rate limiting during this session"
+            )
+        if flags.get("lossless_only") and self.billing == "metered":
+            out.append(
+                "lossless-only mode on metered billing — the digest tier is off; "
+                "savings are limited to delta/dedup"
+            )
+        if peers and self.baseline_tokens > 10_000:
+            others = sorted(
+                100.0 * (p.baseline_tokens - p.distil_tokens) / p.baseline_tokens
+                for p in peers
+                if p.sid != self.sid and p.baseline_tokens > 10_000
+            )
+            if len(others) >= 3:
+                median = others[len(others) // 2]
+                if self.pct_saved < 0.5 * median:
+                    out.append(
+                        f"savings ({self.pct_saved:.1f}%) are well below your typical "
+                        f"session ({median:.1f}% median) — check the wrap flags"
+                    )
+        cal = self.calibration()
+        if cal is not None:
+            est, billed = cal
+            if est and (est / billed > 1.5 or est / billed < 0.67):
+                out.append(
+                    f"heuristic token estimate is off by >50% vs billed usage "
+                    f"({est:,} est vs {billed:,} billed) — treat % figures as rough"
+                )
+        return out
+
     def blocks_by_kind(self) -> list[tuple[str, int, int]]:
         """[(signature, unique_blocks, tokens)] biggest-token first."""
         agg: dict[str, list[int]] = {}
@@ -372,7 +542,9 @@ def _flags_line(man: dict[str, Any]) -> str:
     return ", ".join(on) or "defaults"
 
 
-def render_text(d: Dissection, *, color: bool = True) -> str:
+def render_text(
+    d: Dissection, *, color: bool = True, peers: list[SessionOverview] | None = None
+) -> str:
     """Terminal report. Sections degrade gracefully when a source is missing."""
 
     def c(code: str, s: str) -> str:
@@ -401,6 +573,13 @@ def render_text(d: Dissection, *, color: bool = True) -> str:
     elif d.marker == "1":
         out.append(f"  status   live (heartbeat: {d.heartbeat or '—'})")
 
+    warnings = d.anomalies(peers)
+    if warnings:
+        out.append("")
+        out.append(c("33;1", "worth your attention"))
+        for w in warnings:
+            out.append(c("33", f"  ⚠ {w}"))
+
     # Savings (ledger)
     out.append("")
     out.append(c("1", "savings (input tokens, booked 2xx only)"))
@@ -427,11 +606,50 @@ def render_text(d: Dissection, *, color: bool = True) -> str:
             f"  {n} proxied requests: {n - d.unbooked_requests} booked, {d.unbooked_requests} not booked "
             f"(non-2xx/retry), {d.verbatim_requests} verbatim (nothing worth compressing)"
         )
-        out.append(f"  cache-delta: {_human(d.delta_tokens_saved)} tokens referenced instead of resent")
+        saved = d.tokens_saved_total
+        if saved:
+            dig_pct = 100.0 * d.digest_saved / saved
+            out.append(
+                f"  savings by mechanism: digest folds {_human(d.digest_saved)} ({dig_pct:.0f}%), "
+                f"cache-delta {_human(d.delta_tokens_saved)} ({100 - dig_pct:.0f}%)"
+            )
         out.append(
-            f"  not optimized by design: ~{_human(d.overhead_tokens_avg)} tokens/request of system prompt "
-            "+ tool definitions (sent verbatim every request), plus recent turns kept for fidelity"
+            f"  fixed overhead (not optimizable): system prompt + tool definitions = "
+            f"{_human(d.overhead_tokens_total)} tokens, {d.overhead_share:.0f}% of everything sent "
+            f"(~{_human(d.overhead_tokens_avg)}/request) — trimming unused tools beats compression here"
         )
+        if d.churn_tokens:
+            out.append(
+                f"  re-fold churn: {_human(d.churn_tokens)} tokens re-digested after first sight "
+                f"({d.churned_blocks} blocks folded 3+ times — cache-delta/codec candidates)"
+            )
+        cal = d.calibration()
+        if cal is not None:
+            est, billed = cal
+            out.append(
+                f"  billed usage (from API responses): {_human(d.usage_input_total)} in / "
+                f"{_human(d.usage_output_total)} out over {d.usage_requests} requests; "
+                f"heuristic estimate {_human(est)} vs billed {_human(billed)} "
+                f"(x{est / billed:.2f})" if billed else ""
+            )
+        else:
+            out.append("  billed usage: not captured (older records or non-usage responses)")
+        if d.billing == "subscription" and d.headroom_multiplier > 1:
+            out.append(
+                f"  flat-rate headroom: the same context budget went ~{d.headroom_multiplier:.1f}x "
+                "further than unwrapped"
+            )
+        lat = d.latency_by_path()
+        if lat:
+            out.append(
+                "  latency: "
+                + ", ".join(f"{k} {n} req @ {ms / 1000:.1f}s avg" for k, n, ms in lat)
+            )
+            if d.forced_buffered:
+                out.append(
+                    f"  note: {d.forced_buffered} streamed requests were fully buffered so the "
+                    "expand loop could inspect them — that is the --expand time-to-first-token tax"
+                )
         if d.blocks:
             out.append("")
             out.append(c("1", "digested blocks (content-free: kind:size, tokens)"))
@@ -449,6 +667,11 @@ def render_text(d: Dissection, *, color: bool = True) -> str:
     out.append(c("1", "quality loops"))
     if d.detail_available:
         out.append(f"  expand: {d.expand_resolved} requests had distil_expand calls resolved in-proxy")
+        for sig, exp, total in d.expansion_regret():
+            out.append(
+                f"    regret: {sig} blocks pulled back {exp}/{total} — folding this kind "
+                "costs a round-trip more than it saves"
+            )
         out.append(f"  shadow: {d.shadow_sampled} requests sampled for decision-equivalence")
     if d.shadow_window_rows:
         out.append(
@@ -466,9 +689,38 @@ def render_text(d: Dissection, *, color: bool = True) -> str:
     return "\n".join(out)
 
 
-def to_json(d: Dissection) -> dict[str, Any]:
+def to_json(d: Dissection, peers: list[SessionOverview] | None = None) -> dict[str, Any]:
     """Machine-readable dissection (same numbers the text/html reports show)."""
+    cal = d.calibration()
     return {
+        "insights": {
+            "mechanism": {
+                "digest_tokens_saved": d.digest_saved,
+                "delta_tokens_saved": d.delta_tokens_saved,
+            },
+            "overhead": {
+                "tokens_total": d.overhead_tokens_total,
+                "share_pct": round(d.overhead_share, 1),
+            },
+            "churn": {"tokens": d.churn_tokens, "blocks": d.churned_blocks},
+            "usage": {
+                "input_tokens": d.usage_input_total,
+                "output_tokens": d.usage_output_total,
+                "requests_with_usage": d.usage_requests,
+                "calibration": (
+                    {"estimated": cal[0], "billed": cal[1]} if cal is not None else None
+                ),
+            },
+            "headroom_multiplier": round(d.headroom_multiplier, 2),
+            "latency_by_path": [
+                {"path": k, "requests": n, "avg_ms": ms} for k, n, ms in d.latency_by_path()
+            ],
+            "forced_buffered_requests": d.forced_buffered,
+            "expansion_regret": [
+                {"sig": s, "expanded": e, "blocks": t} for s, e, t in d.expansion_regret()
+            ],
+            "anomalies": d.anomalies(peers),
+        },
         "session": d.sid,
         "manifest": d.manifest,
         "window": {"started_ts": d.started, "ended_ts": d.ended},
@@ -512,7 +764,7 @@ def to_json(d: Dissection) -> dict[str, Any]:
     }
 
 
-def render_html(d: Dissection) -> str:
+def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> str:
     """Self-contained dark page in the ledger `render_html` style."""
     man = d.manifest or {}
     subscription = d.billing == "subscription"
@@ -534,13 +786,51 @@ def render_html(d: Dissection) -> str:
         f"<td class='r'>×{f}</td><td>{'recoverable' if r else '<span class=muted>expired</span>'}</td></tr>"
         for h, s, t, f, r in d.top_blocks()
     )
+    warn_html = "".join(f"<li>{e(w)}</li>" for w in d.anomalies(peers))
+    warn_card = (
+        f"<h2>Worth your attention</h2><ul class='warn'>{warn_html}</ul>" if warn_html else ""
+    )
+    cal = d.calibration()
+    cal_line = (
+        f"Billed usage: <b>{_human(d.usage_input_total)}</b> in / "
+        f"<b>{_human(d.usage_output_total)}</b> out over {d.usage_requests} requests; heuristic "
+        f"estimate x{cal[0] / cal[1]:.2f} of billed."
+        if cal is not None and cal[1]
+        else "Billed usage: not captured for this session."
+    )
+    saved = d.tokens_saved_total
+    mech_line = (
+        f"Mechanism: digest folds <b>{_human(d.digest_saved)}</b> "
+        f"({100.0 * d.digest_saved / saved:.0f}%), cache-delta "
+        f"<b>{_human(d.delta_tokens_saved)}</b>."
+        if saved
+        else ""
+    )
+    lat_line = " · ".join(f"{k}: {n} req @ {ms / 1000:.1f}s" for k, n, ms in d.latency_by_path())
+    headroom_line = (
+        f"Flat-rate headroom: context budget stretched ~<b>{d.headroom_multiplier:.1f}x</b>."
+        if d.billing == "subscription" and d.headroom_multiplier > 1
+        else ""
+    )
+    regret_line = (
+        "Expansion regret: "
+        + "; ".join(f"{e(s)} pulled back {x}/{t}" for s, x, t in d.expansion_regret())
+        + "."
+        if d.expansion_regret()
+        else ""
+    )
     detail_card = (
         f"""<h2>Request detail</h2>
 <p>{len(d.requests)} proxied requests — {d.unbooked_requests} not booked (non-2xx/retry),
 {d.verbatim_requests} verbatim (nothing worth compressing).
-Cache-delta referenced <b>{_human(d.delta_tokens_saved)}</b> tokens instead of resending them.
-Not optimized by design: ~{_human(d.overhead_tokens_avg)} tokens/request of system prompt + tool
-definitions, plus recent turns kept verbatim for fidelity.</p>
+{mech_line}
+Fixed overhead: system prompt + tool definitions = <b>{_human(d.overhead_tokens_total)}</b>
+tokens ({d.overhead_share:.0f}% of everything sent).
+Re-fold churn: <b>{_human(d.churn_tokens)}</b> tokens across {d.churned_blocks} blocks folded
+3+ times. {cal_line} {headroom_line}</p>
+<p class="muted">Latency — {lat_line or "not recorded"}.
+{f"{d.forced_buffered} streamed requests buffered for the expand loop (TTFT tax)." if d.forced_buffered else ""}
+{regret_line}</p>
 <h2>Digested blocks <span class="muted">(content-free: kind:size)</span></h2>
 <table><tr><th>kind</th><th>blocks</th><th>tokens</th></tr>{kind_rows}</table>
 <h2>Largest folds</h2>
@@ -575,6 +865,7 @@ h2{{font-size:17px;font-weight:700;margin:26px 0 10px}}
 table{{width:100%;border-collapse:collapse;border:1px solid #1b2030;border-radius:12px;overflow:hidden}}
 th,td{{padding:11px 14px;border-bottom:1px solid #1b2030;text-align:left}}
 th{{color:#5b6177;font-size:11px;text-transform:uppercase;letter-spacing:.07em}}
+ul.warn{{margin:0;padding-left:20px}} ul.warn li{{color:#e8b34b;margin:4px 0}}
 td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{{color:#5b6177}}
 code{{color:#8b7bff}}
 .foot{{color:#5b6177;font-size:12.5px;margin-top:22px}}
@@ -588,6 +879,7 @@ code{{color:#8b7bff}}
 <div class="card"><div class="l">Saved</div><div class="v g">{d.pct_saved:.1f}%</div></div>
 <div class="card"><div class="l">Dollars{e(dol_note)}</div><div class="v">${d.dollars_saved:.2f}</div></div>
 </div>
+{warn_card}
 <h2>Per model</h2>
 <table><tr><th>model</th><th>req</th><th>baseline</th><th>distil</th><th>saved</th></tr>{model_rows}</table>
 {detail_card}
