@@ -302,7 +302,9 @@ def cmd_dissect(args: argparse.Namespace) -> int:
     use_color = (
         (not args.no_color) and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
     )
+    sid: str | None
     if not args.session:
+        sessions = dz.list_sessions()
         if args.json:
             rows = [
                 {
@@ -315,16 +317,33 @@ def cmd_dissect(args: argparse.Namespace) -> int:
                     "distil_input_tokens": o.distil_tokens,
                     "status": o.status,
                 }
-                for o in dz.list_sessions()
+                for o in sessions
             ]
             print(json.dumps(rows, indent=2))
+            return 0
+        print(dz.render_sessions_text(sessions, color=use_color))
+        # On a terminal, let the user pick right here instead of retyping the id.
+        if not (sessions and sys.stdin.isatty() and sys.stdout.isatty()):
+            return 0
+        try:
+            choice = input(f"\ndissect which session? [1-{len(sessions)}, Enter to quit] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+        if not choice:
+            return 0
+        if choice.isdigit() and 1 <= int(choice) <= len(sessions):
+            sid = sessions[int(choice) - 1].sid
         else:
-            print(dz.render_sessions_text(dz.list_sessions(), color=use_color))
-        return 0
-    sid = dz.resolve_sid(args.session)
-    if sid is None:
-        print(f"no session matches {args.session!r} — run `distil dissect` to list them")
-        return 2
+            sid = dz.resolve_sid(choice)
+        if sid is None:
+            print(f"no session matches {choice!r}")
+            return 2
+    else:
+        sid = dz.resolve_sid(args.session)
+        if sid is None:
+            print(f"no session matches {args.session!r} — run `distil dissect` to list them")
+            return 2
     d = dz.dissect(sid)
     peers = dz.list_sessions()
     if args.json:

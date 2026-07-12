@@ -240,7 +240,10 @@ def _seed_state(home: Path) -> None:
          "status": 200, "booked": True, "duration_ms": 4000,
          "usage_input_tokens": 2100, "usage_output_tokens": 300, "expanded_handles": [],
          "mode": "digest", "compressible_tokens": 5000, "tokens_saved": 3500,
-         "overhead_tokens": 700, "delta_refs": 0, "delta_tokens_saved": 0,
+         "overhead_tokens": 700, "system_tokens": 100, "tools_tokens": 600,
+         "tools": [{"name": "bash", "tokens": 300},
+                   {"name": "mcp__gmail__search", "tokens": 300}],
+         "delta_refs": 0, "delta_tokens_saved": 0,
          "prefix_msgs": 0, "shadow_sampled": True, "expanded": False,
          "output_shaping": "",
          "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000},
@@ -250,7 +253,9 @@ def _seed_state(home: Path) -> None:
          "usage_input_tokens": 1200, "usage_output_tokens": 150,
          "expanded_handles": ["aaaa1111"],
          "mode": "digest", "compressible_tokens": 2000, "tokens_saved": 1200,
-         "overhead_tokens": 500, "delta_refs": 3, "delta_tokens_saved": 800,
+         "overhead_tokens": 500, "system_tokens": 200, "tools_tokens": 300,
+         "tools": [{"name": "bash", "tokens": 300}],
+         "delta_refs": 3, "delta_tokens_saved": 800,
          "prefix_msgs": 4, "shadow_sampled": False, "expanded": True,
          "output_shaping": "",
          "blocks": [{"h": "aaaa1111", "sig": "log:l", "tokens": 2000}]},
@@ -258,7 +263,9 @@ def _seed_state(home: Path) -> None:
          "status": 529, "booked": False, "duration_ms": 500,
          "usage_input_tokens": None, "usage_output_tokens": None, "expanded_handles": [],
          "mode": "verbatim", "compressible_tokens": 0, "tokens_saved": 0,
-         "overhead_tokens": 500, "delta_refs": 0, "delta_tokens_saved": 0,
+         "overhead_tokens": 500, "system_tokens": 250, "tools_tokens": 250,
+         "tools": [{"name": "bash", "tokens": 250}],
+         "delta_refs": 0, "delta_tokens_saved": 0,
          "prefix_msgs": 0, "shadow_sampled": False, "expanded": False,
          "output_shaping": "", "blocks": []},
     ]
@@ -408,8 +415,8 @@ class TestInsights:
 
     def test_churn(self) -> None:
         d = dz.dissect("s200-1")
-        # aaaa1111 folded twice -> 2000 tokens re-digested; no block hit 3+ folds
-        assert d.churn_tokens == 2000 and d.churned_blocks == 0
+        # aaaa1111 folded twice -> 2000 tokens re-digested across 1 re-folded block
+        assert d.churn_tokens == 2000 and d.churned_blocks == 1
 
     def test_usage_and_calibration(self) -> None:
         d = dz.dissect("s200-1")
@@ -458,6 +465,99 @@ class TestInsights:
             "billed": 3300,
         }
         assert payload["insights"]["anomalies"] == []
+
+
+class TestToolsAndCharts:
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        monkeypatch.delenv("DISTIL_SESSION", raising=False)
+        _seed_state(tmp_path)
+
+    def test_tool_costs_aggregation(self) -> None:
+        d = dz.dissect("s200-1")
+        # bash: max 300/req, seen on 3 requests -> 900; gmail: 300 on 1 -> 300.
+        assert d.tool_costs() == [("bash", 300, 900), ("mcp__gmail__search", 300, 300)]
+        assert d.system_tokens_avg == 183 and d.tools_tokens_avg == 383
+        assert d.system_growth() == (100, 250)
+
+    def test_text_report_shows_tools_and_prompt_growth(self) -> None:
+        text = dz.render_text(dz.dissect("s200-1"), color=False)
+        assert "tool definitions (2): bash 300/req, mcp__gmail__search 300/req" in text
+        assert "system prompt: 100 → 250 tokens over the session" in text
+
+    def test_html_has_charts(self) -> None:
+        page = dz.render_html(dz.dissect("s200-1"))
+        assert page.count("<svg") == 3  # timeline, tools, block kinds
+        # Validated categorical series, fixed order: overhead / sent / saved.
+        assert "#3987e5" in page and "#199e70" in page and "#c98500" in page
+        assert "overhead (system + tools)" in page  # legend, not color-alone
+        assert "Tool definitions" in page and "bash" in page
+        assert "request 2 · m-small · overhead 500 · sent 800 · saved 1,200" in page
+        assert "data table" in page  # accessible table view of the timeline
+        assert "Request composition" in page
+
+    def test_json_has_tool_breakdown(self) -> None:
+        payload = dz.to_json(dz.dissect("s200-1"))
+        overhead = payload["insights"]["overhead"]
+        assert overhead["tools"][0] == {
+            "name": "bash",
+            "tokens_per_request": 300,
+            "session_tokens": 900,
+        }
+        assert overhead["system_growth"] == (100, 250)
+
+    def test_charts_absent_without_detail(self) -> None:
+        page = dz.render_html(dz.dissect("s300-9"))
+        assert "<svg" not in page
+
+
+class TestInteractivePicker:
+    @pytest.fixture(autouse=True)
+    def _home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("DISTIL_HOME", str(tmp_path))
+        monkeypatch.delenv("DISTIL_SESSION", raising=False)
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        _seed_state(tmp_path)
+
+    def _tty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import sys
+
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+
+    def test_numbered_pick_renders_report(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._tty(monkeypatch)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "2")
+        assert main(["dissect"]) == 0
+        out = capsys.readouterr().out
+        assert "#" in out and "s200-1" in out  # numbered list first
+        assert "savings (input tokens, booked 2xx only)" in out  # then the report
+        assert "codex" in out
+
+    def test_enter_quits(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._tty(monkeypatch)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "")
+        assert main(["dissect"]) == 0
+        assert "savings (input tokens" not in capsys.readouterr().out
+
+    def test_bad_pick_exits_2(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._tty(monkeypatch)
+        monkeypatch.setattr("builtins.input", lambda prompt="": "zzz")
+        assert main(["dissect"]) == 2
+
+    def test_non_tty_keeps_list_only(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # capsys stdout is not a tty -> no prompt, list only (the old behavior).
+        assert main(["dissect"]) == 0
+        out = capsys.readouterr().out
+        assert "pick one to dissect" in out
+        assert "savings (input tokens" not in out
 
 
 class TestAnomalies:

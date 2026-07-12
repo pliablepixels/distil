@@ -809,14 +809,24 @@ def build_handler(
                         )
                     except Exception:  # noqa: BLE001 — one bad handle must not drop the record
                         continue
-                overhead = 0
+                system_tok = tools_tok = 0
+                tool_costs: list[dict[str, Any]] = []
                 if isinstance(body, dict):
-                    for key in ("system", "tools"):
-                        val = body.get(key)
-                        if val:
-                            overhead += _tokenizer.count(
-                                val if isinstance(val, str) else json.dumps(val)
-                            )
+                    sys_val = body.get("system")
+                    if sys_val:
+                        system_tok = _tokenizer.count(
+                            sys_val if isinstance(sys_val, str) else json.dumps(sys_val)
+                        )
+                    for tool in body.get("tools") or []:
+                        try:
+                            n = _tokenizer.count(json.dumps(tool))
+                            tools_tok += n
+                            name = tool.get("name") if isinstance(tool, dict) else None
+                            tool_costs.append({"name": str(name or "?"), "tokens": n})
+                        except Exception:  # noqa: BLE001 — one odd tool must not drop the rest
+                            continue
+                    tool_costs.sort(key=lambda t: -t["tokens"])
+                overhead = system_tok + tools_tok
                 rec = {
                     "ts": time.time(),
                     "model": model,
@@ -832,6 +842,9 @@ def build_handler(
                     "compressible_tokens": int(extras.get("x-distil-compressible-tokens", 0) or 0),
                     "tokens_saved": int(extras.get("x-distil-tokens-saved", 0) or 0),
                     "overhead_tokens": overhead,
+                    "system_tokens": system_tok,
+                    "tools_tokens": tools_tok,
+                    "tools": tool_costs[:24],  # names + token counts only; content-free
                     "delta_refs": int(extras.get("x-distil-cache-refs", 0) or 0),
                     "delta_tokens_saved": int(extras.get("x-distil-cache-tokens-saved", 0) or 0),
                     "prefix_msgs": int(extras.get("x-distil-cache-prefix-msgs", 0) or 0),

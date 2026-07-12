@@ -269,7 +269,8 @@ class Dissection:
 
     @property
     def churned_blocks(self) -> int:
-        return sum(1 for i in self.blocks.values() if int(i.get("folds") or 0) >= 3)
+        """Blocks folded more than once — the same count churn_tokens sums over."""
+        return sum(1 for i in self.blocks.values() if int(i.get("folds") or 0) >= 2)
 
     @property
     def usage_input_total(self) -> int:
@@ -407,6 +408,38 @@ class Dissection:
                 )
         return out
 
+    @property
+    def system_tokens_avg(self) -> int:
+        vals = [int(r.get("system_tokens") or 0) for r in self.requests]
+        return sum(vals) // len(vals) if vals else 0
+
+    @property
+    def tools_tokens_avg(self) -> int:
+        vals = [int(r.get("tools_tokens") or 0) for r in self.requests]
+        return sum(vals) // len(vals) if vals else 0
+
+    def system_growth(self) -> tuple[int, int] | None:
+        """(first, last) system-prompt size — memory/context injections show up here."""
+        vals = [int(r.get("system_tokens") or 0) for r in self.requests if r.get("system_tokens")]
+        return (vals[0], vals[-1]) if len(vals) >= 2 else None
+
+    def tool_costs(self) -> list[tuple[str, int, int]]:
+        """[(tool_name, tokens_per_request, session_total)] biggest total first.
+
+        A tool definition is resent on every request, so its session cost is
+        its size × the requests that carried it — the "trim this" worklist.
+        """
+        per: dict[str, list[int]] = {}
+        for r in self.requests:
+            for t in r.get("tools") or []:
+                name = str(t.get("name") or "?")
+                m = per.setdefault(name, [0, 0])
+                m[0] = max(m[0], int(t.get("tokens") or 0))
+                m[1] += 1
+        return sorted(
+            ((name, v[0], v[0] * v[1]) for name, v in per.items()), key=lambda t: -t[2]
+        )
+
     def blocks_by_kind(self) -> list[tuple[str, int, int]]:
         """[(signature, unique_blocks, tokens)] biggest-token first."""
         agg: dict[str, list[int]] = {}
@@ -520,15 +553,18 @@ def render_sessions_text(sessions: list[SessionOverview], *, color: bool = True)
             "  distil wrap -- claude   (or codex/gemini/any base-url-honoring tool)"
         )
     out = [c("1", "distil sessions — pick one to dissect"), ""]
-    hdr = f"{'session':<22} {'tool':<10} {'started':<17} {'last':<17} {'reqs':>5} {'saved':>7}  status"
+    hdr = (
+        f"{'#':>3}  {'session':<22} {'tool':<10} {'started':<17} {'last':<17} "
+        f"{'reqs':>5} {'saved':>7}  status"
+    )
     out.append(c("2", hdr))
-    for o in sessions:
+    for i, o in enumerate(sessions, 1):
         pct = 100.0 * (o.baseline_tokens - o.distil_tokens) / o.baseline_tokens if o.baseline_tokens else 0.0
         out.append(
-            f"{o.sid:<22} {(o.tool or '?'):<10} {_when(o.started):<17} {_when(o.last_ts):<17} "
-            f"{o.requests:>5} {pct:>6.1f}%  {o.status}"
+            f"{i:>3}  {o.sid:<22} {(o.tool or '?'):<10} {_when(o.started):<17} "
+            f"{_when(o.last_ts):<17} {o.requests:>5} {pct:>6.1f}%  {o.status}"
         )
-    out += ["", "dissect one:  distil dissect <session>   (a unique prefix or `latest` works)"]
+    out += ["", "dissect one:  distil dissect <session>   (a number above, a unique prefix, or `latest`)"]
     return "\n".join(out)
 
 
@@ -618,10 +654,23 @@ def render_text(
             f"{_human(d.overhead_tokens_total)} tokens, {d.overhead_share:.0f}% of everything sent "
             f"(~{_human(d.overhead_tokens_avg)}/request) — trimming unused tools beats compression here"
         )
+        tools = d.tool_costs()
+        if tools:
+            out.append(
+                f"  tool definitions ({len(tools)}): "
+                + ", ".join(f"{name} {_human(per)}/req" for name, per, _t in tools[:5])
+                + (" …" if len(tools) > 5 else "")
+            )
+        growth = d.system_growth()
+        if growth and growth[1] != growth[0]:
+            out.append(
+                f"  system prompt: {_human(growth[0])} → {_human(growth[1])} tokens over the session"
+            )
         if d.churn_tokens:
             out.append(
                 f"  re-fold churn: {_human(d.churn_tokens)} tokens re-digested after first sight "
-                f"({d.churned_blocks} blocks folded 3+ times — cache-delta/codec candidates)"
+                f"({d.churned_blocks} block{'s' if d.churned_blocks != 1 else ''} re-folded — "
+                "cache-delta/codec candidates)"
             )
         cal = d.calibration()
         if cal is not None:
@@ -701,6 +750,13 @@ def to_json(d: Dissection, peers: list[SessionOverview] | None = None) -> dict[s
             "overhead": {
                 "tokens_total": d.overhead_tokens_total,
                 "share_pct": round(d.overhead_share, 1),
+                "system_tokens_avg": d.system_tokens_avg,
+                "tools_tokens_avg": d.tools_tokens_avg,
+                "system_growth": d.system_growth(),
+                "tools": [
+                    {"name": n, "tokens_per_request": p, "session_tokens": t}
+                    for n, p, t in d.tool_costs()
+                ],
             },
             "churn": {"tokens": d.churn_tokens, "blocks": d.churned_blocks},
             "usage": {
@@ -764,6 +820,136 @@ def to_json(d: Dissection, peers: list[SessionOverview] | None = None) -> dict[s
     }
 
 
+# ---------------------------------------------------------------- svg charts
+# Categorical series, fixed order, validated (dataviz six checks) against the
+# report's dark card surface #0b0d15: overhead / sent / saved.
+_C_OVERHEAD, _C_SENT, _C_SAVED = "#3987e5", "#199e70", "#c98500"
+_GRID = "#1b2030"
+_INK_MUTED = "#9aa1b3"
+
+
+def _svg_hbars(rows: list[tuple[str, int]], *, color: str = _C_OVERHEAD) -> str:
+    """Horizontal bar chart (single measure, one hue): label, thin bar, value."""
+    if not rows:
+        return ""
+    top = max(v for _, v in rows) or 1
+    rh, bar_h, label_w, val_w, width = 26, 12, 220, 64, 640
+    plot_w = width - label_w - val_w
+    parts = [
+        f'<svg viewBox="0 0 {width} {len(rows) * rh + 6}" role="img" '
+        f'style="width:100%;height:auto;font:12px Inter,ui-sans-serif,sans-serif">'
+    ]
+    for i, (label, val) in enumerate(rows):
+        y = i * rh + 4
+        w = max(2, round(plot_w * val / top))
+        name = label if len(label) <= 30 else label[:29] + "…"
+        parts.append(
+            f'<text x="{label_w - 8}" y="{y + bar_h - 2}" text-anchor="end" '
+            f'fill="{_INK_MUTED}">{_html.escape(name)}</text>'
+            f'<rect class="mark" x="{label_w}" y="{y}" width="{w}" height="{bar_h}" '
+            f'rx="2" fill="{color}"><title>{_html.escape(label)}: {val:,} tokens</title></rect>'
+            f'<text x="{label_w + w + 6}" y="{y + bar_h - 2}" fill="{_INK_MUTED}">'
+            f"{_human(val)}</text>"
+        )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _svg_stack_timeline(requests: list[dict[str, Any]]) -> str:
+    """Per-request composition: overhead + sent content + saved, stacked bars.
+
+    2px surface gaps between bars and between segments; rounded data-end on the
+    top segment only; native <title> tooltips carry the per-request numbers.
+    """
+    if not requests:
+        return ""
+    comp = []
+    for r in requests:
+        overhead = int(r.get("overhead_tokens") or 0)
+        saved = int(r.get("tokens_saved") or 0)
+        sent = max(0, int(r.get("compressible_tokens") or 0) - saved)
+        comp.append((overhead, sent, saved, r))
+    top = max(o + s + v for o, s, v, _ in comp) or 1
+    width, height, pad_l, pad_b = 640, 190, 52, 18
+    plot_w, plot_h = width - pad_l - 8, height - pad_b - 8
+    n = len(comp)
+    step = plot_w / n
+    bar_w = max(2, min(28, round(step - 2)))
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" role="img" '
+        f'style="width:100%;height:auto;font:11px Inter,ui-sans-serif,sans-serif">'
+    ]
+    for frac in (0.0, 0.5, 1.0):  # recessive grid, three lines
+        y = 8 + plot_h * (1 - frac)
+        parts.append(
+            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{width - 8}" y2="{y:.1f}" '
+            f'stroke="{_GRID}" stroke-width="1"/>'
+            f'<text x="{pad_l - 6}" y="{y + 3:.1f}" text-anchor="end" '
+            f'fill="{_INK_MUTED}">{_human(top * frac)}</text>'
+        )
+    for i, (overhead, sent, saved, r) in enumerate(comp):
+        x = pad_l + i * step + (step - bar_w) / 2
+        tip = (
+            f"request {i + 1} · {r.get('model', '?')} · overhead {overhead:,} · "
+            f"sent {sent:,} · saved {saved:,}"
+        )
+        y = 8 + plot_h
+        segs = [(_C_OVERHEAD, overhead), (_C_SENT, sent), (_C_SAVED, saved)]
+        drawn = [(c, v) for c, v in segs if v > 0]
+        for j, (color, val) in enumerate(drawn):
+            h = max(1.0, plot_h * val / top)
+            y -= h
+            topmost = j == len(drawn) - 1
+            # 2px surface gap between segments, shaved off each non-top segment's
+            # top edge — bottoms stay anchored (baseline for the first segment).
+            gap = 0.0 if topmost else min(2.0, h - 0.5)
+            parts.append(
+                f'<rect class="mark" x="{x:.1f}" y="{y + gap:.1f}" width="{bar_w}" '
+                f'height="{h - gap:.1f}" rx="{2 if topmost else 0}" fill="{color}">'
+                f"<title>{_html.escape(tip)}</title></rect>"
+            )
+    parts.append(
+        f'<text x="{pad_l}" y="{height - 4}" fill="{_INK_MUTED}">1</text>'
+        f'<text x="{width - 8}" y="{height - 4}" text-anchor="end" '
+        f'fill="{_INK_MUTED}">{n}</text>'
+        f'<text x="{pad_l + plot_w / 2:.0f}" y="{height - 4}" text-anchor="middle" '
+        f'fill="{_INK_MUTED}">request</text>'
+    )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _legend() -> str:
+    items = (
+        (_C_OVERHEAD, "overhead (system + tools)"),
+        (_C_SENT, "sent content"),
+        (_C_SAVED, "saved by distil"),
+    )
+    spans = "".join(
+        f'<span style="margin-right:16px"><span style="display:inline-block;width:10px;'
+        f'height:10px;border-radius:2px;background:{c};margin-right:6px"></span>{t}</span>'
+        for c, t in items
+    )
+    return f'<p class="muted" style="font-size:12.5px">{spans}</p>'
+
+
+def _timeline_table(requests: list[dict[str, Any]]) -> str:
+    rows = "".join(
+        f"<tr><td>{i + 1}</td><td>{_html.escape(str(r.get('model', '?')))}</td>"
+        f"<td class='r'>{int(r.get('overhead_tokens') or 0):,}</td>"
+        f"<td class='r'>{max(0, int(r.get('compressible_tokens') or 0) - int(r.get('tokens_saved') or 0)):,}</td>"
+        f"<td class='r'>{int(r.get('tokens_saved') or 0):,}</td>"
+        f"<td class='r'>{r.get('usage_input_tokens') if r.get('usage_input_tokens') is not None else '—'}</td>"
+        f"<td class='r'>{r.get('duration_ms') if r.get('duration_ms') is not None else '—'}</td></tr>"
+        for i, r in enumerate(requests)
+    )
+    return (
+        "<details><summary class='muted'>data table</summary>"
+        "<table><tr><th>#</th><th>model</th><th>overhead</th><th>sent</th>"
+        f"<th>saved</th><th>billed in</th><th>ms</th></tr>{rows}</table></details>"
+    )
+
+
 def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> str:
     """Self-contained dark page in the ledger `render_html` style."""
     man = d.manifest or {}
@@ -819,19 +1005,43 @@ def render_html(d: Dissection, peers: list[SessionOverview] | None = None) -> st
         if d.expansion_regret()
         else ""
     )
+    tool_rows = [(name, per) for name, per, _tot in d.tool_costs()[:10]]
+    tools_chart = (
+        "<h2>Tool definitions <span class='muted'>(tokens per request — resent every "
+        f"time)</span></h2>{_svg_hbars(tool_rows)}"
+        if tool_rows
+        else ""
+    )
+    growth = d.system_growth()
+    prompt_line = (
+        f"System prompt grew {_human(growth[0])} → {_human(growth[1])} tokens over the "
+        "session (memory/context injections accumulate there)."
+        if growth and growth[1] != growth[0]
+        else ""
+    )
+    kind_chart = _svg_hbars(
+        [(sig, toks) for sig, _u, toks in d.blocks_by_kind()[:10]], color=_C_SAVED
+    )
     detail_card = (
         f"""<h2>Request detail</h2>
 <p>{len(d.requests)} proxied requests — {d.unbooked_requests} not booked (non-2xx/retry),
 {d.verbatim_requests} verbatim (nothing worth compressing).
 {mech_line}
-Fixed overhead: system prompt + tool definitions = <b>{_human(d.overhead_tokens_total)}</b>
-tokens ({d.overhead_share:.0f}% of everything sent).
-Re-fold churn: <b>{_human(d.churn_tokens)}</b> tokens across {d.churned_blocks} blocks folded
-3+ times. {cal_line} {headroom_line}</p>
+Fixed overhead: system prompt ({_human(d.system_tokens_avg)}/req) + tool definitions
+({_human(d.tools_tokens_avg)}/req) = <b>{_human(d.overhead_tokens_total)}</b> tokens
+({d.overhead_share:.0f}% of everything sent). {prompt_line}
+Re-fold churn: <b>{_human(d.churn_tokens)}</b> tokens across {d.churned_blocks} re-folded
+block{'s' if d.churned_blocks != 1 else ''}. {cal_line} {headroom_line}</p>
 <p class="muted">Latency — {lat_line or "not recorded"}.
 {f"{d.forced_buffered} streamed requests buffered for the expand loop (TTFT tax)." if d.forced_buffered else ""}
 {regret_line}</p>
+<h2>Request composition <span class="muted">(tokens per request)</span></h2>
+{_legend()}
+{_svg_stack_timeline(d.requests)}
+{_timeline_table(d.requests)}
+{tools_chart}
 <h2>Digested blocks <span class="muted">(content-free: kind:size)</span></h2>
+{kind_chart}
 <table><tr><th>kind</th><th>blocks</th><th>tokens</th></tr>{kind_rows}</table>
 <h2>Largest folds</h2>
 <table><tr><th>handle</th><th>kind</th><th>tokens</th><th>seen</th><th>restore</th></tr>{top_rows}</table>"""
@@ -866,6 +1076,8 @@ table{{width:100%;border-collapse:collapse;border:1px solid #1b2030;border-radiu
 th,td{{padding:11px 14px;border-bottom:1px solid #1b2030;text-align:left}}
 th{{color:#5b6177;font-size:11px;text-transform:uppercase;letter-spacing:.07em}}
 ul.warn{{margin:0;padding-left:20px}} ul.warn li{{color:#e8b34b;margin:4px 0}}
+svg .mark:hover{{filter:brightness(1.3)}}
+details{{margin:10px 0}} details summary{{cursor:pointer}}
 td.r{{text-align:right;color:#5ad1c9;font-variant-numeric:tabular-nums}} .muted{{color:#5b6177}}
 code{{color:#8b7bff}}
 .foot{{color:#5b6177;font-size:12.5px;margin-top:22px}}
